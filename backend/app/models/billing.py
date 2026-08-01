@@ -33,6 +33,7 @@ class InvoiceLineItem(db.Model, TimestampMixin):
     employee_id = db.Column(db.Integer, db.ForeignKey("employees.id"), nullable=True, index=True)
     quantity = db.Column(db.Integer, nullable=False, default=1)
     unit_price = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
+    mrp = db.Column(db.Numeric(10, 2), nullable=True)
     discount_amount = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
     tax_amount = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
     line_total = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)

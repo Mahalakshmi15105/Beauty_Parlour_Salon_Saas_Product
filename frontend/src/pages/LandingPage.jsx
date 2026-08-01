@@ -8,9 +8,11 @@ import {
   BarChart3,
   Download,
   Check,
+  LayoutDashboard,
+  LogOut,
 } from "lucide-react";
 
-function LandingPage({ onNavigateLogin, onNavigateRegister }) {
+function LandingPage({ isLoggedIn, onNavigateLogin, onNavigateRegister, onNavigateDashboard, onLogout }) {
   const [billingCycle, setBillingCycle] = useState("monthly"); // monthly or yearly
 
   return (
@@ -39,18 +41,39 @@ function LandingPage({ onNavigateLogin, onNavigateRegister }) {
         </nav>
 
         <div className="flex items-center space-x-4">
-          <button
-            onClick={onNavigateLogin}
-            className="text-xs font-bold border-2 border-pink-500 text-pink-600 hover:bg-pink-50 px-5 py-2 rounded-xl transition duration-200"
-          >
-            Login
-          </button>
-          <button
-            onClick={onNavigateRegister}
-            className="bg-gradient-to-r from-pink-600 to-rose-500 hover:from-pink-700 hover:to-rose-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-md shadow-pink-500/25 transition transform hover:-translate-y-0.5 duration-200"
-          >
-            Start Free Trial
-          </button>
+          {isLoggedIn ? (
+            <>
+              <button
+                onClick={onNavigateDashboard}
+                className="flex items-center space-x-1.5 text-xs font-bold border-2 border-pink-500 text-pink-600 hover:bg-pink-50 px-5 py-2 rounded-xl transition duration-200"
+              >
+                <LayoutDashboard className="w-3.5 h-3.5" />
+                <span>Dashboard</span>
+              </button>
+              <button
+                onClick={onLogout}
+                className="flex items-center space-x-1.5 bg-gradient-to-r from-pink-600 to-rose-500 hover:from-pink-700 hover:to-rose-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-md shadow-pink-500/25 transition transform hover:-translate-y-0.5 duration-200"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Logout</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={onNavigateLogin}
+                className="text-xs font-bold border-2 border-pink-500 text-pink-600 hover:bg-pink-50 px-5 py-2 rounded-xl transition duration-200"
+              >
+                Login
+              </button>
+              <button
+                onClick={onNavigateRegister}
+                className="bg-gradient-to-r from-pink-600 to-rose-500 hover:from-pink-700 hover:to-rose-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-md shadow-pink-500/25 transition transform hover:-translate-y-0.5 duration-200"
+              >
+                Start Free Trial
+              </button>
+            </>
+          )}
         </div>
       </header>
 
@@ -80,18 +103,39 @@ function LandingPage({ onNavigateLogin, onNavigateRegister }) {
         </p>
 
         <div className="relative flex flex-col sm:flex-row justify-center items-center gap-4 pt-4">
-          <button
-            onClick={onNavigateRegister}
-            className="w-full sm:w-auto bg-gradient-to-r from-pink-600 to-rose-500 hover:from-pink-700 hover:to-rose-600 text-white px-9 py-4 rounded-xl text-sm font-bold shadow-xl shadow-pink-500/30 transition transform hover:-translate-y-0.5 duration-200"
-          >
-            Start 14-Day Free Trial
-          </button>
-          <button
-            onClick={onNavigateLogin}
-            className="w-full sm:w-auto bg-white border-2 border-pink-500 text-pink-600 hover:bg-pink-50 px-9 py-4 rounded-xl text-sm font-bold shadow-sm transition duration-200"
-          >
-            Login to Admin Portal
-          </button>
+          {isLoggedIn ? (
+            <>
+              <button
+                onClick={onNavigateDashboard}
+                className="w-full sm:w-auto flex items-center justify-center space-x-2 bg-gradient-to-r from-pink-600 to-rose-500 hover:from-pink-700 hover:to-rose-600 text-white px-9 py-4 rounded-xl text-sm font-bold shadow-xl shadow-pink-500/30 transition transform hover:-translate-y-0.5 duration-200"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                <span>Go to Your Dashboard</span>
+              </button>
+              <button
+                onClick={onLogout}
+                className="w-full sm:w-auto flex items-center justify-center space-x-2 bg-white border-2 border-pink-500 text-pink-600 hover:bg-pink-50 px-9 py-4 rounded-xl text-sm font-bold shadow-sm transition duration-200"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Logout</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={onNavigateRegister}
+                className="w-full sm:w-auto bg-gradient-to-r from-pink-600 to-rose-500 hover:from-pink-700 hover:to-rose-600 text-white px-9 py-4 rounded-xl text-sm font-bold shadow-xl shadow-pink-500/30 transition transform hover:-translate-y-0.5 duration-200"
+              >
+                Start 14-Day Free Trial
+              </button>
+              <button
+                onClick={onNavigateLogin}
+                className="w-full sm:w-auto bg-white border-2 border-pink-500 text-pink-600 hover:bg-pink-50 px-9 py-4 rounded-xl text-sm font-bold shadow-sm transition duration-200"
+              >
+                Login to Admin Portal
+              </button>
+            </>
+          )}
         </div>
 
         {/* Feature Pills */}

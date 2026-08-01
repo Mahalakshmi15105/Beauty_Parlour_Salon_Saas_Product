@@ -60,17 +60,15 @@ export function applyThemeToDom(primaryHex) {
   root.style.setProperty("--primary-hover-color", hoverHex);
   root.style.setProperty("--primary-light-color", lightRgba);
   root.style.setProperty("--primary-border-soft", borderRgba);
-
-  localStorage.setItem("app_primary_color", primaryHex);
 }
 
 export function ThemeProvider({ children }) {
-  const [themeName, setThemeName] = useState(() => localStorage.getItem("app_theme_name") || "Default Pink");
-  const [primaryColor, setPrimaryColor] = useState(() => localStorage.getItem("app_primary_color") || "#EC4899");
+  const [themeName, setThemeName] = useState("Default Pink");
+  const [primaryColor, setPrimaryColor] = useState("#EC4899");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Apply local storage color immediately on mount
+    // Apply initial default theme color immediately on mount
     applyThemeToDom(primaryColor);
 
     // Fetch tenant settings on load if logged in
@@ -84,7 +82,6 @@ export function ThemeProvider({ children }) {
             const color = thm.primary_color || "#EC4899";
             setThemeName(name);
             setPrimaryColor(color);
-            localStorage.setItem("app_theme_name", name);
             applyThemeToDom(color);
           }
         })
@@ -97,7 +94,6 @@ export function ThemeProvider({ children }) {
   const changeTheme = async (name, color, saveToBackend = true) => {
     setThemeName(name);
     setPrimaryColor(color);
-    localStorage.setItem("app_theme_name", name);
     applyThemeToDom(color);
 
     if (saveToBackend) {

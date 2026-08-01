@@ -1,8 +1,14 @@
 import os
 from dotenv import load_dotenv
 
-# Load environment variables from .env
-load_dotenv()
+# Load environment variables from backend/.env using an absolute path
+# so credentials resolve regardless of the current working directory
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # d:\Salon\backend
+ENV_PATH = os.path.join(BASE_DIR, ".env")
+if os.path.exists(ENV_PATH):
+    load_dotenv(ENV_PATH)
+else:
+    load_dotenv()
 
 class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-123!")

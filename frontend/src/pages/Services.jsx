@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { useModalFocusTrap, useFormKeyboardNavigation } from "../utils/keyboardNavigation";
-import { X } from "lucide-react";
+import { X, Printer, FileSpreadsheet, FileText } from "lucide-react";
+import { exportToCSV, printDataList, exportToPDF } from "../utils/exportUtils";
 
 function Services() {
   const { formatCurrency, currencySymbol, t } = useLanguageCurrency();
@@ -79,6 +80,39 @@ function Services() {
     fetchCategories();
     fetchServices();
   }, [search, categoryId]);
+
+  const handlePrint = () => {
+    const columns = [
+      { header: "Service Name", accessor: "name" },
+      { header: "Category", accessor: "category_name" },
+      { header: "Duration", accessor: (row) => `${row.duration_minutes} mins` },
+      { header: "Price", accessor: (row) => `${currencySymbol}${parseFloat(row.price || 0).toFixed(2)}` },
+      { header: "Status", accessor: "status" }
+    ];
+    printDataList("Services & Treatments Catalog", services, columns);
+  };
+
+  const handleExportExcel = () => {
+    const columns = [
+      { header: "Service Name", accessor: "name" },
+      { header: "Category", accessor: "category_name" },
+      { header: "Duration", accessor: (row) => `${row.duration_minutes} mins` },
+      { header: "Price", accessor: (row) => `${currencySymbol}${parseFloat(row.price || 0).toFixed(2)}` },
+      { header: "Status", accessor: "status" }
+    ];
+    exportToCSV(services, columns, "services_list");
+  };
+
+  const handleExportPDF = () => {
+    const columns = [
+      { header: "Service Name", accessor: "name", width: 55 },
+      { header: "Category", accessor: "category_name", width: 40 },
+      { header: "Duration", accessor: (row) => `${row.duration_minutes} mins`, width: 30 },
+      { header: "Price", accessor: (row) => `${currencySymbol}${parseFloat(row.price || 0).toFixed(2)}`, width: 30 },
+      { header: "Status", accessor: "status", width: 25 }
+    ];
+    exportToPDF("Services & Treatments Catalog", services, columns, "services_list");
+  };
 
   const handleNextPage = () => {
     if (nextCursor) {
@@ -200,7 +234,7 @@ function Services() {
       </div>
 
       {/* Filter / Search Bar */}
-      <div className="bg-surface border border-border-soft p-4 rounded-lg flex space-x-4">
+      <div className="bg-surface border border-border-soft p-4 rounded-lg flex space-x-4 items-center">
         <input
           type="text"
           placeholder="Search services by name or description..."
@@ -218,6 +252,33 @@ function Services() {
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
+
+        <div className="flex space-x-2 border-l border-border-soft pl-4">
+          <button
+            onClick={handlePrint}
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-slate-200"
+            title="Print List"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>Print</span>
+          </button>
+          <button
+            onClick={handleExportExcel}
+            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-emerald-200"
+            title="Export to Excel"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>Excel</span>
+          </button>
+          <button
+            onClick={handleExportPDF}
+            className="bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-rose-200"
+            title="Export to PDF"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>PDF</span>
+          </button>
+        </div>
       </div>
 
       {/* Data Table */}

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { useModalFocusTrap, useFormKeyboardNavigation } from "../utils/keyboardNavigation";
-import { User, X, ChevronDown, Check } from "lucide-react";
+import { User, X, ChevronDown, Check, Printer, FileSpreadsheet, FileText } from "lucide-react";
+import { exportToCSV, printDataList, exportToPDF } from "../utils/exportUtils";
 
 function CustomerMemberships() {
   const { formatCurrency, currencySymbol, t } = useLanguageCurrency();
@@ -96,6 +97,39 @@ function CustomerMemberships() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const handlePrint = () => {
+    const columns = [
+      { header: "Customer Name", accessor: "customer_name" },
+      { header: "Mobile", accessor: "customer_phone" },
+      { header: "Membership Plan", accessor: "plan_name" },
+      { header: "Status", accessor: "status" },
+      { header: "Expiry Date", accessor: (row) => new Date(row.expires_at).toLocaleDateString() }
+    ];
+    printDataList("Customer Subscriptions & Packages List", allMemberships, columns);
+  };
+
+  const handleExportExcel = () => {
+    const columns = [
+      { header: "Customer Name", accessor: "customer_name" },
+      { header: "Mobile", accessor: "customer_phone" },
+      { header: "Membership Plan", accessor: "plan_name" },
+      { header: "Status", accessor: "status" },
+      { header: "Expiry Date", accessor: (row) => new Date(row.expires_at).toLocaleDateString() }
+    ];
+    exportToCSV(allMemberships, columns, "customer_memberships_list");
+  };
+
+  const handleExportPDF = () => {
+    const columns = [
+      { header: "Customer Name", accessor: "customer_name", width: 45 },
+      { header: "Mobile", accessor: "customer_phone", width: 35 },
+      { header: "Membership Plan", accessor: "plan_name", width: 45 },
+      { header: "Status", accessor: "status", width: 25 },
+      { header: "Expiry Date", accessor: (row) => new Date(row.expires_at).toLocaleDateString(), width: 30 }
+    ];
+    exportToPDF("Customer Subscriptions & Packages List", allMemberships, columns, "customer_memberships_list");
+  };
 
   // Load customer's active memberships
   const fetchCustomerMemberships = (cust) => {
@@ -398,8 +432,35 @@ function CustomerMemberships() {
 
       {/* Datatable Listing of All Customer Memberships */}
       <div className="bg-surface border border-border-soft rounded-lg overflow-hidden shadow-sm">
-        <div className="px-6 py-4 border-b border-border-soft bg-slate-50/50">
+        <div className="px-6 py-4 border-b border-border-soft bg-slate-50/50 flex justify-between items-center">
           <h3 className="text-sm font-semibold text-text-primary">All Assigned Customer Memberships</h3>
+          
+          <div className="flex space-x-2">
+            <button
+              onClick={handlePrint}
+              className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-slate-200"
+              title="Print List"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Print</span>
+            </button>
+            <button
+              onClick={handleExportExcel}
+              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-emerald-200"
+              title="Export to Excel"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>Excel</span>
+            </button>
+            <button
+              onClick={handleExportPDF}
+              className="bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-rose-200"
+              title="Export to PDF"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>PDF</span>
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
 import { useModalFocusTrap, useFormKeyboardNavigation } from "../utils/keyboardNavigation";
-import { X } from "lucide-react";
+import { X, Printer, FileSpreadsheet, FileText } from "lucide-react";
+import { exportToCSV, printDataList, exportToPDF } from "../utils/exportUtils";
 
 function Employees() {
   const modalRef = useRef(null);
@@ -58,6 +59,45 @@ function Employees() {
   useEffect(() => {
     fetchEmployees();
   }, [search, status]);
+
+  const handlePrint = () => {
+    const columns = [
+      { header: "Name", accessor: (row) => `${row.first_name || ""} ${row.last_name || ""}`.trim() },
+      { header: "Role", accessor: "role" },
+      { header: "Phone", accessor: "phone" },
+      { header: "Specialization", accessor: "specialization" },
+      { header: "Salary", accessor: "salary" },
+      { header: "Commission %", accessor: (row) => `${row.commission_percentage || 0}%` },
+      { header: "Status", accessor: "status" }
+    ];
+    printDataList("Employees List", employees, columns);
+  };
+
+  const handleExportExcel = () => {
+    const columns = [
+      { header: "Name", accessor: (row) => `${row.first_name || ""} ${row.last_name || ""}`.trim() },
+      { header: "Role", accessor: "role" },
+      { header: "Phone", accessor: "phone" },
+      { header: "Specialization", accessor: "specialization" },
+      { header: "Salary", accessor: "salary" },
+      { header: "Commission %", accessor: (row) => `${row.commission_percentage || 0}%` },
+      { header: "Status", accessor: "status" }
+    ];
+    exportToCSV(employees, columns, "employees_list");
+  };
+
+  const handleExportPDF = () => {
+    const columns = [
+      { header: "Name", accessor: (row) => `${row.first_name || ""} ${row.last_name || ""}`.trim(), width: 35 },
+      { header: "Role", accessor: "role", width: 25 },
+      { header: "Phone", accessor: "phone", width: 30 },
+      { header: "Specialization", accessor: "specialization", width: 35 },
+      { header: "Salary", accessor: "salary", width: 20 },
+      { header: "Comm %", accessor: (row) => `${row.commission_percentage || 0}%`, width: 20 },
+      { header: "Status", accessor: "status", width: 15 }
+    ];
+    exportToPDF("Employees List", employees, columns, "employees_list");
+  };
 
   const handleNextPage = () => {
     if (nextCursor) {
@@ -152,7 +192,7 @@ function Employees() {
       </div>
 
       {/* Filter / Search Bar */}
-      <div className="bg-surface border border-border-soft p-4 rounded-lg flex space-x-4">
+      <div className="bg-surface border border-border-soft p-4 rounded-lg flex space-x-4 items-center">
         <input
           type="text"
           placeholder="Search by name, phone, specialization..."
@@ -169,6 +209,33 @@ function Employees() {
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
         </select>
+
+        <div className="flex space-x-2 border-l border-border-soft pl-4">
+          <button
+            onClick={handlePrint}
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-slate-200"
+            title="Print List"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>Print</span>
+          </button>
+          <button
+            onClick={handleExportExcel}
+            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-emerald-200"
+            title="Export to Excel"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>Excel</span>
+          </button>
+          <button
+            onClick={handleExportPDF}
+            className="bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-rose-200"
+            title="Export to PDF"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>PDF</span>
+          </button>
+        </div>
       </div>
 
       {/* Data Table */}

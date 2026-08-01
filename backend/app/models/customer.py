@@ -14,6 +14,7 @@ class Customer(db.Model, TimestampMixin, SoftDeleteMixin):
     date_of_birth = db.Column(db.Date, nullable=True)
     address = db.Column(db.Text, nullable=True)
     notes = db.Column(db.Text, nullable=True)
+    spot = db.Column(db.String(50), nullable=True)
 
     # Relationships
     memberships = db.relationship("CustomerMembership", back_populates="customer", cascade="all, delete-orphan")

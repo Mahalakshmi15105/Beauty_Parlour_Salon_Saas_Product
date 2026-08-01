@@ -40,6 +40,39 @@ class Product(db.Model, TimestampMixin, SoftDeleteMixin):
     barcode = db.Column(db.String(100), nullable=True, index=True)
     cost_price = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
     selling_price = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
+    mrp = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
     stock_quantity = db.Column(db.Integer, nullable=False, default=0)
     low_stock_threshold = db.Column(db.Integer, nullable=False, default=5)
     status = db.Column(db.String(50), nullable=False, default="active")  # active, inactive
+
+
+class Supplier(db.Model, TimestampMixin, SoftDeleteMixin):
+    __tablename__ = "suppliers"
+
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    name = db.Column(db.String(150), nullable=False)
+    contact_name = db.Column(db.String(150), nullable=True)
+    phone = db.Column(db.String(50), nullable=False)
+    email = db.Column(db.String(150), nullable=True)
+    address = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(50), nullable=False, default="active")  # active, inactive
+
+
+class StockReorderLog(db.Model, TimestampMixin):
+    __tablename__ = "stock_reorder_logs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False, index=True)
+    supplier_id = db.Column(db.Integer, db.ForeignKey("suppliers.id"), nullable=True, index=True)
+    quantity = db.Column(db.Integer, nullable=False)
+    cost_price = db.Column(db.Numeric(10, 2), nullable=False)
+    status = db.Column(db.String(50), nullable=False, default="Received")  # Received, Ordered, Pending
+    notes = db.Column(db.Text, nullable=True)
+
+    # Relationships
+    product = db.relationship("Product")
+    supplier = db.relationship("Supplier")
+
+

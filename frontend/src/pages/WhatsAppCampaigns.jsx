@@ -16,7 +16,7 @@ import {
   Sparkles,
   Upload,
   RefreshCw,
-  Search,
+  Search, 
   Filter,
   Check,
   ChevronRight,
@@ -39,6 +39,9 @@ export default function WhatsAppCampaigns() {
   const [validUntil, setValidUntil] = useState("");
   const [audienceType, setAudienceType] = useState("ALL");
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [campaignTemplateName, setCampaignTemplateName] = useState("");
+  const [campaignTemplateParams, setCampaignTemplateParams] = useState([""]);
+  const [campaignParamCount, setCampaignParamCount] = useState(1);
 
   // Audience Preview State
   const [previewData, setPreviewData] = useState({
@@ -141,6 +144,10 @@ export default function WhatsAppCampaigns() {
       valid_until: validUntil,
       audience_type: audienceType,
     };
+    if (campaignTemplateName.trim()) {
+      payload.template_name = campaignTemplateName.trim();
+      payload.template_params = campaignTemplateParams.filter((p) => p.trim() !== "");
+    }
 
     API.post("/whatsapp/campaigns/send", payload)
       .then((res) => {

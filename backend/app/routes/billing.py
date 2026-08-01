@@ -90,6 +90,7 @@ def checkout():
 
             discount_amount = Decimal("0.00")
             item_name = ""
+            mrp_val = None
 
             if item_type == "service":
                 # Process Service
@@ -142,6 +143,7 @@ def checkout():
                 prod.stock_quantity -= qty
                 item_name = prod.name
                 unit_price = Decimal(str(prod.selling_price))
+                mrp_val = prod.mrp
                 line_subtotal = unit_price * qty
                 
                 # Apply standard optional flat discount from item payload
@@ -169,6 +171,7 @@ def checkout():
                 employee_id=employee_id,
                 quantity=qty,
                 unit_price=unit_price,
+                mrp=mrp_val if item_type == "product" else None,
                 discount_amount=discount_amount,
                 tax_amount=Decimal("0.00"),
                 line_total=line_total
@@ -181,6 +184,7 @@ def checkout():
                 "type": item_type,
                 "quantity": qty,
                 "unit_price": float(unit_price),
+                "mrp": float(mrp_val) if mrp_val is not None else float(unit_price),
                 "discount": float(discount_amount),
                 "line_total": float(line_total),
                 "staff_name": emp_name,
@@ -370,6 +374,7 @@ def get_invoice(invoice_id):
             "type": "service" if item.service_id else "product",
             "quantity": item.quantity,
             "unit_price": float(item.unit_price),
+            "mrp": float(item.mrp) if item.mrp is not None else float(item.unit_price),
             "discount_amount": float(item.discount_amount),
             "line_total": float(item.line_total),
             "staff_name": emp_name,

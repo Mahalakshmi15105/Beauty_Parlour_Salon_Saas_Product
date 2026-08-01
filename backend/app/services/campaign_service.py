@@ -1,4 +1,5 @@
 import time
+import json
 import logging
 from datetime import datetime, timezone, timedelta
 from app.database import db
@@ -122,6 +123,8 @@ class CampaignService:
         valid_until_str = campaign_data.get("valid_until")
         audience_type = campaign_data.get("audience_type", "ALL")
         custom_ids = campaign_data.get("custom_customer_ids", [])
+        template_name = campaign_data.get("template_name") or ""
+        template_params = campaign_data.get("template_params") or []
 
         valid_until = None
         if valid_until_str:
@@ -144,6 +147,8 @@ class CampaignService:
             coupon_code=coupon_code,
             valid_until=valid_until,
             audience_type=audience_type,
+            template_name=template_name or None,
+            template_params_json=json.dumps(template_params) if template_params else None,
             total_target_customers=preview["total_target_customers"],
             valid_whatsapp_count=preview["valid_whatsapp_count"],
             skipped_count=preview["skipped_count"],
@@ -243,11 +248,25 @@ class CampaignService:
             if campaign.valid_until:
                 body_text += f"\n⏰ Valid Until: {campaign.valid_until.strftime('%d %b %Y')}"
 
+            # Parse template params if campaign uses a Meta-approved template
+            template_params = []
+            if campaign.template_params_json:
+                try:
+                    template_params = json.loads(campaign.template_params_json) or []
+                except (ValueError, TypeError):
+                    template_params = []
+
             # Dispatch message via WhatsAppService
             if campaign.template_type == "IMAGE_WITH_CAPTION" and campaign.image_url:
                 res = WhatsAppService.send_image_message(tenant_setting, item.whatsapp_number, campaign.image_url, body_text)
             else:
-                res = WhatsAppService.send_text_message(tenant_setting, item.whatsapp_number, body_text)
+                res = WhatsAppService.send_text_message(
+                    tenant_setting,
+                    item.whatsapp_number,
+                    body_text,
+                    template_name=campaign.template_name or None,
+                    template_params=template_params,
+                )
 
             if res["success"]:
                 item.status = "SENT"

@@ -76,5 +76,8 @@ class TenantSetting(db.Model, TimestampMixin):
     secondary_color = db.Column(db.String(30), nullable=False, default="#F472B6")
     accent_color = db.Column(db.String(30), nullable=False, default="#FDF2F8")
 
+    # Marketing / Client Churn Settings
+    churn_days_threshold = db.Column(db.Integer, nullable=False, default=45)
+
     # Relationships
     tenant = db.relationship("Tenant", back_populates="settings")

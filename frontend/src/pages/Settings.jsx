@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
-import { useTheme } from "../context/ThemeContext";
+import { useTheme, adjustHexBrightness, hexToRgba } from "../context/ThemeContext";
 import { SUPPORTED_LANGUAGES } from "../utils/translations";
 import { useFormKeyboardNavigation } from "../utils/keyboardNavigation";
 import { getFullImageUrl } from "../utils/imageUrl";
@@ -117,6 +117,9 @@ function Settings() {
       language: language,
       date_format: "YYYY-MM-DD",
       timezone: "UTC",
+    },
+    marketing_settings: {
+      churn_days_threshold: 45,
     },
   });
 
@@ -241,7 +244,18 @@ function Settings() {
     setSaving(true);
     setSaveSuccess(false);
 
-    API.put("/settings", settingsData)
+    // Merge current theme settings to prevent overwriting them with old loaded data
+    const payload = {
+      ...settingsData,
+      theme_settings: {
+        theme_name: themeName,
+        primary_color: primaryColor,
+        secondary_color: adjustHexBrightness(primaryColor, 15),
+        accent_color: hexToRgba(primaryColor, 0.08)
+      }
+    };
+
+    API.put("/settings", payload)
       .then(() => {
         setSaving(false);
         setSaveSuccess(true);
@@ -1115,6 +1129,31 @@ function Settings() {
             <div className="space-y-4 text-xs text-text-secondary">
               <h3 className="text-sm font-semibold text-text-primary border-b border-border-soft pb-3">Security & Notifications</h3>
               <p>Email, SMS, and WhatsApp alerts are enabled for low inventory warnings and membership expirations.</p>
+              
+              <div className="bg-background border border-border-soft p-4 rounded-lg space-y-2">
+                <span className="font-semibold text-text-primary block">Client Re-engagement Threshold (Churn)</span>
+                <p className="text-[11px] text-text-secondary">Number of days of inactivity before a customer is flagged as slipping/dormant.</p>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    min="1"
+                    max="365"
+                    value={settingsData.marketing_settings?.churn_days_threshold || 45}
+                    onChange={(e) =>
+                      setSettingsData({
+                        ...settingsData,
+                        marketing_settings: {
+                          ...settingsData.marketing_settings,
+                          churn_days_threshold: parseInt(e.target.value) || 45,
+                        },
+                      })
+                    }
+                    className="w-24 bg-surface border border-border-soft px-3 py-1.5 rounded-lg text-sm text-text-primary focus:outline-none"
+                  />
+                  <span className="text-xs text-text-secondary font-medium">Days of Inactivity</span>
+                </div>
+              </div>
+
               <div className="bg-background border border-border-soft p-4 rounded-lg flex items-center justify-between">
                 <span className="font-medium text-text-primary">Low Stock Email Notifications</span>
                 <input type="checkbox" defaultChecked className="w-4 h-4 accent-primary" />

@@ -38,6 +38,7 @@ import {
   X,
   Receipt,
   ChevronDown,
+  Award,
 } from "lucide-react";
 
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
@@ -151,9 +152,28 @@ function Billing() {
     email: "",
     gender: "Female",
     date_of_birth: "",
+    plan_id: "",
   });
   const [quickCustomerError, setQuickCustomerError] = useState(null);
   const [quickCustomerSaving, setQuickCustomerSaving] = useState(false);
+
+  // New Customer + Membership Modal State
+  const [showNewMembershipModal, setShowNewMembershipModal] = useState(false);
+  const [membershipPlans, setMembershipPlans] = useState([]);
+  const [membershipServices, setMembershipServices] = useState([]);
+  const [newMembershipForm, setNewMembershipForm] = useState({
+    first_name: "",
+    last_name: "",
+    phone: "",
+    email: "",
+    gender: "Female",
+    spot: "",
+    plan_id: "",
+    benefits: [],
+  });
+  const [newMembershipError, setNewMembershipError] = useState(null);
+  const [newMembershipSaving, setNewMembershipSaving] = useState(false);
+  const newMembershipModalRef = useRef(null);
 
   // Customer Combobox State
   const [customerSearchQuery, setCustomerSearchQuery] = useState("");
@@ -208,6 +228,7 @@ function Billing() {
   useModalFocusTrap(showQuickCustomerModal, quickCustomerModalRef, () => setShowQuickCustomerModal(false));
   useModalFocusTrap(showCustomerHistoryModal, customerHistoryModalRef, () => setShowCustomerHistoryModal(false));
   useModalFocusTrap(showAddProductModal, addProductModalRef, () => setShowAddProductModal(false));
+  useModalFocusTrap(showNewMembershipModal, newMembershipModalRef, () => setShowNewMembershipModal(false));
 
   const openCustomerHistory = () => {
     if (!selectedCustomerId || selectedCustomerId === "walkin") {
@@ -290,6 +311,151 @@ function Billing() {
     fetchReceiptSettings();
   }, []);
 
+  const openNewMembershipModal = () => {
+    setNewMembershipError(null);
+    setNewMembershipForm({
+      first_name: "",
+      last_name: "",
+      phone: "",
+      email: "",
+      gender: selectedGender || "Female",
+      spot: "",
+      plan_id: membershipPlans.length > 0 ? membershipPlans[0].id.toString() : "",
+      benefits: [],
+    });
+    setShowNewMembershipModal(true);
+    setIsCustomerDropdownOpen(false);
+
+    // Fetch active membership plans and services if not already loaded
+    if (membershipPlans.length === 0) {
+      API.get("/membership-plans?status=active&limit=100")
+        .then((res) => {
+          const plans = res.data.items || [];
+          setMembershipPlans(plans);
+          setNewMembershipForm((prev) => ({
+            ...prev,
+            plan_id: plans.length > 0 ? plans[0].id.toString() : "",
+          }));
+        })
+        .catch((err) => console.error("Failed to load membership plans:", err));
+    }
+    if (membershipServices.length === 0) {
+      API.get("/services?status=active&limit=100")
+        .then((res) => setMembershipServices(res.data.items || []))
+        .catch((err) => console.error("Failed to load services:", err));
+    }
+  };
+
+  const handleAddMembershipBenefitRow = () => {
+    const defaultSvc = membershipServices.length > 0 ? membershipServices[0].id : "";
+    setNewMembershipForm({
+      ...newMembershipForm,
+      benefits: [...newMembershipForm.benefits, { service_id: defaultSvc, quantity: 1 }],
+    });
+  };
+
+  const handleMembershipBenefitChange = (index, field, val) => {
+    const updated = [...newMembershipForm.benefits];
+    updated[index][field] = field === "quantity" ? parseInt(val) || 1 : val;
+    setNewMembershipForm({ ...newMembershipForm, benefits: updated });
+  };
+
+  const handleNewMembershipSubmit = (e) => {
+    if (e) e.preventDefault();
+    setNewMembershipError(null);
+
+    const first_name = newMembershipForm.first_name.trim();
+    const phone = newMembershipForm.phone.trim();
+
+    if (!first_name || !phone) {
+      setNewMembershipError("Customer First Name and Mobile Number are required.");
+      return;
+    }
+
+    const phoneRegex = /^[0-9+\-\s]{7,15}$/;
+    if (!phoneRegex.test(phone)) {
+      setNewMembershipError("Please enter a valid mobile number (7-15 digits).");
+      return;
+    }
+
+    if (!newMembershipForm.plan_id) {
+      setNewMembershipError("Please select a membership plan.");
+      return;
+    }
+
+    setNewMembershipSaving(true);
+
+    // Step 1: Create the customer with spot assignment
+    API.post("/customers", {
+      first_name,
+      last_name: newMembershipForm.last_name,
+      phone,
+      email: newMembershipForm.email,
+      gender: newMembershipForm.gender,
+      spot: newMembershipForm.spot,
+    })
+      .then((res) => {
+        const savedCust = res.data?.data || res.data;
+        const customerId = savedCust.id;
+
+        // Step 2: Assign the membership plan to the new customer
+        return API.post("/memberships/assign", {
+          customer_id: customerId,
+          plan_id: parseInt(newMembershipForm.plan_id),
+          benefits: newMembershipForm.benefits.map((b) => ({
+            service_id: parseInt(b.service_id),
+            quantity: parseInt(b.quantity) || 1,
+          })),
+        }).then(() => savedCust);
+      })
+      .then((savedCust) => {
+        // Refresh customer list
+        return API.get("/customers?limit=100").then((resList) => {
+          setCustomers(resList.data.items || []);
+          return savedCust;
+        });
+      })
+      .then((savedCust) => {
+        // Select the new customer in the billing screen
+        setSelectedCustomerId(String(savedCust.id));
+        setSelectedGender(savedCust.gender || "Female");
+        setCustomerSearchQuery(`${savedCust.first_name} ${savedCust.last_name || ""} (${savedCust.phone})`);
+        setShowNewMembershipModal(false);
+        setNewMembershipSaving(false);
+        setActionNotice(`New customer ${savedCust.first_name} created with membership assigned!`);
+        setTimeout(() => setActionNotice(null), 4000);
+
+        // Load the new customer's membership for discount application
+        API.get(`/customers/${savedCust.id}/history`)
+          .then((res) => {
+            const memberships = res.data.memberships || [];
+            const active = memberships.find((m) => m.status === "active");
+            if (active) {
+              const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+              const todayName = weekdays[new Date().getDay()];
+              const isDayRestricted = (active.day_restrictions || []).includes(todayName);
+              setActiveMembership({
+                ...active,
+                isDayRestricted
+              });
+            }
+          })
+          .catch((err) => console.error("Failed to load new customer membership:", err));
+      })
+      .catch((err) => {
+        setNewMembershipSaving(false);
+        const dupData = err.response?.data?.details?.existing_customer;
+        if (dupData && dupData.id) {
+          alert(`Customer with mobile number ${phone} already exists (${dupData.first_name}). Automatically selecting existing customer.`);
+          setSelectedCustomerId(String(dupData.id));
+          setCustomerSearchQuery(`${dupData.first_name} ${dupData.last_name || ""} (${dupData.phone})`);
+          setShowNewMembershipModal(false);
+        } else {
+          setNewMembershipError(err.response?.data?.message || err.message || "Failed to create customer and assign membership.");
+        }
+      });
+  };
+
   const openQuickAddCustomer = (prefillName = "") => {
     setQuickCustomerEditId(null);
     setQuickCustomerForm({
@@ -299,6 +465,7 @@ function Billing() {
       email: "",
       gender: selectedGender || "Female",
       date_of_birth: "",
+      plan_id: "",
     });
     setQuickCustomerError(null);
     setShowQuickCustomerModal(true);
@@ -318,6 +485,7 @@ function Billing() {
       email: cust.email || "",
       gender: cust.gender || "Female",
       date_of_birth: cust.date_of_birth || "",
+      plan_id: "",
     });
     setQuickCustomerError(null);
     setShowQuickCustomerModal(true);
@@ -357,7 +525,10 @@ function Billing() {
     }
 
     setQuickCustomerSaving(true);
-    const payload = { ...quickCustomerForm, first_name, phone };
+    
+    // Extract plan_id for membership assignment
+    const { plan_id, ...customerPayload } = quickCustomerForm;
+    const payload = { ...customerPayload, first_name, phone };
     const apiCall = quickCustomerEditId
       ? API.put(`/customers/${quickCustomerEditId}`, payload)
       : API.post("/customers", payload);
@@ -365,14 +536,49 @@ function Billing() {
     apiCall
       .then((res) => {
         const savedCust = res.data?.data || res.data;
-        API.get("/customers?limit=100").then((resList) => {
-          setCustomers(resList.data.items || []);
-        });
 
+        // If a plan was selected and it's a new customer creation, assign membership
+        if (plan_id && !quickCustomerEditId) {
+          return API.post("/memberships/assign", {
+            customer_id: savedCust.id,
+            plan_id: parseInt(plan_id),
+            benefits: []
+          }).then(() => savedCust);
+        }
+        return savedCust;
+      })
+      .then((savedCust) => {
+        // Refresh customer list
+        return API.get("/customers?limit=100").then((resList) => {
+          setCustomers(resList.data.items || []);
+          return savedCust;
+        });
+      })
+      .then((savedCust) => {
         if (savedCust && savedCust.id) {
           setSelectedCustomerId(String(savedCust.id));
           setSelectedGender(savedCust.gender || "Female");
           setCustomerSearchQuery(`${savedCust.first_name} ${savedCust.last_name || ""} (${savedCust.phone})`);
+
+          // Load active membership for discount application
+          API.get(`/customers/${savedCust.id}/history`)
+            .then((res) => {
+              const memberships = res.data.memberships || [];
+              const active = memberships.find((m) => m.status === "active");
+              if (active) {
+                const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+                const todayName = weekdays[new Date().getDay()];
+                const isDayRestricted = (active.day_restrictions || []).includes(todayName);
+                setActiveMembership({
+                  ...active,
+                  isDayRestricted
+                });
+                setUseMembership(true);
+              } else {
+                setActiveMembership(null);
+              }
+            })
+            .catch((err) => console.error("Failed to load customer membership detail:", err));
         }
         setShowQuickCustomerModal(false);
         setQuickCustomerSaving(false);
@@ -393,7 +599,7 @@ function Billing() {
       });
   };
 
-  // Initial Load: Fetch Categories, Employees, Customers, Products, Settings
+  // Initial Load: Fetch Categories, Employees, Customers, Products, Settings, Membership Plans
   useEffect(() => {
     setLoading(true);
     Promise.all([
@@ -402,13 +608,15 @@ function Billing() {
       API.get("/customers?limit=100"),
       API.get("/products?limit=100"),
       API.get("/settings"),
+      API.get("/membership-plans?status=active&limit=100"),
     ])
-      .then(([catRes, empRes, custRes, prodRes, setRes]) => {
+      .then(([catRes, empRes, custRes, prodRes, setRes, plansRes]) => {
         const catList = catRes.data || [];
         setCategories(catList);
         setEmployees(empRes.data.items || []);
         setCustomers(custRes.data.items || []);
         setProducts(prodRes.data.items || prodRes.data || []);
+        setMembershipPlans(plansRes.data.items || []);
 
         if (setRes.data?.invoice_settings?.tax_rate !== undefined) {
           setTaxRate(parseFloat(setRes.data.invoice_settings.tax_rate));
@@ -574,6 +782,7 @@ function Billing() {
         item_id: prodObj.id,
         name: prodObj.name,
         gross_amount: parseFloat(prodObj.selling_price || prodObj.price || 0),
+        mrp: parseFloat(prodObj.mrp || prodObj.selling_price || prodObj.price || 0),
         quantity: qtyToAdd,
         discount_percent: 0,
         tax_rate: 0, // BUSINESS RULE #6: Products DO NOT have GST/Tax
@@ -1009,12 +1218,14 @@ function Billing() {
           </button>
         </div>
 
-        {draftSaved && (
-          <div className="bg-success/15 border border-success/30 px-4 py-2 rounded-xl text-xs font-bold text-success flex items-center space-x-2">
-            <CheckCircle className="w-4 h-4 text-success" />
-            <span>Draft Invoice Saved!</span>
-          </div>
-        )}
+        <div className="flex items-center space-x-3">
+          {draftSaved && (
+            <div className="bg-success/15 border border-success/30 px-4 py-2 rounded-xl text-xs font-bold text-success flex items-center space-x-2">
+              <CheckCircle className="w-4 h-4 text-success" />
+              <span>Draft Invoice Saved!</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* MODE 1: CHECKOUT SCREEN */}
@@ -1382,6 +1593,7 @@ function Billing() {
                   <tr className="bg-primary-light border-b border-border-soft text-slate-700">
                     <th className="px-3 py-3 font-extrabold w-12 text-center">S.No</th>
                     <th className="px-4 py-3 font-extrabold">Item Description (Service / Product)</th>
+                    <th className="px-4 py-3 font-extrabold">MRP</th>
                     <th className="px-4 py-3 font-extrabold">Gross Amount</th>
                     <th className="px-3 py-3 font-extrabold w-20">Qty</th>
                     <th className="px-4 py-3 font-extrabold">Gross × Qty</th>
@@ -1396,7 +1608,7 @@ function Billing() {
                 <tbody className="divide-y divide-border-soft">
                   {cart.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="p-8 text-center text-text-secondary font-medium">
+                      <td colSpan={12} className="p-8 text-center text-text-secondary font-medium">
                         Table is empty. Select a <strong>Service</strong> or <strong>Product</strong> above, then click <strong>"Add to Table"</strong>.
                       </td>
                     </tr>
@@ -1420,6 +1632,9 @@ function Billing() {
                               </span>
                               <span>{item.name}</span>
                             </div>
+                          </td>
+                          <td className="px-4 py-3 font-medium text-slate-500">
+                            {item.type === "product" ? `${currencySymbol} ${parseFloat(item.mrp || item.gross_amount || 0).toFixed(2)}` : "—"}
                           </td>
                           <td className="px-4 py-3 font-medium text-slate-700">
                             {currencySymbol} {item.gross_amount.toFixed(2)}
@@ -2269,6 +2484,24 @@ function Billing() {
                 />
               </div>
 
+              {!quickCustomerEditId && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Add Membership Plan (Optional)</label>
+                  <select
+                    value={quickCustomerForm.plan_id}
+                    onChange={(e) => setQuickCustomerForm({ ...quickCustomerForm, plan_id: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
+                  >
+                    <option value="">-- No Membership / Normal Customer --</option>
+                    {membershipPlans.map((plan) => (
+                      <option key={plan.id} value={plan.id}>
+                        {plan.name} ({plan.service_discount_percentage}% discount)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="pt-4 border-t border-border-soft flex justify-end space-x-3">
                 <button
                   type="button"
@@ -2902,7 +3135,8 @@ function Billing() {
                                   <span className="truncate">{prod.name}</span>
                                 </div>
                                 <div className="text-[11px] text-right font-medium whitespace-nowrap ml-2">
-                                  {currencySymbol} {parseFloat(prod.selling_price || prod.price || 0).toFixed(2)}{" "}
+                                  {prod.mrp && parseFloat(prod.mrp) > 0 ? `MRP: ${currencySymbol}${parseFloat(prod.mrp).toFixed(2)} | ` : ""}
+                                  Selling: {currencySymbol}{parseFloat(prod.selling_price || prod.price || 0).toFixed(2)}{" "}
                                   <span className="text-slate-400 font-normal">
                                     (Stock: {prod.stock_quantity !== undefined ? prod.stock_quantity : "Avail"})
                                   </span>
@@ -2988,6 +3222,202 @@ function Billing() {
                 Add Product
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* NEW CUSTOMER + MEMBERSHIP MODAL */}
+      {showNewMembershipModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div ref={newMembershipModalRef} className="bg-surface max-w-2xl w-full rounded-2xl shadow-2xl border border-border-soft overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="px-6 py-4 border-b border-border-soft flex justify-between items-center bg-amber-50">
+              <div className="flex items-center space-x-2">
+                <Award className="w-5 h-5 text-amber-600" />
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900">New Customer + Membership Enrollment</h3>
+                  <p className="text-[10px] text-slate-500">Create a new customer, assign a spot, and enroll them in a membership plan</p>
+                </div>
+              </div>
+              <button onClick={() => setShowNewMembershipModal(false)} className="text-slate-400 hover:text-slate-600 font-bold p-1">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleNewMembershipSubmit} className="p-6 space-y-5 overflow-y-auto flex-1">
+              {newMembershipError && (
+                <div className="p-3 bg-danger/10 border border-danger/20 rounded-xl text-xs font-bold text-danger">
+                  {newMembershipError}
+                </div>
+              )}
+
+              {/* Customer Details Section */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider border-b border-border-soft pb-2 flex items-center space-x-2">
+                  <User className="w-3.5 h-3.5 text-primary" />
+                  <span>Customer Details</span>
+                </h4>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">First Name *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Priya"
+                      value={newMembershipForm.first_name}
+                      onChange={(e) => setNewMembershipForm({ ...newMembershipForm, first_name: e.target.value })}
+                      className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Last Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Sharma"
+                      value={newMembershipForm.last_name}
+                      onChange={(e) => setNewMembershipForm({ ...newMembershipForm, last_name: e.target.value })}
+                      className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Mobile Number *</label>
+                    <input
+                      type="tel"
+                      required
+                      placeholder="e.g. 9876543210"
+                      value={newMembershipForm.phone}
+                      onChange={(e) => setNewMembershipForm({ ...newMembershipForm, phone: e.target.value })}
+                      className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Gender</label>
+                    <select
+                      value={newMembershipForm.gender}
+                      onChange={(e) => setNewMembershipForm({ ...newMembershipForm, gender: e.target.value })}
+                      className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
+                    >
+                      <option value="Female">Female</option>
+                      <option value="Male">Male</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Email (Optional)</label>
+                    <input
+                      type="email"
+                      placeholder="client@gmail.com"
+                      value={newMembershipForm.email}
+                      onChange={(e) => setNewMembershipForm({ ...newMembershipForm, email: e.target.value })}
+                      className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Assign Spot / Chair</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Spot 1, Chair 3, Station B..."
+                      value={newMembershipForm.spot}
+                      onChange={(e) => setNewMembershipForm({ ...newMembershipForm, spot: e.target.value })}
+                      className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Membership Plan Section */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider border-b border-border-soft pb-2 flex items-center space-x-2">
+                  <Award className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Membership Plan</span>
+                </h4>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Select Membership Plan *</label>
+                  <select
+                    required
+                    value={newMembershipForm.plan_id}
+                    onChange={(e) => setNewMembershipForm({ ...newMembershipForm, plan_id: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
+                  >
+                    <option value="">[ Select Membership Plan ]</option>
+                    {membershipPlans.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} - {formatCurrency(p.price)} ({p.duration_days} Days)
+                      </option>
+                    ))}
+                  </select>
+                  {membershipPlans.length === 0 && (
+                    <p className="text-[10px] text-amber-600 font-semibold mt-1">
+                      No active membership plans found. Create plans in the Membership section first.
+                    </p>
+                  )}
+                </div>
+
+                {/* Free Service Perks */}
+                <div className="space-y-2 border-t border-border-soft pt-3">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-slate-700">Free Service Perks</label>
+                    <button
+                      type="button"
+                      onClick={handleAddMembershipBenefitRow}
+                      className="text-xs text-primary font-bold hover:underline flex items-center space-x-1"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Add Free Service</span>
+                    </button>
+                  </div>
+                  {newMembershipForm.benefits.length === 0 ? (
+                    <p className="text-[10px] text-slate-400 font-medium">No free service perks added. You can add them after selecting a plan.</p>
+                  ) : (
+                    newMembershipForm.benefits.map((row, idx) => (
+                      <div key={idx} className="flex space-x-2 items-center">
+                        <select
+                          value={row.service_id}
+                          onChange={(e) => handleMembershipBenefitChange(idx, "service_id", e.target.value)}
+                          className="flex-1 bg-background border border-border-soft px-2 py-1.5 rounded text-xs focus:outline-none"
+                        >
+                          {membershipServices.map((s) => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                          ))}
+                        </select>
+                        <input
+                          type="number"
+                          min="1"
+                          placeholder="Qty"
+                          value={row.quantity}
+                          onChange={(e) => handleMembershipBenefitChange(idx, "quantity", e.target.value)}
+                          className="w-20 bg-background border border-border-soft px-2 py-1.5 rounded text-xs focus:outline-none"
+                        />
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-border-soft flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowNewMembershipModal(false)}
+                  className="px-4 py-2 border border-border-soft rounded-xl text-xs font-bold text-slate-600 hover:bg-background"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={newMembershipSaving}
+                  className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-extrabold shadow-md shadow-amber-500/20 disabled:opacity-50"
+                >
+                  {newMembershipSaving ? "Creating Customer & Assigning..." : "Create Customer & Assign Membership"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

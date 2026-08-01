@@ -305,3 +305,84 @@ def export_csv_report():
         mimetype="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
+
+@reports_bp.route("/reports/procurement", methods=["GET"])
+@require_role(["ParlourAdmin"])
+def get_procurement_report():
+    preset = request.args.get("preset", "30days")
+    start_date, end_date = parse_date_range(preset, request.args.get("start_date"), request.args.get("end_date"))
+
+    from app.models.catalog import StockReorderLog
+    logs = get_tenant_query(StockReorderLog).filter(
+        StockReorderLog.created_at >= start_date,
+        StockReorderLog.created_at <= end_date
+    ).order_by(StockReorderLog.created_at.desc()).all()
+
+    total_spent = Decimal("0.00")
+    total_qty = 0
+    items = []
+
+    for log in logs:
+        sub = log.cost_price * log.quantity
+        total_spent += sub
+        total_qty += log.quantity
+        items.append({
+            "id": log.id,
+            "date": log.created_at.strftime("%Y-%m-%d %H:%M"),
+            "product_name": log.product.name if log.product else "Deleted Product",
+            "supplier_name": log.supplier.name if log.supplier else "N/A",
+            "quantity": log.quantity,
+            "cost_price": float(log.cost_price),
+            "total_price": float(sub),
+            "status": log.status
+        })
+
+    return success_response({
+        "summary": {
+            "total_spent": float(total_spent),
+            "total_quantity": total_qty,
+            "total_orders": len(logs)
+        },
+        "items": items
+    })
+
+
+@reports_bp.route("/reports/memberships", methods=["GET"])
+@require_role(["ParlourAdmin"])
+def get_memberships_report():
+    preset = request.args.get("preset", "30days")
+    start_date, end_date = parse_date_range(preset, request.args.get("start_date"), request.args.get("end_date"))
+
+    logs = get_tenant_query(CustomerMembership).filter(
+        CustomerMembership.created_at >= start_date,
+        CustomerMembership.created_at <= end_date
+    ).order_by(CustomerMembership.created_at.desc()).all()
+
+    total_revenue = Decimal("0.00")
+    items = []
+
+    for cm in logs:
+        plan_price = cm.plan.price if cm.plan else Decimal("0.00")
+        # Only count active/non-cancelled memberships toward revenue
+        if cm.status != "cancelled":
+            total_revenue += plan_price
+        items.append({
+            "id": cm.id,
+            "customer_name": f"{cm.customer.first_name} {cm.customer.last_name or ''}".strip() if cm.customer else "Deleted Customer",
+            "plan_name": cm.plan.name if cm.plan else "Deleted Plan",
+            "price": float(plan_price),
+            "start_date": cm.created_at.strftime("%Y-%m-%d"),
+            "end_date": cm.expires_at.strftime("%Y-%m-%d") if cm.expires_at else "—",
+            "status": cm.status,
+            "created_at": cm.created_at.strftime("%Y-%m-%d %H:%M")
+        })
+
+    return success_response({
+        "summary": {
+            "total_revenue": float(total_revenue),
+            "total_sold": len(logs)
+        },
+        "items": items
+    })
+

@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 settings_bp = Blueprint("settings", __name__)
 
 @settings_bp.route("/settings", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "Receptionist", "Employee"])
 def get_settings():
     setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id).first()
     if not setting:
@@ -76,6 +76,9 @@ def get_settings():
             "primary_color": getattr(setting, "primary_color", "#EC4899") or "#EC4899",
             "secondary_color": getattr(setting, "secondary_color", "#F472B6") or "#F472B6",
             "accent_color": getattr(setting, "accent_color", "#FDF2F8") or "#FDF2F8"
+        },
+        "marketing_settings": {
+            "churn_days_threshold": getattr(setting, "churn_days_threshold", 45) or 45
         }
     })
 
@@ -96,6 +99,7 @@ def update_settings():
     reg = data.get("regional_settings", {})
     rec = data.get("receipt_settings", {})
     thm = data.get("theme_settings", {})
+    mkt = data.get("marketing_settings", {})
 
     try:
         # Update Business Profile
@@ -182,6 +186,14 @@ def update_settings():
                 setting.secondary_color = thm["secondary_color"].strip()
             if thm.get("accent_color"):
                 setting.accent_color = thm["accent_color"].strip()
+
+        # Update Marketing / Churn Settings
+        if mkt:
+            if mkt.get("churn_days_threshold") is not None:
+                try:
+                    setting.churn_days_threshold = int(mkt["churn_days_threshold"])
+                except ValueError:
+                    pass
 
         db.session.commit()
     except Exception as e:

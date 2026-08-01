@@ -1,9 +1,13 @@
 from flask import Blueprint, request, g
 from app.database import db
 from app.models.customer import Customer
+from app.models.billing import Invoice
+from app.models.user import TenantSetting
 from app.utils.responses import success_response, error_response
 from app.utils.auth import require_role, get_tenant_query
 from app.utils.query import paginate_query
+from datetime import datetime, timedelta, timezone
+from sqlalchemy import func, or_, and_
 import logging
 
 logger = logging.getLogger(__name__)
@@ -64,6 +68,7 @@ def get_customers():
             "date_of_birth": c.date_of_birth.isoformat() if c.date_of_birth else None,
             "address": c.address,
             "notes": c.notes,
+            "spot": c.spot,
             "created_at": c.created_at.isoformat()
         } for c in customers
     ]
@@ -94,6 +99,7 @@ def get_customer(customer_id):
         "date_of_birth": customer.date_of_birth.isoformat() if customer.date_of_birth else None,
         "address": customer.address,
         "notes": customer.notes,
+        "spot": customer.spot,
         "created_at": customer.created_at.isoformat()
     })
 
@@ -153,7 +159,8 @@ def create_customer():
             gender=data.get("gender"),
             date_of_birth=dob,
             address=data.get("address"),
-            notes=data.get("notes")
+            notes=data.get("notes"),
+            spot=data.get("spot")
         )
         db.session.add(customer)
         db.session.commit()
@@ -169,7 +176,8 @@ def create_customer():
     return success_response({
         "id": customer.id,
         "first_name": customer.first_name,
-        "phone": customer.phone
+        "phone": customer.phone,
+        "spot": customer.spot
     }, 201)
 
 
@@ -226,6 +234,7 @@ def update_customer(customer_id):
         customer.date_of_birth = dob
         customer.address = data.get("address")
         customer.notes = data.get("notes")
+        customer.spot = data.get("spot")
         db.session.commit()
     except Exception as e:
         db.session.rollback()
@@ -246,6 +255,7 @@ def update_customer(customer_id):
         "date_of_birth": customer.date_of_birth.isoformat() if customer.date_of_birth else None,
         "address": customer.address,
         "notes": customer.notes,
+        "spot": customer.spot,
         "created_at": customer.created_at.isoformat()
     })
 
@@ -559,4 +569,67 @@ def get_customer_history(customer_id):
         "financial_summary": financial_summary,
         "timeline": timeline,
         "upcoming_appointments": []
+    })
+
+
+@customers_bp.route("/customers/dormant", methods=["GET"])
+@require_role(["ParlourAdmin"])
+def get_dormant_customers():
+    setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id).first()
+    threshold_days = setting.churn_days_threshold if setting and setting.churn_days_threshold else 45
+
+    now = datetime.utcnow()
+    limit_date = now - timedelta(days=threshold_days)
+
+    subquery = db.session.query(
+        Invoice.customer_id,
+        func.max(Invoice.created_at).label("last_visit")
+    ).filter(
+        Invoice.tenant_id == g.parlour_id,
+        Invoice.status != "Voided"
+    ).group_by(Invoice.customer_id).subquery()
+
+    query = db.session.query(
+        Customer,
+        subquery.c.last_visit
+    ).filter(
+        Customer.tenant_id == g.parlour_id
+    ).outerjoin(
+        subquery, Customer.id == subquery.c.customer_id
+    )
+
+    query = query.filter(
+        or_(
+            subquery.c.last_visit < limit_date,
+            and_(
+                subquery.c.last_visit == None,
+                Customer.created_at < limit_date
+            )
+        )
+    )
+
+    results = query.all()
+
+    data = []
+    for customer, last_visit in results:
+        ref_date = last_visit or customer.created_at
+        days_since = (now - ref_date).days
+        
+        data.append({
+            "id": customer.id,
+            "first_name": customer.first_name,
+            "last_name": customer.last_name or "",
+            "phone": customer.phone,
+            "email": customer.email or "",
+            "gender": customer.gender or "",
+            "last_visit_date": last_visit.isoformat() if last_visit else None,
+            "days_inactive": days_since,
+            "created_at": customer.created_at.isoformat()
+        })
+
+    data.sort(key=lambda x: x["days_inactive"], reverse=True)
+
+    return success_response({
+        "items": data,
+        "threshold_days": threshold_days
     })

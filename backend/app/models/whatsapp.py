@@ -74,6 +74,8 @@ class WhatsAppCampaign(db.Model, TimestampMixin):
     coupon_code = db.Column(db.String(50), nullable=True)
     valid_until = db.Column(db.Date, nullable=True)
     audience_type = db.Column(db.String(50), nullable=False, default="ALL")  # ALL, MEMBERSHIP, RECENT_30D, INACTIVE, BIRTHDAY_TODAY, ANNIVERSARY_TODAY, CUSTOM
+    template_name = db.Column(db.String(100), nullable=True)  # Meta-approved template for guaranteed delivery
+    template_params_json = db.Column(db.Text, nullable=True)  # JSON list of custom values for {{1}}, {{2}}...
     
     total_target_customers = db.Column(db.Integer, nullable=False, default=0)
     valid_whatsapp_count = db.Column(db.Integer, nullable=False, default=0)
@@ -102,6 +104,8 @@ class WhatsAppCampaign(db.Model, TimestampMixin):
             "coupon_code": self.coupon_code or "",
             "valid_until": self.valid_until.strftime("%Y-%m-%d") if self.valid_until else None,
             "audience_type": self.audience_type,
+            "template_name": self.template_name or "",
+            "template_params_json": self.template_params_json or "",
             "total_target_customers": self.total_target_customers,
             "valid_whatsapp_count": self.valid_whatsapp_count,
             "skipped_count": self.skipped_count,

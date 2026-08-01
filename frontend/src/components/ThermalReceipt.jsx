@@ -412,45 +412,97 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
 
       {/* 3. ITEM TABLE HEADER */}
       <div className="text-[10px]">
-        <div className="flex justify-between font-bold uppercase border-b border-dashed border-black pb-0.5 mb-1 text-black">
-          <span className="w-1/2">ITEM</span>
-          <span className="w-1/4 text-center">QTY</span>
-          <span className="w-1/4 text-right">AMT</span>
-        </div>
+        {(() => {
+          const lineItems = invoice.line_items || invoice.items || [];
+          const serviceItems = lineItems.filter(item => item.type === "service" || item.service_id);
+          const productItems = lineItems.filter(item => item.type === "product" || item.product_id);
 
-        {/* ITEMS LIST */}
-        <div className="space-y-1">
-          {(invoice.line_items || invoice.items || []).map((item, idx) => {
-            const itemName = (item.item_name || item.name || item.service_name || item.product_name || `Item #${idx + 1}`).toUpperCase();
-            const staffName = item.staff_name || item.employee_name || (item.employee_names ? item.employee_names.join(", ") : "");
-            const qty = item.quantity || item.qty || 1;
-            const rate = item.unit_price || item.rate || (item.price || 0);
-            const amount = item.line_total || item.total || (rate * qty);
+          return (
+            <div className="space-y-3">
+              {/* SERVICES SECTION */}
+              {serviceItems.length > 0 && (
+                <div>
+                  <div className="font-bold uppercase border-b border-dashed border-black pb-0.5 mb-1 text-black flex justify-between">
+                    <span className="w-1/2">SERVICES</span>
+                    <span className="w-1/4 text-center">QTY</span>
+                    <span className="w-1/4 text-right">AMT</span>
+                  </div>
+                  <div className="space-y-1">
+                    {serviceItems.map((item, idx) => {
+                      const itemName = (item.item_name || item.name || item.service_name || `Service #${idx + 1}`).toUpperCase();
+                      const staffName = item.staff_name || item.employee_name || (item.employee_names ? item.employee_names.join(", ") : "");
+                      const qty = item.quantity || item.qty || 1;
+                      const rate = item.unit_price || item.rate || (item.price || 0);
+                      const amount = item.line_total || item.total || (rate * qty);
 
-            return (
-              <div key={idx} className="space-y-0.5 text-black">
-                <div className="flex justify-between items-start font-bold">
-                  <span className="w-1/2 break-words leading-tight">{itemName}</span>
-                  <span className="w-1/4 text-center">{qty}</span>
-                  <span className="w-1/4 text-right font-bold">{formatCurrency(amount)}</span>
-                </div>
-                <div className="text-[9px] text-black">
-                  ({formatCurrency(rate)} x {qty} qty)
-                </div>
-                {staffName && (
-                  <div className="text-[9px] text-black italic">
-                    Staff: {staffName}
+                      return (
+                        <div key={idx} className="space-y-0.5 text-black">
+                          <div className="flex justify-between items-start font-bold">
+                            <span className="w-1/2 break-words leading-tight">{itemName}</span>
+                            <span className="w-1/4 text-center">{qty}</span>
+                            <span className="w-1/4 text-right font-bold">{formatCurrency(amount)}</span>
+                          </div>
+                          <div className="text-[9px] text-black">
+                            ({formatCurrency(rate)} x {qty} qty)
+                          </div>
+                          {staffName && (
+                            <div className="text-[9px] text-black italic">
+                              Staff: {staffName}
+                            </div>
+                          )}
+                          {item.discount > 0 && (
+                            <div className="text-[9px] text-black">
+                              Disc: -{formatCurrency(item.discount)}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                )}
-                {item.discount > 0 && (
-                  <div className="text-[9px] text-black">
-                    Disc: -{formatCurrency(item.discount)}
+                </div>
+              )}
+
+              {/* PRODUCTS SECTION */}
+              {productItems.length > 0 && (
+                <div>
+                  <div className="font-bold uppercase border-b border-dashed border-black pb-0.5 mb-1 text-black flex justify-between text-[10px]">
+                    <span className="w-[30%] text-left">PRODUCTS</span>
+                    <span className="w-[18%] text-right">RATE</span>
+                    <span className="w-[12%] text-center">QTY</span>
+                    <span className="w-[20%] text-right">MRP</span>
+                    <span className="w-[20%] text-right">AMT</span>
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                  <div className="space-y-1.5">
+                    {productItems.map((item, idx) => {
+                      const itemName = (item.item_name || item.name || item.product_name || `Product #${idx + 1}`).toUpperCase();
+                      const qty = item.quantity || item.qty || 1;
+                      const rate = item.unit_price || item.rate || (item.price || 0);
+                      const mrpValue = item.mrp || item.unit_price || item.rate || 0;
+                      const amount = item.line_total || item.total || (rate * qty);
+
+                      return (
+                        <div key={idx} className="space-y-0.5 text-black">
+                          <div className="flex justify-between items-start text-[10px]">
+                            <span className="w-[30%] break-words leading-tight font-bold">{itemName}</span>
+                            <span className="w-[18%] text-right">{formatCurrency(rate)}</span>
+                            <span className="w-[12%] text-center">{qty}</span>
+                            <span className="w-[20%] text-right">{formatCurrency(mrpValue)}</span>
+                            <span className="w-[20%] text-right font-bold">{formatCurrency(amount)}</span>
+                          </div>
+                          {item.discount > 0 && (
+                            <div className="text-[9px] text-black text-right">
+                              Disc: -{formatCurrency(item.discount)}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* SEPARATOR 3 */}

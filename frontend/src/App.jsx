@@ -28,8 +28,13 @@ function App() {
     return saved ? JSON.parse(saved) : null;
   });
 
+  // Detect Meta OAuth callback redirect (?code=...) and route to WhatsApp integration page
+  const initialActiveTab = new URLSearchParams(window.location.search).get("code")
+    ? "whatsapp_integration"
+    : "dashboard";
+
   const [currentView, setCurrentView] = useState(localStorage.getItem("token") ? "app" : "landing");
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState(initialActiveTab);
 
   // Login Form State
   const [email, setEmail] = useState("");
@@ -90,8 +95,14 @@ function App() {
   if (currentView === "landing") {
     return (
       <LandingPage
+        isLoggedIn={!!token}
         onNavigateLogin={() => setCurrentView("login")}
         onNavigateRegister={() => setCurrentView("register")}
+        onNavigateDashboard={() => {
+          setCurrentView("app");
+          setActiveTab("dashboard");
+        }}
+        onLogout={handleLogout}
       />
     );
   }
