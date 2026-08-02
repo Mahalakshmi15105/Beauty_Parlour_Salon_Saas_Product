@@ -246,10 +246,10 @@ function Settings() {
     const payload = {
       ...settingsData,
       theme_settings: {
-        theme_name: themeName,
-        primary_color: primaryColor,
-        secondary_color: adjustHexBrightness(primaryColor, 15),
-        accent_color: hexToRgba(primaryColor, 0.08)
+        theme_name: "light",
+        primary_color: accentColor,
+        secondary_color: "#F472B6",
+        accent_color: "rgba(236, 72, 153, 0.08)"
       }
     };
 
@@ -286,14 +286,6 @@ function Settings() {
     setAccentColor(color);
     changeAccentColor(color);
   };
-
-  // Load accent color on mount
-  useEffect(() => {
-    const savedAccentColor = localStorage.getItem('accent_color') || '#EC4899';
-    setAccentColor(savedAccentColor);
-    setCustomColor(savedAccentColor);
-    changeAccentColor(savedAccentColor);
-  }, []);
 
   return (
     <div className="space-y-6 pb-12">
