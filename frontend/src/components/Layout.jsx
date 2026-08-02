@@ -9,7 +9,6 @@ import {
   BarChart3,
   Settings as SettingsIcon,
   ShieldCheck,
-  Globe,
   LogOut,
   Sparkles,
   Menu,
@@ -200,16 +199,16 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
         <div className={`py-3.5 border-b border-border-soft flex items-center ${isCollapsed ? "justify-center px-2" : "px-4 justify-between"}`}>
           {isCollapsed ? (
             <div className="relative group cursor-pointer flex justify-center w-full" onClick={onNavigateHome}>
-              <div className="w-16 h-16 rounded-lg border-2 border-primary/20 bg-primary-light flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+              <div className="w-12 h-12 rounded-full border-2 border-primary/20 bg-primary-light flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
                 {logoUrl && !imgFailed ? (
                   <img
                     src={logoUrl}
                     alt={parlourName || "Logo"}
-                    className="w-full h-full object-contain rounded-lg"
+                    className="w-full h-full object-cover object-center rounded-full"
                     onError={() => setImgFailed(true)}
                   />
                 ) : (
-                  <div className="w-full h-full bg-primary flex items-center justify-center text-white font-extrabold text-lg rounded-lg">
+                  <div className="w-full h-full bg-primary flex items-center justify-center text-white font-extrabold text-sm rounded-full">
                     {(parlourName || user?.parlour_name || "P").charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -223,16 +222,16 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
             </div>
           ) : (
             <div className="flex items-center space-x-3 cursor-pointer w-full py-0.5" onClick={onNavigateHome}>
-              <div className="w-16 h-16 rounded-lg border-2 border-primary/20 bg-primary-light flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+              <div className="w-12 h-12 rounded-full border-2 border-primary/20 bg-primary-light flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
                 {logoUrl && !imgFailed ? (
                   <img
                     src={logoUrl}
                     alt={parlourName || "Logo"}
-                    className="w-full h-full object-contain rounded-lg"
+                    className="w-full h-full object-cover object-center rounded-full"
                     onError={() => setImgFailed(true)}
                   />
                 ) : (
-                  <div className="w-full h-full bg-primary flex items-center justify-center text-white font-extrabold text-lg rounded-lg">
+                  <div className="w-full h-full bg-primary flex items-center justify-center text-white font-extrabold text-sm rounded-full">
                     {(parlourName || user?.parlour_name || "P").charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -330,16 +329,16 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
       >
         <div className="h-16 px-6 border-b border-border-soft flex items-center justify-between">
           <div className="flex items-center space-x-3 cursor-pointer" onClick={onNavigateHome}>
-            <div className="w-16 h-16 rounded-lg border-2 border-primary/20 bg-primary-light flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+            <div className="w-12 h-12 rounded-full border-2 border-primary/20 bg-primary-light flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
               {logoUrl && !imgFailed ? (
                 <img
                   src={logoUrl}
                   alt={parlourName || "Logo"}
-                  className="w-full h-full object-contain rounded-lg"
+                  className="w-full h-full object-cover object-center rounded-full"
                   onError={() => setImgFailed(true)}
                 />
               ) : (
-                <div className="w-full h-full bg-primary flex items-center justify-center text-white font-extrabold text-base rounded-lg">
+                <div className="w-full h-full bg-primary flex items-center justify-center text-white font-extrabold text-sm rounded-full">
                   {(parlourName || user?.parlour_name || "P").charAt(0).toUpperCase()}
                 </div>
               )}
@@ -538,17 +537,6 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
                 </div>
               )}
             </div>
-
-            <button
-              onClick={onNavigateHome}
-              className="hidden sm:flex items-center space-x-1.5 text-xs text-text-secondary hover:text-primary font-semibold transition"
-            >
-              <Globe className="w-3.5 h-3.5 text-primary" />
-              <span>View Public Landing Page</span>
-            </button>
-            <span className="text-xs bg-primary-light text-primary font-bold px-3 py-1 rounded-full border border-primary/20">
-              Pro SaaS Plan
-            </span>
           </div>
         </header>
 
