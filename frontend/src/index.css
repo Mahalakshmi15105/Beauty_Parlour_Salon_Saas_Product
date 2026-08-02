@@ -1,10 +1,10 @@
 @import "tailwindcss";
 
 :root {
-  --primary-color: #EC4899;
-  --primary-hover-color: #DB2777;
-  --primary-light-color: #FDF2F8;
-  --primary-border-soft: rgba(236, 72, 153, 0.18);
+  --color-primary: #EC4899;
+  --color-primary-hover: #DB2777;
+  --color-primary-light: #FDF2F8;
+  --color-primary-border-soft: rgba(236, 72, 153, 0.18);
 
   --color-gold-accent: #D4AF37;
   --color-gold-light: #FEF3C7;
@@ -15,26 +15,35 @@
   
   --color-background: #FDFBFD;
   --color-surface: #FFFFFF;
+  --color-sidebar: #FFFFFF;
+  --color-navbar: #FFFFFF;
+  --color-card: #FFFFFF;
+  --color-border: #E2E8F0;
+  --color-input-bg: #FFFFFF;
+  --color-input-border: #E2E8F0;
+  --color-hover-bg: #F1F5F9;
+  --color-accent: #8B5CF6;
   
   --color-text-primary: #0F172A;
   --color-text-secondary: #64748B;
+  --color-border-soft: rgba(0, 0, 0, 0.1);
 }
 
 /* Dynamic CSS Variable Driven Design System Utilities */
-.bg-primary { background-color: var(--primary-color) !important; }
-.text-primary { color: var(--primary-color) !important; }
-.border-primary { border-color: var(--primary-color) !important; }
+.bg-primary { background-color: var(--color-primary) !important; }
+.text-primary { color: var(--color-primary) !important; }
+.border-primary { border-color: var(--color-primary) !important; }
 
-.bg-primary-hover:hover, .hover\:bg-primary-hover:hover { background-color: var(--primary-hover-color) !important; }
-.bg-primary-light { background-color: var(--primary-light-color) !important; }
-.hover\:bg-primary-light:hover { background-color: var(--primary-light-color) !important; }
-.border-border-soft { border-color: var(--primary-border-soft) !important; }
+.bg-primary-hover:hover, .hover\:bg-primary-hover:hover { background-color: var(--color-primary-hover) !important; }
+.bg-primary-light { background-color: var(--color-primary-light) !important; }
+.hover\:bg-primary-light:hover { background-color: var(--color-primary-light) !important; }
+.border-border-soft { border-color: var(--color-primary-border-soft) !important; }
 
-.bg-background { background-color: #FDFBFD !important; }
-.bg-surface { background-color: #FFFFFF !important; }
+.bg-background { background-color: var(--color-background) !important; }
+.bg-surface { background-color: var(--color-surface) !important; }
 
-.text-text-primary { color: #0F172A !important; }
-.text-text-secondary { color: #64748B !important; }
+.text-text-primary { color: var(--color-text-primary) !important; }
+.text-text-secondary { color: var(--color-text-secondary) !important; }
 
 @layer base {
   body {

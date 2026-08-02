@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import API from "../services/api";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
+import { useTheme } from "../context/ThemeContext";
 import { exportToCSV, printDataList, exportToPDF } from "../utils/exportUtils";
 import { 
   Printer, 
@@ -18,6 +19,8 @@ import {
 
 function Reports() {
   const { formatCurrency, currencySymbol, t } = useLanguageCurrency();
+  const { getChartColors } = useTheme();
+  const chartColors = getChartColors();
 
   // Active Report Types: "sales", "tax", "employees", "products", "procurement", "memberships"
   const [reportType, setReportType] = useState("sales");

@@ -6,6 +6,9 @@ from app.utils.responses import success_response, error_response
 from app.utils.auth import require_role
 from decimal import Decimal
 import logging
+import os
+from PIL import Image
+import io
 
 logger = logging.getLogger(__name__)
 settings_bp = Blueprint("settings", __name__)
@@ -324,9 +327,45 @@ import os
 
 ALLOWED_LOGO_EXTENSIONS = {"png", "jpg", "jpeg", "svg", "webp"}
 MAX_LOGO_SIZE = 5 * 1024 * 1024  # 5MB
+MIN_LOGO_SIZE = 1024  # 1KB minimum to prevent corrupted uploads
 
 def is_allowed_logo(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_LOGO_EXTENSIONS
+
+def is_valid_image(file):
+    """Verify the uploaded file is a valid image by attempting to open it with PIL"""
+    try:
+        file.seek(0)
+        image_bytes = file.read()
+        file.seek(0)
+        
+        # Check minimum file size
+        if len(image_bytes) < MIN_LOGO_SIZE:
+            return False, "File is too small. Please upload a valid image file."
+        
+        # Try to open with PIL to verify it's a valid image
+        if file.filename.lower().endswith('.svg'):
+            # SVG files are text-based, handle differently
+            try:
+                image_bytes.decode('utf-8')
+                return True, None
+            except UnicodeDecodeError:
+                return False, "Invalid SVG file."
+        else:
+            # For raster images, use PIL to verify
+            try:
+                img = Image.open(io.BytesIO(image_bytes))
+                img.verify()
+                # Re-open after verify (verify closes the image)
+                img = Image.open(io.BytesIO(image_bytes))
+                # Check if image has reasonable dimensions
+                if img.width < 32 or img.height < 32:
+                    return False, "Image dimensions too small. Minimum 32x32 pixels required."
+                return True, None
+            except Exception as e:
+                return False, f"Invalid image file: {str(e)}"
+    except Exception as e:
+        return False, f"Error validating image: {str(e)}"
 
 @settings_bp.route("/settings/upload-logo", methods=["POST"])
 @require_role(["ParlourAdmin"])
@@ -353,6 +392,15 @@ def upload_logo():
             status_code=400
         )
 
+    # Validate the image is not corrupted
+    is_valid, error_msg = is_valid_image(file)
+    if not is_valid:
+        return error_response(
+            error_code="INVALID_IMAGE",
+            message=error_msg,
+            status_code=400
+        )
+
     file.seek(0, os.SEEK_END)
     file_length = file.tell()
     file.seek(0)
@@ -362,6 +410,49 @@ def upload_logo():
             error_code="FILE_TOO_LARGE",
             message="File size exceeds maximum allowed limit of 5 MB.",
             status_code=400
+        )
+
+    if file_length < MIN_LOGO_SIZE:
+        return error_response(
+            error_code="FILE_TOO_SMALL",
+            message=f"File is too small ({file_length} bytes). Please upload a valid image file.",
+            status_code=400
+        )
+
+    logger.info(f"Uploading logo: {file.filename}, size: {file_length} bytes")
+
+    ext = file.filename.rsplit(".", 1)[1].lower()
+    filename = f"logo_tenant_{g.parlour_id}.{ext}"
+
+    static_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "uploads", "logos")
+    os.makedirs(static_folder, exist_ok=True)
+    destination = os.path.join(static_folder, filename)
+    
+    # Delete existing file if it exists
+    if os.path.exists(destination):
+        os.remove(destination)
+        logger.info(f"Deleted existing logo file: {destination}")
+    
+    file.save(destination)
+    
+    # Verify the saved file
+    if not os.path.exists(destination):
+        logger.error(f"File save failed: {destination}")
+        return error_response(
+            error_code="SAVE_FAILED",
+            message="Failed to save logo file.",
+            status_code=500
+        )
+    
+    saved_size = os.path.getsize(destination)
+    logger.info(f"Logo saved successfully: {destination}, size: {saved_size} bytes")
+    
+    if saved_size != file_length:
+        logger.error(f"File size mismatch: original {file_length} bytes, saved {saved_size} bytes")
+        return error_response(
+            error_code="SIZE_MISMATCH",
+            message="File was corrupted during upload. Please try again.",
+            status_code=500
         )
 
     ext = file.filename.rsplit(".", 1)[1].lower()

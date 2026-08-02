@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Layout from "./components/Layout";
+import { ThemeProvider } from "./context/ThemeContext";
 import Customers from "./pages/Customers";
 import Employees from "./pages/Employees";
 import Services from "./pages/Services";
@@ -318,15 +319,17 @@ function App() {
   };
 
   return (
-    <Layout
-      activeTab={activeTab}
-      setActiveTab={setActiveTab}
-      onLogout={handleLogout}
-      onNavigateHome={() => setCurrentView("landing")}
-      user={user}
-    >
-      {renderContent()}
-    </Layout>
+    <ThemeProvider>
+      <Layout
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onLogout={handleLogout}
+        onNavigateHome={() => setCurrentView("landing")}
+        user={user}
+      >
+        {renderContent()}
+      </Layout>
+    </ThemeProvider>
   );
 }
 

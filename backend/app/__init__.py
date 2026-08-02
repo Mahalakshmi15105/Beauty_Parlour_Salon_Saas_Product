@@ -41,6 +41,7 @@ def create_app(config_class=Config):
             "ALTER TABLE tenant_settings ADD COLUMN primary_color VARCHAR(30) NOT NULL DEFAULT '#EC4899'",
             "ALTER TABLE tenant_settings ADD COLUMN secondary_color VARCHAR(30) NOT NULL DEFAULT '#F472B6'",
             "ALTER TABLE tenant_settings ADD COLUMN accent_color VARCHAR(30) NOT NULL DEFAULT '#FDF2F8'",
+            "ALTER TABLE tenant_settings ADD COLUMN dark_mode TINYINT(1) NOT NULL DEFAULT 0",
             "ALTER TABLE tenant_settings ADD COLUMN churn_days_threshold INT NOT NULL DEFAULT 45",
             "ALTER TABLE invoice_line_items MODIFY COLUMN employee_id INT NULL",
             "ALTER TABLE customers ADD COLUMN spot VARCHAR(50) NULL",

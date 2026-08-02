@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
-import { useTheme, adjustHexBrightness, hexToRgba } from "../context/ThemeContext";
+import { useTheme } from "../context/ThemeContext";
 import { SUPPORTED_LANGUAGES } from "../utils/translations";
 import { useFormKeyboardNavigation } from "../utils/keyboardNavigation";
 import { getFullImageUrl } from "../utils/imageUrl";
@@ -26,7 +26,6 @@ import {
   Printer,
   Eye,
   QrCode,
-  Palette,
   MessageSquare,
 } from "lucide-react";
 import WhatsAppIntegration from "./WhatsAppIntegration";
@@ -45,12 +44,7 @@ function Settings() {
     SUPPORTED_CURRENCIES,
   } = useLanguageCurrency();
 
-  const { themeName, primaryColor, presetThemes, changeTheme } = useTheme();
-  const [customColor, setCustomColor] = useState(primaryColor);
-
-  useEffect(() => {
-    setCustomColor(primaryColor);
-  }, [primaryColor]);
+  const { changeAccentColor } = useTheme();
 
   const [activeTab, setActiveTab] = useState("business");
   const [loading, setLoading] = useState(true);
@@ -63,6 +57,10 @@ function Settings() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Accent Color State
+  const [accentColor, setAccentColor] = useState(localStorage.getItem('accent_color') || '#EC4899');
+  const [customColor, setCustomColor] = useState(localStorage.getItem('accent_color') || '#EC4899');
 
   useFormKeyboardNavigation(formRef, () => {
     const submitBtn = formRef.current?.querySelector('button[type="submit"]');
@@ -276,112 +274,26 @@ function Settings() {
     );
   }
 
-  const renderThemeCard = () => (
-    <div className="p-6 bg-background/50 border border-border-soft rounded-2xl space-y-5">
-      <div className="flex justify-between items-center border-b border-border-soft/60 pb-3">
-        <div className="flex items-center space-x-2.5 text-xs font-extrabold text-slate-800">
-          <div className="p-1.5 bg-primary/10 text-primary rounded-lg">
-            <Palette className="w-4 h-4 text-primary" />
-          </div>
-          <div>
-            <h4 className="text-sm font-bold text-text-primary">System Theme Color</h4>
-            <p className="text-[11px] font-normal text-text-secondary">
-              Choose your preferred theme color for your salon workspace. The default theme is Pink (#EC4899), or choose a custom color.
-            </p>
-          </div>
-        </div>
-        <span className="text-[11px] font-bold text-primary bg-primary-light px-3 py-1 rounded-full border border-primary/20 shrink-0">
-          Active: {themeName} ({primaryColor ? primaryColor.toUpperCase() : "#EC4899"})
-        </span>
-      </div>
+  const handleAccentColorChange = (color) => {
+    setAccentColor(color);
+    setCustomColor(color);
+    changeAccentColor(color);
+  };
 
-      {/* Preset Themes Grid */}
-      <div className="space-y-2">
-        <label className="text-xs font-bold text-text-secondary uppercase tracking-wider block">Theme Presets</label>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {(presetThemes || []).map((preset) => {
-            const isActive =
-              themeName === preset.name ||
-              (themeName === "Custom" && primaryColor && primaryColor.toUpperCase() === preset.color.toUpperCase());
-            return (
-              <button
-                key={preset.name}
-                type="button"
-                onClick={() => {
-                  setCustomColor(preset.color);
-                  changeTheme(preset.name, preset.color, true);
-                }}
-                className={`flex items-center space-x-3 p-3 rounded-xl border transition-all text-left group ${
-                  isActive
-                    ? "border-primary bg-primary-light ring-2 ring-primary/30 shadow-xs"
-                    : "border-border-soft bg-surface hover:border-primary/40 hover:bg-background/80"
-                }`}
-              >
-                <span
-                  className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-white shadow-sm transition-transform group-hover:scale-105"
-                  style={{ backgroundColor: preset.color }}
-                >
-                  {isActive && <Check className="w-4 h-4 stroke-[3]" />}
-                </span>
-                <div className="truncate">
-                  <div className="text-xs font-bold text-text-primary truncate">{preset.name}</div>
-                  <div className="text-[10px] text-text-secondary font-mono">{preset.color}</div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+  const handleCustomColorChange = (e) => {
+    const color = e.target.value;
+    setCustomColor(color);
+    setAccentColor(color);
+    changeAccentColor(color);
+  };
 
-      {/* Custom Color Picker Section */}
-      <div className="pt-4 border-t border-border-soft flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <span className="text-xs font-bold text-text-primary block">Custom Color Picker</span>
-          <span className="text-[11px] text-text-secondary block">Select any custom HEX color code for your portal</span>
-        </div>
-
-        <div className="flex items-center space-x-3">
-          <div className="flex items-center space-x-2 bg-surface border border-border-soft px-3 py-1.5 rounded-xl shadow-xs">
-            <input
-              type="color"
-              value={customColor || "#EC4899"}
-              onChange={(e) => {
-                const hex = e.target.value;
-                setCustomColor(hex);
-                changeTheme("Custom", hex, true);
-              }}
-              className="w-7 h-7 rounded-md border-0 cursor-pointer p-0 bg-transparent"
-            />
-            <input
-              type="text"
-              value={customColor ? customColor.toUpperCase() : "#EC4899"}
-              onChange={(e) => {
-                const hex = e.target.value;
-                setCustomColor(hex);
-                if (/^#[0-9A-F]{6}$/i.test(hex)) {
-                  changeTheme("Custom", hex, true);
-                }
-              }}
-              className="w-20 font-mono text-xs font-bold text-text-primary bg-transparent focus:outline-hidden"
-              placeholder="#EC4899"
-              maxLength={7}
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              setCustomColor("#EC4899");
-              changeTheme("Default Pink", "#EC4899", true);
-            }}
-            className="px-3.5 py-2 text-xs font-semibold text-text-secondary border border-border-soft hover:bg-background rounded-xl transition"
-          >
-            Reset Default
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  // Load accent color on mount
+  useEffect(() => {
+    const savedAccentColor = localStorage.getItem('accent_color') || '#EC4899';
+    setAccentColor(savedAccentColor);
+    setCustomColor(savedAccentColor);
+    changeAccentColor(savedAccentColor);
+  }, []);
 
   return (
     <div className="space-y-6 pb-12">
@@ -426,10 +338,10 @@ function Settings() {
           {[
             { id: "business", label: "Parlour Profile", icon: Building2 },
             { id: "whatsapp", label: "WhatsApp Integration", icon: MessageSquare },
-            { id: "theme", label: "System Theme Color", icon: Palette },
             { id: "receipt", label: "Receipt & Thermal Printing", icon: Printer },
             { id: "invoice", label: "Invoice & Taxes", icon: Receipt },
             { id: "regional", label: `${t("currency_settings")} & ${t("language_settings")}`, icon: Globe },
+            { id: "accent", label: "System Accent Color", icon: Sparkles },
             { id: "notifications", label: "Notifications & Security", icon: Bell },
             { id: "backup", label: "Backup & Restore", icon: Database },
           ].map((tab) => {
@@ -456,18 +368,6 @@ function Settings() {
           {/* WhatsApp Integration Tab */}
           {activeTab === "whatsapp" && (
             <WhatsAppIntegration />
-          )}
-          {/* Theme Customization Tab */}
-          {activeTab === "theme" && (
-            <div className="space-y-6">
-              <div className="flex justify-between items-center border-b border-border-soft pb-3">
-                <h3 className="text-sm font-semibold text-text-primary">Workspace Theme Customization</h3>
-                <span className="text-[11px] font-bold text-primary bg-primary-light px-2.5 py-0.5 rounded-full border border-primary/20">
-                  Instant Live Preview
-                </span>
-              </div>
-              {renderThemeCard()}
-            </div>
           )}
 
           {/* Business Profile Tab */}
@@ -1119,6 +1019,69 @@ function Settings() {
                   <p className="text-[11px] text-text-secondary mt-1">
                     Language preferences apply globally across all navigation menus, dashboard cards, POS billing controls, and forms for your parlour account.
                   </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* System Accent Color Picker Tab */}
+          {activeTab === "accent" && (
+            <div className="space-y-6">
+              <h3 className="text-sm font-semibold text-text-primary border-b border-border-soft pb-3">🎨 Accent Color Picker</h3>
+              <p className="text-xs text-text-secondary">
+                Pick your preferred accent theme color for your website (default Rose Pink #EC4899 or choose a custom color).
+              </p>
+
+              {/* Default Color Badge */}
+              <div className="inline-flex items-center">
+                <span className="px-2 py-1 bg-gray-100 rounded-md text-[10px] font-mono text-gray-600">
+                  #EC4899
+                </span>
+              </div>
+
+              {/* Color Options - Horizontal Pill Layout */}
+              <div className="flex flex-wrap items-center gap-3">
+                {[
+                  { color: '#EC4899', name: 'Default Pink' },
+                  { color: '#EF4444', name: 'Red Vibrant' },
+                  { color: '#DC2626', name: 'Crimson Red' },
+                  { color: '#F43F5E', name: 'Rose' },
+                  { color: '#10B981', name: 'Emerald Green' },
+                  { color: '#3B82F6', name: 'Royal Blue' },
+                  { color: '#A855F7', name: 'Purple Neon' },
+                ].map((preset) => (
+                  <button
+                    key={preset.color}
+                    type="button"
+                    onClick={() => handleAccentColorChange(preset.color)}
+                    className="flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold text-white transition-all duration-200"
+                    style={{
+                      backgroundColor: preset.color,
+                      boxShadow: accentColor === preset.color ? `0 0 0 2px ${preset.color}, 0 0 0 4px white` : 'none',
+                    }}
+                  >
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{
+                        backgroundColor: preset.color,
+                        boxShadow: 'inset 0 1px 2px rgba(255, 255, 255, 0.3)',
+                      }}
+                    />
+                    <span>{preset.name}</span>
+                  </button>
+                ))}
+
+                {/* Custom Color - Last Item */}
+                <div className="flex items-center gap-2 rounded-lg px-3 py-2 bg-white border border-border-soft">
+                  <div className="relative">
+                    <input
+                      type="color"
+                      value={customColor}
+                      onChange={handleCustomColorChange}
+                      className="w-6 h-6 rounded cursor-pointer border-0 p-0"
+                    />
+                  </div>
+                  <span className="text-[10px] font-mono text-gray-600">{customColor}</span>
                 </div>
               </div>
             </div>

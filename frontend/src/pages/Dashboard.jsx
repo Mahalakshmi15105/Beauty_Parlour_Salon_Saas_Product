@@ -16,11 +16,13 @@ import {
 } from "recharts";
 import { AlertTriangle } from "lucide-react";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
-
-const COLORS = ["#EC4899", "#10B981", "#F59E0B", "#EF4444", "#64748B"];
+import { useTheme } from "../context/ThemeContext";
 
 function Dashboard() {
   const { formatCurrency, t } = useLanguageCurrency();
+  const { getChartColors } = useTheme();
+  const chartColors = getChartColors();
+  const COLORS = [chartColors.primary, chartColors.secondary, chartColors.tertiary, chartColors.quaternary, chartColors.quinary];
 
   const [summary, setSummary] = useState(null);
   const [charts, setCharts] = useState(null);

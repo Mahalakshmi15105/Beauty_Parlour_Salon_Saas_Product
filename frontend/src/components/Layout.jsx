@@ -25,6 +25,8 @@ import {
 } from "lucide-react";
 import API from "../services/api";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
+import { useTheme } from "../context/ThemeContext";
+import ThemeSelector from "./ThemeSelector";
 import { getFullImageUrl } from "../utils/imageUrl";
 
 const getMenuIcon = (id) => {
@@ -198,16 +200,16 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
         <div className={`py-3.5 border-b border-border-soft flex items-center ${isCollapsed ? "justify-center px-2" : "px-4 justify-between"}`}>
           {isCollapsed ? (
             <div className="relative group cursor-pointer flex justify-center w-full" onClick={onNavigateHome}>
-              <div className="w-12 h-12 rounded-full border-2 border-primary/20 bg-primary-light flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+              <div className="w-16 h-16 rounded-lg border-2 border-primary/20 bg-primary-light flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
                 {logoUrl && !imgFailed ? (
                   <img
                     src={logoUrl}
                     alt={parlourName || "Logo"}
-                    className="w-full h-full object-cover rounded-full"
+                    className="w-full h-full object-contain rounded-lg"
                     onError={() => setImgFailed(true)}
                   />
                 ) : (
-                  <div className="w-full h-full bg-primary flex items-center justify-center text-white font-extrabold text-lg rounded-full">
+                  <div className="w-full h-full bg-primary flex items-center justify-center text-white font-extrabold text-lg rounded-lg">
                     {(parlourName || user?.parlour_name || "P").charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -221,16 +223,16 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
             </div>
           ) : (
             <div className="flex items-center space-x-3 cursor-pointer w-full py-0.5" onClick={onNavigateHome}>
-              <div className="w-13 h-13 rounded-full border-2 border-primary/20 bg-primary-light flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+              <div className="w-16 h-16 rounded-lg border-2 border-primary/20 bg-primary-light flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
                 {logoUrl && !imgFailed ? (
                   <img
                     src={logoUrl}
                     alt={parlourName || "Logo"}
-                    className="w-full h-full object-cover rounded-full"
+                    className="w-full h-full object-contain rounded-lg"
                     onError={() => setImgFailed(true)}
                   />
                 ) : (
-                  <div className="w-full h-full bg-primary flex items-center justify-center text-white font-extrabold text-lg rounded-full">
+                  <div className="w-full h-full bg-primary flex items-center justify-center text-white font-extrabold text-lg rounded-lg">
                     {(parlourName || user?.parlour_name || "P").charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -328,16 +330,16 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
       >
         <div className="h-16 px-6 border-b border-border-soft flex items-center justify-between">
           <div className="flex items-center space-x-3 cursor-pointer" onClick={onNavigateHome}>
-            <div className="w-12 h-12 rounded-full border-2 border-primary/20 bg-primary-light flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+            <div className="w-16 h-16 rounded-lg border-2 border-primary/20 bg-primary-light flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
               {logoUrl && !imgFailed ? (
                 <img
                   src={logoUrl}
                   alt={parlourName || "Logo"}
-                  className="w-full h-full object-cover rounded-full"
+                  className="w-full h-full object-contain rounded-lg"
                   onError={() => setImgFailed(true)}
                 />
               ) : (
-                <div className="w-full h-full bg-primary flex items-center justify-center text-white font-extrabold text-base rounded-full">
+                <div className="w-full h-full bg-primary flex items-center justify-center text-white font-extrabold text-base rounded-lg">
                   {(parlourName || user?.parlour_name || "P").charAt(0).toUpperCase()}
                 </div>
               )}
@@ -420,6 +422,9 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
           </div>
 
           <div className="flex items-center space-x-3">
+            {/* THEME SELECTOR */}
+            <ThemeSelector />
+
             {/* NOTIFICATION BELL & DROPDOWN */}
             <div ref={notifDropdownRef} className="relative">
               <button
