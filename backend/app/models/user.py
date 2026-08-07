@@ -71,10 +71,30 @@ class TenantSetting(db.Model, TimestampMixin):
     timezone = db.Column(db.String(50), nullable=False, default="UTC")
 
     # Theme Settings
-    theme_name = db.Column(db.String(50), nullable=False, default="Default Pink")
+    theme_name = db.Column(db.String(50), nullable=False, default="light")
     primary_color = db.Column(db.String(30), nullable=False, default="#EC4899")
     secondary_color = db.Column(db.String(30), nullable=False, default="#F472B6")
     accent_color = db.Column(db.String(30), nullable=False, default="#FDF2F8")
+
+    # Shop Name Typography Settings
+    shop_name_font_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    shop_name_font = db.Column(db.String(100), nullable=False, default="Outfit")
+    shop_name_font_size = db.Column(db.Integer, nullable=False, default=32)
+    shop_name_font_weight = db.Column(db.String(20), nullable=False, default="700")
+    shop_name_letter_spacing = db.Column(db.Numeric(4, 2), nullable=False, default=0.00)
+
+    # Booking & Appointments Configuration
+    booking_enabled = db.Column(db.Boolean, nullable=False, default=True)
+    booking_type = db.Column(db.String(20), nullable=False, default="Token")  # Token, Slot
+    allow_staff_selection = db.Column(db.Boolean, nullable=False, default=False)
+    working_days = db.Column(db.Text, nullable=False, default='["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]')
+    opening_time = db.Column(db.String(20), nullable=False, default="09:00")
+    closing_time = db.Column(db.String(20), nullable=False, default="20:00")
+    break_start_time = db.Column(db.String(20), nullable=True, default="13:00")
+    break_end_time = db.Column(db.String(20), nullable=True, default="14:00")
+    booking_interval_minutes = db.Column(db.Integer, nullable=False, default=30)
+    max_daily_bookings = db.Column(db.Integer, nullable=False, default=50)
+    max_concurrent_slots = db.Column(db.Integer, nullable=False, default=2)
 
     # Marketing / Client Churn Settings
     churn_days_threshold = db.Column(db.Integer, nullable=False, default=45)

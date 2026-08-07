@@ -29,3 +29,10 @@ class Tenant(db.Model, TimestampMixin, SoftDeleteMixin):
     subscription_plan = db.relationship("SubscriptionPlan", back_populates="tenants")
     users = db.relationship("User", back_populates="tenant", cascade="all, delete-orphan")
     settings = db.relationship("TenantSetting", back_populates="tenant", cascade="all, delete-orphan", uselist=False)
+
+    @property
+    def slug(self):
+        import re
+        s = re.sub(r'[^a-z0-9]+', '-', (self.name or "").lower()).strip('-')
+        return s or f"parlour-{self.id}"
+

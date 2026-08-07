@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 employees_bp = Blueprint("employees", __name__)
 
 @employees_bp.route("/employees", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "Receptionist", "Employee"])
 def get_employees():
     q = request.args.get("q", "").strip()
     status = request.args.get("status", "").strip()

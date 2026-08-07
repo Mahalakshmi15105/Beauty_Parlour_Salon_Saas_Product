@@ -40,7 +40,14 @@ def get_settings():
             "country": setting.country or "",
             "postal_code": setting.postal_code or "",
             "website": setting.website or "",
-            "description": setting.description or ""
+            "description": setting.description or "",
+            "shop_name_typography": {
+                "enabled": getattr(setting, "shop_name_font_enabled", False),
+                "font_family": getattr(setting, "shop_name_font", "Outfit") or "Outfit",
+                "font_size": getattr(setting, "shop_name_font_size", 32) or 32,
+                "font_weight": str(getattr(setting, "shop_name_font_weight", "700") or "700"),
+                "letter_spacing": float(getattr(setting, "shop_name_letter_spacing", 0.00) or 0.00)
+            }
         },
         "invoice_settings": {
             "invoice_prefix": setting.invoice_prefix or "INV",
@@ -75,7 +82,7 @@ def get_settings():
             "receipt_footer": setting.receipt_footer or "",
         },
         "theme_settings": {
-            "theme_name": getattr(setting, "theme_name", "Default Pink") or "Default Pink",
+            "theme_name": getattr(setting, "theme_name", "light") or "light",
             "primary_color": getattr(setting, "primary_color", "#EC4899") or "#EC4899",
             "secondary_color": getattr(setting, "secondary_color", "#F472B6") or "#F472B6",
             "accent_color": getattr(setting, "accent_color", "#FDF2F8") or "#FDF2F8"
@@ -121,6 +128,30 @@ def update_settings():
         setting.postal_code = biz.get("postal_code")
         setting.website = biz.get("website")
         setting.description = biz.get("description")
+
+        # Update Shop Name Typography Settings
+        typo = biz.get("shop_name_typography") or data.get("shop_name_typography") or {}
+        if typo:
+            if "enabled" in typo:
+                setting.shop_name_font_enabled = bool(typo["enabled"])
+            if typo.get("font_family"):
+                setting.shop_name_font = typo["font_family"].strip()
+            if typo.get("font_size") is not None:
+                try:
+                    raw_size = int(typo["font_size"])
+                    setting.shop_name_font_size = max(14, min(64, raw_size))
+                except (ValueError, TypeError):
+                    pass
+            if typo.get("font_weight"):
+                weight_str = str(typo["font_weight"]).strip()
+                if weight_str in ["400", "500", "700"]:
+                    setting.shop_name_font_weight = weight_str
+            if typo.get("letter_spacing") is not None:
+                try:
+                    raw_spacing = float(typo["letter_spacing"])
+                    setting.shop_name_letter_spacing = Decimal(str(max(-2.0, min(10.0, raw_spacing))))
+                except (ValueError, TypeError):
+                    pass
 
         # Update Invoice Settings
         if inv.get("invoice_prefix"):

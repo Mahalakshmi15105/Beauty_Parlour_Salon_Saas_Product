@@ -4,22 +4,33 @@ import API from "../services/api";
 
 const ThemeContext = createContext();
 
+// Helper to get tenant-specific localStorage keys
+const getTenantKey = (key) => {
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const tenantId = user.tenant_id || user.parlour_id || "default";
+  return `${key}_${tenantId}`;
+};
+
 export function ThemeProvider({ children }) {
   const [currentTheme, setCurrentTheme] = useState(() => {
-    // Initialize from localStorage or default
-    return localStorage.getItem('selected_theme') || DEFAULT_THEME;
+    // Initialize from tenant-specific localStorage or default
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    const tenantId = user.tenant_id || user.parlour_id || "default";
+    return localStorage.getItem(`selected_theme_${tenantId}`) || DEFAULT_THEME;
   });
 
   const [accentColor, setAccentColor] = useState(() => {
-    // Initialize accent color from localStorage or default
-    return localStorage.getItem('accent_color') || '#EC4899';
+    // Initialize accent color from tenant-specific localStorage or default
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    const tenantId = user.tenant_id || user.parlour_id || "default";
+    return localStorage.getItem(`accent_color_${tenantId}`) || '#EC4899';
   });
 
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Apply accent color first on mount (this ensures custom accent is used)
-    applyAccentColor(accentColor);
+    // Apply both theme and accent color on mount
+    applyTheme(currentTheme, accentColor);
 
     // Fetch tenant settings on load if logged in to sync with backend
     const token = localStorage.getItem("token");
@@ -28,12 +39,28 @@ export function ThemeProvider({ children }) {
         .then((res) => {
           const thm = res.data.data?.theme_settings || res.data?.theme_settings;
           if (thm) {
+            // Map backend theme names to frontend theme IDs (Sunlight or Starlight)
+            const backendThemeName = thm.theme_name || 'light';
+            let frontendThemeId = DEFAULT_THEME;
+            
+            if (backendThemeName === 'dark' || backendThemeName === 'Dark' || backendThemeName === 'Starlight') {
+              frontendThemeId = 'dark';
+            } else {
+              frontendThemeId = 'light';
+            }
+
             const backendAccent = thm.primary_color || '#EC4899';
-            // Sync backend accent color with local state
+            
+            // Sync both theme and accent color from backend
+            if (frontendThemeId && frontendThemeId !== currentTheme) {
+              setCurrentTheme(frontendThemeId);
+            }
             if (backendAccent && backendAccent !== accentColor) {
               setAccentColor(backendAccent);
-              applyAccentColor(backendAccent);
             }
+            
+            // Apply both
+            applyTheme(frontendThemeId, backendAccent);
           }
         })
         .catch(() => {
@@ -45,31 +72,40 @@ export function ThemeProvider({ children }) {
   const changeTheme = (themeId) => {
     if (THEMES[themeId]) {
       setCurrentTheme(themeId);
-      applyTheme(themeId);
+      applyTheme(themeId, accentColor);
+      // Save to backend
+      saveThemeToBackend(themeId, accentColor);
     }
   };
 
   const changeAccentColor = (color) => {
     setAccentColor(color);
     applyAccentColor(color);
+    // Save to backend
+    saveThemeToBackend(currentTheme, color);
   };
 
-  const saveAccentColorToBackend = async (color) => {
+  const saveThemeToBackend = async (themeId, color) => {
     setLoading(true);
     try {
       await API.put("/settings", {
         theme_settings: {
-          theme_name: currentTheme,
+          theme_name: themeId,
           primary_color: color,
           secondary_color: '#F472B6',
           accent_color: 'rgba(236, 72, 153, 0.08)',
         },
       });
     } catch (err) {
-      console.error("Failed to save accent color to backend:", err);
+      console.error("Failed to save theme settings to backend:", err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const saveAccentColorToBackend = async (color) => {
+    // This is now handled by changeAccentColor, but kept for compatibility
+    await saveThemeToBackend(currentTheme, color);
   };
 
   const getCurrentTheme = () => {
@@ -78,15 +114,11 @@ export function ThemeProvider({ children }) {
 
   const getChartColors = () => {
     const theme = getCurrentTheme();
-    // Override primary color with custom accent if set
-    const customAccent = localStorage.getItem('accent_color');
-    if (customAccent) {
-      return {
-        ...theme.chartColors,
-        primary: customAccent,
-      };
-    }
-    return theme.chartColors;
+    // Use the current accent color from state (already tenant-specific)
+    return {
+      ...theme.chartColors,
+      primary: accentColor,
+    };
   };
 
   return (

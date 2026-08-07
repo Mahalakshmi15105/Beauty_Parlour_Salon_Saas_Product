@@ -46,9 +46,13 @@
 .text-text-secondary { color: var(--color-text-secondary) !important; }
 
 @layer base {
+  * {
+    transition: background-color 250ms ease-in-out, border-color 250ms ease-in-out, color 250ms ease-in-out, box-shadow 250ms ease-in-out;
+  }
+
   body {
-    background-color: #FDFBFD;
-    color: #0F172A;
+    background-color: var(--color-background);
+    color: var(--color-text-primary);
     font-family: "Inter", system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     margin: 0;

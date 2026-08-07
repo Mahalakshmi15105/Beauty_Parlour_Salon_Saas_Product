@@ -27,6 +27,7 @@ import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { useTheme } from "../context/ThemeContext";
 import ThemeSelector from "./ThemeSelector";
 import { getFullImageUrl } from "../utils/imageUrl";
+import { getShopNameStyle } from "../utils/fontLoader";
 
 const getMenuIcon = (id) => {
   switch (id) {
@@ -46,6 +47,8 @@ const getMenuIcon = (id) => {
     case "customer_memberships":
     case "memberships":
       return <Award className="w-4 h-4 shrink-0" />;
+    case "appointments":
+      return <CalendarClock className="w-4 h-4 shrink-0" />;
     case "notifications":
       return <Bell className="w-4 h-4 shrink-0" />;
     case "marketing":
@@ -95,6 +98,7 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
   // Parlour Branding & Logo State
   const [logoUrl, setLogoUrl] = useState("");
   const [parlourName, setParlourName] = useState("");
+  const [shopNameTypography, setShopNameTypography] = useState(null);
   const [imgFailed, setImgFailed] = useState(false);
 
   const fetchBranding = () => {
@@ -107,6 +111,7 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
           setImgFailed(false);
         }
         setParlourName(biz.name || user?.parlour_name || "Beauty Parlour");
+        setShopNameTypography(biz.shop_name_typography || null);
         if (fullUrl) {
           localStorage.setItem("parlour_logo_url", fullUrl);
         } else {
@@ -172,6 +177,7 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
     { id: "employees", labelKey: "employees", defaultLabel: "Employees" },
     { id: "catalog", labelKey: "services_products", defaultLabel: "Services & Products" },
     { id: "memberships", labelKey: "membership_management", defaultLabel: "Membership Management" },
+    { id: "appointments", labelKey: "appointments", defaultLabel: "Appointments" },
     { id: "notifications", labelKey: "notifications", defaultLabel: "Notifications" },
     { id: "marketing", labelKey: "whatsapp_marketing", defaultLabel: "WhatsApp Campaigns" },
     { id: "reports", labelKey: "reports", defaultLabel: "Reports" },
@@ -237,7 +243,10 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
                 )}
               </div>
               <div className="overflow-hidden leading-tight">
-                <span className="font-extrabold text-slate-900 text-sm block truncate">
+                <span
+                  className="font-extrabold text-slate-900 text-sm block truncate transition-all duration-200"
+                  style={getShopNameStyle(shopNameTypography)}
+                >
                   {parlourName || user?.parlour_name || "Beauty Parlour"}
                 </span>
                 <span className="text-[11px] font-semibold text-slate-500 block mt-0.5 whitespace-nowrap">

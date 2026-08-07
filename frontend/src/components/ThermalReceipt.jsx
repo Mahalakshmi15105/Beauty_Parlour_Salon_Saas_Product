@@ -1,6 +1,7 @@
 import React from "react";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { getFullImageUrl } from "../utils/imageUrl";
+import { getShopNameStyle } from "../utils/fontLoader";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
@@ -369,7 +370,10 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
           </div>
         )}
 
-        <h1 className={`font-bold uppercase tracking-wide text-black ${is58mm ? "text-xs" : "text-sm"}`}>
+        <h1
+          className={`font-bold uppercase tracking-wide text-black ${is58mm ? "text-xs" : "text-sm"}`}
+          style={getShopNameStyle(businessProfile.shop_name_typography)}
+        >
           {businessProfile.name || "Beauty Parlour"}
         </h1>
 

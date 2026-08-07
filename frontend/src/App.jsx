@@ -8,6 +8,7 @@ import Products from "./pages/Products";
 import Billing from "./pages/Billing";
 import MembershipPlans from "./pages/MembershipPlans";
 import CustomerMemberships from "./pages/CustomerMemberships";
+import Appointments from "./pages/Appointments";
 import ServicesAndProducts from "./pages/ServicesAndProducts";
 import MembershipManagement from "./pages/MembershipManagement";
 import Dashboard from "./pages/Dashboard";
@@ -19,6 +20,7 @@ import WhatsAppCampaigns from "./pages/WhatsAppCampaigns";
 import SuperAdmin from "./pages/SuperAdmin";
 import LandingPage from "./pages/LandingPage";
 import Register from "./pages/Register";
+import PublicBookingPage from "./pages/PublicBookingPage";
 import API from "./services/api";
 import { LogOut, ShieldCheck, Sparkles, UserCheck } from "lucide-react";
 
@@ -29,12 +31,34 @@ function App() {
     return saved ? JSON.parse(saved) : null;
   });
 
+  // Detect Public Booking Portal route e.g. /book/zeros-lan-3, /book/zeros-lan, or /book/3
+  const getPublicTenantIdentifier = () => {
+    const path = window.location.pathname;
+    if (path.startsWith("/book/")) {
+      const parts = path.split("/book/");
+      if (parts[1]) {
+        const identifier = parts[1].split("?")[0].split("#")[0].trim();
+        return identifier || "1";
+      }
+    }
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.get("book_tenant_id")) {
+      return searchParams.get("book_tenant_id").trim();
+    }
+    return null;
+  };
+
+  const publicTenantId = getPublicTenantIdentifier();
+
   // Detect Meta OAuth callback redirect (?code=...) and route to WhatsApp integration page
   const initialActiveTab = new URLSearchParams(window.location.search).get("code")
     ? "whatsapp_integration"
     : "dashboard";
 
-  const [currentView, setCurrentView] = useState(localStorage.getItem("token") ? "app" : "landing");
+  const [currentView, setCurrentView] = useState(() => {
+    if (publicTenantId !== null) return "public_booking";
+    return localStorage.getItem("token") ? "app" : "landing";
+  });
   const [activeTab, setActiveTab] = useState(initialActiveTab);
 
   // Login Form State
@@ -91,6 +115,19 @@ function App() {
       setCurrentView("login");
     }
   }, []);
+
+  // 0. PUBLIC BOOKING PORTAL VIEW
+  if (currentView === "public_booking" || publicTenantId !== null) {
+    return (
+      <PublicBookingPage
+        tenantId={publicTenantId || 1}
+        onNavigateHome={() => {
+          window.history.pushState({}, "", "/");
+          setCurrentView(localStorage.getItem("token") ? "app" : "landing");
+        }}
+      />
+    );
+  }
 
   // 1. LANDING PAGE VIEW
   if (currentView === "landing") {
@@ -302,6 +339,8 @@ function App() {
       case "membership_plans":
       case "customer_memberships":
         return <MembershipManagement />;
+      case "appointments":
+        return <Appointments />;
       case "marketing":
       case "whatsapp_campaigns":
         return <WhatsAppCampaigns />;

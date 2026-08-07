@@ -27,8 +27,13 @@ import {
   Eye,
   QrCode,
   MessageSquare,
+  Type,
+  Search,
+  RotateCcw,
+  Sliders,
 } from "lucide-react";
 import WhatsAppIntegration from "./WhatsAppIntegration";
+import { CURATED_FONTS, DEFAULT_TYPOGRAPHY, getShopNameStyle, loadGoogleFont } from "../utils/fontLoader";
 
 function Settings() {
   const formRef = useRef(null);
@@ -44,7 +49,7 @@ function Settings() {
     SUPPORTED_CURRENCIES,
   } = useLanguageCurrency();
 
-  const { changeAccentColor } = useTheme();
+  const { changeAccentColor, currentTheme } = useTheme();
 
   const [activeTab, setActiveTab] = useState("business");
   const [loading, setLoading] = useState(true);
@@ -58,9 +63,19 @@ function Settings() {
   const [uploadError, setUploadError] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Accent Color State
-  const [accentColor, setAccentColor] = useState(localStorage.getItem('accent_color') || '#EC4899');
-  const [customColor, setCustomColor] = useState(localStorage.getItem('accent_color') || '#EC4899');
+  // Shop Name Typography Search & Dropdown State
+  const [fontSearchQuery, setFontSearchQuery] = useState("");
+  const [isFontDropdownOpen, setIsFontDropdownOpen] = useState(false);
+
+  // Accent Color State - use tenant-specific localStorage
+  const getTenantKey = (key) => {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    const tenantId = user.tenant_id || user.parlour_id || "default";
+    return `${key}_${tenantId}`;
+  };
+  
+  const [accentColor, setAccentColor] = useState(localStorage.getItem(getTenantKey('accent_color')) || '#EC4899');
+  const [customColor, setCustomColor] = useState(localStorage.getItem(getTenantKey('accent_color')) || '#EC4899');
 
   useFormKeyboardNavigation(formRef, () => {
     const submitBtn = formRef.current?.querySelector('button[type="submit"]');
@@ -83,6 +98,7 @@ function Settings() {
       postal_code: "",
       website: "",
       description: "",
+      shop_name_typography: { ...DEFAULT_TYPOGRAPHY },
     },
     invoice_settings: {
       invoice_prefix: "INV",
@@ -190,7 +206,44 @@ function Settings() {
     setLoading(true);
     API.get("/settings")
       .then((res) => {
-        setSettingsData(res.data);
+        const rawData = res.data || {};
+        setSettingsData((prev) => ({
+          ...prev,
+          ...rawData,
+          business_profile: {
+            ...prev.business_profile,
+            ...(rawData.business_profile || {}),
+            shop_name_typography: {
+              ...DEFAULT_TYPOGRAPHY,
+              ...(rawData.business_profile?.shop_name_typography || {}),
+            },
+          },
+          invoice_settings: {
+            ...prev.invoice_settings,
+            ...(rawData.invoice_settings || {}),
+          },
+          receipt_settings: {
+            ...prev.receipt_settings,
+            ...(rawData.receipt_settings || {}),
+          },
+          regional_settings: {
+            ...prev.regional_settings,
+            ...(rawData.regional_settings || {}),
+          },
+          marketing_settings: {
+            ...prev.marketing_settings,
+            ...(rawData.marketing_settings || {}),
+          },
+        }));
+
+        // Sync theme settings from backend
+        const thm = rawData.theme_settings;
+        if (thm) {
+          const backendAccent = thm.primary_color || "#EC4899";
+          setAccentColor(backendAccent);
+          setCustomColor(backendAccent);
+        }
+
         setLoading(false);
       })
       .catch((err) => {
@@ -246,7 +299,7 @@ function Settings() {
     const payload = {
       ...settingsData,
       theme_settings: {
-        theme_name: "light",
+        theme_name: currentTheme,
         primary_color: accentColor,
         secondary_color: "#F472B6",
         accent_color: "rgba(236, 72, 153, 0.08)"
@@ -292,10 +345,9 @@ function Settings() {
       {/* Header Bar */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-xl font-semibold text-text-primary">{t("settings")}</h1>
-          <h2 className="text-xl font-extrabold text-text-primary tracking-tight">
+          <h1 className="text-xl font-extrabold text-text-primary tracking-tight">
             {t("settings")}
-          </h2>
+          </h1>
           <p className="text-xs text-text-secondary">
             Manage business profile, thermal receipt templates, tax rules, themes, regional settings, and system configurations
           </p>
@@ -517,6 +569,261 @@ function Settings() {
                     className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
                   />
                 </div>
+              </div>
+
+              {/* SHOP NAME FONT STYLE & TYPOGRAPHY SECTION */}
+              <div className="p-4 bg-background/50 border border-border-soft rounded-xl space-y-4">
+                <div className="flex items-center justify-between border-b border-border-soft pb-3">
+                  <div className="flex items-center space-x-2">
+                    <Type className="w-5 h-5 text-primary" />
+                    <div>
+                      <h3 className="text-sm font-bold text-text-primary">Shop Name Font Style</h3>
+                      <p className="text-[11px] text-text-secondary">Customize typography specifically for your parlour shop name</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSettingsData((prev) => ({
+                          ...prev,
+                          business_profile: {
+                            ...prev.business_profile,
+                            shop_name_typography: { ...DEFAULT_TYPOGRAPHY },
+                          },
+                        }));
+                      }}
+                      className="flex items-center space-x-1 text-xs text-text-secondary hover:text-primary transition font-medium px-2.5 py-1 rounded-lg border border-border-soft hover:border-primary/40 bg-surface"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Reset to Default</span>
+                    </button>
+
+                    {/* Enable / Disable Toggle Switch */}
+                    <label className="flex items-center space-x-2 cursor-pointer bg-surface px-3 py-1.5 rounded-lg border border-border-soft select-none">
+                      <span className="text-xs font-bold text-text-primary">Enable Custom Font</span>
+                      <input
+                        type="checkbox"
+                        checked={settingsData.business_profile.shop_name_typography?.enabled || false}
+                        onChange={(e) => {
+                          const val = e.target.checked;
+                          setSettingsData((prev) => ({
+                            ...prev,
+                            business_profile: {
+                              ...prev.business_profile,
+                              shop_name_typography: {
+                                ...(prev.business_profile.shop_name_typography || DEFAULT_TYPOGRAPHY),
+                                enabled: val,
+                              },
+                            },
+                          }));
+                        }}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary relative"></div>
+                    </label>
+                  </div>
+                </div>
+
+                {settingsData.business_profile.shop_name_typography?.enabled ? (
+                  <div className="space-y-4">
+                    {/* 1. Searchable Font Family Selector Dropdown */}
+                    <div className="relative">
+                      <label className="block text-xs font-semibold text-text-secondary mb-1">Font Family</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="Search font style (e.g. Elegant, Luxury, Script)..."
+                          value={fontSearchQuery || settingsData.business_profile.shop_name_typography?.font_family || "Outfit"}
+                          onFocus={() => setIsFontDropdownOpen(true)}
+                          onChange={(e) => {
+                            setFontSearchQuery(e.target.value);
+                            setIsFontDropdownOpen(true);
+                          }}
+                          className="w-full bg-surface border border-border-soft px-3 py-2 pl-9 rounded-lg text-xs text-text-primary focus:outline-none font-medium"
+                        />
+                        <Search className="w-4 h-4 text-text-secondary absolute left-3 top-2.5" />
+                      </div>
+
+                      {/* Dropdown Options List */}
+                      {isFontDropdownOpen && (
+                        <div className="absolute z-50 left-0 right-0 mt-1 bg-surface border border-border-soft rounded-xl shadow-xl max-h-60 overflow-y-auto divide-y divide-border-soft/50">
+                          {CURATED_FONTS.filter(
+                            (f) =>
+                              f.name.toLowerCase().includes(fontSearchQuery.toLowerCase()) ||
+                              f.id.toLowerCase().includes(fontSearchQuery.toLowerCase()) ||
+                              f.category.toLowerCase().includes(fontSearchQuery.toLowerCase())
+                          ).map((font) => {
+                            // Preload font on hover for preview
+                            loadGoogleFont(font.id);
+                            const isSelected =
+                              (settingsData.business_profile.shop_name_typography?.font_family || "Outfit").toLowerCase() ===
+                              font.id.toLowerCase();
+
+                            return (
+                              <button
+                                key={font.id}
+                                type="button"
+                                onClick={() => {
+                                  setSettingsData((prev) => ({
+                                    ...prev,
+                                    business_profile: {
+                                      ...prev.business_profile,
+                                      shop_name_typography: {
+                                        ...prev.business_profile.shop_name_typography,
+                                        font_family: font.id,
+                                      },
+                                    },
+                                  }));
+                                  setFontSearchQuery("");
+                                  setIsFontDropdownOpen(false);
+                                }}
+                                className={`w-full text-left p-2.5 flex items-center justify-between hover:bg-background/80 transition ${
+                                  isSelected ? "bg-primary/10 font-bold" : ""
+                                }`}
+                              >
+                                <div>
+                                  <div className="text-xs text-text-primary font-semibold flex items-center space-x-2">
+                                    <span>{font.name}</span>
+                                    <span className="text-[10px] text-text-secondary font-normal border border-border-soft px-1.5 py-0.2 rounded uppercase">
+                                      {font.category}
+                                    </span>
+                                  </div>
+                                  <div
+                                    className="text-sm mt-0.5 text-primary truncate max-w-[280px]"
+                                    style={{ fontFamily: font.family }}
+                                  >
+                                    {settingsData.business_profile.name || "Glamour Beauty Studio"}
+                                  </div>
+                                </div>
+                                {isSelected && <Check className="w-4 h-4 text-primary" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Controls Grid: Size, Weight, Letter Spacing */}
+                    <div className="grid grid-cols-3 gap-4">
+                      {/* Font Size Slider & Box */}
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="text-xs font-semibold text-text-secondary">Font Size</label>
+                          <span className="text-xs font-bold text-primary">
+                            {settingsData.business_profile.shop_name_typography?.font_size || 32} px
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="14"
+                          max="64"
+                          value={settingsData.business_profile.shop_name_typography?.font_size || 32}
+                          onChange={(e) =>
+                            setSettingsData((prev) => ({
+                              ...prev,
+                              business_profile: {
+                                ...prev.business_profile,
+                                shop_name_typography: {
+                                  ...prev.business_profile.shop_name_typography,
+                                  font_size: Number(e.target.value),
+                                },
+                              },
+                            }))
+                          }
+                          className="w-full accent-primary"
+                        />
+                      </div>
+
+                      {/* Font Weight Selector */}
+                      <div>
+                        <label className="block text-xs font-semibold text-text-secondary mb-1">Font Weight</label>
+                        <div className="flex border border-border-soft rounded-lg overflow-hidden p-0.5 bg-surface">
+                          {[
+                            { label: "Regular", val: "400" },
+                            { label: "Medium", val: "500" },
+                            { label: "Bold", val: "700" },
+                          ].map((w) => (
+                            <button
+                              key={w.val}
+                              type="button"
+                              onClick={() =>
+                                setSettingsData((prev) => ({
+                                  ...prev,
+                                  business_profile: {
+                                    ...prev.business_profile,
+                                    shop_name_typography: {
+                                      ...prev.business_profile.shop_name_typography,
+                                      font_weight: w.val,
+                                    },
+                                  },
+                                }))
+                              }
+                              className={`flex-1 text-[11px] py-1 font-bold rounded-md transition ${
+                                String(settingsData.business_profile.shop_name_typography?.font_weight || "700") === w.val
+                                  ? "bg-primary text-white shadow-xs"
+                                  : "text-text-secondary hover:text-text-primary"
+                              }`}
+                            >
+                              {w.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Letter Spacing Slider */}
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="text-xs font-semibold text-text-secondary">Letter Spacing</label>
+                          <span className="text-xs font-bold text-primary">
+                            {settingsData.business_profile.shop_name_typography?.letter_spacing || 0} px
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="-2"
+                          max="10"
+                          step="0.5"
+                          value={settingsData.business_profile.shop_name_typography?.letter_spacing || 0}
+                          onChange={(e) =>
+                            setSettingsData((prev) => ({
+                              ...prev,
+                              business_profile: {
+                                ...prev.business_profile,
+                                shop_name_typography: {
+                                  ...prev.business_profile.shop_name_typography,
+                                  letter_spacing: Number(e.target.value),
+                                },
+                              },
+                            }))
+                          }
+                          className="w-full accent-primary"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Real-time Interactive Live Preview Card */}
+                    <div className="pt-2">
+                      <div className="text-[11px] font-bold text-text-secondary uppercase tracking-wider mb-1 flex items-center space-x-1">
+                        <Eye className="w-3.5 h-3.5 text-primary" />
+                        <span>Live Preview</span>
+                      </div>
+                      <div className="p-4 bg-surface border border-border-soft rounded-xl text-center flex items-center justify-center min-h-[90px] overflow-hidden shadow-inner">
+                        <span
+                          className="text-text-primary break-words max-w-full leading-tight transition-all duration-200"
+                          style={getShopNameStyle(settingsData.business_profile.shop_name_typography)}
+                        >
+                          {settingsData.business_profile.name || "Glamour Beauty Studio"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-text-secondary italic">
+                    Custom typography disabled. Reverted to standard application font (`Outfit` / `sans-serif`).
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">

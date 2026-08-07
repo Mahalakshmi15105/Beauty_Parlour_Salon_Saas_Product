@@ -159,7 +159,7 @@ def delete_category(category_id):
 # --- SERVICE CRUD ---
 
 @services_bp.route("/services", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "Receptionist", "Employee"])
 def get_services():
     q = request.args.get("q", "").strip()
     category_id = request.args.get("category_id", "").strip()
