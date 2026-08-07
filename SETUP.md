@@ -52,12 +52,13 @@ The backend will start on `http://localhost:5000`
 
 ### 3. Database Setup
 
-The project uses SQLAlchemy with Flask-Migrate for database management.
+The project uses SQLAlchemy with automatic table creation via `db.create_all()`.
 
 **For Development (SQLite):**
 - The default `DATABASE_URL` in `.env` uses SQLite
 - No additional database setup required
 - Database file will be created automatically at `backend/parlour.db`
+- Tables are created automatically by the setup script
 
 **For Production (MySQL):**
 1. Create a MySQL database:
@@ -70,28 +71,33 @@ CREATE DATABASE salon_software CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 DATABASE_URL=mysql+pymysql://username:password@localhost/salon_software
 ```
 
-3. Run migrations:
+3. Run migrations (optional - MySQL users can use Flask-Migrate):
 ```bash
 flask db upgrade
 ```
 
-### 4. Seed Data
+### 4. Database Setup
 
-The `seed.py` script creates:
+Run the setup script to initialize the database:
+```bash
+python setup.py
+```
+
+This script will:
+- Create all database tables automatically
+- Run seed data if the database is empty
+- Create default users and sample data
+
+The `setup.py` script creates:
 - Default subscription plans
 - Sample tenant (SmartGoNext Beauty Salon)
 - Super admin user (superadmin@smartgonext.com / SuperAdmin123!)
 - Parlour admin user (admin@smartgonext.com / ParlourAdmin123!)
-- Default settings
+- Default settings including booking configuration
 - Sample service categories and services
 - Sample products
 - Sample employees
 - Sample membership plans
-
-Run the seed script:
-```bash
-python seed.py
-```
 
 ## Frontend Setup
 
@@ -166,7 +172,7 @@ If you encounter database issues, you can reset the database:
 rm backend/parlour.db
 python setup.py
 
-# For MySQL
+# For MySQL (optional - if using migrations)
 flask db downgrade base
 flask db upgrade
 python setup.py
