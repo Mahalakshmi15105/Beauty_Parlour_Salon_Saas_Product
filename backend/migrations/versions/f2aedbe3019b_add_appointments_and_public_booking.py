@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'add_appointments_and_public_booking'
+revision = 'f2aedbe3019b'
 down_revision = 'e000b25f6634'
 branch_labels = None
 depends_on = None
