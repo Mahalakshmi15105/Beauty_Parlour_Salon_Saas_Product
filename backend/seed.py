@@ -76,7 +76,18 @@ def seed_database():
                 tax_rate=18.00,
                 currency="INR",
                 receipt_header="Welcome to SmartGoNext Beauty Salon!",
-                receipt_footer="Thank you for visiting us. Have a wonderful day!"
+                receipt_footer="Thank you for visiting us. Have a wonderful day!",
+                booking_enabled=True,
+                booking_type="Token",
+                allow_staff_selection=False,
+                working_days='["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]',
+                opening_time="09:00",
+                closing_time="20:00",
+                break_start_time="13:00",
+                break_end_time="14:00",
+                booking_interval_minutes=30,
+                max_daily_bookings=50,
+                max_concurrent_slots=2
             )
             db.session.add(settings)
             print("Default settings created.")

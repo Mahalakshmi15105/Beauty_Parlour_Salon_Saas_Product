@@ -37,4 +37,14 @@ env/
 # Local env files
 .env
 instance/
-migrations/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploaded files
+static/uploads/*
+
+# Keep migrations folder for version control
+# migrations/
