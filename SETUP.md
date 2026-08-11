@@ -78,15 +78,31 @@ flask db upgrade
 
 ### 4. Database Setup
 
-Run the setup script to initialize the database:
+**AUTO-SEED (Recommended):** The backend now **automatically seeds** the database
+on startup if it's empty. Just run the server:
+
+```bash
+python run.py
+```
+
+On startup, the backend will:
+1. Auto-create the database if it doesn't exist
+2. Create all database tables automatically
+3. **Auto-seed** default data if the database is empty:
+   - Default subscription plans
+   - Sample tenant (SmartGoNext Beauty Salon)
+   - Super admin user (superadmin@smartgonext.com / SuperAdmin123!)
+   - Parlour admin user (admin@smartgonext.com / ParlourAdmin123!)
+   - Default settings including booking configuration
+   - Sample service categories and services
+   - Sample products
+   - Sample employees
+   - Sample membership plans
+
+**Manual seeding (optional):** You can also run the setup script manually:
 ```bash
 python setup.py
 ```
-
-This script will:
-- Create all database tables automatically
-- Run seed data if the database is empty
-- Create default users and sample data
 
 The `setup.py` script creates:
 - Default subscription plans
@@ -212,17 +228,133 @@ flask db upgrade
 - Authentication uses JWT tokens
 - File uploads are stored in `backend/static/uploads/`
 
-## Production Deployment
+## Production Deployment (Cloud Linux)
 
-For production deployment:
+The project is fully optimized for **cloud Linux** with **single-thread** execution
+and **auto-sleep** (idle shutdown) to save server resources.
+
+### Single-Thread Mode
+
+- **Development**: Flask `app.run(threaded=False)` — exactly 1 thread.
+- **Production**: Waitress `serve(..., threads=1)` — exactly 1 thread.
+- One thread processes ALL user requests **sequentially** — no multi-threading.
+- Set `SINGLE_THREAD=false` in `.env` to enable multi-threading intentionally.
+
+### Auto-Sleep Mode
+
+The backend automatically **kills all threads and goes to sleep** after
+`AUTO_SLEEP_MINUTES` (default 5) of no API activity:
+
+1. Backend tracks the **last API request** timestamp.
+2. After 5 minutes of **zero activity**, the process calls `SIGTERM` on itself.
+3. **systemd** (`Restart=always`) automatically restarts the service.
+4. The next user request wakes the backend automatically (1-3 second delay).
+5. The **frontend auto-wake interceptor** retries the request automatically.
+
+### Production Domains
+
+- **Frontend:** `https://salon.smartgonext.com`
+- **Backend API:** `https://salon-backend.smartgonext.com`
+- **Database:** `smartgo1_salon` (user: `smartgo1_salon_user`)
+
+### One-Command Cloud Linux Installer
+
+```bash
+# On your cloud Linux server (Ubuntu/Debian), as root or with sudo:
+bash deploy/install.sh
+```
+
+This installs:
+- Python 3, MySQL, Nginx, Git
+- Clones the repository to `/var/www/salon`
+- Creates a Python virtual environment
+- Installs `requirements.txt` (includes Waitress)
+- **Creates MySQL database `smartgo1_salon` and user `smartgo1_salon_user`**
+- Generates `.env` (edit with production secrets)
+- Installs & starts the `salon-backend` systemd service
+- Verifies the health endpoint
+
+### Phusion Passenger Hosting (cPanel / Plesk / CloudLinux)
+
+If you are using **shared hosting** with Phusion Passenger (cPanel, Plesk,
+or CloudLinux), the `passenger_wsgi.py` file is provided:
+
+```bash
+# Files needed for Passenger hosting:
+backend/passenger_wsgi.py   # WSGI entry point (application = Flask app)
+backend/.htaccess           # Single-thread + auto-sleep Passenger config
+deploy/CPANEL_SETUP.md      # Step-by-step cPanel setup guide
+```
+
+> ⚠️ **IMPORTANT:** If you see the error
+> `No such application (or application not configured) "salon-backend.smartgonext.com"`,
+> it means the **Python app has not been created in cPanel yet**.
+> Follow the complete guide in **`deploy/CPANEL_SETUP.md`**.
+
+The `.htaccess` file configures:
+- `PassengerMaxPoolSize 1` → only **ONE** process serves all users
+- `PassengerAppEnv production` → production environment
+
+To deploy on cPanel:
+1. Upload the `backend/` folder to `~/salon-backend/`
+2. In cPanel → **Setup Python App** → **Create Application**:
+   - Application root: `/salon-backend`
+   - Application URL: `salon-backend.smartgonext.com`
+   - **Application startup file:** `passenger_wsgi.py`
+   - **Application entry point:** `application`
+3. Install dependencies: `pip install -r requirements.txt`
+4. Create MySQL database `smartgo1_salon` + user `smartgo1_salon_user`
+5. Update `backend/.env` with your `DATABASE_URL` and CORS domains
+6. Click **RESTART** on your app in cPanel
+7. Verify: `https://salon-backend.smartgonext.com/api/v1/health`
+
+### Manual Wake
+
+```bash
+# From the server
+bash deploy/wake.sh
+
+# Or with curl
+curl http://127.0.0.1:5000/api/v1/health
+```
+
+### Nginx Setup
+
+```bash
+cp deploy/nginx.conf /etc/nginx/sites-available/salon
+ln -s /etc/nginx/sites-available/salon /etc/nginx/sites-enabled/
+nginx -t
+systemctl reload nginx
+```
+
+### Useful Commands
+
+```bash
+# Check service status
+systemctl status salon-backend
+
+# Watch logs
+journalctl -u salon-backend -f
+
+# Restart manually
+systemctl restart salon-backend
+
+# Disable auto-sleep permanently
+#   Set AUTO_SLEEP_ENABLED=false in backend/.env
+#   Then: systemctl restart salon-backend
+```
+
+### Production Checklist
 
 1. Update `.env` with production values
-2. Use a production WSGI server (Gunicorn, uWSGI)
-3. Set up a proper database (MySQL/PostgreSQL)
-4. Configure CORS for your domain
-5. Enable HTTPS
-6. Set up proper logging
-7. Configure WhatsApp Meta API credentials (if using)
+2. Set `ENVIRONMENT=production` in `.env`
+3. Set `SINGLE_THREAD=true` (default) for single-thread mode
+4. Set `AUTO_SLEEP_ENABLED=true` (default) for auto-sleep
+5. Set up a proper database (MySQL/PostgreSQL) — auto-created on startup
+6. Configure CORS for your domain
+7. Enable HTTPS
+8. Set up proper logging
+9. Configure WhatsApp Meta API credentials (if using)
 
 ## Support
 

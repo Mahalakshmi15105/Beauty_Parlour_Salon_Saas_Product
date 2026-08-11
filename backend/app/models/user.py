@@ -15,6 +15,9 @@ class User(db.Model, TimestampMixin, SoftDeleteMixin):
     # Relationships
     tenant = db.relationship("Tenant", back_populates="users")
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
@@ -101,3 +104,7 @@ class TenantSetting(db.Model, TimestampMixin):
 
     # Relationships
     tenant = db.relationship("Tenant", back_populates="settings")
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+

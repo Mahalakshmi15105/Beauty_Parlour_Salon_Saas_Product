@@ -1,0 +1,92 @@
+# ============================================================
+# SmartGoNext Salon - Frontend .htaccess
+#
+# For cPanel / Plesk / Apache shared hosting.
+# Serves the built React app (frontend/dist) and handles
+# SPA routing (all routes fall back to index.html).
+#
+# Deploy steps:
+#   1. Build:  cd frontend && npm run build
+#   2. Upload the contents of frontend/dist/ to your
+#      public_html (or the domain's document root)
+#   3. This .htaccess file must be in the same folder
+#      as index.html
+# ============================================================
+
+# Enable URL rewriting
+RewriteEngine On
+
+# If the request is for a real file or directory, serve it directly
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Otherwise, route everything to index.html (SPA fallback)
+RewriteRule ^ index.html [L]
+
+# ------------------------------------------------------------
+# Security Headers
+# ------------------------------------------------------------
+<IfModule mod_headers.c>
+    # Prevent MIME type sniffing
+    Header set X-Content-Type-Options "nosniff"
+
+    # Clickjacking protection
+    Header set X-Frame-Options "SAMEORIGIN"
+
+    # Basic XSS protection
+    Header set X-XSS-Protection "1; mode=block"
+
+    # Referrer policy
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# ------------------------------------------------------------
+# Caching
+# ------------------------------------------------------------
+<IfModule mod_expires.c>
+    ExpiresActive On
+
+    # HTML - no cache (always fresh)
+    ExpiresByType text/html "access plus 0 seconds"
+
+    # CSS/JS - cache for 30 days
+    ExpiresByType text/css "access plus 30 days"
+    ExpiresByType application/javascript "access plus 30 days"
+
+    # Images - cache for 30 days
+    ExpiresByType image/png "access plus 30 days"
+    ExpiresByType image/jpeg "access plus 30 days"
+    ExpiresByType image/svg+xml "access plus 30 days"
+    ExpiresByType image/webp "access plus 30 days"
+    ExpiresByType image/x-icon "access plus 30 days"
+
+    # Fonts - cache for 30 days
+    ExpiresByType font/woff2 "access plus 30 days"
+    ExpiresByType font/woff "access plus 30 days"
+</IfModule>
+
+# ------------------------------------------------------------
+# Compression
+# ------------------------------------------------------------
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html
+    AddOutputFilterByType DEFLATE text/css
+    AddOutputFilterByType DEFLATE application/javascript
+    AddOutputFilterByType DEFLATE application/json
+    AddOutputFilterByType DEFLATE image/svg+xml
+    AddOutputFilterByType DEFLATE font/woff2
+    AddOutputFilterByType DEFLATE font/woff
+</IfModule>
+
+# ------------------------------------------------------------
+# Block access to sensitive files
+# ------------------------------------------------------------
+<FilesMatch "^(\.env|\.env\.local|\.gitignore|package\.json|package-lock\.json|vite\.config\.js)$">
+    Require all denied
+</FilesMatch>
+
+# Block dotfiles
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>

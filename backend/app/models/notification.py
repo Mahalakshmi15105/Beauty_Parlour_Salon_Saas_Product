@@ -19,3 +19,6 @@ class Notification(db.Model, TimestampMixin):
     # Relationships
     customer = db.relationship("Customer", lazy="joined")
     customer_membership = db.relationship("CustomerMembership", lazy="joined")
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)

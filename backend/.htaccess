@@ -1,0 +1,50 @@
+# ============================================================
+# Phusion Passenger / cPanel Python App Configuration
+#
+# IMPORTANT: When using cPanel "Setup Python App", cPanel
+# auto-generates its own .htaccess in the application root.
+# This file provides SUPPLEMENTAL safe directives.
+#
+# Single-Thread Mode: enforced by cPanel Passenger pool settings
+# (only 1 process is created for the app).
+#
+# Auto-Sleep: handled by backend/app/services/auto_sleep.py
+# (process terminates after AUTO_SLEEP_MINUTES of inactivity;
+#  the next request wakes it because Passenger restarts).
+# ============================================================
+
+# Only ONE Passenger process serves this app (single-thread)
+PassengerMaxPoolSize 1
+PassengerMinInstances 1
+PassengerMaxInstancesPerApp 1
+
+# Production environment
+SetEnv ENVIRONMENT production
+SetEnv SINGLE_THREAD true
+SetEnv THREADS 1
+SetEnv AUTO_SLEEP_ENABLED true
+SetEnv AUTO_SLEEP_MINUTES 5
+SetEnv PORT 5000
+
+# ============================================================
+# CORS Headers
+# Allow the production frontend (https://salon.smartgonext.com)
+# to access this API from the browser.
+# ============================================================
+<IfModule mod_headers.c>
+    # Allow requests from the production frontend domain
+    Header set Access-Control-Allow-Origin "https://salon.smartgonext.com"
+    Header set Access-Control-Allow-Credentials "true"
+    Header set Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    Header set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+    Header set Access-Control-Max-Age "86400"
+</IfModule>
+
+# Handle CORS preflight requests
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # If the request is an OPTIONS preflight, respond 200 with CORS headers
+    RewriteCond %{REQUEST_METHOD} OPTIONS
+    RewriteRule ^(.*)$ $1 [R=200,L]
+</IfModule>

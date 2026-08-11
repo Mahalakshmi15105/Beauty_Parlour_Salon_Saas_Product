@@ -15,6 +15,9 @@ class SubscriptionPlan(db.Model, TimestampMixin):
     # Relationships
     tenants = db.relationship("Tenant", back_populates="subscription_plan")
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
 
 class Tenant(db.Model, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "tenants"
@@ -29,6 +32,9 @@ class Tenant(db.Model, TimestampMixin, SoftDeleteMixin):
     subscription_plan = db.relationship("SubscriptionPlan", back_populates="tenants")
     users = db.relationship("User", back_populates="tenant", cascade="all, delete-orphan")
     settings = db.relationship("TenantSetting", back_populates="tenant", cascade="all, delete-orphan", uselist=False)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     @property
     def slug(self):

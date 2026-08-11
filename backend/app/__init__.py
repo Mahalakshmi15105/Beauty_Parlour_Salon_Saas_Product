@@ -7,6 +7,7 @@ from werkzeug.exceptions import HTTPException
 
 from app.config import Config
 from app.database import db, migrate
+from app.db_bootstrap import ensure_database_exists
 from app.utils.responses import error_response
 import app.models
 
@@ -21,11 +22,58 @@ def create_app(config_class=Config):
     app.config.from_object(config_class)
 
     # Initialize extensions
-    CORS(app, resources={r"/api/*": {"origins": app.config["CORS_ORIGINS"]}})
+    # CORS: allow production frontend + configured origins
+    if app.config.get("CORS_ALLOW_ALL", False):
+        CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=False)
+    else:
+        CORS(
+            app,
+            resources={r"/api/*": {"origins": app.config["CORS_ORIGINS"]}},
+            supports_credentials=True,
+            allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+            methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        )
     db.init_app(app)
     migrate.init_app(app, db)
+
+    # ------------------------------------------------------------------
+    # AUTO DATABASE CREATION
+    # If the database does not exist (fresh server), create it first.
+    # ------------------------------------------------------------------
+    ensure_database_exists(app.config["SQLALCHEMY_DATABASE_URI"])
+
     with app.app_context():
-        db.create_all()
+        # ------------------------------------------------------------------
+        # CREATE TABLES + AUTO-SEED
+        # Wrapped in try/except so the app still starts even if the
+        # database is temporarily unreachable (e.g. first deploy before
+        # the MySQL user is provisioned). Requests will return 500 with
+        # a clear error until the DB becomes available.
+        # ------------------------------------------------------------------
+        try:
+            # If RESET_DATABASE=true, drop ALL tables and recreate fresh
+            if app.config.get("RESET_DATABASE", False):
+                app.logger.warning("RESET_DATABASE=true: Dropping ALL tables and recreating fresh...")
+                db.drop_all()
+                app.logger.warning("All tables dropped.")
+
+            db.create_all()
+
+            # AUTO-SEED: if the database is empty, seed default data
+            from app.models.global_models import Tenant
+            tenant_count = Tenant.query.count()
+            if tenant_count == 0:
+                app.logger.info("Database is empty. Auto-seeding default data...")
+                from seed import seed_database
+                seed_database()
+                app.logger.info("Auto-seed completed successfully.")
+            else:
+                app.logger.info(f"Database already contains {tenant_count} tenant(s). Skipping seed.")
+        except Exception as db_error:
+            app.logger.error(f"Database initialization failed: {db_error}")
+            app.logger.error("App will start in degraded mode. Fix DATABASE_URL and MySQL credentials.")
+            # Store the error so routes can report it
+            app.config["DB_INIT_ERROR"] = str(db_error)
     
     # Initialize JWT
     jwt = JWTManager(app)
@@ -112,10 +160,22 @@ def create_app(config_class=Config):
         
         # Log unhandled exceptions
         app.logger.error(f"Unhandled Exception: {str(e)}", exc_info=True)
+        
+        # In production, include the error detail for easier debugging
+        error_detail = str(e)
         return error_response(
             error_code="INTERNAL_SERVER_ERROR",
             message="An unexpected server error occurred.",
-            status_code=500
+            status_code=500,
+            details={"error": error_detail}
         )
+
+    # ------------------------------------------------------------------
+    # AUTO-SLEEP MODE
+    # Starts the idle-monitor after ALL blueprints are registered so
+    # the before_request hook sees every route.
+    # ------------------------------------------------------------------
+    from app.services.auto_sleep import start_sleep_monitor
+    start_sleep_monitor(app)
 
     return app

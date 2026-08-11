@@ -21,6 +21,9 @@ class Invoice(db.Model, TimestampMixin):
     line_items = db.relationship("InvoiceLineItem", back_populates="invoice", cascade="all, delete-orphan")
     payments = db.relationship("InvoicePayment", back_populates="invoice", cascade="all, delete-orphan")
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
 
 class InvoiceLineItem(db.Model, TimestampMixin):
     __tablename__ = "invoice_line_items"
@@ -42,6 +45,9 @@ class InvoiceLineItem(db.Model, TimestampMixin):
     invoice = db.relationship("Invoice", back_populates="line_items")
     employee = db.relationship("Employee", back_populates="line_items")
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
 
 class InvoicePayment(db.Model, TimestampMixin):
     __tablename__ = "invoice_payments"
@@ -54,3 +60,7 @@ class InvoicePayment(db.Model, TimestampMixin):
 
     # Relationships
     invoice = db.relationship("Invoice", back_populates="payments")
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+

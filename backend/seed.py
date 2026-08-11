@@ -1,4 +1,3 @@
-from app import create_app
 from app.database import db
 from app.models.global_models import SubscriptionPlan, Tenant
 from app.models.user import User, TenantSetting
@@ -10,9 +9,15 @@ from datetime import date, datetime, timedelta
 import json
 from decimal import Decimal
 
-app = create_app()
-
 def seed_database():
+    """Seed the database with default data.
+
+    Uses the CURRENT app context (no new app is created).
+    When run directly (python seed.py), creates a new app.
+    """
+    from flask import current_app
+    app = current_app._get_current_object()
+
     with app.app_context():
         # 1. Create Default Subscription Plan
         plan = SubscriptionPlan.query.filter_by(name="Standard Business Plan").first()
@@ -317,4 +322,8 @@ def seed_database():
         print("Database seeding completed successfully.")
 
 if __name__ == "__main__":
-    seed_database()
+    # When run directly: create a new app and seed
+    from app import create_app
+    app = create_app()
+    with app.app_context():
+        seed_database()

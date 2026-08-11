@@ -27,6 +27,9 @@ class Appointment(db.Model, TimestampMixin, SoftDeleteMixin):
     customer = db.relationship("Customer")
     items = db.relationship("AppointmentItem", back_populates="appointment", cascade="all, delete-orphan")
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
     def to_dict(self):
         return {
             "id": self.id,
@@ -69,6 +72,9 @@ class AppointmentItem(db.Model, TimestampMixin):
     appointment = db.relationship("Appointment", back_populates="items")
     service = db.relationship("Service")
     employee = db.relationship("Employee")
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     def to_dict(self):
         return {

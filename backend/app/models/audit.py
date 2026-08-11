@@ -11,3 +11,6 @@ class AuditLog(db.Model, TimestampMixin):
     resource_name = db.Column(db.String(100), nullable=False)
     resource_id = db.Column(db.Integer, nullable=True)
     details = db.Column(db.Text, nullable=True)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)

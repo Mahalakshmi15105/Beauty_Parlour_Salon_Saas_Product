@@ -1,0 +1,29 @@
+[Unit]
+Description=SmartGoNext Salon Backend (Single-Thread + Auto-Sleep)
+After=network.target mysql.service mariadb.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/salon/backend
+EnvironmentFile=/var/www/salon/backend/.env
+ExecStart=/usr/bin/python3 /var/www/salon/backend/run.py
+Restart=always
+RestartSec=3
+# Kill ALL threads when service stops/restarts
+KillMode=mixed
+TimeoutStopSec=5
+# Production resource limits (1 thread only)
+TasksMax=16
+LimitNOFILE=1024
+# Logging
+StandardOutput=journal
+StandardError=journal
+# Auto-sleep: after the process exits, systemd restarts it in 3s.
+# Any HTTP request during the 3s restart window is retried by the
+# frontend auto-wake interceptor (frontend/src/services/api.js).
+
+[Install]
+WantedBy=multi-user.target

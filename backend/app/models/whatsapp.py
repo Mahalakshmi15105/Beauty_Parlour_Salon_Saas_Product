@@ -47,6 +47,9 @@ class WhatsAppSetting(db.Model, TimestampMixin):
     def access_token(self, value):
         self.encrypted_access_token = encrypt_token(value)
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
     def to_dict(self, include_sensitive=False):
         return {
             "id": self.id,
@@ -91,6 +94,9 @@ class WhatsAppCampaign(db.Model, TimestampMixin):
 
     # Relationships
     recipients = db.relationship("WhatsAppCampaignRecipient", back_populates="campaign", cascade="all, delete-orphan")
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     def to_dict(self):
         return {
@@ -140,6 +146,9 @@ class WhatsAppCampaignRecipient(db.Model, TimestampMixin):
     # Relationship
     campaign = db.relationship("WhatsAppCampaign", back_populates="recipients")
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
     def to_dict(self):
         return {
             "id": self.id,
@@ -167,6 +176,9 @@ class WhatsAppLog(db.Model, TimestampMixin):
     recipient_id = db.Column(db.Integer, db.ForeignKey("whatsapp_campaign_recipients.id"), nullable=True, index=True)
     event_type = db.Column(db.String(50), nullable=False)  # OAUTH_CONNECT, API_REQUEST, META_WEBHOOK, RETRY_ATTEMPT, ERROR
     payload_json = db.Column(db.Text, nullable=True)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     def to_dict(self):
         return {

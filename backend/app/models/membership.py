@@ -19,6 +19,9 @@ class MembershipPlan(db.Model, TimestampMixin, SoftDeleteMixin):
     memberships = db.relationship("CustomerMembership", back_populates="plan")
     eligible_services = db.relationship("MembershipPlanService", back_populates="plan", cascade="all, delete-orphan")
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
 
 class MembershipPlanService(db.Model, TimestampMixin):
     __tablename__ = "membership_plan_services"
@@ -31,6 +34,9 @@ class MembershipPlanService(db.Model, TimestampMixin):
     # Relationships
     plan = db.relationship("MembershipPlan", back_populates="eligible_services")
     service = db.relationship("Service")
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
 
 class CustomerMembership(db.Model, TimestampMixin):
@@ -48,6 +54,9 @@ class CustomerMembership(db.Model, TimestampMixin):
     plan = db.relationship("MembershipPlan", back_populates="memberships")
     benefits = db.relationship("MembershipBenefit", back_populates="membership", cascade="all, delete-orphan")
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
 
 class MembershipBenefit(db.Model, TimestampMixin):
     __tablename__ = "membership_benefits"
@@ -62,3 +71,6 @@ class MembershipBenefit(db.Model, TimestampMixin):
     # Relationships
     membership = db.relationship("CustomerMembership", back_populates="benefits")
     service = db.relationship("Service", back_populates="benefits")
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)

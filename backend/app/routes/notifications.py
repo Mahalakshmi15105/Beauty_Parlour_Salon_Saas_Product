@@ -1,6 +1,7 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from flask import Blueprint, request, g
+from sqlalchemy import cast, Date, func
 from app.database import db
 from app.models.notification import Notification
 from app.models.membership import CustomerMembership, MembershipPlan
@@ -20,12 +21,16 @@ def check_and_generate_expiry_notifications(target_tenant_id=None):
     for stages: 30d, 15d, 7d, 3d, 1d, 0d, expired. Guarantees zero duplicate notifications.
     """
     try:
+        today = datetime.now(timezone.utc).date()
+        max_expiry_date = today + timedelta(days=30)
+
         query = CustomerMembership.query
         if target_tenant_id:
             query = query.filter_by(tenant_id=target_tenant_id)
         
+        # Only query memberships expiring in the next 30 days (or already expired)
+        query = query.filter(cast(CustomerMembership.expires_at, Date) <= max_expiry_date)
         memberships = query.all()
-        today = datetime.now(timezone.utc).date()
         created_count = 0
 
         for m in memberships:
@@ -53,6 +58,10 @@ def check_and_generate_expiry_notifications(target_tenant_id=None):
                 stage = "0d"
                 title = "Membership Expires Today"
             elif remaining_days < 0:
+                # Do not check memberships that expired long ago (e.g. more than 30 days ago)
+                # to avoid spamming or loading very old records.
+                if remaining_days < -30:
+                    continue
                 stage = "expired"
                 title = "Membership Expired"
 
@@ -119,34 +128,47 @@ def check_and_generate_expiry_notifications(target_tenant_id=None):
         return 0
 
 
+
 def check_and_generate_inactive_customer_notifications(target_tenant_id=None):
     from app.models.billing import Invoice, InvoiceLineItem
     from app.models.catalog import Service
     from app.models.employee import Employee
     from app.models.membership import CustomerMembership
 
+    if not target_tenant_id:
+        return 0
+
     try:
-        query = Customer.query
-        if target_tenant_id:
-            query = query.filter_by(tenant_id=target_tenant_id)
-        
-        customers = query.all()
         today = datetime.now(timezone.utc).date()
+        threshold_date = today - timedelta(days=60)
+
+        # 1. Get the latest invoice date for each customer of this tenant via a single subquery
+        latest_invoice_sub = db.session.query(
+            Invoice.customer_id,
+            func.max(Invoice.created_at).label("latest_created_at")
+        ).filter(
+            Invoice.tenant_id == target_tenant_id,
+            (Invoice.status == None) | (~Invoice.status.in_(["Void", "Voided"]))
+        ).group_by(Invoice.customer_id).subquery()
+
+        # 2. Join Customer with subquery and filter for customers whose latest visit is older than 60 days
+        inactive_customers_query = db.session.query(Customer, latest_invoice_sub.c.latest_created_at).join(
+            latest_invoice_sub, Customer.id == latest_invoice_sub.c.customer_id
+        ).filter(
+            Customer.tenant_id == target_tenant_id,
+            cast(latest_invoice_sub.c.latest_created_at, Date) <= threshold_date
+        )
+
+        inactive_records = inactive_customers_query.all()
+        if not inactive_records:
+            return 0
+
         created_count = 0
+        tenant = db.session.get(Tenant, target_tenant_id)
+        salon_name = tenant.name if tenant else "Salon"
 
-        for c in customers:
-            # Query last non-void invoice for customer
-            last_inv = Invoice.query.filter_by(
-                customer_id=c.id,
-                tenant_id=c.tenant_id
-            ).filter(
-                (Invoice.status == None) | (Invoice.status != "Void")
-            ).order_by(Invoice.created_at.desc()).first()
-
-            if not last_inv:
-                continue
-
-            last_date = last_inv.created_at.date()
+        for c, latest_created_at in inactive_records:
+            last_date = latest_created_at.date() if isinstance(latest_created_at, datetime) else latest_created_at
             days_inactive = (today - last_date).days
 
             stage = None
@@ -175,6 +197,17 @@ def check_and_generate_inactive_customer_notifications(target_tenant_id=None):
             if existing:
                 continue
 
+            # Fetch the actual last invoice to compile metadata
+            last_inv = Invoice.query.filter_by(
+                customer_id=c.id,
+                tenant_id=c.tenant_id
+            ).filter(
+                (Invoice.status == None) | (~Invoice.status.in_(["Void", "Voided"]))
+            ).order_by(Invoice.created_at.desc()).first()
+
+            if not last_inv:
+                continue
+
             # Compute stats
             last_service_name = "Salon Service"
             last_stylist_name = "N/A"
@@ -200,15 +233,13 @@ def check_and_generate_inactive_customer_notifications(target_tenant_id=None):
                 customer_id=c.id,
                 tenant_id=c.tenant_id
             ).filter(
-                (Invoice.status == None) | (Invoice.status != "Void")
+                (Invoice.status == None) | (~Invoice.status.in_(["Void", "Voided"]))
             ).all()
 
             total_visits = len(all_invs)
             total_spent = sum([float(inv.total or 0) for inv in all_invs])
 
             cust_name = f"{c.first_name} {c.last_name or ''}".strip()
-            tenant = db.session.get(Tenant, c.tenant_id)
-            salon_name = tenant.name if tenant else "Salon"
 
             title = "Inactive Customer Alert"
             message = f"Customer {cust_name} has not visited for {days_inactive} days. Last Visit: {last_date.strftime('%d-%b-%Y')} | Last Service: {last_service_name}"

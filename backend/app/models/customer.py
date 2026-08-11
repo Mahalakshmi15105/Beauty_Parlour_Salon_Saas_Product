@@ -20,6 +20,9 @@ class Customer(db.Model, TimestampMixin, SoftDeleteMixin):
     memberships = db.relationship("CustomerMembership", back_populates="customer", cascade="all, delete-orphan")
     invoices = db.relationship("Invoice", back_populates="customer")
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
 
 class Reminder(db.Model, TimestampMixin):
     __tablename__ = "reminders"
@@ -33,6 +36,10 @@ class Reminder(db.Model, TimestampMixin):
     notes = db.Column(db.Text, nullable=True)
     status = db.Column(db.String(50), nullable=False, default="Pending")
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+
 
 class CustomerFeedback(db.Model, TimestampMixin):
     __tablename__ = "customer_feedback"
@@ -43,3 +50,6 @@ class CustomerFeedback(db.Model, TimestampMixin):
     invoice_id = db.Column(db.Integer, db.ForeignKey("invoices.id"), nullable=False, index=True)
     rating = db.Column(db.Integer, nullable=False, default=5)
     comments = db.Column(db.Text, nullable=True)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)

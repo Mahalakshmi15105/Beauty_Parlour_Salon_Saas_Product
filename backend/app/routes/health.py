@@ -10,12 +10,14 @@ health_bp = Blueprint("health", __name__)
 @health_bp.route("/health", methods=["GET"])
 def health_check():
     db_status = "healthy"
+    db_error = None
     try:
         # Ping the database using connection test
         db.session.execute(text("SELECT 1"))
     except Exception as e:
         logger.error(f"Database health check failed: {str(e)}")
         db_status = "unhealthy"
+        db_error = str(e)
 
     status_code = 200 if db_status == "healthy" else 500
     
@@ -31,5 +33,6 @@ def health_check():
             error_code="DATABASE_CONNECTION_FAILED",
             message="Unable to connect to the database.",
             status_code=status_code,
-            errors=[{"detail": "Check database service and connection URI settings."}]
+            errors=[{"detail": "Check database service and connection URI settings."}],
+            details={"error": db_error}
         )

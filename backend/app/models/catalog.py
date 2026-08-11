@@ -11,6 +11,9 @@ class ServiceCategory(db.Model, TimestampMixin, SoftDeleteMixin):
     # Relationships
     services = db.relationship("Service", back_populates="category", cascade="all, delete-orphan")
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
 
 class Service(db.Model, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "services"
@@ -27,6 +30,9 @@ class Service(db.Model, TimestampMixin, SoftDeleteMixin):
     # Relationships
     category = db.relationship("ServiceCategory", back_populates="services")
     benefits = db.relationship("MembershipBenefit", back_populates="service", cascade="all, delete-orphan")
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
 
 class Product(db.Model, TimestampMixin, SoftDeleteMixin):
@@ -45,6 +51,10 @@ class Product(db.Model, TimestampMixin, SoftDeleteMixin):
     low_stock_threshold = db.Column(db.Integer, nullable=False, default=5)
     status = db.Column(db.String(50), nullable=False, default="active")  # active, inactive
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+
 
 class Supplier(db.Model, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "suppliers"
@@ -57,6 +67,10 @@ class Supplier(db.Model, TimestampMixin, SoftDeleteMixin):
     email = db.Column(db.String(150), nullable=True)
     address = db.Column(db.Text, nullable=True)
     status = db.Column(db.String(50), nullable=False, default="active")  # active, inactive
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
 
 
 class StockReorderLog(db.Model, TimestampMixin):
@@ -74,5 +88,9 @@ class StockReorderLog(db.Model, TimestampMixin):
     # Relationships
     product = db.relationship("Product")
     supplier = db.relationship("Supplier")
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
 
 

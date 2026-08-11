@@ -19,3 +19,6 @@ class Employee(db.Model, TimestampMixin, SoftDeleteMixin):
 
     # Relationships
     line_items = db.relationship("InvoiceLineItem", back_populates="employee")
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)

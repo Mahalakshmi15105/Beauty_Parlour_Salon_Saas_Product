@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Salon Software - Instagram Promo Message</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: linear-gradient(135deg, #f9f0ff 0%, #ffe8f0 50%, #fff3e0 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .card {
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+    max-width: 560px;
+    width: 100%;
+    overflow: hidden;
+  }
+  .header {
+    background: linear-gradient(135deg, #e91e63, #ff6f00);
+    color: #fff;
+    padding: 28px 24px;
+    text-align: center;
+  }
+  .header h1 { font-size: 26px; margin-bottom: 6px; }
+  .header p { font-size: 14px; opacity: 0.95; }
+  .body { padding: 24px; }
+  .msg-box {
+    background: #fafafa;
+    border: 1px solid #eee;
+    border-radius: 12px;
+    padding: 18px;
+    font-size: 15px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    color: #333;
+    max-height: 420px;
+    overflow-y: auto;
+  }
+  .pricing {
+    display: flex;
+    gap: 12px;
+    margin: 18px 0;
+    flex-wrap: wrap;
+  }
+  .plan {
+    flex: 1;
+    min-width: 140px;
+    background: #fff;
+    border: 2px solid #eee;
+    border-radius: 12px;
+    padding: 14px;
+    text-align: center;
+    transition: 0.2s;
+  }
+  .plan:hover { border-color: #e91e63; transform: translateY(-3px); }
+  .plan .name { font-weight: 700; color: #e91e63; font-size: 16px; }
+  .plan .price { font-size: 22px; font-weight: 800; color: #333; margin: 6px 0; }
+  .plan .per { font-size: 12px; color: #888; }
+  .plan.popular { border-color: #e91e63; background: #fff0f5; }
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    background: linear-gradient(135deg, #e91e63, #ff6f00);
+    color: #fff;
+    transition: 0.2s;
+  }
+  .btn:hover { opacity: 0.9; }
+  .btn:active { transform: scale(0.98); }
+  .copied {
+    text-align: center;
+    color: #2e7d32;
+    font-weight: 600;
+    margin-top: 10px;
+    opacity: 0;
+    transition: 0.3s;
+  }
+  .copied.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="header">
+    <h1>💈 Salon Software</h1>
+    <p>Complete Salon Management System</p>
+  </div>
+  <div class="body">
+    <div class="pricing">
+      <div class="plan">
+        <div class="name">3 Months</div>
+        <div class="price">₹3,000</div>
+        <div class="per">per 3 months</div>
+      </div>
+      <div class="plan">
+        <div class="name">6 Months</div>
+        <div class="price">₹5,500</div>
+        <div class="per">per 6 months</div>
+      </div>
+      <div class="plan popular">
+        <div class="name">1 Year ⭐</div>
+        <div class="price">₹9,000</div>
+        <div class="per">Best Value</div>
+      </div>
+    </div>
+
+    <div class="msg-box" id="msg">
+💈 SALON SOFTWARE – GROW YOUR SALON BUSINESS! 💈
+
+✨ Complete Salon Management System ✨
+
+✅ Customer Management & Memberships
+✅ Billing & GST Invoices
+✅ Services & Products Management
+✅ Employee Management
+✅ Reports & Analytics
+✅ WhatsApp Integration & Campaigns
+✅ Thermal Receipt Printing
+✅ Easy & User-Friendly
+
+💰 PRICING 💰
+🔹 3 Months – ₹3,000
+🔹 6 Months – ₹5,500
+🔹 1 Year – ₹9,000 (Best Value ⭐)
+
+🎁 Save more with the 1 Year plan!
+
+📲 DM us NOW to book a FREE demo!
+📍 Limited time offer – Don't miss out!
+
+#SalonSoftware #SalonManagement #BillingSoftware #SalonApp #BeautyParlour #SalonBusiness #GSTBilling #SalonOwner #SoftwareForSalon</div>
+
+    <button class="btn" onclick="copyMsg()">📋 Copy Message</button>
+    <div class="copied" id="copied">✅ Message copied! Paste it on Instagram.</div>
+  </div>
+</div>
+
+<script>
+function copyMsg() {
+  const text = document.getElementById('msg').innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    const c = document.getElementById('copied');
+    c.classList.add('show');
+    setTimeout(() => c.classList.remove('show'), 2500);
+  });
+}
+</script>
+</body>
+</html>
