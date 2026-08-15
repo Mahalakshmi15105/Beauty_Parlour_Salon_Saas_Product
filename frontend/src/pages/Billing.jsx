@@ -1082,8 +1082,8 @@ function Billing() {
     const targetCust = customers.find((c) => String(c.id) === String(selectedCustomerId));
     const phone = targetInv?.customer_phone || targetInv?.customer?.phone || targetCust?.phone || "";
 
-    if (!phone || phone.trim() === "") {
-      alert("Customer mobile number not available.");
+    if (!phone || phone.trim() === "" || phone === "0000000000") {
+      alert("Customer mobile number not available or Walk-in customer.");
       return;
     }
 
@@ -1094,35 +1094,27 @@ function Billing() {
     const amountStr = formatCurrency(totalVal);
     const smsMsg = `Hello ${customerName}, thank you for visiting ${parlourName}! Bill No: ${billNo}, Amount Paid: ${amountStr}. Thank you!`;
 
-    if (targetInv?.id) {
-      API.post(`/invoices/${targetInv.id}/sms`)
-        .then((res) => {
-          alert(res.data?.message || `SMS dispatched to ${phone}`);
-        })
-        .catch((err) => {
-          if (err.response?.status === 404 || err.response?.data?.message?.includes("not configured")) {
-            alert("SMS service is not configured.");
-          } else {
-            window.open(`sms:${phone}?body=${encodeURIComponent(smsMsg)}`, "_blank");
-          }
-        });
-    } else {
-      window.open(`sms:${phone}?body=${encodeURIComponent(smsMsg)}`, "_blank");
-    }
+    // Trigger SMS dispatch alert / Web SMS link
+    alert(`SMS Bill Notification:\n\nTo: ${phone}\nMessage: ${smsMsg}`);
   };
 
   const triggerWhatsAppWeb = (inv = null) => {
     const targetInv = inv || invoiceResult || selectedInvoiceDetail || activePrintInvoice;
     const targetCust = customers.find((c) => String(c.id) === String(selectedCustomerId));
     const rawPhone = targetInv?.customer_phone || targetInv?.customer?.phone || targetCust?.phone || "";
-    const cleanPhone = rawPhone.replace(/[^0-9]/g, "");
+    let cleanPhone = rawPhone.replace(/[^0-9]/g, "");
 
-    if (!cleanPhone || cleanPhone.length < 5) {
-      alert("Customer mobile number not available.");
+    if (!cleanPhone || cleanPhone.length < 5 || cleanPhone === "0000000000") {
+      alert("Customer mobile number not available or Walk-in customer.");
       return;
     }
 
-    const formattedPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+    if (cleanPhone.length === 10) {
+      cleanPhone = `91${cleanPhone}`;
+    } else if (cleanPhone.length === 12 && cleanPhone.startsWith("91")) {
+      // Valid 12-digit Indian number with 91
+    }
+
     const parlourName = businessProfile?.name || "Beauty Parlour";
     const customerName = targetInv?.customer_name || targetInv?.customer?.first_name || targetCust?.first_name || "Customer";
     const billNo = targetInv?.invoice_number || targetInv?.id || "N/A";
@@ -1131,13 +1123,13 @@ function Billing() {
     const thankYouMsg = receiptSettings?.thank_you_message || "Thank you for visiting. Please visit again!";
 
     const text = encodeURIComponent(
-      `Hello ${customerName}, thank you for visiting ${parlourName}!\n` +
-        `Bill No: ${billNo}\n` +
-        `Amount Paid: ${amountStr}\n` +
+      `Hello ${customerName}, thank you for visiting ${parlourName}!\n\n` +
+        `🧾 Bill No: ${billNo}\n` +
+        `💰 Amount Paid: ${amountStr}\n\n` +
         `${thankYouMsg}`
     );
 
-    window.open(`https://wa.me/${formattedPhone}?text=${text}`, "_blank");
+    window.open(`https://wa.me/${cleanPhone}?text=${text}`, "_blank");
   };
 
   const handleSaveReminderSubmit = () => {

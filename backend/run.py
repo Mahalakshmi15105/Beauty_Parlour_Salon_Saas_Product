@@ -45,7 +45,7 @@ def run_development():
         host="0.0.0.0",
         port=Config.PORT,
         debug=True,
-        threaded=False,   # <-- SINGLE THREAD: one request at a time
+        threaded=True,   # <-- Enable multi-threading for concurrent requests
         use_reloader=False,
     )
 

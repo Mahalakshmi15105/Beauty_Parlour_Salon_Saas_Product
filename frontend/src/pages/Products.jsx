@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { useModalFocusTrap, useFormKeyboardNavigation } from "../utils/keyboardNavigation";
-import { AlertTriangle, X, Printer, FileSpreadsheet, FileText, Boxes, Users, ClipboardList, Plus, Trash2, Edit, CheckCircle } from "lucide-react";
+import { AlertTriangle, X, Printer, FileSpreadsheet, FileText, Boxes, Users, ClipboardList, Plus, Trash2, Edit, CheckCircle, Upload } from "lucide-react";
 import { exportToCSV, printDataList, exportToPDF } from "../utils/exportUtils";
+import BulkUploadModal from "../components/BulkUploadModal";
 
 function Products() {
   const { formatCurrency, currencySymbol } = useLanguageCurrency();
@@ -34,6 +35,7 @@ function Products() {
   // Product Form Modal State
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     category: "",
@@ -447,21 +449,39 @@ function Products() {
         </div>
         <div className="flex space-x-3">
           {activeTab === "suppliers" ? (
-            <button
-              onClick={openAddSupplierModal}
-              className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-1.5"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Supplier</span>
-            </button>
+            <>
+              <button
+                onClick={() => setShowBulkUpload(true)}
+                className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2"
+              >
+                <Upload className="w-4 h-4" />
+                Bulk Upload
+              </button>
+              <button
+                onClick={openAddSupplierModal}
+                className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-1.5"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Supplier</span>
+              </button>
+            </>
           ) : (
-            <button
-              onClick={openAddModal}
-              className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-1.5"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Product</span>
-            </button>
+            <>
+              <button
+                onClick={() => setShowBulkUpload(true)}
+                className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2"
+              >
+                <Upload className="w-4 h-4" />
+                Bulk Upload
+              </button>
+              <button
+                onClick={openAddModal}
+                className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-1.5"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Product</span>
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -1206,6 +1226,14 @@ function Products() {
             </div>
           </div>
         </div>
+      )}
+      
+      {showBulkUpload && (
+        <BulkUploadModal
+          module="products"
+          onClose={() => setShowBulkUpload(false)}
+          onSuccess={fetchProducts}
+        />
       )}
     </div>
   );

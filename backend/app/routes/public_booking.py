@@ -7,6 +7,7 @@ from app.models.catalog import Service
 from app.models.employee import Employee
 from app.models.customer import Customer
 from app.models.user import TenantSetting
+from app.models.branch import Branch
 from app.services.booking_service import BookingService
 from app.utils.responses import success_response, error_response
 
@@ -50,6 +51,44 @@ def resolve_tenant(identifier):
     return None
 
 
+def resolve_branch(identifier):
+    """
+    Resolve branch by ID or slug/name for branch-specific booking.
+    Supports formats:
+      - "3" (integer ID)
+      - "branch-3" or "www2-0-3" (slug ending with -ID)
+      - "www2-0" or "www2.0" (branch name or slug)
+    """
+    if isinstance(identifier, int):
+        return Branch.query.filter_by(id=identifier, is_deleted=False).first()
+
+    raw = str(identifier).strip()
+    if not raw:
+        return None
+
+    # 1. Direct Integer check
+    if raw.isdigit():
+        return Branch.query.filter_by(id=int(raw), is_deleted=False).first()
+
+    # 2. Extract trailing -ID if present (e.g. "branch-3" or "www2-0-3")
+    match = re.search(r"-(\d+)$", raw)
+    if match:
+        bid = int(match.group(1))
+        b = Branch.query.filter_by(id=bid, is_deleted=False).first()
+        if b:
+            return b
+
+    # 3. Match by branch name or normalized slug
+    raw_norm = raw.lower().replace("-", "").replace(".", "").replace(" ", "")
+    all_branches = Branch.query.filter_by(is_deleted=False).all()
+    for b in all_branches:
+        b_name_norm = b.name.lower().replace("-", "").replace(".", "").replace(" ", "")
+        if b.name.lower() == raw.lower() or b_name_norm == raw_norm:
+            return b
+
+    return None
+
+
 @public_booking_bp.route("/<tenant_identifier>/config", methods=["GET"])
 def get_public_booking_config(tenant_identifier):
     """Fetch parlour details & public booking settings for customer portal."""
@@ -68,12 +107,24 @@ def get_public_booking_config(tenant_identifier):
                 working_days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]
 
         raw_logo = settings.logo_url or ""
+        
+        theme = {
+            "theme_name": getattr(settings, "theme_name", "light"),
+            "primary_color": getattr(settings, "primary_color", "#EC4899"),
+            "secondary_color": getattr(settings, "secondary_color", "#F472B6"),
+            "accent_color": getattr(settings, "accent_color", "#FDF2F8"),
+            "shop_name_font_enabled": getattr(settings, "shop_name_font_enabled", False),
+            "shop_name_font": getattr(settings, "shop_name_font", "Outfit"),
+            "shop_name_font_size": getattr(settings, "shop_name_font_size", 32),
+            "shop_name_font_weight": getattr(settings, "shop_name_font_weight", "700"),
+            "shop_name_letter_spacing": float(getattr(settings, "shop_name_letter_spacing", 0.00)),
+        }
 
         data = {
             "tenant_id": tenant.id,
             "parlour_name": tenant.name,
             "slug": tenant.slug,
-            "booking_url": f"/book/{tenant.slug}-{tenant.id}",
+            "booking_url": f"/book/{tenant.slug or tenant.id}",
             "logo_url": raw_logo,
             "owner_name": settings.owner_name or "",
             "phone": settings.alternate_phone or "",
@@ -93,11 +144,94 @@ def get_public_booking_config(tenant_identifier):
             "booking_interval_minutes": getattr(settings, "booking_interval_minutes", 30),
             "max_daily_bookings": getattr(settings, "max_daily_bookings", 50),
             "max_concurrent_slots": getattr(settings, "max_concurrent_slots", 2),
+            # Theme settings - scoped to this tenant only
+            "theme": theme
         }
         return success_response(data=data)
     except Exception as e:
         logger.exception("Failed to fetch public booking config")
         return error_response("SERVER_ERROR", f"Failed to load parlour config: {str(e)}", 500)
+
+
+@public_booking_bp.route("/branch/<branch_identifier>/config", methods=["GET"])
+def get_branch_booking_config(branch_identifier):
+    """Fetch branch-specific booking configuration with isolated theme settings."""
+    try:
+        branch = resolve_branch(branch_identifier)
+        if not branch or branch.status != "active":
+            return error_response("INVALID_BRANCH", "Branch not found or inactive.", 404)
+
+        # Get tenant settings first (base configuration)
+        tenant_settings = BookingService.get_tenant_settings(branch.tenant_id)
+        
+        # Get branch-specific settings if they exist
+        branch_settings = TenantSetting.query.filter_by(
+            tenant_id=branch.tenant_id, 
+            branch_id=branch.id
+        ).first()
+
+        working_days = []
+        if branch_settings and branch_settings.working_days:
+            try:
+                working_days = json.loads(branch_settings.working_days)
+            except Exception:
+                working_days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]
+        elif tenant_settings.working_days:
+            try:
+                working_days = json.loads(tenant_settings.working_days)
+            except Exception:
+                working_days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]
+
+        # Use branch-specific logo if available, otherwise tenant logo
+        raw_logo = branch.logo_url if branch.logo_url else (tenant_settings.logo_url or "")
+
+        # Determine theme: Branch custom theme -> Main Parlour theme -> System Default
+        theme = {
+            "theme_name": branch.theme_name or (branch_settings.theme_name if branch_settings and branch_settings.theme_name else getattr(tenant_settings, "theme_name", "light")),
+            "primary_color": branch.primary_color or (branch_settings.primary_color if branch_settings and branch_settings.primary_color else getattr(tenant_settings, "primary_color", "#EC4899")),
+            "secondary_color": branch.secondary_color or (branch_settings.secondary_color if branch_settings and branch_settings.secondary_color else getattr(tenant_settings, "secondary_color", "#F472B6")),
+            "accent_color": branch.accent_color or (branch_settings.accent_color if branch_settings and branch_settings.accent_color else getattr(tenant_settings, "accent_color", "#FDF2F8")),
+            "shop_name_font_enabled": getattr(branch_settings, "shop_name_font_enabled", getattr(tenant_settings, "shop_name_font_enabled", False)),
+            "shop_name_font": getattr(branch_settings, "shop_name_font", getattr(tenant_settings, "shop_name_font", "Outfit")),
+            "shop_name_font_size": getattr(branch_settings, "shop_name_font_size", getattr(tenant_settings, "shop_name_font_size", 32)),
+            "shop_name_font_weight": getattr(branch_settings, "shop_name_font_weight", getattr(tenant_settings, "shop_name_font_weight", "700")),
+            "shop_name_letter_spacing": float(getattr(branch_settings, "shop_name_letter_spacing", getattr(tenant_settings, "shop_name_letter_spacing", 0.00))),
+        }
+
+        # Build clean slug URL for branch
+        branch_slug_part = re.sub(r'[^a-zA-Z0-9]', '-', branch.name.lower()).strip('-')
+        data = {
+            "branch_id": branch.id,
+            "tenant_id": branch.tenant_id,
+            "branch_name": branch.name,
+            "parlour_name": branch.tenant.name,
+            "booking_url": f"/book/branch/{branch_slug_part}-{branch.id}",
+            "logo_url": raw_logo,
+            "owner_name": (branch_settings.owner_name if branch_settings else tenant_settings.owner_name) or "",
+            "phone": branch.phone or (tenant_settings.alternate_phone or ""),
+            "address": branch.address or (tenant_settings.address or ""),
+            "city": (branch_settings.city if branch_settings else tenant_settings.city) or "",
+            "state": (branch_settings.state if branch_settings else tenant_settings.state) or "",
+            "postal_code": (branch_settings.postal_code if branch_settings else tenant_settings.postal_code) or "",
+            "currency_symbol": (branch_settings.currency_symbol if branch_settings else tenant_settings.currency_symbol) or "₹",
+            "booking_enabled": bool(getattr(branch_settings, "booking_enabled", getattr(tenant_settings, "booking_enabled", True))),
+            "booking_type": getattr(branch_settings, "booking_type", getattr(tenant_settings, "booking_type", "Token")),
+            "allow_staff_selection": bool(getattr(branch_settings, "allow_staff_selection", getattr(tenant_settings, "allow_staff_selection", False))),
+            "working_days": working_days,
+            "opening_time": getattr(branch_settings, "opening_time", getattr(tenant_settings, "opening_time", "09:00")),
+            "closing_time": getattr(branch_settings, "closing_time", getattr(tenant_settings, "closing_time", "20:00")),
+            "break_start_time": getattr(branch_settings, "break_start_time", getattr(tenant_settings, "break_start_time", "13:00")),
+            "break_end_time": getattr(branch_settings, "break_end_time", getattr(tenant_settings, "break_end_time", "14:00")),
+            "booking_interval_minutes": getattr(branch_settings, "booking_interval_minutes", getattr(tenant_settings, "booking_interval_minutes", 30)),
+            "max_daily_bookings": getattr(branch_settings, "max_daily_bookings", getattr(tenant_settings, "max_daily_bookings", 50)),
+            "max_concurrent_slots": getattr(branch_settings, "max_concurrent_slots", getattr(tenant_settings, "max_concurrent_slots", 2)),
+            # Branch-isolated theme settings
+            "theme": theme
+        }
+        return success_response(data=data)
+    except Exception as e:
+        logger.exception("Failed to fetch branch booking config")
+        return error_response("SERVER_ERROR", f"Failed to load branch config: {str(e)}", 500)
 
 
 @public_booking_bp.route("/<tenant_identifier>/services", methods=["GET"])
@@ -225,7 +359,7 @@ def public_customer_lookup(tenant_identifier):
 
 @public_booking_bp.route("/<tenant_identifier>", methods=["POST"])
 def create_website_booking(tenant_identifier):
-    """Public customer website appointment booking endpoint."""
+    """Public customer website appointment booking endpoint for main parlour."""
     try:
         tenant = resolve_tenant(tenant_identifier)
         if not tenant or tenant.status != "active":
@@ -237,7 +371,8 @@ def create_website_booking(tenant_identifier):
             tenant_id=tenant.id,
             payload=payload,
             booking_source=payload.get("booking_source", "Website"),
-            default_channel="Website"
+            default_channel="Website",
+            target_branch_id=None
         )
 
         if not ok:
@@ -247,4 +382,31 @@ def create_website_booking(tenant_identifier):
     except Exception as e:
         logger.exception("Public website booking failed")
         return error_response("SERVER_ERROR", f"Booking request failed: {str(e)}", 500)
+
+
+@public_booking_bp.route("/branch/<branch_identifier>", methods=["POST"])
+def create_branch_website_booking(branch_identifier):
+    """Public customer website appointment booking endpoint for a specific branch."""
+    try:
+        branch = resolve_branch(branch_identifier)
+        if not branch or branch.status != "active":
+            return error_response("INVALID_BRANCH", "Branch not found or account inactive.", 404)
+
+        payload = request.get_json() or {}
+        
+        ok, res, status_code = BookingService.validate_and_create_appointment(
+            tenant_id=branch.tenant_id,
+            payload=payload,
+            booking_source=payload.get("booking_source", "Website"),
+            default_channel="Website",
+            target_branch_id=branch.id
+        )
+
+        if not ok:
+            return error_response(res.get("error_code", "VALIDATION_FAILED"), res.get("message", "Booking failed"), status_code)
+
+        return success_response(data=res, message=f"Appointment {res.get('appointment_number')} booked successfully for {branch.name}!", status_code=status_code)
+    except Exception as e:
+        logger.exception("Public branch website booking failed")
+        return error_response("SERVER_ERROR", f"Branch booking request failed: {str(e)}", 500)
 

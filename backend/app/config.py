@@ -31,15 +31,16 @@ class Config:
     # One thread serves ALL users sequentially (no multi-threading).
     # Set SINGLE_THREAD=false only if you intentionally want multi.
     # ---------------------------------------------------------------
-    SINGLE_THREAD = os.getenv("SINGLE_THREAD", "true").lower() in ("true", "1", "yes")
+    SINGLE_THREAD = os.getenv("SINGLE_THREAD", "false").lower() in ("true", "1", "yes")
     THREADS = 1 if SINGLE_THREAD else int(os.getenv("THREADS", 4))
 
     # ---------------------------------------------------------------
     # AUTO-SLEEP MODE
     # After AUTO_SLEEP_MINUTES of NO API activity, the backend kills
     # itself (and therefore ALL its threads) to save server resources.
+    # DISABLED for continuous 24-hour access
     # ---------------------------------------------------------------
-    AUTO_SLEEP_ENABLED = os.getenv("AUTO_SLEEP_ENABLED", "true").lower() in ("true", "1", "yes")
+    AUTO_SLEEP_ENABLED = os.getenv("AUTO_SLEEP_ENABLED", "false").lower() in ("true", "1", "yes")
     AUTO_SLEEP_MINUTES = int(os.getenv("AUTO_SLEEP_MINUTES", 5))
     AUTO_SLEEP_CHECK_INTERVAL = int(os.getenv("AUTO_SLEEP_CHECK_INTERVAL", 30))  # seconds
 
@@ -50,6 +51,12 @@ class Config:
     )
     SQLALCHEMY_DATABASE_URI = DATABASE_URL
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,
+        "pool_recycle": 280,
+        "pool_size": 10,
+        "max_overflow": 20,
+    }
     
     # CORS
     # Always include production domains in addition to configured origins

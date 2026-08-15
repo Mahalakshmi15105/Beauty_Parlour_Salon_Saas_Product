@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { useModalFocusTrap, useFormKeyboardNavigation } from "../utils/keyboardNavigation";
-import { X, Printer, FileSpreadsheet, FileText } from "lucide-react";
+import { X, Printer, FileSpreadsheet, FileText, Upload } from "lucide-react";
 import { exportToCSV, printDataList, exportToPDF } from "../utils/exportUtils";
+import BulkUploadModal from "../components/BulkUploadModal";
 
 function Services() {
   const { formatCurrency, currencySymbol, t } = useLanguageCurrency();
@@ -25,6 +26,7 @@ function Services() {
   // Modals Toggle
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [editId, setEditId] = useState(null);
   
   // Category Form State
@@ -218,6 +220,13 @@ function Services() {
           <p className="text-xs text-text-secondary">Manage service offerings, category partitions, durations, and pricing.</p>
         </div>
         <div className="space-x-3">
+          <button
+            onClick={() => setShowBulkUpload(true)}
+            className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2"
+          >
+            <Upload className="w-4 h-4" />
+            Bulk Upload
+          </button>
           <button
             onClick={() => setShowCategoryModal(true)}
             className="border border-border-soft hover:bg-background text-text-primary px-4 py-2 rounded-lg text-sm font-medium transition"
@@ -515,6 +524,14 @@ function Services() {
             </div>
           </div>
         </div>
+      )}
+      
+      {showBulkUpload && (
+        <BulkUploadModal
+          module="services"
+          onClose={() => setShowBulkUpload(false)}
+          onSuccess={fetchServices}
+        />
       )}
     </div>
   );

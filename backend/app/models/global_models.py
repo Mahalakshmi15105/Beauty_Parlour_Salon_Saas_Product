@@ -11,6 +11,7 @@ class SubscriptionPlan(db.Model, TimestampMixin):
     max_employees = db.Column(db.Integer, nullable=False, default=5)
     max_services = db.Column(db.Integer, nullable=False, default=20)
     max_customers = db.Column(db.Integer, nullable=False, default=100)
+    max_branches = db.Column(db.Integer, nullable=False, default=3)
 
     # Relationships
     tenants = db.relationship("Tenant", back_populates="subscription_plan")
@@ -32,6 +33,7 @@ class Tenant(db.Model, TimestampMixin, SoftDeleteMixin):
     subscription_plan = db.relationship("SubscriptionPlan", back_populates="tenants")
     users = db.relationship("User", back_populates="tenant", cascade="all, delete-orphan")
     settings = db.relationship("TenantSetting", back_populates="tenant", cascade="all, delete-orphan", uselist=False)
+    branches = db.relationship("Branch", back_populates="tenant", cascade="all, delete-orphan")
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

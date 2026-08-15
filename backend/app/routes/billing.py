@@ -7,7 +7,7 @@ from app.models.employee import Employee
 from app.models.membership import MembershipBenefit, CustomerMembership
 from app.models.user import TenantSetting
 from app.utils.responses import success_response, error_response
-from app.utils.auth import require_role, get_tenant_query
+from app.utils.auth import require_role, get_tenant_query, get_branch_query
 from app.utils.query import paginate_query
 from decimal import Decimal
 import logging
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 billing_bp = Blueprint("billing", __name__)
 
 @billing_bp.route("/billing/checkout", methods=["POST"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def checkout():
     data = request.get_json() or {}
     customer_id = data.get("customer_id")
@@ -33,7 +33,7 @@ def checkout():
 
     # 1. Verify Customer
     if customer_id and str(customer_id) != "walkin" and str(customer_id) != "0":
-        customer = get_tenant_query(Customer).filter_by(id=customer_id).first()
+        customer = get_branch_query(Customer).filter_by(id=customer_id).first()
         if not customer:
             return error_response(
                 error_code="CUSTOMER_NOT_FOUND",
@@ -41,7 +41,7 @@ def checkout():
                 status_code=400
             )
     else:
-        customer = get_tenant_query(Customer).filter_by(phone="0000000000").first()
+        customer = get_branch_query(Customer).filter_by(phone="0000000000").first()
         if not customer:
             customer = Customer(
                 tenant_id=g.parlour_id,
@@ -79,7 +79,7 @@ def checkout():
 
             if item_type == "service":
                 primary_emp_id = emp_ids[0]
-                emp = get_tenant_query(Employee).filter_by(id=primary_emp_id, status="active").first()
+                emp = get_branch_query(Employee).filter_by(id=primary_emp_id, status="active").first()
                 if not emp:
                     raise ValueError(f"Assigned Employee ID {primary_emp_id} is inactive or invalid.")
                 employee_id = primary_emp_id
@@ -93,7 +93,7 @@ def checkout():
             mrp_val = None
 
             if item_type == "service":
-                # Process Service
+                # Process Service (shared across branches)
                 svc = get_tenant_query(Service).filter_by(id=item_id, status="active").first()
                 if not svc:
                     raise ValueError(f"Service ID {item_id} is inactive or invalid.")
@@ -297,13 +297,13 @@ def checkout():
 
 
 @billing_bp.route("/invoices", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_invoices():
     limit = request.args.get("limit", 20)
     cursor = request.args.get("cursor")
     sort = request.args.get("sort", "-created_at")
 
-    query = get_tenant_query(Invoice)
+    query = get_branch_query(Invoice)
 
     sort_field = "id"
     sort_desc = False
@@ -345,9 +345,9 @@ def get_invoices():
 
 
 @billing_bp.route("/invoices/<int:invoice_id>", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_invoice(invoice_id):
-    invoice = get_tenant_query(Invoice).filter_by(id=invoice_id).first()
+    invoice = get_branch_query(Invoice).filter_by(id=invoice_id).first()
     if not invoice:
         return error_response(
             error_code="INVOICE_NOT_FOUND",
@@ -410,9 +410,9 @@ def get_invoice(invoice_id):
 
 
 @billing_bp.route("/invoices/<int:invoice_id>/void", methods=["POST"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def void_invoice(invoice_id):
-    invoice = get_tenant_query(Invoice).filter_by(id=invoice_id).first()
+    invoice = get_branch_query(Invoice).filter_by(id=invoice_id).first()
     if not invoice:
         return error_response(
             error_code="INVOICE_NOT_FOUND",
@@ -469,9 +469,9 @@ def void_invoice(invoice_id):
 
 
 @billing_bp.route("/invoices/<int:invoice_id>/sms", methods=["POST"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def send_invoice_sms(invoice_id):
-    invoice = get_tenant_query(Invoice).filter_by(id=invoice_id).first()
+    invoice = get_branch_query(Invoice).filter_by(id=invoice_id).first()
     if not invoice:
         return error_response(
             error_code="INVOICE_NOT_FOUND",
@@ -491,7 +491,7 @@ def send_invoice_sms(invoice_id):
 
 
 @billing_bp.route("/reminders", methods=["POST"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def create_reminder():
     from app.models.customer import Reminder
     data = request.get_json() or {}
@@ -538,7 +538,7 @@ def create_reminder():
 
 
 @billing_bp.route("/feedback", methods=["POST"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def collect_feedback():
     from app.models.customer import CustomerFeedback
     data = request.get_json() or {}

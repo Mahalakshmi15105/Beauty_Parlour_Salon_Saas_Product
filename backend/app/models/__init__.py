@@ -1,5 +1,6 @@
 from app.models.global_models import SubscriptionPlan, Tenant
 from app.models.user import User, TenantSetting
+from app.models.branch import Branch
 from app.models.catalog import ServiceCategory, Service, Product, Supplier, StockReorderLog
 from app.models.customer import Customer, Reminder, CustomerFeedback
 from app.models.employee import Employee
@@ -15,6 +16,7 @@ __all__ = [
     "Tenant",
     "User",
     "TenantSetting",
+    "Branch",
     "ServiceCategory",
     "Service",
     "Product",

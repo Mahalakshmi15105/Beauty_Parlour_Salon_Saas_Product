@@ -22,7 +22,7 @@ import LandingPage from "./pages/LandingPage";
 import Register from "./pages/Register";
 import PublicBookingPage from "./pages/PublicBookingPage";
 import API from "./services/api";
-import { LogOut, ShieldCheck, Sparkles, UserCheck } from "lucide-react";
+import { LogOut, Sparkles, ShieldCheck } from "lucide-react";
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem("token"));
@@ -31,24 +31,33 @@ function App() {
     return saved ? JSON.parse(saved) : null;
   });
 
-  // Detect Public Booking Portal route e.g. /book/zeros-lan-3, /book/zeros-lan, or /book/3
-  const getPublicTenantIdentifier = () => {
+  // Detect Public Booking Portal route e.g. /book/zeros-lan-3, /book/branch/www2-0-3, /book/branch/3
+  const getPublicBookingRouteInfo = () => {
     const path = window.location.pathname;
-    if (path.startsWith("/book/")) {
+    if (path.startsWith("/book/branch/")) {
+      const parts = path.split("/book/branch/");
+      if (parts[1]) {
+        const identifier = parts[1].split("?")[0].split("#")[0].trim();
+        return { identifier: identifier || "1", isBranch: true };
+      }
+    } else if (path.startsWith("/book/")) {
       const parts = path.split("/book/");
       if (parts[1]) {
         const identifier = parts[1].split("?")[0].split("#")[0].trim();
-        return identifier || "1";
+        return { identifier: identifier || "1", isBranch: false };
       }
     }
     const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.get("book_branch_id")) {
+      return { identifier: searchParams.get("book_branch_id").trim(), isBranch: true };
+    }
     if (searchParams.get("book_tenant_id")) {
-      return searchParams.get("book_tenant_id").trim();
+      return { identifier: searchParams.get("book_tenant_id").trim(), isBranch: false };
     }
     return null;
   };
 
-  const publicTenantId = getPublicTenantIdentifier();
+  const bookingRouteInfo = getPublicBookingRouteInfo();
 
   // Detect Meta OAuth callback redirect (?code=...) and route to WhatsApp integration page
   const initialActiveTab = new URLSearchParams(window.location.search).get("code")
@@ -56,12 +65,11 @@ function App() {
     : "dashboard";
 
   const [currentView, setCurrentView] = useState(() => {
-    if (publicTenantId !== null) return "public_booking";
+    if (bookingRouteInfo !== null) return "public_booking";
     return localStorage.getItem("token") ? "app" : "landing";
   });
-  const [activeTab, setActiveTab] = useState(initialActiveTab);
 
-  // Login Form State
+  const [activeTab, setActiveTab] = useState(initialActiveTab);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -117,10 +125,12 @@ function App() {
   }, []);
 
   // 0. PUBLIC BOOKING PORTAL VIEW
-  if (currentView === "public_booking" || publicTenantId !== null) {
+  if (currentView === "public_booking" || bookingRouteInfo !== null) {
     return (
       <PublicBookingPage
-        tenantId={publicTenantId || 1}
+        tenantId={bookingRouteInfo?.identifier || "1"}
+        tenantIdentifier={bookingRouteInfo?.identifier || "1"}
+        isBranch={bookingRouteInfo?.isBranch || false}
         onNavigateHome={() => {
           window.history.pushState({}, "", "/");
           setCurrentView(localStorage.getItem("token") ? "app" : "landing");
@@ -242,35 +252,6 @@ function App() {
             </button>
           </form>
 
-          {/* Quick Login Presets for Easy Demo Testing */}
-          <div className="pt-4 border-t border-slate-100 space-y-2">
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider text-center">Demo Quick Login</p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail("admin@smartgonext.com");
-                  setPassword("ParlourAdmin123!");
-                }}
-                className="px-3 py-2 bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1"
-              >
-                <UserCheck className="w-3.5 h-3.5" />
-                <span>Salon Owner</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail("superadmin@smartgonext.com");
-                  setPassword("SuperAdmin123!");
-                }}
-                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1"
-              >
-                <ShieldCheck className="w-3.5 h-3.5 text-pink-600" />
-                <span>Super Admin</span>
-              </button>
-            </div>
-          </div>
-
           <div className="text-center pt-2 border-t border-slate-100">
             <p className="text-xs text-slate-500 font-medium">
               Don't have a salon account?{" "}
@@ -320,7 +301,9 @@ function App() {
     );
   }
 
-  // 5. SALON OWNER / PARLOUR ADMIN PORTAL
+
+
+  // 5. SALON OWNER / PARLOUR ADMIN & BRANCH ADMIN PORTAL
   const renderContent = () => {
     switch (activeTab) {
       case "dashboard":

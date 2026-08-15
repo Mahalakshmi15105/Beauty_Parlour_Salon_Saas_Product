@@ -16,9 +16,13 @@ logger = logging.getLogger(__name__)
 class CampaignService:
 
     @staticmethod
-    def fetch_target_customers(tenant_id: int, audience_type: str, custom_ids: list = None):
+    def fetch_target_customers(tenant_id: int, audience_type: str, custom_ids: list = None, branch_id: int = None):
         """Fetches active customers strictly belonging to the given tenant with non-empty phone numbers."""
         query = get_tenant_query(Customer).filter_by(tenant_id=tenant_id, is_deleted=False)
+        
+        # Add branch filter for BranchAdmin
+        if branch_id:
+            query = query.filter_by(branch_id=branch_id)
 
         if audience_type == "MEMBERSHIP":
             active_m_cust_ids = [
@@ -62,9 +66,9 @@ class CampaignService:
         return query.all()
 
     @staticmethod
-    def preview_campaign_audience(tenant_id: int, audience_type: str, custom_ids: list = None) -> dict:
+    def preview_campaign_audience(tenant_id: int, audience_type: str, custom_ids: list = None, branch_id: int = None) -> dict:
         """Returns statistics breakdown: Total Target, Valid WhatsApp, Skipped Count and Reasons."""
-        customers = CampaignService.fetch_target_customers(tenant_id, audience_type, custom_ids)
+        customers = CampaignService.fetch_target_customers(tenant_id, audience_type, custom_ids, branch_id)
         total_target = len(customers)
 
         valid_recipients = []
@@ -113,7 +117,7 @@ class CampaignService:
         }
 
     @staticmethod
-    def create_campaign_and_queue(tenant_id: int, user_id: int, campaign_data: dict) -> WhatsAppCampaign:
+    def create_campaign_and_queue(tenant_id: int, user_id: int, campaign_data: dict, branch_id: int = None) -> WhatsAppCampaign:
         """Saves campaign record and enqueues recipient records in DB."""
         title = campaign_data.get("title", "WhatsApp Marketing Campaign")
         template_type = campaign_data.get("template_type", "TEXT_ONLY")
@@ -134,8 +138,8 @@ class CampaignService:
                 pass
 
         # Calculate audience
-        preview = CampaignService.preview_campaign_audience(tenant_id, audience_type, custom_ids)
-        target_customers = CampaignService.fetch_target_customers(tenant_id, audience_type, custom_ids)
+        preview = CampaignService.preview_campaign_audience(tenant_id, audience_type, custom_ids, branch_id)
+        target_customers = CampaignService.fetch_target_customers(tenant_id, audience_type, custom_ids, branch_id)
 
         campaign = WhatsAppCampaign(
             tenant_id=tenant_id,

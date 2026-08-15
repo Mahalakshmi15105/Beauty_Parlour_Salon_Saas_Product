@@ -6,6 +6,7 @@ class Customer(db.Model, TimestampMixin, SoftDeleteMixin):
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     first_name = db.Column(db.String(100), nullable=False)
     last_name = db.Column(db.String(100), nullable=True)
     phone = db.Column(db.String(30), nullable=False, index=True)
@@ -29,6 +30,7 @@ class Reminder(db.Model, TimestampMixin):
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     customer_id = db.Column(db.Integer, db.ForeignKey("customers.id"), nullable=False, index=True)
     invoice_id = db.Column(db.Integer, db.ForeignKey("invoices.id"), nullable=True, index=True)
     reminder_type = db.Column(db.String(50), nullable=False)  # Next visit, Membership renewal, Follow-up appointment
@@ -46,6 +48,7 @@ class CustomerFeedback(db.Model, TimestampMixin):
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     customer_id = db.Column(db.Integer, db.ForeignKey("customers.id"), nullable=False, index=True)
     invoice_id = db.Column(db.Integer, db.ForeignKey("invoices.id"), nullable=False, index=True)
     rating = db.Column(db.Integer, nullable=False, default=5)

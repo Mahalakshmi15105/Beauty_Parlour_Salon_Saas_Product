@@ -14,93 +14,129 @@ logger = logging.getLogger(__name__)
 settings_bp = Blueprint("settings", __name__)
 
 @settings_bp.route("/settings", methods=["GET"])
-@require_role(["ParlourAdmin", "Receptionist", "Employee"])
+@require_role(["ParlourAdmin", "BranchAdmin", "Receptionist", "Employee"])
 def get_settings():
-    setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id).first()
-    if not setting:
-        # Create default tenant settings if missing
-        setting = TenantSetting(tenant_id=g.parlour_id)
-        db.session.add(setting)
-        db.session.commit()
+    from app.models.branch import Branch
 
+    # Fetch main parlour settings (branch_id=None)
+    main_setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id, branch_id=None).first()
+    if not main_setting:
+        try:
+            main_setting = TenantSetting(tenant_id=g.parlour_id, branch_id=None)
+            db.session.add(main_setting)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            main_setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id, branch_id=None).first()
+
+    branch = None
+    if g.role == "BranchAdmin" and g.branch_id:
+        branch = Branch.query.filter_by(id=g.branch_id, tenant_id=g.parlour_id).first()
+
+    setting = main_setting
     tenant = Tenant.query.get(g.parlour_id)
+
+    def _get(attr, default=""):
+        val = getattr(setting, attr, None) if setting else None
+        return val if val is not None else default
+
+    # Use branch logo if branch has logo; otherwise fallback to main parlour logo
+    logo_url = ""
+    if branch and branch.logo_url:
+        logo_url = branch.logo_url
+    elif main_setting and main_setting.logo_url:
+        logo_url = main_setting.logo_url
+
+    # Resolve theme: Branch custom theme -> Main Parlour theme -> Default
+    theme_name = (branch.theme_name if branch and branch.theme_name else _get("theme_name", "light")) or "light"
+    primary_color = (branch.primary_color if branch and branch.primary_color else _get("primary_color", "#EC4899")) or "#EC4899"
+    secondary_color = (branch.secondary_color if branch and branch.secondary_color else _get("secondary_color", "#F472B6")) or "#F472B6"
+    accent_color = (branch.accent_color if branch and branch.accent_color else _get("accent_color", "#FDF2F8")) or "#FDF2F8"
 
     return success_response({
         "business_profile": {
             "name": tenant.name if tenant else "Beauty Parlour",
-            "logo_url": setting.logo_url or "",
-            "owner_name": setting.owner_name or "",
-            "phone": setting.alternate_phone or "",
-            "alternate_phone": setting.alternate_phone or "",
-            "email": setting.website or "",
-            "gst_number": setting.gst_number or "",
-            "address": setting.address or "",
-            "city": setting.city or "",
-            "state": setting.state or "",
-            "country": setting.country or "",
-            "postal_code": setting.postal_code or "",
-            "website": setting.website or "",
-            "description": setting.description or "",
+            "logo_url": logo_url,
+            "owner_name": _get("owner_name"),
+            "phone": _get("alternate_phone"),
+            "alternate_phone": _get("alternate_phone"),
+            "email": _get("website"),
+            "gst_number": _get("gst_number"),
+            "address": _get("address"),
+            "city": _get("city"),
+            "state": _get("state"),
+            "country": _get("country"),
+            "postal_code": _get("postal_code"),
+            "website": _get("website"),
+            "description": _get("description"),
             "shop_name_typography": {
-                "enabled": getattr(setting, "shop_name_font_enabled", False),
-                "font_family": getattr(setting, "shop_name_font", "Outfit") or "Outfit",
-                "font_size": getattr(setting, "shop_name_font_size", 32) or 32,
-                "font_weight": str(getattr(setting, "shop_name_font_weight", "700") or "700"),
-                "letter_spacing": float(getattr(setting, "shop_name_letter_spacing", 0.00) or 0.00)
+                "enabled": bool(_get("shop_name_font_enabled", False)),
+                "font_family": _get("shop_name_font", "Outfit") or "Outfit",
+                "font_size": int(_get("shop_name_font_size", 32) or 32),
+                "font_weight": str(_get("shop_name_font_weight", "700") or "700"),
+                "letter_spacing": float(_get("shop_name_letter_spacing", 0.00) or 0.00)
             }
         },
         "invoice_settings": {
-            "invoice_prefix": setting.invoice_prefix or "INV",
-            "tax_name": setting.tax_name or "GST",
-            "tax_rate": float(setting.tax_rate or 18.00),
-            "receipt_header": setting.receipt_header or "",
-            "receipt_footer": setting.receipt_footer or "",
-            "terms_and_conditions": setting.terms_and_conditions or "",
-            "show_logo": setting.show_logo if setting.show_logo is not None else True
+            "invoice_prefix": _get("invoice_prefix", "INV"),
+            "tax_name": _get("tax_name", "GST"),
+            "tax_rate": float(_get("tax_rate", 18.00)),
+            "receipt_header": _get("receipt_header"),
+            "receipt_footer": _get("receipt_footer"),
+            "terms_and_conditions": _get("terms_and_conditions"),
+            "show_logo": bool(_get("show_logo", True))
         },
         "regional_settings": {
-            "currency": getattr(setting, "currency_code", None) or setting.currency or "INR",
-            "currency_code": getattr(setting, "currency_code", None) or setting.currency or "INR",
-            "currency_symbol": setting.currency_symbol or "₹",
-            "language": getattr(setting, "language", None) or "English",
-            "date_format": setting.date_format or "YYYY-MM-DD",
-            "timezone": setting.timezone or "UTC"
+            "currency": _get("currency_code", "INR") or _get("currency", "INR"),
+            "currency_code": _get("currency_code", "INR") or _get("currency", "INR"),
+            "currency_symbol": _get("currency_symbol", "₹"),
+            "language": _get("language", "English"),
+            "date_format": _get("date_format", "YYYY-MM-DD"),
+            "timezone": _get("timezone", "UTC")
         },
         "receipt_settings": {
-            "receipt_template": getattr(setting, "receipt_template", "Classic") or "Classic",
-            "paper_size": getattr(setting, "paper_size", "80mm") or "80mm",
-            "show_logo": getattr(setting, "show_logo", True),
-            "show_gst": getattr(setting, "show_gst", True),
-            "show_address": getattr(setting, "show_address", True),
-            "show_phone": getattr(setting, "show_phone", True),
-            "show_email": getattr(setting, "show_email", True),
-            "show_website": getattr(setting, "show_website", True),
-            "show_qr_code": getattr(setting, "show_qr_code", False),
-            "auto_print": getattr(setting, "auto_print", False),
-            "thank_you_message": getattr(setting, "thank_you_message", "Thank you for visiting. Please visit again.") or "Thank you for visiting. Please visit again.",
-            "receipt_header": setting.receipt_header or "",
-            "receipt_footer": setting.receipt_footer or "",
+            "receipt_template": _get("receipt_template", "Classic") or "Classic",
+            "paper_size": _get("paper_size", "80mm") or "80mm",
+            "show_logo": bool(_get("show_logo", True)),
+            "show_gst": bool(_get("show_gst", True)),
+            "show_address": bool(_get("show_address", True)),
+            "show_phone": bool(_get("show_phone", True)),
+            "show_email": bool(_get("show_email", True)),
+            "show_website": bool(_get("show_website", True)),
+            "show_qr_code": bool(_get("show_qr_code", False)),
+            "auto_print": bool(_get("auto_print", False)),
+            "thank_you_message": _get("thank_you_message", "Thank you for visiting. Please visit again.") or "Thank you for visiting. Please visit again.",
+            "receipt_header": _get("receipt_header"),
+            "receipt_footer": _get("receipt_footer"),
         },
         "theme_settings": {
-            "theme_name": getattr(setting, "theme_name", "light") or "light",
-            "primary_color": getattr(setting, "primary_color", "#EC4899") or "#EC4899",
-            "secondary_color": getattr(setting, "secondary_color", "#F472B6") or "#F472B6",
-            "accent_color": getattr(setting, "accent_color", "#FDF2F8") or "#FDF2F8"
+            "theme_name": theme_name,
+            "primary_color": primary_color,
+            "secondary_color": secondary_color,
+            "accent_color": accent_color
         },
         "marketing_settings": {
-            "churn_days_threshold": getattr(setting, "churn_days_threshold", 45) or 45
+            "churn_days_threshold": int(_get("churn_days_threshold", 45) or 45)
         }
     })
 
 
 @settings_bp.route("/settings", methods=["PUT"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def update_settings():
+    from app.models.branch import Branch
+
     data = request.get_json() or {}
-    setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id).first()
+    
+    # Always operate on main_setting for general settings
+    setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id, branch_id=None).first()
     if not setting:
-        setting = TenantSetting(tenant_id=g.parlour_id)
+        setting = TenantSetting(tenant_id=g.parlour_id, branch_id=None)
         db.session.add(setting)
+
+    branch = None
+    if g.role == "BranchAdmin" and g.branch_id:
+        branch = Branch.query.filter_by(id=g.branch_id, tenant_id=g.parlour_id).first()
 
     tenant = Tenant.query.get(g.parlour_id)
 
@@ -113,121 +149,47 @@ def update_settings():
 
     try:
         # Update Business Profile
-        if tenant and biz.get("name"):
+        # Only ParlourAdmin can update tenant name
+        if g.role == "ParlourAdmin" and tenant and biz.get("name"):
             tenant.name = biz["name"].strip()
 
-        if "logo_url" in biz:
+        if "logo_url" in biz and g.role == "ParlourAdmin":
             setting.logo_url = biz.get("logo_url")
-        setting.owner_name = biz.get("owner_name")
-        setting.alternate_phone = biz.get("phone") or biz.get("alternate_phone")
-        setting.gst_number = biz.get("gst_number")
-        setting.address = biz.get("address")
-        setting.city = biz.get("city")
-        setting.state = biz.get("state")
-        setting.country = biz.get("country")
-        setting.postal_code = biz.get("postal_code")
-        setting.website = biz.get("website")
-        setting.description = biz.get("description")
 
-        # Update Shop Name Typography Settings
-        typo = biz.get("shop_name_typography") or data.get("shop_name_typography") or {}
-        if typo:
-            if "enabled" in typo:
-                setting.shop_name_font_enabled = bool(typo["enabled"])
-            if typo.get("font_family"):
-                setting.shop_name_font = typo["font_family"].strip()
-            if typo.get("font_size") is not None:
-                try:
-                    raw_size = int(typo["font_size"])
-                    setting.shop_name_font_size = max(14, min(64, raw_size))
-                except (ValueError, TypeError):
-                    pass
-            if typo.get("font_weight"):
-                weight_str = str(typo["font_weight"]).strip()
-                if weight_str in ["400", "500", "700"]:
-                    setting.shop_name_font_weight = weight_str
-            if typo.get("letter_spacing") is not None:
-                try:
-                    raw_spacing = float(typo["letter_spacing"])
-                    setting.shop_name_letter_spacing = Decimal(str(max(-2.0, min(10.0, raw_spacing))))
-                except (ValueError, TypeError):
-                    pass
-
-        # Update Invoice Settings
-        if inv.get("invoice_prefix"):
-            setting.invoice_prefix = inv["invoice_prefix"].strip()
-        if inv.get("tax_name"):
-            setting.tax_name = inv["tax_name"].strip()
-        if inv.get("tax_rate") is not None:
-            setting.tax_rate = Decimal(str(inv["tax_rate"]))
-        setting.receipt_header = inv.get("receipt_header")
-        setting.receipt_footer = inv.get("receipt_footer")
-        setting.terms_and_conditions = inv.get("terms_and_conditions")
-        if inv.get("show_logo") is not None:
-            setting.show_logo = bool(inv["show_logo"])
-
-        # Update Regional Settings
-        if reg.get("currency") or reg.get("currency_code"):
-            curr_code = (reg.get("currency_code") or reg.get("currency")).strip()
-            setting.currency = curr_code
-            if hasattr(setting, "currency_code"):
-                setting.currency_code = curr_code
-        if reg.get("currency_symbol"):
-            setting.currency_symbol = reg["currency_symbol"].strip()
-        if reg.get("language") and hasattr(setting, "language"):
-            setting.language = reg["language"].strip()
-        if reg.get("date_format"):
-            setting.date_format = reg["date_format"].strip()
-        if reg.get("timezone"):
-            setting.timezone = reg["timezone"].strip()
-
-        # Update Receipt & Printing Settings
-        if rec:
-            if rec.get("receipt_template"):
-                setting.receipt_template = rec["receipt_template"].strip()
-            if rec.get("paper_size"):
-                setting.paper_size = rec["paper_size"].strip()
-            if rec.get("show_logo") is not None:
-                setting.show_logo = bool(rec["show_logo"])
-            if rec.get("show_gst") is not None:
-                setting.show_gst = bool(rec["show_gst"])
-            if rec.get("show_address") is not None:
-                setting.show_address = bool(rec["show_address"])
-            if rec.get("show_phone") is not None:
-                setting.show_phone = bool(rec["show_phone"])
-            if rec.get("show_email") is not None:
-                setting.show_email = bool(rec["show_email"])
-            if rec.get("show_website") is not None:
-                setting.show_website = bool(rec["show_website"])
-            if rec.get("show_qr_code") is not None:
-                setting.show_qr_code = bool(rec["show_qr_code"])
-            if rec.get("auto_print") is not None:
-                setting.auto_print = bool(rec["auto_print"])
-            if rec.get("thank_you_message"):
-                setting.thank_you_message = rec["thank_you_message"].strip()
-            if rec.get("receipt_header"):
-                setting.receipt_header = rec["receipt_header"].strip()
-            if rec.get("receipt_footer"):
-                setting.receipt_footer = rec["receipt_footer"].strip()
+        if g.role == "ParlourAdmin":
+            setting.owner_name = biz.get("owner_name")
+            setting.alternate_phone = biz.get("phone") or biz.get("alternate_phone")
+            setting.gst_number = biz.get("gst_number")
+            setting.address = biz.get("address")
+            setting.city = biz.get("city")
+            setting.state = biz.get("state")
+            setting.country = biz.get("country")
+            setting.postal_code = biz.get("postal_code")
+            setting.website = biz.get("website")
+            setting.description = biz.get("description")
 
         # Update Theme Settings
         if thm:
-            if thm.get("theme_name"):
-                setting.theme_name = thm["theme_name"].strip()
-            if thm.get("primary_color"):
-                setting.primary_color = thm["primary_color"].strip()
-            if thm.get("secondary_color"):
-                setting.secondary_color = thm["secondary_color"].strip()
-            if thm.get("accent_color"):
-                setting.accent_color = thm["accent_color"].strip()
-
-        # Update Marketing / Churn Settings
-        if mkt:
-            if mkt.get("churn_days_threshold") is not None:
-                try:
-                    setting.churn_days_threshold = int(mkt["churn_days_threshold"])
-                except ValueError:
-                    pass
+            if g.role == "BranchAdmin" and branch:
+                # Store branch theme directly on Branch record
+                if thm.get("theme_name"):
+                    branch.theme_name = thm["theme_name"].strip()
+                if thm.get("primary_color"):
+                    branch.primary_color = thm["primary_color"].strip()
+                if thm.get("secondary_color"):
+                    branch.secondary_color = thm["secondary_color"].strip()
+                if thm.get("accent_color"):
+                    branch.accent_color = thm["accent_color"].strip()
+            else:
+                # ParlourAdmin updates Main Parlour theme settings
+                if thm.get("theme_name"):
+                    setting.theme_name = thm["theme_name"].strip()
+                if thm.get("primary_color"):
+                    setting.primary_color = thm["primary_color"].strip()
+                if thm.get("secondary_color"):
+                    setting.secondary_color = thm["secondary_color"].strip()
+                if thm.get("accent_color"):
+                    setting.accent_color = thm["accent_color"].strip()
 
         db.session.commit()
     except Exception as e:
@@ -243,7 +205,7 @@ def update_settings():
 
 
 @settings_bp.route("/settings/currency", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_currency_setting():
     setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id).first()
     if not setting:
@@ -261,7 +223,7 @@ def get_currency_setting():
 
 
 @settings_bp.route("/settings/currency", methods=["PUT"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def update_currency_setting():
     data = request.get_json() or {}
     curr_code = data.get("currency_code") or data.get("currency")
@@ -303,7 +265,7 @@ def update_currency_setting():
 
 
 @settings_bp.route("/settings/language", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_language_setting():
     setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id).first()
     if not setting:
@@ -318,7 +280,7 @@ def get_language_setting():
 
 
 @settings_bp.route("/settings/language", methods=["PUT"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def update_language_setting():
     data = request.get_json() or {}
     lang = data.get("language")
@@ -399,7 +361,7 @@ def is_valid_image(file):
         return False, f"Error validating image: {str(e)}"
 
 @settings_bp.route("/settings/upload-logo", methods=["POST"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def upload_logo():
     if "logo" not in request.files:
         return error_response(
@@ -453,56 +415,40 @@ def upload_logo():
     logger.info(f"Uploading logo: {file.filename}, size: {file_length} bytes")
 
     ext = file.filename.rsplit(".", 1)[1].lower()
-    filename = f"logo_tenant_{g.parlour_id}.{ext}"
+
+    if g.role == "BranchAdmin" and g.branch_id:
+        filename = f"logo_branch_{g.branch_id}.{ext}"
+    else:
+        filename = f"logo_tenant_{g.parlour_id}.{ext}"
 
     static_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "uploads", "logos")
     os.makedirs(static_folder, exist_ok=True)
     destination = os.path.join(static_folder, filename)
-    
-    # Delete existing file if it exists
+
     if os.path.exists(destination):
-        os.remove(destination)
-        logger.info(f"Deleted existing logo file: {destination}")
-    
-    file.save(destination)
-    
-    # Verify the saved file
-    if not os.path.exists(destination):
-        logger.error(f"File save failed: {destination}")
-        return error_response(
-            error_code="SAVE_FAILED",
-            message="Failed to save logo file.",
-            status_code=500
-        )
-    
-    saved_size = os.path.getsize(destination)
-    logger.info(f"Logo saved successfully: {destination}, size: {saved_size} bytes")
-    
-    if saved_size != file_length:
-        logger.error(f"File size mismatch: original {file_length} bytes, saved {saved_size} bytes")
-        return error_response(
-            error_code="SIZE_MISMATCH",
-            message="File was corrupted during upload. Please try again.",
-            status_code=500
-        )
+        try:
+            os.remove(destination)
+        except Exception as e:
+            logger.warning(f"Could not remove old file: {e}")
 
-    ext = file.filename.rsplit(".", 1)[1].lower()
-    filename = f"logo_tenant_{g.parlour_id}.{ext}"
-
-    static_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "uploads", "logos")
-    os.makedirs(static_folder, exist_ok=True)
-    destination = os.path.join(static_folder, filename)
     file.save(destination)
+    logger.info(f"Saved logo file to {destination}")
 
     logo_url = f"/api/v1/static/uploads/logos/{filename}"
 
-    setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id).first()
-    if not setting:
-        setting = TenantSetting(tenant_id=g.parlour_id)
-        db.session.add(setting)
-
-    setting.logo_url = logo_url
     try:
+        if g.role == "BranchAdmin" and g.branch_id:
+            from app.models.branch import Branch
+            branch = Branch.query.filter_by(id=g.branch_id, tenant_id=g.parlour_id).first()
+            if branch:
+                branch.logo_url = logo_url
+        else:
+            setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id, branch_id=None).first()
+            if not setting:
+                setting = TenantSetting(tenant_id=g.parlour_id, branch_id=None)
+                db.session.add(setting)
+            setting.logo_url = logo_url
+        
         db.session.commit()
     except Exception as e:
         db.session.rollback()
@@ -520,7 +466,7 @@ def upload_logo():
 
 
 @settings_bp.route("/settings/remove-logo", methods=["DELETE"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def remove_logo():
     setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id).first()
     if setting:

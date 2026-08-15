@@ -20,19 +20,20 @@ def allowed_file(filename):
 
 
 @campaigns_bp.route("/whatsapp/campaigns/preview", methods=["POST"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def preview_campaign_audience():
     """Generates recipient breakdown statistics (Total Target, Valid WhatsApp, Skipped Count and Reasons)."""
     data = request.get_json() or {}
     audience_type = data.get("audience_type", "ALL")
     custom_ids = data.get("custom_customer_ids", [])
 
-    preview = CampaignService.preview_campaign_audience(g.parlour_id, audience_type, custom_ids)
+    branch_id = g.branch_id if g.role == "BranchAdmin" else None
+    preview = CampaignService.preview_campaign_audience(g.parlour_id, audience_type, custom_ids, branch_id)
     return success_response(preview)
 
 
 @campaigns_bp.route("/whatsapp/campaigns/upload-image", methods=["POST"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def upload_campaign_image():
     """Uploads a campaign offer image asset and returns static URL."""
     if "image" not in request.files:
@@ -59,7 +60,7 @@ def upload_campaign_image():
 
 
 @campaigns_bp.route("/whatsapp/campaigns/send", methods=["POST"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def send_campaign():
     """Creates campaign record, enqueues recipient items, and processes initial batch."""
     data = request.get_json() or {}
@@ -71,7 +72,8 @@ def send_campaign():
 
     try:
         # Create campaign and recipient queue in DB
-        campaign = CampaignService.create_campaign_and_queue(g.parlour_id, g.user_id, data)
+        branch_id = g.branch_id if g.role == "BranchAdmin" else None
+        campaign = CampaignService.create_campaign_and_queue(g.parlour_id, g.user_id, data, branch_id)
 
         # Process first batch immediately (e.g. 50 items)
         batch_res = CampaignService.process_campaign_batch(campaign.id, batch_size=50)
@@ -87,7 +89,7 @@ def send_campaign():
 
 
 @campaigns_bp.route("/whatsapp/campaigns", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def list_campaigns():
     """Returns paginated list of tenant campaigns."""
     page = int(request.args.get("page", 1))
@@ -105,7 +107,7 @@ def list_campaigns():
 
 
 @campaigns_bp.route("/whatsapp/campaigns/<int:campaign_id>", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_campaign_detail(campaign_id):
     """Returns campaign summary and recipient audit drawer entries."""
     campaign = get_tenant_query(WhatsAppCampaign).filter_by(id=campaign_id).first()
@@ -128,7 +130,7 @@ def get_campaign_detail(campaign_id):
 
 
 @campaigns_bp.route("/whatsapp/campaigns/<int:campaign_id>/process", methods=["POST"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def process_campaign_step(campaign_id):
     """Processes next batch of queued messages for a running campaign."""
     campaign = get_tenant_query(WhatsAppCampaign).filter_by(id=campaign_id).first()

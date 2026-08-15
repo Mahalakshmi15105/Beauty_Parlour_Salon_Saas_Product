@@ -6,6 +6,7 @@ class Invoice(db.Model, TimestampMixin):
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     invoice_number = db.Column(db.String(100), nullable=False, unique=True, index=True)
     customer_id = db.Column(db.Integer, db.ForeignKey("customers.id"), nullable=False, index=True)
     subtotal = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
@@ -30,6 +31,7 @@ class InvoiceLineItem(db.Model, TimestampMixin):
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     invoice_id = db.Column(db.Integer, db.ForeignKey("invoices.id"), nullable=False, index=True)
     service_id = db.Column(db.Integer, db.ForeignKey("services.id"), nullable=True, index=True)
     product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=True, index=True)

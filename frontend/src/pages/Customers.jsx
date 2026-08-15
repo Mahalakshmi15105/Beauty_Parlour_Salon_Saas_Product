@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
 import { useModalFocusTrap, useFormKeyboardNavigation } from "../utils/keyboardNavigation";
-import { UserRoundX, X, MessageSquare, Phone, AlertTriangle, Calendar, Settings as SettingsIcon, Printer, FileSpreadsheet, FileText } from "lucide-react";
+import { UserRoundX, X, MessageSquare, Phone, AlertTriangle, Calendar, Settings as SettingsIcon, Printer, FileSpreadsheet, FileText, Upload } from "lucide-react";
 import { exportToCSV, printDataList, exportToPDF } from "../utils/exportUtils";
+import BulkUploadModal from "../components/BulkUploadModal";
 
 function Customers() {
   const modalRef = useRef(null);
@@ -30,6 +31,7 @@ function Customers() {
   // Form State
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
@@ -205,12 +207,21 @@ function Customers() {
           <h1 className="text-xl font-semibold text-text-primary">Customers Manager</h1>
           <p className="text-xs text-text-secondary">Manage visitor directories, preferences, and dormant re-engagement campaigns.</p>
         </div>
-        <button
-          onClick={openAddModal}
-          className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition"
-        >
-          + Add Customer
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowBulkUpload(true)}
+            className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2"
+          >
+            <Upload className="w-4 h-4" />
+            Bulk Upload
+          </button>
+          <button
+            onClick={openAddModal}
+            className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition"
+          >
+            + Add Customer
+          </button>
+        </div>
       </div>
 
       {/* Sub-navigation Tabs */}
@@ -618,6 +629,14 @@ function Customers() {
             </form>
           </div>
         </div>
+      )}
+      
+      {showBulkUpload && (
+        <BulkUploadModal
+          module="customers"
+          onClose={() => setShowBulkUpload(false)}
+          onSuccess={fetchCustomers}
+        />
       )}
     </div>
   );

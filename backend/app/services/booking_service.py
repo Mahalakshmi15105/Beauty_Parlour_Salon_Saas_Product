@@ -81,9 +81,19 @@ class BookingService:
         max_daily = settings.max_daily_bookings or 50
 
         if booking_type == "Token":
-            # Generate Tokens
+            # Generate Tokens with current serving token
             booked_token_numbers = set(b.token_number for b in existing_bookings if b.token_number)
             tokens = []
+            
+            # Find current serving token (first booked token in chronological order)
+            current_token = None
+            booked_tokens = [b.token_number for b in existing_bookings if b.token_number]
+            if booked_tokens:
+                # Sort by appointment creation time to find the earliest booked token
+                sorted_bookings = sorted([b for b in existing_bookings if b.token_number], key=lambda x: x.created_at)
+                if sorted_bookings:
+                    current_token = sorted_bookings[0].token_number
+            
             for i in range(1, max_daily + 1):
                 is_available = i not in booked_token_numbers
                 tokens.append({
@@ -95,6 +105,7 @@ class BookingService:
                 "booking_type": "Token",
                 "is_open": True,
                 "max_daily_bookings": max_daily,
+                "current_token": current_token,
                 "tokens": tokens
             }, 200
 
@@ -181,15 +192,23 @@ class BookingService:
             }, 200
 
     @staticmethod
-    def validate_and_create_appointment(tenant_id, payload, booking_source="Walk-in", default_channel="Website"):
+    def validate_and_create_appointment(tenant_id, payload, booking_source="Walk-in", default_channel="Website", target_branch_id=None):
         """
         Core service to validate rules and persist appointment into database.
         Used by both Admin Manual Booking and Customer Public Website Booking.
+        Enforces tenant and branch boundaries for appointments and employees.
         """
         try:
             tenant = Tenant.query.filter_by(id=tenant_id, is_deleted=False).first()
             if not tenant or tenant.status != "active":
                 return False, {"error_code": "INVALID_TENANT", "message": "The associated beauty parlour account is inactive or not found."}, 400
+
+            # Validate target_branch_id if supplied
+            if target_branch_id:
+                from app.models.branch import Branch
+                b_exists = Branch.query.filter_by(id=target_branch_id, tenant_id=tenant_id, is_deleted=False).first()
+                if not b_exists:
+                    return False, {"error_code": "INVALID_BRANCH", "message": "Branch not found or does not belong to this parlour."}, 400
 
             # Required fields validation using safe _clean_str
             customer_name = _clean_str(payload.get("customer_name"))
@@ -227,7 +246,7 @@ class BookingService:
 
             active_booking_type = booking_type_req or settings.booking_type or "Token"
 
-            # Parse Time if Slot mode or provided
+            # Parse Time if Slot mode or provided (Token mode should not require time)
             start_time_dt = None
             if start_time_str:
                 try:
@@ -235,6 +254,7 @@ class BookingService:
                 except ValueError:
                     return False, {"error_code": "VALIDATION_FAILED", "message": "Invalid Appointment Time format. Use HH:MM."}, 400
             elif active_booking_type == "Slot":
+                # Only require time for Slot booking mode
                 return False, {"error_code": "VALIDATION_FAILED", "message": "Appointment Time is required for Time Slot booking mode."}, 400
 
             # 1. Working Days Validation
@@ -242,8 +262,8 @@ class BookingService:
             if not is_open:
                 return False, {"error_code": "VALIDATION_FAILED", "message": open_err}, 400
 
-            # 2. Operating Hours & Break Time Validation (if time provided)
-            if start_time_dt:
+            # 2. Operating Hours & Break Time Validation (only for Slot mode or if time provided)
+            if start_time_dt and active_booking_type == "Slot":
                 open_time = datetime.strptime(settings.opening_time or "09:00", "%H:%M").time()
                 close_time = datetime.strptime(settings.closing_time or "20:00", "%H:%M").time()
                 if start_time_dt < open_time or start_time_dt >= close_time:
@@ -297,11 +317,14 @@ class BookingService:
                 if not service:
                     return False, {"error_code": "VALIDATION_FAILED", "message": f"Selected service (ID: {service_id}) not found."}, 400
 
-                # Employee conflict validation if employee assigned
+                # Employee conflict & branch validation if employee assigned
                 if employee_id:
-                    employee = Employee.query.filter_by(id=employee_id, tenant_id=tenant_id, is_deleted=False).first()
+                    emp_filter = [Employee.id == employee_id, Employee.tenant_id == tenant_id, Employee.is_deleted == False]
+                    if target_branch_id:
+                        emp_filter.append(Employee.branch_id == target_branch_id)
+                    employee = Employee.query.filter(*emp_filter).first()
                     if not employee:
-                        return False, {"error_code": "VALIDATION_FAILED", "message": f"Selected staff (ID: {employee_id}) not found."}, 400
+                        return False, {"error_code": "VALIDATION_FAILED", "message": f"Selected staff (ID: {employee_id}) not found or does not belong to this branch."}, 400
                     
                     if start_time_dt:
                         conflict = AppointmentItem.query.join(Appointment).filter(
@@ -377,6 +400,7 @@ class BookingService:
             # Create Appointment Record
             appointment = Appointment(
                 tenant_id=tenant_id,
+                branch_id=target_branch_id,
                 appointment_number=appointment_number,
                 customer_id=customer.id if customer else None,
                 customer_name=customer_name,
@@ -401,6 +425,7 @@ class BookingService:
             for v_item in validated_items:
                 app_item = AppointmentItem(
                     tenant_id=tenant_id,
+                    branch_id=target_branch_id,
                     appointment_id=appointment.id,
                     service_id=v_item["service_id"],
                     employee_id=v_item["employee_id"],

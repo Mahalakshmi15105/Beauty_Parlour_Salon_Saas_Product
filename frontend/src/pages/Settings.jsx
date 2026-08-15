@@ -31,8 +31,10 @@ import {
   Search,
   RotateCcw,
   Sliders,
+  Network,
 } from "lucide-react";
 import WhatsAppIntegration from "./WhatsAppIntegration";
+import BranchManagement from "./BranchManagement";
 import { CURATED_FONTS, DEFAULT_TYPOGRAPHY, getShopNameStyle, loadGoogleFont } from "../utils/fontLoader";
 
 function Settings() {
@@ -56,6 +58,9 @@ function Settings() {
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState(null);
+  
+  // Get user from localStorage to check role
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
 
   // Logo Upload State
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -179,6 +184,7 @@ function Settings() {
         }));
         setUploadingLogo(false);
         setSaveSuccess(true);
+        window.dispatchEvent(new CustomEvent("branding_updated"));
         setTimeout(() => setSaveSuccess(false), 3000);
       })
       .catch((err) => {
@@ -379,32 +385,41 @@ function Settings() {
       <div className="grid grid-cols-12 gap-8">
         {/* Navigation Tabs */}
         <div className="col-span-3 space-y-1 bg-surface border border-border-soft p-3 rounded-lg h-fit">
-          {[
-            { id: "business", label: "Parlour Profile", icon: Building2 },
-            { id: "whatsapp", label: "WhatsApp Integration", icon: MessageSquare },
-            { id: "receipt", label: "Receipt & Thermal Printing", icon: Printer },
-            { id: "invoice", label: "Invoice & Taxes", icon: Receipt },
-            { id: "regional", label: `${t("currency_settings")} & ${t("language_settings")}`, icon: Globe },
-            { id: "accent", label: "System Accent Color", icon: Sparkles },
-            { id: "notifications", label: "Notifications & Security", icon: Bell },
-            { id: "backup", label: "Backup & Restore", icon: Database },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`w-full text-left px-4 py-2.5 rounded-lg text-xs font-semibold flex items-center space-x-3 transition ${
-                  activeTab === tab.id
-                    ? "bg-primary text-white shadow-sm"
-                    : "text-text-secondary hover:text-text-primary hover:bg-background"
-                }`}
-              >
-                <Icon className="w-4 h-4 shrink-0" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
+          {(() => {
+            const tabs = [
+              { id: "business", label: "Parlour Profile", icon: Building2 },
+              { id: "whatsapp", label: "WhatsApp Integration", icon: MessageSquare },
+              { id: "receipt", label: "Receipt & Thermal Printing", icon: Printer },
+              { id: "invoice", label: "Invoice & Taxes", icon: Receipt },
+              { id: "regional", label: `${t("currency_settings")} & ${t("language_settings")}`, icon: Globe },
+              { id: "accent", label: "System Accent Color", icon: Sparkles },
+              { id: "notifications", label: "Notifications & Security", icon: Bell },
+              { id: "backup", label: "Backup & Restore", icon: Database },
+            ];
+            
+            // Add Branch Management tab only for ParlourAdmin
+            if (user.role !== "BranchAdmin") {
+              tabs.splice(1, 0, { id: "branches", label: "Branch Management", icon: Network });
+            }
+            
+            return tabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`w-full text-left px-4 py-2.5 rounded-lg text-xs font-semibold flex items-center space-x-3 transition ${
+                    activeTab === tab.id
+                      ? "bg-primary text-white shadow-sm"
+                      : "text-text-secondary hover:text-text-primary hover:bg-background"
+                  }`}
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            });
+          })()}
         </div>
 
         {/* Settings Form Panel */}
@@ -412,6 +427,11 @@ function Settings() {
           {/* WhatsApp Integration Tab */}
           {activeTab === "whatsapp" && (
             <WhatsAppIntegration />
+          )}
+
+          {/* Branch Management Tab */}
+          {activeTab === "branches" && (
+            <BranchManagement />
           )}
 
           {/* Business Profile Tab */}

@@ -2,7 +2,7 @@ from flask import Blueprint, request, g
 from app.database import db
 from app.models.catalog import Product, Supplier, StockReorderLog
 from app.utils.responses import success_response, error_response
-from app.utils.auth import require_role, get_tenant_query
+from app.utils.auth import require_role, get_tenant_query, get_branch_query
 from app.utils.query import paginate_query
 import logging
 
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 products_bp = Blueprint("products", __name__)
 
 @products_bp.route("/products", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_products():
     q = request.args.get("q", "").strip()
     category = request.args.get("category", "").strip()
@@ -79,7 +79,7 @@ def get_products():
 
 
 @products_bp.route("/products/<int:product_id>", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_product(product_id):
     product = get_tenant_query(Product).filter_by(id=product_id).first()
     if not product:
@@ -105,7 +105,7 @@ def get_product(product_id):
 
 
 @products_bp.route("/products", methods=["POST"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def create_product():
     data = request.get_json() or {}
     name = data.get("name", "").strip()
@@ -194,7 +194,7 @@ def create_product():
 
 
 @products_bp.route("/products/<int:product_id>", methods=["PUT"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def update_product(product_id):
     product = get_tenant_query(Product).filter_by(id=product_id).first()
     if not product:
@@ -280,7 +280,7 @@ def update_product(product_id):
 
 
 @products_bp.route("/products/<int:product_id>", methods=["DELETE"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def delete_product(product_id):
     product = get_tenant_query(Product).filter_by(id=product_id).first()
     if not product:
@@ -306,7 +306,7 @@ def delete_product(product_id):
 
 
 @products_bp.route("/suppliers", methods=["GET"])
-@require_role(["ParlourAdmin", "Receptionist"])
+@require_role(["ParlourAdmin", "BranchAdmin", "Receptionist"])
 def get_suppliers():
     suppliers = get_tenant_query(Supplier).all()
     data = [
@@ -324,7 +324,7 @@ def get_suppliers():
 
 
 @products_bp.route("/suppliers", methods=["POST"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def create_supplier():
     data = request.get_json() or {}
     name = data.get("name", "").strip()
@@ -363,7 +363,7 @@ def create_supplier():
 
 
 @products_bp.route("/suppliers/<int:supplier_id>", methods=["PUT"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def update_supplier(supplier_id):
     supplier = get_tenant_query(Supplier).filter_by(id=supplier_id).first()
     if not supplier:
@@ -405,7 +405,7 @@ def update_supplier(supplier_id):
 
 
 @products_bp.route("/suppliers/<int:supplier_id>", methods=["DELETE"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def delete_supplier(supplier_id):
     supplier = get_tenant_query(Supplier).filter_by(id=supplier_id).first()
     if not supplier:
@@ -431,7 +431,7 @@ def delete_supplier(supplier_id):
 
 
 @products_bp.route("/reorders", methods=["GET"])
-@require_role(["ParlourAdmin", "Receptionist"])
+@require_role(["ParlourAdmin", "BranchAdmin", "Receptionist"])
 def get_reorder_logs():
     logs = get_tenant_query(StockReorderLog).order_by(StockReorderLog.created_at.desc()).all()
     data = []
@@ -451,7 +451,7 @@ def get_reorder_logs():
 
 
 @products_bp.route("/reorders", methods=["POST"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def create_reorder_log():
     data = request.get_json() or {}
     product_id = data.get("product_id")

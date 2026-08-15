@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 dashboard_bp = Blueprint("dashboard", __name__)
 
 @dashboard_bp.route("/dashboard/summary", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_summary():
     now = datetime.now(timezone.utc)
     today_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
@@ -100,7 +100,7 @@ def get_summary():
 
 
 @dashboard_bp.route("/dashboard/charts", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_charts():
     range_days = request.args.get("range", 7)
     try:
@@ -189,7 +189,7 @@ def get_charts():
 
 
 @dashboard_bp.route("/dashboard/activities", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_activities():
     recent_invoices = get_tenant_query(Invoice).order_by(Invoice.created_at.desc()).limit(5).all()
     recent_customers = get_tenant_query(Customer).order_by(Customer.created_at.desc()).limit(5).all()

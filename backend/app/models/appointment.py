@@ -6,6 +6,7 @@ class Appointment(db.Model, TimestampMixin, SoftDeleteMixin):
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     appointment_number = db.Column(db.String(100), nullable=False, index=True)
     customer_id = db.Column(db.Integer, db.ForeignKey("customers.id"), nullable=True, index=True)
     customer_name = db.Column(db.String(150), nullable=False)
@@ -34,6 +35,7 @@ class Appointment(db.Model, TimestampMixin, SoftDeleteMixin):
         return {
             "id": self.id,
             "tenant_id": self.tenant_id,
+            "branch_id": self.branch_id,
             "appointment_number": self.appointment_number,
             "customer_id": self.customer_id,
             "customer_name": self.customer_name,
@@ -61,6 +63,7 @@ class AppointmentItem(db.Model, TimestampMixin):
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     appointment_id = db.Column(db.Integer, db.ForeignKey("appointments.id"), nullable=False, index=True)
     service_id = db.Column(db.Integer, db.ForeignKey("services.id"), nullable=False, index=True)
     employee_id = db.Column(db.Integer, db.ForeignKey("employees.id"), nullable=True, index=True)

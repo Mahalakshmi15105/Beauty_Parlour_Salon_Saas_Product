@@ -4,7 +4,7 @@ from app.models.customer import Customer
 from app.models.billing import Invoice
 from app.models.user import TenantSetting
 from app.utils.responses import success_response, error_response
-from app.utils.auth import require_role, get_tenant_query
+from app.utils.auth import require_role, get_tenant_query, get_branch_query
 from app.utils.query import paginate_query
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, or_, and_
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 customers_bp = Blueprint("customers", __name__)
 
 @customers_bp.route("/customers", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_customers():
     # Parse query parameters
     q = request.args.get("q", "").strip()
@@ -23,8 +23,8 @@ def get_customers():
     cursor = request.args.get("cursor")
     sort = request.args.get("sort", "-created_at")
 
-    # Start tenant query
-    query = get_tenant_query(Customer)
+    # Start branch query (respects branch isolation for BranchAdmin)
+    query = get_branch_query(Customer)
 
     # Search filter
     if q:
@@ -69,6 +69,7 @@ def get_customers():
             "address": c.address,
             "notes": c.notes,
             "spot": c.spot,
+            "branch_id": c.branch_id,
             "created_at": c.created_at.isoformat()
         } for c in customers
     ]
@@ -80,9 +81,9 @@ def get_customers():
 
 
 @customers_bp.route("/customers/<int:customer_id>", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_customer(customer_id):
-    customer = get_tenant_query(Customer).filter_by(id=customer_id).first()
+    customer = get_branch_query(Customer).filter_by(id=customer_id).first()
     if not customer:
         return error_response(
             error_code="CUSTOMER_NOT_FOUND",
@@ -100,12 +101,13 @@ def get_customer(customer_id):
         "address": customer.address,
         "notes": customer.notes,
         "spot": customer.spot,
+        "branch_id": customer.branch_id,
         "created_at": customer.created_at.isoformat()
     })
 
 
 @customers_bp.route("/customers", methods=["POST"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def create_customer():
     data = request.get_json() or {}
     first_name = data.get("first_name", "").strip()
@@ -149,9 +151,29 @@ def create_customer():
                 status_code=400
             )
 
+    # Determine branch_id automatically for BranchAdmin or validate for ParlourAdmin
+    target_branch_id = None
+    if g.role == "BranchAdmin":
+        target_branch_id = g.branch_id
+    elif data.get("branch_id"):
+        try:
+            bid = int(data["branch_id"])
+            from app.models.branch import Branch
+            b_exists = Branch.query.filter_by(id=bid, tenant_id=g.parlour_id, is_deleted=False).first()
+            if not b_exists:
+                return error_response(
+                    error_code="INVALID_BRANCH",
+                    message="The specified branch does not belong to your parlour.",
+                    status_code=400
+                )
+            target_branch_id = bid
+        except ValueError:
+            pass
+
     try:
         customer = Customer(
             tenant_id=g.parlour_id,
+            branch_id=target_branch_id,
             first_name=first_name,
             last_name=data.get("last_name"),
             phone=phone,
@@ -182,9 +204,9 @@ def create_customer():
 
 
 @customers_bp.route("/customers/<int:customer_id>", methods=["PUT"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def update_customer(customer_id):
-    customer = get_tenant_query(Customer).filter_by(id=customer_id).first()
+    customer = get_branch_query(Customer).filter_by(id=customer_id).first()
     if not customer:
         return error_response(
             error_code="CUSTOMER_NOT_FOUND",
@@ -235,6 +257,19 @@ def update_customer(customer_id):
         customer.address = data.get("address")
         customer.notes = data.get("notes")
         customer.spot = data.get("spot")
+        if g.role == "ParlourAdmin" and data.get("branch_id") is not None:
+            bid = data.get("branch_id")
+            if bid is None:
+                customer.branch_id = None
+            else:
+                try:
+                    bid = int(bid)
+                    from app.models.branch import Branch
+                    b_exists = Branch.query.filter_by(id=bid, tenant_id=g.parlour_id, is_deleted=False).first()
+                    if b_exists:
+                        customer.branch_id = bid
+                except ValueError:
+                    pass
         db.session.commit()
     except Exception as e:
         db.session.rollback()
@@ -261,9 +296,9 @@ def update_customer(customer_id):
 
 
 @customers_bp.route("/customers/<int:customer_id>", methods=["DELETE"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def delete_customer(customer_id):
-    customer = get_tenant_query(Customer).filter_by(id=customer_id).first()
+    customer = get_branch_query(Customer).filter_by(id=customer_id).first()
     if not customer:
         return error_response(
             error_code="CUSTOMER_NOT_FOUND",
@@ -287,12 +322,12 @@ def delete_customer(customer_id):
 
 
 @customers_bp.route("/customers/<int:customer_id>/memberships", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_customer_memberships(customer_id):
     from app.models.membership import CustomerMembership, MembershipBenefit
     
-    # Verify customer exists in tenant context
-    customer = get_tenant_query(Customer).filter_by(id=customer_id).first()
+    # Verify customer exists in tenant/branch context
+    customer = get_branch_query(Customer).filter_by(id=customer_id).first()
     if not customer:
         return error_response(
             error_code="CUSTOMER_NOT_FOUND",
@@ -331,7 +366,7 @@ def get_customer_memberships(customer_id):
 
 
 @customers_bp.route("/customers/<int:customer_id>/history", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_customer_history(customer_id):
     from app.models.billing import Invoice, InvoiceLineItem, InvoicePayment
     from app.models.catalog import Service, Product
@@ -340,8 +375,8 @@ def get_customer_history(customer_id):
     from collections import defaultdict
     from decimal import Decimal
 
-    # 1. Verify customer exists in current tenant
-    customer = get_tenant_query(Customer).filter_by(id=customer_id).first()
+    # 1. Verify customer exists in tenant/branch context
+    customer = get_branch_query(Customer).filter_by(id=customer_id).first()
     if not customer:
         return error_response(
             error_code="CUSTOMER_NOT_FOUND",
@@ -349,11 +384,14 @@ def get_customer_history(customer_id):
             status_code=404
         )
 
-    # 2. Query customer's invoices (tenant isolated)
-    invoices = Invoice.query.filter_by(
+    # 2. Query customer's invoices (tenant + branch isolated)
+    invoice_query = Invoice.query.filter_by(
         customer_id=customer_id,
         tenant_id=g.parlour_id
-    ).order_by(Invoice.created_at.desc()).all()
+    )
+    if g.role == "BranchAdmin" and g.branch_id:
+        invoice_query = invoice_query.filter_by(branch_id=g.branch_id)
+    invoices = invoice_query.order_by(Invoice.created_at.desc()).all()
 
     # 3. Query active/past memberships
     memberships = CustomerMembership.query.filter_by(
@@ -573,20 +611,27 @@ def get_customer_history(customer_id):
 
 
 @customers_bp.route("/customers/dormant", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_dormant_customers():
-    setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id).first()
+    setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id, branch_id=g.branch_id if g.role == "BranchAdmin" else None).first()
     threshold_days = setting.churn_days_threshold if setting and setting.churn_days_threshold else 45
 
     now = datetime.utcnow()
     limit_date = now - timedelta(days=threshold_days)
 
+    # Build invoice subquery with branch isolation
+    invoice_filter = [
+        Invoice.tenant_id == g.parlour_id,
+        Invoice.status != "Voided"
+    ]
+    if g.role == "BranchAdmin" and g.branch_id:
+        invoice_filter.append(Invoice.branch_id == g.branch_id)
+
     subquery = db.session.query(
         Invoice.customer_id,
         func.max(Invoice.created_at).label("last_visit")
     ).filter(
-        Invoice.tenant_id == g.parlour_id,
-        Invoice.status != "Voided"
+        *invoice_filter
     ).group_by(Invoice.customer_id).subquery()
 
     query = db.session.query(
@@ -594,7 +639,13 @@ def get_dormant_customers():
         subquery.c.last_visit
     ).filter(
         Customer.tenant_id == g.parlour_id
-    ).outerjoin(
+    )
+    
+    # Add branch filter for BranchAdmin
+    if g.role == "BranchAdmin" and g.branch_id:
+        query = query.filter(Customer.branch_id == g.branch_id)
+    
+    query = query.outerjoin(
         subquery, Customer.id == subquery.c.customer_id
     )
 
@@ -608,7 +659,7 @@ def get_dormant_customers():
         )
     )
 
-    results = query.all()
+    results = query.limit(100).all()
 
     data = []
     for customer, last_visit in results:

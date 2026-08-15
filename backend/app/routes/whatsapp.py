@@ -14,7 +14,7 @@ whatsapp_bp = Blueprint("whatsapp", __name__)
 
 
 @whatsapp_bp.route("/whatsapp/settings", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_whatsapp_settings():
     """Returns Meta WhatsApp Business account connection details for the logged-in parlour tenant."""
     setting = get_tenant_query(WhatsAppSetting).filter_by(tenant_id=g.parlour_id).first()
@@ -47,7 +47,7 @@ def get_whatsapp_settings():
 
 
 @whatsapp_bp.route("/whatsapp/settings", methods=["POST"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def update_whatsapp_settings():
     """Updates or sets tenant's WhatsApp Business credentials directly."""
     data = request.get_json() or {}
@@ -83,7 +83,7 @@ def update_whatsapp_settings():
 
 
 @whatsapp_bp.route("/whatsapp/oauth/connect", methods=["POST"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def connect_meta_oauth():
     """Exchanges Meta OAuth Embedded Signup code, auto-discovers WABA and Phone IDs, and saves tenant credentials."""
     data = request.get_json() or {}
@@ -158,7 +158,7 @@ def connect_meta_oauth():
 
 
 @whatsapp_bp.route("/whatsapp/disconnect", methods=["POST"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def disconnect_whatsapp():
     """Disconnects Meta WhatsApp account for current tenant."""
     setting = get_tenant_query(WhatsAppSetting).filter_by(tenant_id=g.parlour_id).first()
@@ -178,7 +178,7 @@ def disconnect_whatsapp():
 
 
 @whatsapp_bp.route("/whatsapp/send-message", methods=["POST"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def send_direct_message():
     """Sends a single direct WhatsApp text or media message to a customer/phone number."""
     data = request.get_json() or {}

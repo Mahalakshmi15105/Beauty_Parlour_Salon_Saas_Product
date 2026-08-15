@@ -2,7 +2,7 @@ from flask import Blueprint, request, g
 from app.database import db
 from app.models.catalog import ServiceCategory, Service
 from app.utils.responses import success_response, error_response
-from app.utils.auth import require_role, get_tenant_query
+from app.utils.auth import require_role, get_tenant_query, get_branch_query
 from app.utils.query import paginate_query
 import logging
 
@@ -75,7 +75,7 @@ def ensure_tenant_categories(tenant_id):
 # --- SERVICE CATEGORY CRUD ---
 
 @services_bp.route("/service-categories", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_categories():
     ensure_tenant_categories(g.parlour_id)
     categories = ServiceCategory.query.filter_by(tenant_id=g.parlour_id, is_deleted=False).order_by(ServiceCategory.name.asc()).all()
@@ -84,7 +84,7 @@ def get_categories():
 
 
 @services_bp.route("/service-categories", methods=["POST"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def create_category():
     data = request.get_json() or {}
     name = data.get("name", "").strip()
@@ -122,7 +122,7 @@ def create_category():
 
 
 @services_bp.route("/service-categories/<int:category_id>", methods=["DELETE"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def delete_category(category_id):
     category = get_tenant_query(ServiceCategory).filter_by(id=category_id).first()
     if not category:
@@ -159,7 +159,7 @@ def delete_category(category_id):
 # --- SERVICE CRUD ---
 
 @services_bp.route("/services", methods=["GET"])
-@require_role(["ParlourAdmin", "Receptionist", "Employee"])
+@require_role(["ParlourAdmin", "BranchAdmin", "Receptionist", "Employee"])
 def get_services():
     q = request.args.get("q", "").strip()
     category_id = request.args.get("category_id", "").strip()
@@ -223,7 +223,7 @@ def get_services():
 
 
 @services_bp.route("/services/<int:service_id>", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_service(service_id):
     service = get_tenant_query(Service).filter_by(id=service_id).first()
     if not service:
@@ -246,7 +246,7 @@ def get_service(service_id):
 
 
 @services_bp.route("/services", methods=["POST"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def create_service():
     data = request.get_json() or {}
     name = data.get("name", "").strip()
@@ -321,7 +321,7 @@ def create_service():
 
 
 @services_bp.route("/services/<int:service_id>", methods=["PUT"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def update_service(service_id):
     service = get_tenant_query(Service).filter_by(id=service_id).first()
     if not service:
@@ -395,7 +395,7 @@ def update_service(service_id):
 
 
 @services_bp.route("/services/<int:service_id>", methods=["DELETE"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def delete_service(service_id):
     service = get_tenant_query(Service).filter_by(id=service_id).first()
     if not service:

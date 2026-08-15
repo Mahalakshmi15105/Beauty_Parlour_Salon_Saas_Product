@@ -18,7 +18,7 @@ memberships_bp = Blueprint("memberships", __name__)
 # --- MEMBERSHIP PLANS CRUD ---
 
 @memberships_bp.route("/membership-plans", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_plans():
     q = request.args.get("q", "").strip()
     status = request.args.get("status", "").strip()
@@ -76,7 +76,7 @@ def get_plans():
 
 
 @memberships_bp.route("/membership-plans/<int:plan_id>", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_plan(plan_id):
     plan = get_tenant_query(MembershipPlan).filter_by(id=plan_id).first()
     if not plan:
@@ -99,7 +99,7 @@ def get_plan(plan_id):
 
 
 @memberships_bp.route("/membership-plans", methods=["POST"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def create_plan():
     # Ensure tenant context is available
     if not getattr(g, 'parlour_id', None):
@@ -191,7 +191,7 @@ def create_plan():
 
 
 @memberships_bp.route("/membership-plans/<int:plan_id>", methods=["PUT"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def update_plan(plan_id):
     plan = get_tenant_query(MembershipPlan).filter_by(id=plan_id).first()
     if not plan:
@@ -288,7 +288,7 @@ def update_plan(plan_id):
 
 
 @memberships_bp.route("/membership-plans/<int:plan_id>", methods=["DELETE"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def delete_plan(plan_id):
     plan = get_tenant_query(MembershipPlan).filter_by(id=plan_id).first()
     if not plan:
@@ -316,7 +316,7 @@ def delete_plan(plan_id):
 # --- CUSTOMER MEMBERSHIP ACTIONS ---
 
 @memberships_bp.route("/memberships/assign", methods=["POST"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def assign_membership():
     data = request.get_json() or {}
     customer_id = data.get("customer_id")
@@ -391,7 +391,7 @@ def assign_membership():
 
 
 @memberships_bp.route("/memberships/<int:cm_id>/renew", methods=["POST"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def renew_membership(cm_id):
     cm = CustomerMembership.query.filter_by(id=cm_id, tenant_id=g.parlour_id).first()
     if not cm:
@@ -428,7 +428,7 @@ def renew_membership(cm_id):
 
 
 @memberships_bp.route("/memberships/<int:cm_id>/upgrade", methods=["POST"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def upgrade_membership(cm_id):
     cm = CustomerMembership.query.filter_by(id=cm_id, tenant_id=g.parlour_id).first()
     if not cm:
@@ -496,7 +496,7 @@ def upgrade_membership(cm_id):
 
 
 @memberships_bp.route("/memberships/<int:cm_id>/cancel", methods=["POST"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def cancel_membership(cm_id):
     cm = CustomerMembership.query.filter_by(id=cm_id, tenant_id=g.parlour_id).first()
     if not cm:
@@ -522,7 +522,7 @@ def cancel_membership(cm_id):
 
 
 @memberships_bp.route("/memberships", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_all_memberships():
     query = CustomerMembership.query.filter_by(tenant_id=g.parlour_id).order_by(CustomerMembership.id.desc())
     

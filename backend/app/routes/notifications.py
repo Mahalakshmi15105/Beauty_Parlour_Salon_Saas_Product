@@ -9,7 +9,7 @@ from app.models.customer import Customer
 from app.models.global_models import Tenant
 from app.routes.auth import require_role
 from app.utils.responses import success_response, error_response
-from app.utils.auth import get_tenant_query
+from app.utils.auth import get_tenant_query, get_branch_query
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,7 @@ def check_and_generate_expiry_notifications(target_tenant_id=None):
 
             # Load details for notification payload
             customer = db.session.get(Customer, m.customer_id)
-            plan = db.session.get(MembershipPlan, m.plan_id)
+            plan = db.session.get(MembershipPlan, m.membership_plan_id)
             tenant = db.session.get(Tenant, m.tenant_id)
 
             cust_name = f"{customer.first_name} {customer.last_name or ''}".strip() if customer else "Customer"
@@ -280,11 +280,9 @@ def check_and_generate_inactive_customer_notifications(target_tenant_id=None):
 
 
 @notifications_bp.route("/notifications", methods=["GET"])
-@require_role(["ParlourAdmin", "SuperAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin", "SuperAdmin"])
 def get_notifications():
-    # Automatically scan expiries & inactive customers for current tenant on fetch
-    check_and_generate_expiry_notifications(g.parlour_id)
-    check_and_generate_inactive_customer_notifications(g.parlour_id)
+    from app.models.notification import Notification
 
     unread_only = request.args.get("unread_only", "false").lower() == "true"
     notif_type = request.args.get("type", None)
@@ -331,7 +329,7 @@ def get_notifications():
 
 
 @notifications_bp.route("/notifications/read-all", methods=["PUT"])
-@require_role(["ParlourAdmin", "SuperAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin", "SuperAdmin"])
 def mark_all_notifications_read():
     try:
         get_tenant_query(Notification).filter_by(is_read=False).update({"is_read": True})
@@ -348,7 +346,7 @@ def mark_all_notifications_read():
 
 
 @notifications_bp.route("/notifications/check-expiries", methods=["POST"])
-@require_role(["ParlourAdmin", "SuperAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin", "SuperAdmin"])
 def trigger_expiry_check():
     c1 = check_and_generate_expiry_notifications(g.parlour_id)
     c2 = check_and_generate_inactive_customer_notifications(g.parlour_id)
@@ -356,7 +354,7 @@ def trigger_expiry_check():
 
 
 @notifications_bp.route("/notifications/<int:notif_id>/read", methods=["PUT"])
-@require_role(["ParlourAdmin", "SuperAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin", "SuperAdmin"])
 def mark_notification_read(notif_id):
     notif = get_tenant_query(Notification).filter_by(id=notif_id).first()
     if not notif:

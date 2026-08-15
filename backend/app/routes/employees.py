@@ -2,7 +2,7 @@ from flask import Blueprint, request, g
 from app.database import db
 from app.models.employee import Employee
 from app.utils.responses import success_response, error_response
-from app.utils.auth import require_role, get_tenant_query
+from app.utils.auth import require_role, get_tenant_query, get_branch_query
 from app.utils.query import paginate_query
 import logging
 from datetime import datetime
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 employees_bp = Blueprint("employees", __name__)
 
 @employees_bp.route("/employees", methods=["GET"])
-@require_role(["ParlourAdmin", "Receptionist", "Employee"])
+@require_role(["ParlourAdmin", "BranchAdmin", "Receptionist", "Employee"])
 def get_employees():
     q = request.args.get("q", "").strip()
     status = request.args.get("status", "").strip()
@@ -19,7 +19,7 @@ def get_employees():
     cursor = request.args.get("cursor")
     sort = request.args.get("sort", "first_name")
 
-    query = get_tenant_query(Employee)
+    query = get_branch_query(Employee)
 
     if q:
         query = query.filter(
@@ -72,9 +72,9 @@ def get_employees():
 
 
 @employees_bp.route("/employees/<int:employee_id>", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_employee(employee_id):
-    employee = get_tenant_query(Employee).filter_by(id=employee_id).first()
+    employee = get_branch_query(Employee).filter_by(id=employee_id).first()
     if not employee:
         return error_response(
             error_code="EMPLOYEE_NOT_FOUND",
@@ -97,7 +97,7 @@ def get_employee(employee_id):
 
 
 @employees_bp.route("/employees", methods=["POST"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def create_employee():
     data = request.get_json() or {}
     first_name = data.get("first_name", "").strip()
@@ -126,7 +126,7 @@ def create_employee():
         )
 
     # Check phone duplicates
-    dup = get_tenant_query(Employee).filter_by(phone=phone).first()
+    dup = get_branch_query(Employee).filter_by(phone=phone).first()
     if dup:
         return error_response(
             error_code="DUPLICATE_RECORD",
@@ -145,9 +145,29 @@ def create_employee():
                 status_code=400
             )
 
+    # Determine & validate branch_id
+    target_branch_id = None
+    if g.role == "BranchAdmin":
+        target_branch_id = g.branch_id
+    elif data.get("branch_id"):
+        try:
+            bid = int(data["branch_id"])
+            from app.models.branch import Branch
+            b_exists = Branch.query.filter_by(id=bid, tenant_id=g.parlour_id, is_deleted=False).first()
+            if not b_exists:
+                return error_response(
+                    error_code="INVALID_BRANCH",
+                    message="The specified branch does not belong to your parlour.",
+                    status_code=400
+                )
+            target_branch_id = bid
+        except ValueError:
+            pass
+
     try:
         employee = Employee(
             tenant_id=g.parlour_id,
+            branch_id=target_branch_id,
             first_name=first_name,
             last_name=data.get("last_name"),
             phone=phone,
@@ -179,9 +199,9 @@ def create_employee():
 
 
 @employees_bp.route("/employees/<int:employee_id>", methods=["PUT"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def update_employee(employee_id):
-    employee = get_tenant_query(Employee).filter_by(id=employee_id).first()
+    employee = get_branch_query(Employee).filter_by(id=employee_id).first()
     if not employee:
         return error_response(
             error_code="EMPLOYEE_NOT_FOUND",
@@ -215,7 +235,7 @@ def update_employee(employee_id):
         )
 
     # Check duplicates
-    dup = get_tenant_query(Employee).filter(Employee.phone == phone, Employee.id != employee_id).first()
+    dup = get_branch_query(Employee).filter(Employee.phone == phone, Employee.id != employee_id).first()
     if dup:
         return error_response(
             error_code="DUPLICATE_RECORD",
@@ -233,6 +253,25 @@ def update_employee(employee_id):
                 message="Joining date must be in YYYY-MM-DD format.",
                 status_code=400
             )
+
+    if g.role == "ParlourAdmin" and "branch_id" in data:
+        bid = data.get("branch_id")
+        if bid is None:
+            employee.branch_id = None
+        else:
+            try:
+                bid = int(bid)
+                from app.models.branch import Branch
+                b_exists = Branch.query.filter_by(id=bid, tenant_id=g.parlour_id, is_deleted=False).first()
+                if not b_exists:
+                    return error_response(
+                        error_code="INVALID_BRANCH",
+                        message="The specified branch does not belong to your parlour.",
+                        status_code=400
+                    )
+                employee.branch_id = bid
+            except ValueError:
+                pass
 
     try:
         employee.first_name = first_name
@@ -260,9 +299,9 @@ def update_employee(employee_id):
 
 
 @employees_bp.route("/employees/<int:employee_id>", methods=["DELETE"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def delete_employee(employee_id):
-    employee = get_tenant_query(Employee).filter_by(id=employee_id).first()
+    employee = get_branch_query(Employee).filter_by(id=employee_id).first()
     if not employee:
         return error_response(
             error_code="EMPLOYEE_NOT_FOUND",

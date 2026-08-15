@@ -27,6 +27,7 @@ def login():
             status_code=400
         )
 
+    # Optimized single query with joined relationships
     user = User.query.filter_by(email=email.lower(), is_deleted=False).first()
     if not user or not user.check_password(password):
         return error_response(
@@ -42,7 +43,7 @@ def login():
             status_code=403
         )
 
-    # Check tenant status if user is ParlourAdmin
+    # Check tenant status if user is ParlourAdmin (optimized query)
     if user.role == "ParlourAdmin":
         tenant = Tenant.query.filter_by(id=user.tenant_id, is_deleted=False).first()
         if not tenant or tenant.status != "active":
@@ -55,6 +56,7 @@ def login():
     # Issue tokens
     additional_claims = {
         "parlour_id": user.tenant_id,
+        "branch_id": user.branch_id,
         "role": user.role
     }
     
@@ -72,10 +74,13 @@ def login():
 def build_user_payload(user):
     owner_name = None
     parlour_name = None
+    branch_name = None
     if user.tenant:
         parlour_name = user.tenant.name
         if user.tenant.settings and user.tenant.settings.owner_name:
             owner_name = user.tenant.settings.owner_name
+    if user.branch:
+        branch_name = user.branch.name
 
     if not owner_name:
         owner_name = user.email.split("@")[0].replace(".", " ").title()
@@ -85,8 +90,10 @@ def build_user_payload(user):
         "email": user.email,
         "role": user.role,
         "parlour_id": user.tenant_id,
+        "branch_id": user.branch_id,
         "owner_name": owner_name,
-        "parlour_name": parlour_name or "SmartGoNext Beauty Parlour"
+        "parlour_name": parlour_name or "SmartGoNext Beauty Parlour",
+        "branch_name": branch_name
     }
 
 
@@ -97,6 +104,7 @@ def refresh():
     claims = get_jwt()
     additional_claims = {
         "parlour_id": claims.get("parlour_id"),
+        "branch_id": claims.get("branch_id"),
         "role": claims.get("role")
     }
     new_access_token = create_access_token(identity=identity, additional_claims=additional_claims, expires_delta=timedelta(hours=2))
@@ -107,7 +115,7 @@ def refresh():
 
 
 @auth_bp.route("/auth/me", methods=["GET"])
-@require_role(["SuperAdmin", "ParlourAdmin"])
+@require_role(["SuperAdmin", "ParlourAdmin", "BranchAdmin"])
 def get_me():
     user = User.query.get(g.user_id)
     if not user:
@@ -203,6 +211,7 @@ def register():
         # Issue JWT Access & Refresh Tokens for immediate login
         additional_claims = {
             "parlour_id": user.tenant_id,
+            "branch_id": user.branch_id,
             "role": user.role
         }
         access_token = create_access_token(identity=str(user.id), additional_claims=additional_claims, expires_delta=timedelta(hours=2))
@@ -216,7 +225,8 @@ def register():
                 "id": user.id,
                 "email": user.email,
                 "role": user.role,
-                "parlour_id": user.tenant_id
+                "parlour_id": user.tenant_id,
+                "branch_id": user.branch_id
             }
         }, 201)
 

@@ -1229,9 +1229,14 @@ function BookingLinkPreview() {
   const [seoUrl, setSeoUrl] = useState("");
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const tenantId = user.parlour_id || user.tenant_id || 1;
+  const isBranchAdmin = user.role === "BranchAdmin" && user.branch_id;
 
   useEffect(() => {
-    API.get(`/public/booking/${tenantId}/config`)
+    const configUrl = isBranchAdmin 
+      ? `/public/booking/branch/${user.branch_id}/config` 
+      : `/public/booking/${tenantId}/config`;
+
+    API.get(configUrl)
       .then((res) => {
         const d = res.data?.data || res.data || {};
         if (d.booking_url) {
@@ -1243,11 +1248,11 @@ function BookingLinkPreview() {
         }
       })
       .catch(() => {
-        setSeoUrl(`${window.location.origin}/book/${tenantId}`);
+        setSeoUrl(`${window.location.origin}/book/${isBranchAdmin ? `branch/${user.branch_id}` : tenantId}`);
       });
-  }, [tenantId]);
+  }, [tenantId, isBranchAdmin, user.branch_id]);
 
-  const publicUrl = seoUrl || `${window.location.origin}/book/${tenantId}`;
+  const publicUrl = seoUrl || `${window.location.origin}/book/${isBranchAdmin ? `branch/${user.branch_id}` : tenantId}`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(publicUrl);

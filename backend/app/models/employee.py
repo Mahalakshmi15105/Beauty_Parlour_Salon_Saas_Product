@@ -7,6 +7,7 @@ class Employee(db.Model, TimestampMixin, SoftDeleteMixin):
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     first_name = db.Column(db.String(100), nullable=False)
     last_name = db.Column(db.String(100), nullable=True)
     phone = db.Column(db.String(30), nullable=False, index=True)

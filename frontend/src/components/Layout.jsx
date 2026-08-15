@@ -21,6 +21,7 @@ import {
   Building2,
   Send,
   X,
+  Building,
 } from "lucide-react";
 import API from "../services/api";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
@@ -100,31 +101,57 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
   const [parlourName, setParlourName] = useState("");
   const [shopNameTypography, setShopNameTypography] = useState(null);
   const [imgFailed, setImgFailed] = useState(false);
+  const [branchData, setBranchData] = useState(null);
 
   const fetchBranding = () => {
-    API.get("/settings")
-      .then((res) => {
-        const biz = res.data.business_profile || {};
-        const fullUrl = getFullImageUrl(biz.logo_url);
-        if (fullUrl !== logoUrl) {
-          setLogoUrl(fullUrl);
-          setImgFailed(false);
-        }
-        setParlourName(biz.name || user?.parlour_name || "Beauty Parlour");
-        setShopNameTypography(biz.shop_name_typography || null);
-        if (fullUrl) {
-          localStorage.setItem("parlour_logo_url", fullUrl);
-        } else {
-          localStorage.removeItem("parlour_logo_url");
-        }
-      })
-      .catch(() => {});
+    if (user?.role === "BranchAdmin" && user?.branch_id) {
+      let bLogo = "";
+      API.get(`/branches/${user.branch_id}`)
+        .then((res) => {
+          const branch = res.data.data || res.data;
+          setBranchData(branch);
+          setParlourName(branch.name || user.branch_name || "Branch");
+          if (branch.logo_url) {
+            bLogo = getFullImageUrl(branch.logo_url);
+            setLogoUrl(bLogo);
+            setImgFailed(false);
+          }
+          return API.get("/settings");
+        })
+        .then((res) => {
+          const biz = res.data.business_profile || {};
+          // Fall back to main parlour logo if branch has no custom logo
+          if (!bLogo && biz.logo_url) {
+            const fullUrl = getFullImageUrl(biz.logo_url);
+            setLogoUrl(fullUrl);
+            setImgFailed(false);
+          }
+          setShopNameTypography(biz.shop_name_typography || null);
+        })
+        .catch(() => {
+          setParlourName(user.branch_name || "Branch");
+        });
+    } else {
+      API.get("/settings")
+        .then((res) => {
+          const biz = res.data.business_profile || {};
+          const fullUrl = getFullImageUrl(biz.logo_url);
+          if (fullUrl !== logoUrl) {
+            setLogoUrl(fullUrl);
+            setImgFailed(false);
+          }
+          setParlourName(biz.name || user?.parlour_name || "Beauty Parlour");
+          setShopNameTypography(biz.shop_name_typography || null);
+        })
+        .catch(() => {});
+    }
   };
 
   useEffect(() => {
     fetchBranding();
-    const interval = setInterval(fetchBranding, 10000); // 10s sync
-    return () => clearInterval(interval);
+    const handleBrandingUpdated = () => fetchBranding();
+    window.addEventListener("branding_updated", handleBrandingUpdated);
+    return () => window.removeEventListener("branding_updated", handleBrandingUpdated);
   }, []);
 
   // Notification Dropdown State & Unread Polling
@@ -222,8 +249,12 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
 
               {/* Hover Tooltip for Collapsed Sidebar */}
               <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-3.5 py-2 bg-slate-900 text-white rounded-xl shadow-2xl z-50 whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs">
-                <p className="font-extrabold text-white">{parlourName || user?.parlour_name || "Beauty Parlour"}</p>
-                <p className="text-[11px] text-slate-400 font-semibold mt-0.5">Powered By SmartGoNext</p>
+                <p className="font-extrabold text-white">{parlourName || user?.parlour_name || (user?.role === "BranchAdmin" ? "Branch" : "Beauty Parlour")}</p>
+                <p className="text-[11px] text-slate-400 font-semibold mt-0.5">
+                  {user?.role === "BranchAdmin" 
+                    ? user?.parlour_name || "SmartGoNext Beauty Parlour"
+                    : "Powered By SmartGoNext"}
+                </p>
               </div>
             </div>
           ) : (
@@ -247,11 +278,22 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
                   className="font-extrabold text-slate-900 text-sm block truncate transition-all duration-200"
                   style={getShopNameStyle(shopNameTypography)}
                 >
-                  {parlourName || user?.parlour_name || "Beauty Parlour"}
+                  {parlourName || user?.branch_name || "Branch"}
                 </span>
-                <span className="text-[11px] font-semibold text-slate-500 block mt-0.5 whitespace-nowrap">
-                  Powered By SmartGoNext
-                </span>
+                {user?.role === "BranchAdmin" ? (
+                  <>
+                    <span className="text-[11px] font-bold text-slate-600 block truncate mt-0.5">
+                      {user?.parlour_name || "Main Parlour"}
+                    </span>
+                    <span className="text-[10px] font-semibold text-pink-600 block truncate mt-0.5">
+                      Powered By SmartGoNext
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-[11px] font-semibold text-slate-500 block mt-0.5 whitespace-nowrap">
+                    Powered By SmartGoNext
+                  </span>
+                )}
               </div>
             </div>
           )}
@@ -302,10 +344,14 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
           {!isCollapsed && user && (
             <div className="px-3.5 py-2 mb-2 text-left border-b border-border-soft/40 pb-2.5">
               <p className="text-xs font-bold text-slate-800 truncate">
-                {user.owner_name || "Parlour Owner"}
+                {user.owner_name || user.email || "Admin"}
               </p>
               <p className="text-[10px] text-slate-500 font-semibold truncate">
-                {user.role === "ParlourAdmin" ? "Parlour Owner" : user.role || ""}
+                {user.role === "BranchAdmin" 
+                  ? `Branch Admin: ${branchData?.name || user.branch_name || "Branch"}`
+                  : user.role === "ParlourAdmin" 
+                    ? "Parlour Owner" 
+                    : user.role || ""}
               </p>
             </div>
           )}
@@ -327,6 +373,15 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
               </div>
             )}
           </div>
+
+          {/* Branch Admin indicator for collapsed sidebar */}
+          {isCollapsed && user?.role === "BranchAdmin" && (
+            <div className="flex justify-center mt-2">
+              <div className="h-6 w-6 bg-slate-900 text-white rounded-lg flex items-center justify-center" title="Branch Admin">
+                <Building className="w-3.5 h-3.5 text-pink-400" />
+              </div>
+            </div>
+          )}
         </div>
       </aside>
 
@@ -354,10 +409,12 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
             </div>
             <div className="overflow-hidden leading-tight">
               <span className="font-extrabold text-slate-900 text-sm block truncate">
-                {parlourName || user?.parlour_name || "Beauty Parlour"}
+                {parlourName || user?.parlour_name || (user?.role === "BranchAdmin" ? "Branch" : "Beauty Parlour")}
               </span>
               <span className="text-[11px] font-semibold text-slate-500 block mt-0.5 whitespace-nowrap">
-                Powered By SmartGoNext
+                {user?.role === "BranchAdmin" 
+                  ? user?.parlour_name || "SmartGoNext Beauty Parlour"
+                  : "Powered By SmartGoNext"}
               </span>
             </div>
           </div>
@@ -396,10 +453,16 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
             </div>
             <div className="max-w-[110px] truncate">
               <p className="text-xs font-extrabold text-text-primary truncate">
-                {user?.owner_name || (user?.email ? user.email.split("@")[0] : "Salon Owner")}
+                {user?.owner_name || (user?.email ? user.email.split("@")[0] : "Admin")}
               </p>
               <p className="text-[10px] text-text-secondary font-medium truncate">
-                {user?.parlour_name ? `${user.parlour_name} ${t("salon_owner")}` : user?.role === "SuperAdmin" ? "SaaS Admin" : t("salon_owner")}
+                {user?.role === "BranchAdmin" 
+                  ? `Branch: ${branchData?.name || user.branch_name || "Branch"}`
+                  : user?.parlour_name 
+                    ? `${user.parlour_name} ${t("salon_owner")}` 
+                    : user?.role === "SuperAdmin" 
+                      ? "SaaS Admin" 
+                      : t("salon_owner")}
               </p>
             </div>
           </div>
@@ -432,6 +495,16 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
           <div className="flex items-center space-x-3">
             {/* THEME SELECTOR */}
             <ThemeSelector />
+
+            {/* BRANCH ADMIN INDICATOR */}
+            {user?.role === "BranchAdmin" && (
+              <div className="flex items-center space-x-1.5 bg-slate-900 text-white px-3 py-1.5 rounded-xl border border-pink-500/30 shadow-sm">
+                <Building className="w-3.5 h-3.5 text-pink-400" />
+                <span className="text-[10px] font-bold uppercase tracking-wide">
+                  Branch: {branchData?.name || user.branch_name || "Branch"}
+                </span>
+              </div>
+            )}
 
             {/* NOTIFICATION BELL & DROPDOWN */}
             <div ref={notifDropdownRef} className="relative">

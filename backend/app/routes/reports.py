@@ -54,7 +54,7 @@ def parse_date_range(preset, start_str=None, end_str=None):
 
 
 @reports_bp.route("/reports/sales", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_sales_report():
     preset = request.args.get("preset", "30days")
     start_date, end_date = parse_date_range(preset, request.args.get("start_date"), request.args.get("end_date"))
@@ -106,7 +106,7 @@ def get_sales_report():
 
 
 @reports_bp.route("/reports/tax", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_tax_report():
     preset = request.args.get("preset", "30days")
     start_date, end_date = parse_date_range(preset, request.args.get("start_date"), request.args.get("end_date"))
@@ -145,7 +145,7 @@ def get_tax_report():
 
 
 @reports_bp.route("/reports/employees", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_employee_report():
     preset = request.args.get("preset", "30days")
     start_date, end_date = parse_date_range(preset, request.args.get("start_date"), request.args.get("end_date"))
@@ -185,7 +185,7 @@ def get_employee_report():
 
 
 @reports_bp.route("/reports/products", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_product_report():
     query = db.session.query(
         Product.id,
@@ -216,7 +216,7 @@ def get_product_report():
 
 
 @reports_bp.route("/reports/export", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def export_csv_report():
     report_type = request.args.get("type", "sales")
     preset = request.args.get("preset", "30days")
@@ -308,7 +308,7 @@ def export_csv_report():
 
 
 @reports_bp.route("/reports/procurement", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_procurement_report():
     preset = request.args.get("preset", "30days")
     start_date, end_date = parse_date_range(preset, request.args.get("start_date"), request.args.get("end_date"))
@@ -349,7 +349,7 @@ def get_procurement_report():
 
 
 @reports_bp.route("/reports/memberships", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def get_memberships_report():
     preset = request.args.get("preset", "30days")
     start_date, end_date = parse_date_range(preset, request.args.get("start_date"), request.args.get("end_date"))

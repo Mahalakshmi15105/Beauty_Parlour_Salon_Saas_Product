@@ -5,7 +5,7 @@ from app.models.customer import Customer
 from app.models.catalog import Service
 from app.models.user import TenantSetting, User
 from app.models.employee import Employee
-from app.utils.auth import require_role, get_tenant_query
+from app.utils.auth import require_role, get_tenant_query, get_branch_query
 from app.utils.responses import success_response, error_response
 from datetime import datetime, time
 import json
@@ -13,14 +13,15 @@ import json
 appointments_bp = Blueprint("appointments", __name__, url_prefix="/api/v1/appointments")
 
 @appointments_bp.route("", methods=["GET"])
-@require_role(["ParlourAdmin", "Receptionist", "Employee"])
+@require_role(["ParlourAdmin", "BranchAdmin", "Receptionist", "Employee"])
 def get_appointments():
     """
     Fetch appointments for current tenant with optional filtering.
     Filters: date, status, booking_source, employee_id, phone, search
     """
     try:
-        query = get_tenant_query(Appointment)
+        from sqlalchemy.orm import joinedload
+        query = get_branch_query(Appointment).options(joinedload(Appointment.items))
         
         date_str = request.args.get("date")
         if date_str:
@@ -55,7 +56,7 @@ def get_appointments():
                 (Appointment.appointment_number.like(search_term))
             )
             
-        appointments = query.order_by(Appointment.appointment_date.desc(), Appointment.id.desc()).all()
+        appointments = query.order_by(Appointment.appointment_date.desc(), Appointment.id.desc()).limit(200).all()
         return success_response(data=[app.to_dict() for app in appointments])
     except Exception as e:
         import logging
@@ -64,7 +65,7 @@ def get_appointments():
 
 
 @appointments_bp.route("/customer-lookup", methods=["GET"])
-@require_role(["ParlourAdmin", "Receptionist", "Employee"])
+@require_role(["ParlourAdmin", "BranchAdmin", "Receptionist", "Employee"])
 def customer_lookup():
     """
     Search customer by phone number and return details, memberships, and visit count.
@@ -154,7 +155,7 @@ def update_appointment_status(appointment_id):
         if not new_status or new_status not in allowed_statuses:
             return error_response("VALIDATION_FAILED", f"Invalid status. Allowed: {', '.join(allowed_statuses)}", 400)
 
-        appointment = get_tenant_query(Appointment).filter(Appointment.id == appointment_id).first()
+        appointment = get_branch_query(Appointment).filter(Appointment.id == appointment_id).first()
         if not appointment:
             return error_response("NOT_FOUND", "Appointment not found.", 404)
 
@@ -208,7 +209,7 @@ def get_booking_settings():
 
 
 @appointments_bp.route("/settings", methods=["PUT"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
 def update_booking_settings():
     """
     Update tenant's booking & appointment configuration.

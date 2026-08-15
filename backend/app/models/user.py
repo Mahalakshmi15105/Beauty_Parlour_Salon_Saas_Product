@@ -7,13 +7,15 @@ class User(db.Model, TimestampMixin, SoftDeleteMixin):
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=True, index=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     email = db.Column(db.String(120), nullable=False, unique=True)
     password_hash = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.String(50), nullable=False, default="ParlourAdmin")  # SuperAdmin, ParlourAdmin
+    role = db.Column(db.String(50), nullable=False, default="ParlourAdmin")  # SuperAdmin, ParlourAdmin, BranchAdmin
     status = db.Column(db.String(50), nullable=False, default="active")  # active, inactive
 
     # Relationships
     tenant = db.relationship("Tenant", back_populates="users")
+    branch = db.relationship("Branch", back_populates="users")
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -29,7 +31,8 @@ class TenantSetting(db.Model, TimestampMixin):
     __tablename__ = "tenant_settings"
 
     id = db.Column(db.Integer, primary_key=True)
-    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, unique=True, index=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     
     # Business Profile & Branding
     logo_url = db.Column(db.String(255), nullable=True)

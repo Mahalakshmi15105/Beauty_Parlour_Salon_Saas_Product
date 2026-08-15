@@ -25,7 +25,19 @@ export async function downloadThermalReceiptPDF(elementOrRef, invoiceNumber = "I
   }
 
   try {
-    const canvas = await html2canvas(targetEl, {
+    // Clone element temporarily into visible off-screen container for 100% reliable canvas capture
+    const clone = targetEl.cloneNode(true);
+    clone.style.position = "fixed";
+    clone.style.left = "0";
+    clone.style.top = "0";
+    clone.style.opacity = "1";
+    clone.style.zIndex = "99999";
+    clone.style.background = "#ffffff";
+    clone.style.color = "#000000";
+    clone.style.width = paperSize === "58mm" ? "219px" : "302px";
+    document.body.appendChild(clone);
+
+    const canvas = await html2canvas(clone, {
       scale: 2,
       useCORS: true,
       allowTaint: true,
@@ -33,9 +45,11 @@ export async function downloadThermalReceiptPDF(elementOrRef, invoiceNumber = "I
       logging: false,
     });
 
+    document.body.removeChild(clone);
+
     const imgData = canvas.toDataURL("image/png");
     const imgWidth = paperSize === "58mm" ? 58 : 80;
-    const pageHeight = Math.max(100, (canvas.height * imgWidth) / canvas.width);
+    const pageHeight = Math.max(80, (canvas.height * imgWidth) / canvas.width);
 
     const pdf = new jsPDF({
       orientation: "portrait",
@@ -66,25 +80,12 @@ export function printThermalReceiptElement(elementOrRef, paperSize = "80mm") {
     targetEl = document.getElementById("thermal-receipt-printable");
   }
 
-  console.log("=== STEP 1: PRINT FUNCTION DIAGNOSTIC LOGS ===");
-  console.log("1. elementOrRef input:", elementOrRef);
-  console.log("2. targetElement DOM node:", targetEl);
-  console.log("3. innerHTML length:", targetEl?.innerHTML?.length || 0);
-  console.log("4. innerHTML raw content:\n", targetEl?.innerHTML || "EMPTY");
-
   if (!targetEl || !targetEl.innerHTML || targetEl.innerHTML.trim() === "") {
-    console.error("CRITICAL ERROR: Thermal Receipt target element is missing or empty! Unable to print.");
     alert("Thermal Receipt content is empty or not rendered. Please try again.");
     return;
   }
 
   const receiptHtml = targetEl.innerHTML;
-  if (!receiptHtml || receiptHtml.trim() === "") {
-    console.error("CRITICAL ERROR: Thermal Receipt HTML content is empty string!");
-    alert("Thermal Receipt content is empty. Please try again.");
-    return;
-  }
-
   const is58mm = paperSize === "58mm";
   const paperWidth = is58mm ? "58mm" : "80mm";
   const contentWidth = is58mm ? "219px" : "302px";
@@ -98,6 +99,19 @@ export function printThermalReceiptElement(elementOrRef, paperSize = "80mm") {
       @page {
         size: ${paperWidth} auto;
         margin: 0mm !important;
+      }
+      @media print {
+        @page {
+          size: ${paperWidth} auto;
+          margin: 0mm !important;
+        }
+        html, body {
+          width: ${paperWidth} !important;
+          max-width: ${paperWidth} !important;
+          margin: 0 auto !important;
+          padding: 0 !important;
+          background: #ffffff !important;
+        }
       }
       *, *:before, *:after {
         box-sizing: border-box !important;

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
 import { useModalFocusTrap, useFormKeyboardNavigation } from "../utils/keyboardNavigation";
-import { X, Printer, FileSpreadsheet, FileText } from "lucide-react";
-import { exportToCSV, printDataList, exportToPDF } from "../utils/exportUtils";
+import { X, Printer, FileSpreadsheet, FileText, Upload } from "lucide-react";
+import { exportToCSV, printDataList, exportToPDF, exportToExcel } from "../utils/exportUtils";
+import BulkUploadModal from "../components/BulkUploadModal";
 
 function Employees() {
   const modalRef = useRef(null);
@@ -15,10 +16,12 @@ function Employees() {
   const [cursor, setCursor] = useState(null);
   const [cursorHistory, setCursorHistory] = useState([]);
   const [nextCursor, setNextCursor] = useState(null);
+  const [parlourName, setParlourName] = useState("SmartGoNext Beauty SaaS");
 
   // Form State
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
@@ -56,47 +59,58 @@ function Employees() {
       });
   };
 
+  const fetchParlourName = () => {
+    API.get("/settings")
+      .then((res) => {
+        setParlourName(res.data.business_profile?.name || "SmartGoNext Beauty SaaS");
+      })
+      .catch((err) => {
+        console.error("Failed to fetch parlour name:", err);
+      });
+  };
+
   useEffect(() => {
     fetchEmployees();
+    fetchParlourName();
   }, [search, status]);
 
   const handlePrint = () => {
     const columns = [
-      { header: "Name", accessor: (row) => `${row.first_name || ""} ${row.last_name || ""}`.trim() },
-      { header: "Role", accessor: "role" },
-      { header: "Phone", accessor: "phone" },
-      { header: "Specialization", accessor: "specialization" },
-      { header: "Salary", accessor: "salary" },
-      { header: "Commission %", accessor: (row) => `${row.commission_percentage || 0}%` },
-      { header: "Status", accessor: "status" }
+      { header: "Name", accessor: (row) => `${row.first_name || ""} ${row.last_name || ""}`.trim(), width: 40 },
+      { header: "Role", accessor: "role", width: 20 },
+      { header: "Phone", accessor: "phone", width: 25 },
+      { header: "Specialization", accessor: "specialization", width: 30 },
+      { header: "Salary", accessor: "salary", width: 20 },
+      { header: "Commission %", accessor: (row) => `${row.commission_percentage || 0}%`, width: 15 },
+      { header: "Status", accessor: "status", width: 15 }
     ];
-    printDataList("Employees List", employees, columns);
+    printDataList("Employees List", employees, columns, parlourName);
   };
 
   const handleExportExcel = () => {
     const columns = [
-      { header: "Name", accessor: (row) => `${row.first_name || ""} ${row.last_name || ""}`.trim() },
-      { header: "Role", accessor: "role" },
-      { header: "Phone", accessor: "phone" },
-      { header: "Specialization", accessor: "specialization" },
-      { header: "Salary", accessor: "salary" },
-      { header: "Commission %", accessor: (row) => `${row.commission_percentage || 0}%` },
-      { header: "Status", accessor: "status" }
+      { header: "Name", accessor: (row) => `${row.first_name || ""} ${row.last_name || ""}`.trim(), width: 40 },
+      { header: "Role", accessor: "role", width: 20 },
+      { header: "Phone", accessor: "phone", width: 25 },
+      { header: "Specialization", accessor: "specialization", width: 30 },
+      { header: "Salary", accessor: "salary", width: 20 },
+      { header: "Commission %", accessor: (row) => `${row.commission_percentage || 0}%`, width: 15 },
+      { header: "Status", accessor: "status", width: 15 }
     ];
-    exportToCSV(employees, columns, "employees_list");
+    exportToExcel("Employees List", employees, columns, "employees_list", parlourName);
   };
 
   const handleExportPDF = () => {
     const columns = [
-      { header: "Name", accessor: (row) => `${row.first_name || ""} ${row.last_name || ""}`.trim(), width: 35 },
-      { header: "Role", accessor: "role", width: 25 },
-      { header: "Phone", accessor: "phone", width: 30 },
-      { header: "Specialization", accessor: "specialization", width: 35 },
+      { header: "Name", accessor: (row) => `${row.first_name || ""} ${row.last_name || ""}`.trim(), width: 40 },
+      { header: "Role", accessor: "role", width: 20 },
+      { header: "Phone", accessor: "phone", width: 25 },
+      { header: "Specialization", accessor: "specialization", width: 30 },
       { header: "Salary", accessor: "salary", width: 20 },
-      { header: "Comm %", accessor: (row) => `${row.commission_percentage || 0}%`, width: 20 },
+      { header: "Commission %", accessor: (row) => `${row.commission_percentage || 0}%`, width: 15 },
       { header: "Status", accessor: "status", width: 15 }
     ];
-    exportToPDF("Employees List", employees, columns, "employees_list");
+    exportToPDF("Employees List", employees, columns, "employees_list", parlourName);
   };
 
   const handleNextPage = () => {
@@ -156,10 +170,25 @@ function Employees() {
     action
       .then(() => {
         setShowModal(false);
+        // Reset form data after successful submission
+        setFormData({
+          first_name: "",
+          last_name: "",
+          phone: "",
+          specialization: "",
+          role: "",
+          salary: "",
+          commission_percentage: "",
+          joining_date: new Date().toISOString().split("T")[0],
+          status: "active",
+        });
+        setEditId(null);
         fetchEmployees(cursor);
       })
       .catch((err) => {
-        alert(err.message || "Operation failed.");
+        // Show the actual error message from backend
+        const errorMessage = err.response?.data?.message || err.message || "Operation failed.";
+        alert(errorMessage);
       });
   };
 
@@ -183,12 +212,21 @@ function Employees() {
           <h1 className="text-xl font-semibold text-text-primary">Staff & Employee Roster</h1>
           <p className="text-xs text-text-secondary">Configure commissions, salaries, specializations, and access status.</p>
         </div>
-        <button
-          onClick={openAddModal}
-          className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition"
-        >
-          + Add Employee
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowBulkUpload(true)}
+            className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2"
+          >
+            <Upload className="w-4 h-4" />
+            Bulk Upload
+          </button>
+          <button
+            onClick={openAddModal}
+            className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition"
+          >
+            + Add Employee
+          </button>
+        </div>
       </div>
 
       {/* Filter / Search Bar */}
@@ -448,6 +486,14 @@ function Employees() {
             </form>
           </div>
         </div>
+      )}
+      
+      {showBulkUpload && (
+        <BulkUploadModal
+          module="employees"
+          onClose={() => setShowBulkUpload(false)}
+          onSuccess={fetchEmployees}
+        />
       )}
     </div>
   );

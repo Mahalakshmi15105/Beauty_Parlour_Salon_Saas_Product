@@ -96,6 +96,8 @@ def create_app(config_class=Config):
     from app.routes.campaigns import campaigns_bp
     from app.routes.appointments import appointments_bp
     from app.routes.public_booking import public_booking_bp
+    from app.routes.branches import branches_bp
+    from app.routes.bulk_upload import bulk_upload_bp
     app.register_blueprint(health_bp, url_prefix="/api/v1")
     app.register_blueprint(auth_bp, url_prefix="/api/v1")
     app.register_blueprint(customers_bp, url_prefix="/api/v1")
@@ -113,6 +115,8 @@ def create_app(config_class=Config):
     app.register_blueprint(campaigns_bp, url_prefix="/api/v1")
     app.register_blueprint(appointments_bp)
     app.register_blueprint(public_booking_bp)
+    app.register_blueprint(branches_bp, url_prefix="/api/v1")
+    app.register_blueprint(bulk_upload_bp, url_prefix="/api/v1")
 
     from flask import send_from_directory
     import os
@@ -125,6 +129,9 @@ def create_app(config_class=Config):
     # Global JWT Custom Error Handlers
     @jwt.unauthorized_loader
     def unauthorized_callback(err_str):
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"JWT Unauthorized - Error: {err_str}")
         return error_response(
             error_code="UNAUTHORIZED",
             message=err_str,
@@ -133,6 +140,9 @@ def create_app(config_class=Config):
 
     @jwt.expired_token_loader
     def expired_token_callback(jwt_header, jwt_payload):
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"JWT Expired - Payload: {jwt_payload}")
         return error_response(
             error_code="TOKEN_EXPIRED",
             message="The provided authorization token has expired.",
@@ -141,6 +151,9 @@ def create_app(config_class=Config):
 
     @jwt.invalid_token_loader
     def invalid_token_callback(err_str):
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"JWT Invalid Token - Error: {err_str}")
         return error_response(
             error_code="INVALID_TOKEN",
             message=err_str,
@@ -174,8 +187,9 @@ def create_app(config_class=Config):
     # AUTO-SLEEP MODE
     # Starts the idle-monitor after ALL blueprints are registered so
     # the before_request hook sees every route.
+    # DISABLED for continuous 24-hour access
     # ------------------------------------------------------------------
-    from app.services.auto_sleep import start_sleep_monitor
-    start_sleep_monitor(app)
+    # from app.services.auto_sleep import start_sleep_monitor
+    # start_sleep_monitor(app)
 
     return app
