@@ -46,9 +46,9 @@ class BookingService:
         return True, ""
 
     @staticmethod
-    def get_available_slots(tenant_id, date_str, employee_id=None, booking_type_override=None):
+    def get_available_slots(tenant_id, date_str, employee_id=None, booking_type_override=None, branch_id=None):
         """
-        Generate available tokens or time slots for a given tenant and date.
+        Generate available tokens or time slots for a given tenant, branch, and date.
         """
         date_str = _clean_str(date_str)
         try:
@@ -70,13 +70,19 @@ class BookingService:
                 "tokens": []
             }, 200
 
-        # Fetch existing non-cancelled bookings for this date and tenant
-        existing_bookings = Appointment.query.filter(
+        # Fetch existing non-cancelled bookings for this date, tenant, and branch
+        booking_filter = [
             Appointment.tenant_id == tenant_id,
             Appointment.appointment_date == target_date,
-            Appointment.status != "Cancelled",
-            Appointment.is_deleted == False if hasattr(Appointment, "is_deleted") else True
-        ).all()
+            Appointment.status != "Cancelled"
+        ]
+        if branch_id:
+            booking_filter.append(Appointment.branch_id == branch_id)
+
+        if hasattr(Appointment, "is_deleted"):
+            booking_filter.append(Appointment.is_deleted == False)
+
+        existing_bookings = Appointment.query.filter(*booking_filter).all()
 
         max_daily = settings.max_daily_bookings or 50
 
@@ -89,7 +95,6 @@ class BookingService:
             current_token = None
             booked_tokens = [b.token_number for b in existing_bookings if b.token_number]
             if booked_tokens:
-                # Sort by appointment creation time to find the earliest booked token
                 sorted_bookings = sorted([b for b in existing_bookings if b.token_number], key=lambda x: x.created_at)
                 if sorted_bookings:
                     current_token = sorted_bookings[0].token_number
@@ -129,12 +134,16 @@ class BookingService:
             # Check existing staff conflicts if employee_id specified
             employee_busy_times = set()
             if employee_id:
-                busy_items = AppointmentItem.query.join(Appointment).filter(
+                busy_filter = [
                     AppointmentItem.tenant_id == tenant_id,
                     AppointmentItem.employee_id == employee_id,
                     Appointment.appointment_date == target_date,
                     Appointment.status.in_(["Booked", "Waiting", "In Service"])
-                ).all()
+                ]
+                if branch_id:
+                    busy_filter.append(AppointmentItem.branch_id == branch_id)
+
+                busy_items = AppointmentItem.query.join(Appointment).filter(*busy_filter).all()
                 for bi in busy_items:
                     if bi.appointment and bi.appointment.start_time:
                         employee_busy_times.add(bi.appointment.start_time.strftime("%H:%M"))
@@ -196,7 +205,7 @@ class BookingService:
         """
         Core service to validate rules and persist appointment into database.
         Used by both Admin Manual Booking and Customer Public Website Booking.
-        Enforces tenant and branch boundaries for appointments and employees.
+        Enforces tenant and branch boundaries for appointments, customers, and employees.
         """
         try:
             tenant = Tenant.query.filter_by(id=tenant_id, is_deleted=False).first()
@@ -224,7 +233,6 @@ class BookingService:
             booking_channel_final = _clean_str(payload.get("booking_channel"), default_channel) or default_channel
             items_payload = payload.get("items", [])
 
-
             if not customer_name:
                 return False, {"error_code": "VALIDATION_FAILED", "message": "Customer Name is required."}, 400
             if not customer_phone:
@@ -246,7 +254,7 @@ class BookingService:
 
             active_booking_type = booking_type_req or settings.booking_type or "Token"
 
-            # Parse Time if Slot mode or provided (Token mode should not require time)
+            # Parse Time if Slot mode or provided
             start_time_dt = None
             if start_time_str:
                 try:
@@ -254,7 +262,6 @@ class BookingService:
                 except ValueError:
                     return False, {"error_code": "VALIDATION_FAILED", "message": "Invalid Appointment Time format. Use HH:MM."}, 400
             elif active_booking_type == "Slot":
-                # Only require time for Slot booking mode
                 return False, {"error_code": "VALIDATION_FAILED", "message": "Appointment Time is required for Time Slot booking mode."}, 400
 
             # 1. Working Days Validation
@@ -262,7 +269,7 @@ class BookingService:
             if not is_open:
                 return False, {"error_code": "VALIDATION_FAILED", "message": open_err}, 400
 
-            # 2. Operating Hours & Break Time Validation (only for Slot mode or if time provided)
+            # 2. Operating Hours & Break Time Validation
             if start_time_dt and active_booking_type == "Slot":
                 open_time = datetime.strptime(settings.opening_time or "09:00", "%H:%M").time()
                 close_time = datetime.strptime(settings.closing_time or "20:00", "%H:%M").time()
@@ -278,27 +285,33 @@ class BookingService:
                     except ValueError:
                         pass
 
-            # 3. Duplicate Booking Validation (same customer phone, date, and start time)
-            dup_query = Appointment.query.filter(
+            # 3. Duplicate Booking Validation (scoped by branch if target_branch_id set)
+            dup_filter = [
                 Appointment.tenant_id == tenant_id,
                 Appointment.customer_phone == customer_phone,
                 Appointment.appointment_date == appointment_date,
                 Appointment.status != "Cancelled"
-            )
+            ]
+            if target_branch_id:
+                dup_filter.append(Appointment.branch_id == target_branch_id)
             if start_time_dt:
-                dup_query = dup_query.filter(Appointment.start_time == start_time_dt)
+                dup_filter.append(Appointment.start_time == start_time_dt)
 
-            existing_duplicate = dup_query.first()
+            existing_duplicate = Appointment.query.filter(*dup_filter).first()
             if existing_duplicate:
                 time_info = f" at {start_time_str}" if start_time_str else ""
                 return False, {"error_code": "DUPLICATE_BOOKING", "message": f"A booking for {customer_phone} already exists on {appointment_date_str}{time_info}."}, 400
 
-            # 4. Maximum Daily Booking Limit Check
-            daily_count = Appointment.query.filter(
+            # 4. Maximum Daily Booking Limit Check (scoped by branch if target_branch_id set)
+            daily_filter = [
                 Appointment.tenant_id == tenant_id,
                 Appointment.appointment_date == appointment_date,
                 Appointment.status != "Cancelled"
-            ).count()
+            ]
+            if target_branch_id:
+                daily_filter.append(Appointment.branch_id == target_branch_id)
+
+            daily_count = Appointment.query.filter(*daily_filter).count()
 
             max_daily = settings.max_daily_bookings or 50
             if daily_count >= max_daily:
@@ -327,13 +340,17 @@ class BookingService:
                         return False, {"error_code": "VALIDATION_FAILED", "message": f"Selected staff (ID: {employee_id}) not found or does not belong to this branch."}, 400
                     
                     if start_time_dt:
-                        conflict = AppointmentItem.query.join(Appointment).filter(
+                        conflict_filter = [
                             AppointmentItem.tenant_id == tenant_id,
                             AppointmentItem.employee_id == employee_id,
                             Appointment.appointment_date == appointment_date,
                             Appointment.start_time == start_time_dt,
                             Appointment.status.in_(["Booked", "Waiting", "In Service"])
-                        ).first()
+                        ]
+                        if target_branch_id:
+                            conflict_filter.append(AppointmentItem.branch_id == target_branch_id)
+
+                        conflict = AppointmentItem.query.join(Appointment).filter(*conflict_filter).first()
                         if conflict:
                             return False, {"error_code": "EMPLOYEE_BUSY", "message": f"Staff member {employee.first_name} is already assigned to another appointment at {start_time_str}."}, 400
 
@@ -355,26 +372,41 @@ class BookingService:
             if active_booking_type == "Token":
                 token_number = payload.get("token_number")
                 if not token_number:
-                    # Auto assign next token number for date
+                    token_filter = [
+                        Appointment.tenant_id == tenant_id,
+                        Appointment.appointment_date == appointment_date,
+                        Appointment.status != "Cancelled"
+                    ]
+                    if target_branch_id:
+                        token_filter.append(Appointment.branch_id == target_branch_id)
+
                     existing_tokens = [
-                        b.token_number for b in Appointment.query.filter(
-                            Appointment.tenant_id == tenant_id,
-                            Appointment.appointment_date == appointment_date,
-                            Appointment.status != "Cancelled"
-                        ).all() if b.token_number
+                        b.token_number for b in Appointment.query.filter(*token_filter).all() if b.token_number
                     ]
                     token_number = (max(existing_tokens) + 1) if existing_tokens else 1
 
             # Generate Appointment Number: APT-YYYYMMDD-XXX
             today_code = appointment_date.strftime("%Y%m%d")
-            seq_count = Appointment.query.filter(
+            seq_filter = [
                 Appointment.tenant_id == tenant_id,
                 Appointment.appointment_date == appointment_date
-            ).count() + 1
+            ]
+            if target_branch_id:
+                seq_filter.append(Appointment.branch_id == target_branch_id)
+
+            seq_count = Appointment.query.filter(*seq_filter).count() + 1
             appointment_number = f"APT-{today_code}-{seq_count:03d}"
 
-            # Link customer if exists, or create customer record
-            customer = Customer.query.filter_by(tenant_id=tenant_id, phone=customer_phone, is_deleted=False).first()
+            # Link customer if exists in target branch, or create customer record
+            cust_filter = [Customer.tenant_id == tenant_id, Customer.phone == customer_phone, Customer.is_deleted == False]
+            if target_branch_id:
+                cust_filter.append(Customer.branch_id == target_branch_id)
+
+            customer = Customer.query.filter(*cust_filter).first()
+            if not customer:
+                # Check if customer exists under main tenant without branch
+                customer = Customer.query.filter_by(tenant_id=tenant_id, phone=customer_phone, is_deleted=False).first()
+
             if not customer:
                 name_parts = customer_name.split(" ", 1)
                 first_name = name_parts[0]
@@ -382,6 +414,7 @@ class BookingService:
                 
                 customer = Customer(
                     tenant_id=tenant_id,
+                    branch_id=target_branch_id,
                     first_name=first_name,
                     last_name=last_name,
                     phone=customer_phone,

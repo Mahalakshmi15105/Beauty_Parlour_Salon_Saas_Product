@@ -6,7 +6,7 @@ from app.models.global_models import Tenant
 from app.models.catalog import Service
 from app.models.customer import Customer
 from app.utils.responses import success_response, error_response
-from app.utils.auth import require_role, get_tenant_query
+from app.utils.auth import require_role, get_tenant_query, get_branch_query
 from app.utils.query import paginate_query
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -26,7 +26,7 @@ def get_plans():
     cursor = request.args.get("cursor")
     sort = request.args.get("sort", "name")
 
-    query = get_tenant_query(MembershipPlan)
+    query = get_branch_query(MembershipPlan)
 
     if q:
         query = query.filter(
@@ -143,7 +143,7 @@ def create_plan():
         )
 
     # Check duplicates in tenant context
-    dup = get_tenant_query(MembershipPlan).filter_by(name=name).first()
+    dup = get_branch_query(MembershipPlan).filter_by(name=name).first()
     if dup:
         return error_response(
             error_code="DUPLICATE_RECORD",
@@ -154,9 +154,12 @@ def create_plan():
     day_restrictions = data.get("day_restrictions", [])
     eligible_services_ids = data.get("eligible_services", [])
 
+    target_branch_id = g.branch_id if (hasattr(g, "branch_id") and g.branch_id) else (int(data["branch_id"]) if data.get("branch_id") else None)
+
     try:
         plan = MembershipPlan(
             tenant_id=g.parlour_id,
+            branch_id=target_branch_id,
             name=name,
             description=data.get("description"),
             price=price_val,

@@ -31,6 +31,16 @@ def checkout():
             status_code=400
         )
 
+    # Determine target_branch_id
+    target_branch_id = None
+    if hasattr(g, "branch_id") and g.branch_id:
+        target_branch_id = g.branch_id
+    elif data.get("branch_id"):
+        try:
+            target_branch_id = int(data["branch_id"])
+        except (ValueError, TypeError):
+            pass
+
     # 1. Verify Customer
     if customer_id and str(customer_id) != "walkin" and str(customer_id) != "0":
         customer = get_branch_query(Customer).filter_by(id=customer_id).first()
@@ -45,6 +55,7 @@ def checkout():
         if not customer:
             customer = Customer(
                 tenant_id=g.parlour_id,
+                branch_id=target_branch_id,
                 first_name="Walk-in",
                 last_name="Customer",
                 phone="0000000000",
@@ -166,6 +177,7 @@ def checkout():
             # Assemble line item row
             line_item = InvoiceLineItem(
                 tenant_id=g.parlour_id,
+                branch_id=target_branch_id,
                 service_id=item_id if item_type == "service" else None,
                 product_id=item_id if item_type == "product" else None,
                 employee_id=employee_id,
@@ -216,12 +228,17 @@ def checkout():
             invoice_status = "Paid"
 
         # 5. Generate unique sequential invoice number
-        count = db.session.query(Invoice).filter_by(tenant_id=g.parlour_id).count()
+        count_filter = [Invoice.tenant_id == g.parlour_id]
+        if target_branch_id:
+            count_filter.append(Invoice.branch_id == target_branch_id)
+
+        count = db.session.query(Invoice).filter(*count_filter).count()
         invoice_number = f"INV-{g.parlour_id}-{count + 1:06d}"
 
         # 6. Save Invoice Header
         invoice = Invoice(
             tenant_id=g.parlour_id,
+            branch_id=target_branch_id,
             invoice_number=invoice_number,
             customer_id=customer_id,
             subtotal=subtotal,

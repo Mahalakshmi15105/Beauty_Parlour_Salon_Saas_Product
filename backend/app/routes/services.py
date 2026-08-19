@@ -97,7 +97,7 @@ def create_category():
         )
 
     # Check duplicates in tenant context
-    dup = get_tenant_query(ServiceCategory).filter_by(name=name).first()
+    dup = get_branch_query(ServiceCategory).filter_by(name=name).first()
     if dup:
         return error_response(
             error_code="DUPLICATE_RECORD",
@@ -105,8 +105,10 @@ def create_category():
             status_code=400
         )
 
+    target_branch_id = g.branch_id if (hasattr(g, "branch_id") and g.branch_id) else (int(data["branch_id"]) if data.get("branch_id") else None)
+
     try:
-        category = ServiceCategory(tenant_id=g.parlour_id, name=name)
+        category = ServiceCategory(tenant_id=g.parlour_id, branch_id=target_branch_id, name=name)
         db.session.add(category)
         db.session.commit()
     except Exception as e:
@@ -124,7 +126,7 @@ def create_category():
 @services_bp.route("/service-categories/<int:category_id>", methods=["DELETE"])
 @require_role(["ParlourAdmin", "BranchAdmin"])
 def delete_category(category_id):
-    category = get_tenant_query(ServiceCategory).filter_by(id=category_id).first()
+    category = get_branch_query(ServiceCategory).filter_by(id=category_id).first()
     if not category:
         return error_response(
             error_code="CATEGORY_NOT_FOUND",
@@ -133,7 +135,7 @@ def delete_category(category_id):
         )
 
     # Prevent delete if category has active services
-    has_services = get_tenant_query(Service).filter_by(category_id=category_id).first()
+    has_services = get_branch_query(Service).filter_by(category_id=category_id).first()
     if has_services:
         return error_response(
             error_code="CASCADING_RESTRICTION",
@@ -168,7 +170,7 @@ def get_services():
     cursor = request.args.get("cursor")
     sort = request.args.get("sort", "name")
 
-    query = get_tenant_query(Service)
+    query = get_branch_query(Service)
 
     if q:
         query = query.filter(
@@ -225,7 +227,7 @@ def get_services():
 @services_bp.route("/services/<int:service_id>", methods=["GET"])
 @require_role(["ParlourAdmin", "BranchAdmin"])
 def get_service(service_id):
-    service = get_tenant_query(Service).filter_by(id=service_id).first()
+    service = get_branch_query(Service).filter_by(id=service_id).first()
     if not service:
         return error_response(
             error_code="SERVICE_NOT_FOUND",
@@ -275,7 +277,7 @@ def create_service():
         )
 
     # Verify category exists in tenant context
-    category = get_tenant_query(ServiceCategory).filter_by(id=category_id).first()
+    category = get_branch_query(ServiceCategory).filter_by(id=category_id).first()
     if not category:
         return error_response(
             error_code="CATEGORY_NOT_FOUND",
@@ -284,7 +286,7 @@ def create_service():
         )
 
     # Check duplicate service name in tenant context
-    dup = get_tenant_query(Service).filter_by(name=name).first()
+    dup = get_branch_query(Service).filter_by(name=name).first()
     if dup:
         return error_response(
             error_code="DUPLICATE_RECORD",
@@ -292,9 +294,12 @@ def create_service():
             status_code=400
         )
 
+    target_branch_id = g.branch_id if (hasattr(g, "branch_id") and g.branch_id) else (int(data["branch_id"]) if data.get("branch_id") else None)
+
     try:
         service = Service(
             tenant_id=g.parlour_id,
+            branch_id=target_branch_id,
             category_id=category_id,
             name=name,
             price=price_val,

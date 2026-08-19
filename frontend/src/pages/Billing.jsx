@@ -70,6 +70,8 @@ function Billing() {
   const checkoutContainerRef = useRef(null);
   const paymentModalRef = useRef(null);
   const receiptModalRef = useRef(null);
+  const settlementBtnRef = useRef(null);
+  const submitInvoiceBtnRef = useRef(null);
 
   // Master Datasets
   const [categories, setCategories] = useState([]);
@@ -95,6 +97,8 @@ function Billing() {
 
   // Regional & Tax Settings
   const [taxRate, setTaxRate] = useState(18.0);
+  const [invoiceTaxAmount, setInvoiceTaxAmount] = useState(0);
+  const [isTaxAmountOverridden, setIsTaxAmountOverridden] = useState(false);
 
   // Payment Settlement State
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -178,6 +182,7 @@ function Billing() {
   // Customer Combobox State
   const [customerSearchQuery, setCustomerSearchQuery] = useState("");
   const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
+  const [customerHighlightedIndex, setCustomerHighlightedIndex] = useState(0);
 
   // Customer History Modal State
   const [showCustomerHistoryModal, setShowCustomerHistoryModal] = useState(false);
@@ -199,6 +204,40 @@ function Billing() {
   const customerHistoryModalRef = useRef(null);
   const addProductModalRef = useRef(null);
   const productDropdownRef = useRef(null);
+
+  const quickFirstNameRef = useRef(null);
+  const quickLastNameRef = useRef(null);
+  const quickPhoneRef = useRef(null);
+  const quickGenderRef = useRef(null);
+  const quickDobRef = useRef(null);
+  const quickSubmitRef = useRef(null);
+
+  const handleQuickInputKeyDown = (e, nextRef, prevRef) => {
+    if (e.key === "ArrowRight") {
+      if (
+        e.target.selectionStart === undefined ||
+        e.target.selectionStart === e.target.value.length ||
+        (e.target.selectionStart === 0 && e.target.value === "")
+      ) {
+        e.preventDefault();
+        if (nextRef && nextRef.current) {
+          nextRef.current.focus();
+        }
+      }
+    } else if (e.key === "ArrowLeft") {
+      if (e.target.selectionStart === undefined || e.target.selectionStart === 0) {
+        e.preventDefault();
+        if (prevRef && prevRef.current) {
+          prevRef.current.focus();
+        }
+      }
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (nextRef && nextRef.current) {
+        nextRef.current.focus();
+      }
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -456,20 +495,27 @@ function Billing() {
       });
   };
 
-  const openQuickAddCustomer = (prefillName = "") => {
+  const openQuickAddCustomer = (prefill = "") => {
     setQuickCustomerEditId(null);
+    const trimmed = prefill.trim();
+    const isPhone = /[0-9]/.test(trimmed);
+
     setQuickCustomerForm({
-      first_name: prefillName,
+      first_name: isPhone ? "" : trimmed,
       last_name: "",
-      phone: "",
-      email: "",
-      gender: selectedGender || "Female",
+      phone: isPhone ? trimmed : "",
+      gender: "",
       date_of_birth: "",
-      plan_id: "",
     });
     setQuickCustomerError(null);
     setShowQuickCustomerModal(true);
     setIsCustomerDropdownOpen(false);
+
+    setTimeout(() => {
+      if (quickFirstNameRef.current) {
+        quickFirstNameRef.current.focus();
+      }
+    }, 100);
   };
 
   const openQuickEditCustomer = () => {
@@ -482,14 +528,18 @@ function Billing() {
       first_name: cust.first_name || "",
       last_name: cust.last_name || "",
       phone: cust.phone || "",
-      email: cust.email || "",
-      gender: cust.gender || "Female",
+      gender: cust.gender || "",
       date_of_birth: cust.date_of_birth || "",
-      plan_id: "",
     });
     setQuickCustomerError(null);
     setShowQuickCustomerModal(true);
     setIsCustomerDropdownOpen(false);
+
+    setTimeout(() => {
+      if (quickFirstNameRef.current) {
+        quickFirstNameRef.current.focus();
+      }
+    }, 100);
   };
 
   const handleQuickCustomerSubmit = (e) => {
@@ -498,9 +548,15 @@ function Billing() {
 
     const first_name = quickCustomerForm.first_name.trim();
     const phone = quickCustomerForm.phone.trim();
+    const gender = quickCustomerForm.gender;
 
     if (!first_name || !phone) {
       setQuickCustomerError("Customer First Name and Mobile Number are required.");
+      return;
+    }
+
+    if (!gender) {
+      setQuickCustomerError("Please choose gender.");
       return;
     }
 
@@ -526,27 +582,19 @@ function Billing() {
 
     setQuickCustomerSaving(true);
     
-    // Extract plan_id for membership assignment
-    const { plan_id, ...customerPayload } = quickCustomerForm;
-    const payload = { ...customerPayload, first_name, phone };
+    const payload = {
+      first_name,
+      last_name: quickCustomerForm.last_name ? quickCustomerForm.last_name.trim() : "",
+      phone,
+      gender,
+      date_of_birth: quickCustomerForm.date_of_birth || null,
+    };
     const apiCall = quickCustomerEditId
       ? API.put(`/customers/${quickCustomerEditId}`, payload)
       : API.post("/customers", payload);
 
     apiCall
-      .then((res) => {
-        const savedCust = res.data?.data || res.data;
-
-        // If a plan was selected and it's a new customer creation, assign membership
-        if (plan_id && !quickCustomerEditId) {
-          return API.post("/memberships/assign", {
-            customer_id: savedCust.id,
-            plan_id: parseInt(plan_id),
-            benefits: []
-          }).then(() => savedCust);
-        }
-        return savedCust;
-      })
+      .then((res) => res.data?.data || res.data)
       .then((savedCust) => {
         // Refresh customer list
         return API.get("/customers?limit=100").then((resList) => {
@@ -618,11 +666,15 @@ function Billing() {
         setProducts(prodRes.data.items || prodRes.data || []);
         setMembershipPlans(plansRes.data.items || []);
 
-        if (setRes.data?.invoice_settings?.tax_rate !== undefined) {
-          setTaxRate(parseFloat(setRes.data.invoice_settings.tax_rate));
+        const settingsData = setRes?.data || setRes;
+        const invSet = settingsData?.invoice_settings || {};
+        const regSet = settingsData?.regional_settings || {};
+
+        if (invSet.tax_rate !== undefined && invSet.tax_rate !== null) {
+          setTaxRate(parseFloat(invSet.tax_rate));
         }
-        if (setRes.data?.regional_settings?.currency_symbol) {
-          setCurrencySymbol(setRes.data.regional_settings.currency_symbol);
+        if (regSet.currency_symbol) {
+          setCurrencySymbol(regSet.currency_symbol);
         }
 
         if (catList.length > 0) {
@@ -648,11 +700,7 @@ function Billing() {
       .then((res) => {
         const svcs = res.data.items || [];
         setServices(svcs);
-        if (svcs.length > 0) {
-          setSelectedServiceId(svcs[0].id.toString());
-        } else {
-          setSelectedServiceId("");
-        }
+        setSelectedServiceId("");
       })
       .catch((err) => console.error("Error fetching category services:", err));
   }, [selectedCategoryId]);
@@ -723,9 +771,6 @@ function Billing() {
       }
 
       // New service -> add single row
-      const defaultEmpId = employees.length > 0 ? employees[0].id : null;
-      const defaultEmpIds = defaultEmpId ? [defaultEmpId] : [];
-
       const newItem = {
         type: "service",
         item_id: serviceObj.id,
@@ -734,7 +779,7 @@ function Billing() {
         quantity: 1,
         discount_percent: 0,
         tax_rate: taxRate,
-        employee_ids: defaultEmpIds,
+        employee_ids: [],
       };
 
       return [...prevCart, newItem];
@@ -795,6 +840,22 @@ function Billing() {
   };
 
   // Cart Updaters with e.target.select() onFocus
+  const handleUpdateGrossAmount = (index, val) => {
+    const updated = [...cart];
+    const item = updated[index];
+    const parsed = val === "" ? 0 : Math.max(0, parseFloat(val) || 0);
+    item.gross_amount = parsed;
+    const lineGross = item.gross_amount * item.quantity;
+    if (item.discount_amount_override !== undefined && item.discount_amount_override !== null) {
+      if (lineGross > 0) {
+        item.discount_percent = Math.min(100, Math.max(0, (item.discount_amount_override / lineGross) * 100));
+      } else {
+        item.discount_percent = 0;
+      }
+    }
+    setCart(updated);
+  };
+
   const handleUpdateQty = (index, val) => {
     const updated = [...cart];
     const item = updated[index];
@@ -806,13 +867,38 @@ function Billing() {
     } else {
       item.quantity = parsed;
     }
+    const lineGross = item.gross_amount * item.quantity;
+    if (item.discount_amount_override !== undefined && item.discount_amount_override !== null) {
+      if (lineGross > 0) {
+        item.discount_percent = Math.min(100, Math.max(0, (item.discount_amount_override / lineGross) * 100));
+      } else {
+        item.discount_percent = 0;
+      }
+    }
     setCart(updated);
   };
 
   const handleUpdateDiscountPercent = (index, val) => {
     const updated = [...cart];
+    const item = updated[index];
     const parsed = val === "" ? 0 : Math.max(0, Math.min(100, parseFloat(val) || 0));
-    updated[index].discount_percent = parsed;
+    item.discount_percent = parsed;
+    const lineGross = item.gross_amount * item.quantity;
+    item.discount_amount_override = (lineGross * parsed) / 100;
+    setCart(updated);
+  };
+
+  const handleUpdateDiscountAmount = (index, val) => {
+    const updated = [...cart];
+    const item = updated[index];
+    const lineGross = item.gross_amount * item.quantity;
+    const parsed = val === "" ? 0 : Math.max(0, parseFloat(val) || 0);
+    item.discount_amount_override = parsed;
+    if (lineGross > 0) {
+      item.discount_percent = Math.min(100, Math.max(0, (parsed / lineGross) * 100));
+    } else {
+      item.discount_percent = 0;
+    }
     setCart(updated);
   };
 
@@ -823,21 +909,75 @@ function Billing() {
     setCart(updated);
   };
 
-  const handleToggleEmployee = (index, empId) => {
+  const handleSelectEmployee = (index, empIdStr) => {
+    const updated = [...cart];
+    const empId = parseInt(empIdStr);
+    if (!empId) return;
+    const currentList = updated[index].employee_ids || [];
+    if (!currentList.includes(empId)) {
+      updated[index].employee_ids = [...currentList, empId];
+    }
+    setCart(updated);
+  };
+
+  const handleRemoveEmployeeTag = (index, empId) => {
     const updated = [...cart];
     const currentList = updated[index].employee_ids || [];
-    const empIdNum = parseInt(empId);
-
-    if (currentList.includes(empIdNum)) {
-      updated[index].employee_ids = currentList.filter((id) => id !== empIdNum);
-    } else {
-      updated[index].employee_ids = [...currentList, empIdNum];
-    }
+    updated[index].employee_ids = currentList.filter((id) => id !== empId);
     setCart(updated);
   };
 
   const handleRemoveItem = (index) => {
     setCart(cart.filter((_, idx) => idx !== index));
+  };
+
+  const handleLineItemKeyDown = (e, rowIdx, fieldName) => {
+    if (e.key === "ArrowRight" || e.key === "Enter") {
+      e.preventDefault();
+      const fieldOrder = ["gross_amount", "qty", "discount_percent", "discount_amount", "employee"];
+      const currentPos = fieldOrder.indexOf(fieldName);
+
+      if (currentPos < fieldOrder.length - 1) {
+        const nextFieldName = fieldOrder[currentPos + 1];
+        const targetEl = document.querySelector(`[data-row="${rowIdx}"][data-field="${nextFieldName}"]`);
+        if (targetEl) {
+          targetEl.focus();
+          if (typeof targetEl.select === "function" && targetEl.tagName === "INPUT") {
+            targetEl.select();
+          }
+        }
+      } else {
+        const nextRowEl = document.querySelector(`[data-row="${rowIdx + 1}"][data-field="gross_amount"]`);
+        if (nextRowEl) {
+          nextRowEl.focus();
+          if (typeof nextRowEl.select === "function") {
+            nextRowEl.select();
+          }
+        } else if (settlementBtnRef.current) {
+          settlementBtnRef.current.focus();
+        }
+      }
+    } else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      const fieldOrder = ["gross_amount", "qty", "discount_percent", "discount_amount", "employee"];
+      const currentPos = fieldOrder.indexOf(fieldName);
+
+      if (currentPos > 0) {
+        const prevFieldName = fieldOrder[currentPos - 1];
+        const targetEl = document.querySelector(`[data-row="${rowIdx}"][data-field="${prevFieldName}"]`);
+        if (targetEl) {
+          targetEl.focus();
+          if (typeof targetEl.select === "function" && targetEl.tagName === "INPUT") {
+            targetEl.select();
+          }
+        }
+      } else if (rowIdx > 0) {
+        const prevRowEl = document.querySelector(`[data-row="${rowIdx - 1}"][data-field="employee"]`);
+        if (prevRowEl) prevRowEl.focus();
+      } else {
+        if (addProductBtnRef.current) addProductBtnRef.current.focus();
+      }
+    }
   };
 
   // Computations
@@ -858,6 +998,9 @@ function Billing() {
 
   const calculateRowDiscountAmount = (item) => {
     const lineGross = item.gross_amount * item.quantity;
+    if (item.discount_amount_override !== undefined && item.discount_amount_override !== null) {
+      return Math.min(lineGross, Math.max(0, parseFloat(item.discount_amount_override) || 0));
+    }
     const effPercent = getEffectiveDiscountPercent(item);
     return (lineGross * effPercent) / 100;
   };
@@ -878,7 +1021,10 @@ function Billing() {
   const grossTotal = cart.reduce((sum, item) => sum + item.gross_amount * item.quantity, 0);
   const totalDiscount = cart.reduce((sum, item) => sum + calculateRowDiscountAmount(item), 0);
   const netTotal = Math.max(0, grossTotal - totalDiscount);
-  const totalTaxAmount = cart.reduce((sum, item) => sum + calculateRowTaxAmount(item), 0);
+  const defaultTaxAmountFromSettings = (netTotal * (taxRate || 0)) / 100;
+  const totalTaxAmount = isTaxAmountOverridden
+    ? (parseFloat(invoiceTaxAmount) || 0)
+    : defaultTaxAmountFromSettings;
   const netPayable = netTotal + totalTaxAmount;
 
   const handleTogglePaymentMethod = (methodId) => {
@@ -1275,16 +1421,60 @@ function Billing() {
                     type="text"
                     placeholder="Search by Name or Phone..."
                     value={customerSearchQuery}
-                    onFocus={() => setIsCustomerDropdownOpen(true)}
+                    onFocus={() => {
+                      setIsCustomerDropdownOpen(true);
+                      setCustomerHighlightedIndex(0);
+                    }}
                     onChange={(e) => {
                       setCustomerSearchQuery(e.target.value);
                       setIsCustomerDropdownOpen(true);
+                      setCustomerHighlightedIndex(0);
                     }}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") {
+                      const filteredCustomerList = customers.filter((c) => {
+                        if (!customerSearchQuery || customerSearchQuery === "Walk-in Customer") return true;
+                        const q = customerSearchQuery.toLowerCase().trim();
+                        const name = `${c.first_name || ""} ${c.last_name || ""}`.toLowerCase();
+                        const phone = (c.phone || "").toLowerCase();
+                        return name.includes(q) || phone.includes(q);
+                      });
+
+                      const options = [
+                        { type: "walkin", id: "walkin" },
+                        ...filteredCustomerList.map((c) => ({ type: "customer", id: c.id, data: c })),
+                        { type: "add_new", id: "add_new" },
+                      ];
+
+                      if (e.key === "ArrowDown") {
                         e.preventDefault();
-                        setIsCustomerDropdownOpen(false);
-                        advanceToNextRef(e.target, genderSelectRef);
+                        setIsCustomerDropdownOpen(true);
+                        setCustomerHighlightedIndex((prev) => Math.min(prev + 1, options.length - 1));
+                      } else if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        setIsCustomerDropdownOpen(true);
+                        setCustomerHighlightedIndex((prev) => Math.max(prev - 1, 0));
+                      } else if (e.key === "Enter" || e.key === "ArrowRight") {
+                        e.preventDefault();
+                        if (isCustomerDropdownOpen && options.length > 0) {
+                          const targetOpt = options[customerHighlightedIndex] || options[0];
+                          if (targetOpt.type === "walkin") {
+                            handleCustomerChange("walkin");
+                            setCustomerSearchQuery("Walk-in Customer");
+                            setIsCustomerDropdownOpen(false);
+                            advanceToNextRef(e.target, genderSelectRef);
+                          } else if (targetOpt.type === "customer") {
+                            const c = targetOpt.data;
+                            handleCustomerChange(String(c.id));
+                            setCustomerSearchQuery(`${c.first_name} ${c.last_name || ""} (${c.phone || "No Phone"})`);
+                            setIsCustomerDropdownOpen(false);
+                            advanceToNextRef(e.target, genderSelectRef);
+                          } else if (targetOpt.type === "add_new") {
+                            openQuickAddCustomer(customerSearchQuery !== "Walk-in Customer" ? customerSearchQuery : "");
+                            setIsCustomerDropdownOpen(false);
+                          }
+                        } else {
+                          advanceToNextRef(e.target, genderSelectRef);
+                        }
                       } else if (e.key === "Escape") {
                         setIsCustomerDropdownOpen(false);
                       }
@@ -1294,73 +1484,103 @@ function Billing() {
                   <Search className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
 
                   {/* Dropdown Options List */}
-                  {isCustomerDropdownOpen && (
-                    <div className="absolute left-0 right-0 top-full mt-1 bg-surface border border-border-soft rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto text-xs">
-                      {/* Pinned Walk-in Customer Option */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          handleCustomerChange("walkin");
-                          setCustomerSearchQuery("Walk-in Customer");
-                          setIsCustomerDropdownOpen(false);
-                          setTimeout(() => advanceToNextRef(customerSelectRef.current, genderSelectRef), 50);
-                        }}
-                        className="w-full text-left px-4 py-2.5 hover:bg-primary-light/50 flex items-center justify-between border-b border-border-soft font-bold text-primary"
-                      >
-                        <span className="flex items-center space-x-1.5">
-                          <User className="w-3.5 h-3.5 text-primary" />
-                          <span>Walk-in Customer</span>
-                        </span>
-                        <span className="text-[10px] bg-primary-light text-primary px-2 py-0.5 rounded-full font-bold">Default</span>
-                      </button>
+                  {isCustomerDropdownOpen && (() => {
+                    const filteredCustomerList = customers.filter((c) => {
+                      if (!customerSearchQuery || customerSearchQuery === "Walk-in Customer") return true;
+                      const q = customerSearchQuery.toLowerCase().trim();
+                      const name = `${c.first_name || ""} ${c.last_name || ""}`.toLowerCase();
+                      const phone = (c.phone || "").toLowerCase();
+                      return name.includes(q) || phone.includes(q);
+                    });
 
-                      {/* Filtered Existing Customers */}
-                      {customers
-                        .filter((c) => {
-                          if (!customerSearchQuery || customerSearchQuery === "Walk-in Customer") return true;
-                          const q = customerSearchQuery.toLowerCase().trim();
-                          const name = `${c.first_name || ""} ${c.last_name || ""}`.toLowerCase();
-                          const phone = (c.phone || "").toLowerCase();
-                          return name.includes(q) || phone.includes(q);
-                        })
-                        .map((c) => (
-                          <button
-                            key={c.id}
-                            type="button"
-                            onClick={() => {
-                              handleCustomerChange(String(c.id));
-                              setCustomerSearchQuery(`${c.first_name} ${c.last_name || ""} (${c.phone || "No Phone"})`);
-                              setIsCustomerDropdownOpen(false);
-                              setTimeout(() => advanceToNextRef(customerSelectRef.current, genderSelectRef), 50);
-                            }}
-                            className="w-full text-left px-4 py-2 hover:bg-background flex items-center justify-between border-b border-border-soft/40"
-                          >
-                            <div>
-                              <span className="font-semibold text-slate-900">{c.first_name} {c.last_name || ""}</span>
-                              <span className="text-slate-500 text-[11px] block">{c.phone || "No Mobile"}</span>
-                            </div>
-                            {selectedCustomerId === String(c.id) && (
-                              <span className="text-primary font-bold flex items-center space-x-1">
-                                <Check className="w-3.5 h-3.5" />
-                                <span>Selected</span>
-                              </span>
-                            )}
-                          </button>
-                        ))}
+                    const options = [
+                      { type: "walkin", id: "walkin" },
+                      ...filteredCustomerList.map((c) => ({ type: "customer", id: c.id, data: c })),
+                      { type: "add_new", id: "add_new" },
+                    ];
 
-                      {/* Quick Add Option */}
-                      <button
-                        type="button"
-                        onClick={() => openQuickAddCustomer(customerSearchQuery !== "Walk-in Customer" ? customerSearchQuery : "")}
-                        className="w-full text-left px-4 py-2.5 bg-primary/5 hover:bg-primary/10 text-primary font-extrabold flex items-center space-x-2"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>
-                          + Add New Customer {customerSearchQuery && customerSearchQuery !== "Walk-in Customer" ? `"${customerSearchQuery}"` : ""}
-                        </span>
-                      </button>
-                    </div>
-                  )}
+                    return (
+                      <div className="absolute left-0 right-0 top-full mt-1 bg-surface border border-border-soft rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto text-xs">
+                        {options.map((opt, idx) => {
+                          const isHighlighted = idx === customerHighlightedIndex;
+
+                          if (opt.type === "walkin") {
+                            return (
+                              <button
+                                key="walkin"
+                                type="button"
+                                onClick={() => {
+                                  handleCustomerChange("walkin");
+                                  setCustomerSearchQuery("Walk-in Customer");
+                                  setIsCustomerDropdownOpen(false);
+                                  setTimeout(() => advanceToNextRef(customerSelectRef.current, genderSelectRef), 50);
+                                }}
+                                className={`w-full text-left px-4 py-2.5 flex items-center justify-between border-b border-border-soft font-bold ${
+                                  isHighlighted ? "bg-pink-100 text-primary border-l-4 border-primary" : "hover:bg-primary-light/50 text-primary"
+                                }`}
+                              >
+                                <span className="flex items-center space-x-1.5">
+                                  <User className="w-3.5 h-3.5 text-primary" />
+                                  <span>Walk-in Customer</span>
+                                </span>
+                                <span className="text-[10px] bg-primary-light text-primary px-2 py-0.5 rounded-full font-bold">Default</span>
+                              </button>
+                            );
+                          }
+
+                          if (opt.type === "customer") {
+                            const c = opt.data;
+                            return (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => {
+                                  handleCustomerChange(String(c.id));
+                                  setCustomerSearchQuery(`${c.first_name} ${c.last_name || ""} (${c.phone || "No Phone"})`);
+                                  setIsCustomerDropdownOpen(false);
+                                  setTimeout(() => advanceToNextRef(customerSelectRef.current, genderSelectRef), 50);
+                                }}
+                                className={`w-full text-left px-4 py-2 flex items-center justify-between border-b border-border-soft/40 ${
+                                  isHighlighted ? "bg-pink-100 text-slate-900 border-l-4 border-primary" : "hover:bg-background"
+                                }`}
+                              >
+                                <div>
+                                  <span className="font-semibold text-slate-900">{c.first_name} {c.last_name || ""}</span>
+                                  <span className="text-slate-500 text-[11px] block">{c.phone || "No Mobile"}</span>
+                                </div>
+                                {selectedCustomerId === String(c.id) && (
+                                  <span className="text-primary font-bold flex items-center space-x-1">
+                                    <Check className="w-3.5 h-3.5" />
+                                    <span>Selected</span>
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          }
+
+                          if (opt.type === "add_new") {
+                            return (
+                              <button
+                                key="add_new"
+                                type="button"
+                                onClick={() => openQuickAddCustomer(customerSearchQuery !== "Walk-in Customer" ? customerSearchQuery : "")}
+                                className={`w-full text-left px-4 py-2.5 text-primary font-extrabold flex items-center space-x-2 ${
+                                  isHighlighted ? "bg-pink-100 border-l-4 border-primary" : "bg-primary/5 hover:bg-primary/10"
+                                }`}
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>
+                                  + Add New Customer {customerSearchQuery && customerSearchQuery !== "Walk-in Customer" ? `"${customerSearchQuery}"` : ""}
+                                </span>
+                              </button>
+                            );
+                          }
+
+                          return null;
+                        })}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -1371,9 +1591,12 @@ function Billing() {
                   value={selectedGender}
                   onChange={(e) => setSelectedGender(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") {
+                    if (e.key === "ArrowRight" || e.key === "Enter") {
                       e.preventDefault();
                       advanceToNextRef(e.target, categorySelectRef);
+                    } else if (e.key === "ArrowLeft") {
+                      e.preventDefault();
+                      advanceToNextRef(e.target, customerSelectRef);
                     }
                   }}
                   className="w-full bg-background border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
@@ -1491,9 +1714,12 @@ function Billing() {
                   value={selectedCategoryId}
                   onChange={(e) => setSelectedCategoryId(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") {
+                    if (e.key === "ArrowRight" || e.key === "Enter") {
                       e.preventDefault();
                       advanceToNextRef(e.target, serviceSelectRef);
+                    } else if (e.key === "ArrowLeft") {
+                      e.preventDefault();
+                      advanceToNextRef(e.target, genderSelectRef);
                     }
                   }}
                   className="w-full bg-background border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
@@ -1512,11 +1738,32 @@ function Billing() {
                 <select
                   ref={serviceSelectRef}
                   value={selectedServiceId}
-                  onChange={(e) => setSelectedServiceId(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedServiceId(e.target.value);
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
-                      advanceToNextRef(e.target, addServiceBtnRef);
+                      if (selectedServiceId) {
+                        handleAddServiceToCart(selectedServiceId);
+                        setTimeout(() => {
+                          const firstRowGross = document.querySelector('[data-row="0"][data-field="gross_amount"]');
+                          if (firstRowGross) {
+                            firstRowGross.focus();
+                            if (typeof firstRowGross.select === "function") firstRowGross.select();
+                          } else if (addProductBtnRef.current) {
+                            addProductBtnRef.current.focus();
+                          }
+                        }, 50);
+                      } else {
+                        advanceToNextRef(e.target, addProductBtnRef);
+                      }
+                    } else if (e.key === "ArrowRight") {
+                      e.preventDefault();
+                      advanceToNextRef(e.target, addProductBtnRef);
+                    } else if (e.key === "ArrowLeft") {
+                      e.preventDefault();
+                      advanceToNextRef(e.target, categorySelectRef);
                     }
                   }}
                   disabled={!selectedCategoryId}
@@ -1533,23 +1780,7 @@ function Billing() {
 
               <div className="flex items-center space-x-3">
                 <button
-                  ref={addServiceBtnRef}
-                  onClick={() => {
-                    handleAddServiceToCart(selectedServiceId);
-                    setTimeout(() => {
-                      if (serviceSelectRef.current && isElementNavigable(serviceSelectRef.current)) {
-                        serviceSelectRef.current.focus();
-                      }
-                    }, 50);
-                  }}
-                  disabled={!selectedServiceId}
-                  className="bg-primary hover:bg-primary-hover text-white px-5 py-2.5 rounded-xl text-xs font-extrabold shadow-md shadow-pink-500/20 transition flex items-center justify-center space-x-2 disabled:opacity-50"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Add Service to Table</span>
-                </button>
-
-                <button
+                  ref={addProductBtnRef}
                   type="button"
                   onClick={() => {
                     setProductSearchQuery("");
@@ -1557,6 +1788,21 @@ function Billing() {
                     setProductQuantities({});
                     setIsProductDropdownOpen(false);
                     setShowAddProductModal(true);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowRight") {
+                      e.preventDefault();
+                      if (cart.length > 0) {
+                        const firstRowGross = document.querySelector('[data-row="0"][data-field="gross_amount"]');
+                        if (firstRowGross) {
+                          firstRowGross.focus();
+                          if (typeof firstRowGross.select === "function") firstRowGross.select();
+                        }
+                      }
+                    } else if (e.key === "ArrowLeft") {
+                      e.preventDefault();
+                      advanceToNextRef(e.target, serviceSelectRef);
+                    }
                   }}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs font-extrabold shadow-md shadow-emerald-600/20 transition flex items-center justify-center space-x-2"
                 >
@@ -1592,7 +1838,6 @@ function Billing() {
                     <th className="px-3 py-3 font-extrabold w-24">Discount (%)</th>
                     <th className="px-4 py-3 font-extrabold">Discount Amount</th>
                     <th className="px-4 py-3 font-extrabold">Net Amount</th>
-                    <th className="px-3 py-3 font-extrabold w-20">Tax (%)</th>
                     <th className="px-4 py-3 font-extrabold min-w-[200px]">Employee (Stylist / Seller) Multi-Select *</th>
                     <th className="px-4 py-3 font-extrabold text-right">Action</th>
                   </tr>
@@ -1600,7 +1845,7 @@ function Billing() {
                 <tbody className="divide-y divide-border-soft">
                   {cart.length === 0 ? (
                     <tr>
-                      <td colSpan={12} className="p-8 text-center text-text-secondary font-medium">
+                      <td colSpan={11} className="p-8 text-center text-text-secondary font-medium">
                         Table is empty. Select a <strong>Service</strong> or <strong>Product</strong> above, then click <strong>"Add to Table"</strong>.
                       </td>
                     </tr>
@@ -1628,18 +1873,37 @@ function Billing() {
                           <td className="px-4 py-3 font-medium text-slate-500">
                             {item.type === "product" ? `${currencySymbol} ${parseFloat(item.mrp || item.gross_amount || 0).toFixed(2)}` : "—"}
                           </td>
-                          <td className="px-4 py-3 font-medium text-slate-700">
-                            {currencySymbol} {item.gross_amount.toFixed(2)}
+
+                          {/* Editable Gross Amount Input */}
+                          <td className="px-3 py-3">
+                            <div className="flex items-center space-x-1">
+                              <span className="text-xs text-slate-400 font-bold">{currencySymbol}</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                data-row={idx}
+                                data-field="gross_amount"
+                                value={item.gross_amount}
+                                onFocus={(e) => e.target.select()}
+                                onChange={(e) => handleUpdateGrossAmount(idx, e.target.value)}
+                                onKeyDown={(e) => handleLineItemKeyDown(e, idx, "gross_amount")}
+                                className="w-20 bg-background border border-border-soft px-2 py-1 rounded-lg text-xs font-bold text-slate-900 text-center focus:border-primary focus:outline-none"
+                              />
+                            </div>
                           </td>
 
-                          {/* Qty Input with auto-select focus to fix 012 bug */}
+                          {/* Qty Input */}
                           <td className="px-3 py-3">
                             <input
                               type="number"
                               min="1"
+                              data-row={idx}
+                              data-field="qty"
                               value={item.quantity}
                               onFocus={(e) => e.target.select()}
                               onChange={(e) => handleUpdateQty(idx, e.target.value)}
+                              onKeyDown={(e) => handleLineItemKeyDown(e, idx, "qty")}
                               className="w-16 bg-background border border-border-soft px-2 py-1 rounded-lg text-xs font-bold text-slate-900 text-center focus:border-primary focus:outline-none"
                             />
                           </td>
@@ -1654,66 +1918,89 @@ function Billing() {
                               type="number"
                               min="0"
                               max="100"
-                              value={item.discount_percent}
+                              step="0.01"
+                              data-row={idx}
+                              data-field="discount_percent"
+                              value={item.discount_percent !== undefined ? (Math.round(item.discount_percent * 100) / 100) : 0}
                               onFocus={(e) => e.target.select()}
                               onChange={(e) => handleUpdateDiscountPercent(idx, e.target.value)}
+                              onKeyDown={(e) => handleLineItemKeyDown(e, idx, "discount_percent")}
                               className="w-16 bg-background border border-border-soft px-2 py-1 rounded-lg text-xs font-bold text-slate-900 text-center focus:border-primary focus:outline-none"
                             />
                           </td>
 
-                          <td className="px-4 py-3 text-danger font-bold">
-                            -{currencySymbol} {discAmt.toFixed(2)}
+                          {/* Editable Discount Amount Input */}
+                          <td className="px-3 py-3">
+                            <div className="flex items-center space-x-1">
+                              <span className="text-xs text-danger font-bold">-</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                data-row={idx}
+                                data-field="discount_amount"
+                                value={item.discount_amount_override !== undefined && item.discount_amount_override !== null ? item.discount_amount_override : (Math.round(discAmt * 100) / 100)}
+                                onFocus={(e) => e.target.select()}
+                                onChange={(e) => handleUpdateDiscountAmount(idx, e.target.value)}
+                                onKeyDown={(e) => handleLineItemKeyDown(e, idx, "discount_amount")}
+                                className="w-20 bg-background border border-border-soft px-2 py-1 rounded-lg text-xs font-bold text-danger text-center focus:border-primary focus:outline-none"
+                              />
+                            </div>
                           </td>
 
                           <td className="px-4 py-3 font-extrabold text-slate-900">
                             {currencySymbol} {rowNet.toFixed(2)}
                           </td>
 
-                          {/* Tax (%) Input */}
-                          <td className="px-3 py-3">
-                            {item.type === "product" ? (
-                              <span className="text-[11px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 block text-center">0%</span>
-                            ) : (
-                              <input
-                                type="number"
-                                min="0"
-                                value={item.tax_rate}
-                                onFocus={(e) => e.target.select()}
-                                onChange={(e) => handleUpdateTaxRate(idx, e.target.value)}
-                                className="w-16 bg-background border border-border-soft px-2 py-1 rounded-lg text-xs font-bold text-slate-900 text-center focus:border-primary focus:outline-none"
-                              />
-                            )}
-                          </td>
-
-                          {/* Multi-Select Employee Dropdown Checklist */}
+                          {/* Employee Select Dropdown + Selected Employee Name Tags below */}
                           <td className="px-4 py-3">
                             {item.type === "product" ? (
                               <span className="text-slate-400 font-bold italic text-center block">—</span>
                             ) : (
-                              <div className="bg-background border border-border-soft p-2 rounded-xl space-y-1 max-h-28 overflow-y-auto">
-                                {employees.length === 0 ? (
-                                  <span className="text-[10px] text-danger">No active stylists found</span>
-                                ) : (
-                                  employees.map((emp) => {
-                                    const isChecked = (item.employee_ids || []).includes(emp.id);
+                              <div className="space-y-1.5 min-w-[180px]">
+                                <select
+                                  data-row={idx}
+                                  data-field="employee"
+                                  value=""
+                                  onChange={(e) => {
+                                    if (e.target.value) {
+                                      handleSelectEmployee(idx, e.target.value);
+                                    }
+                                  }}
+                                  onKeyDown={(e) => handleLineItemKeyDown(e, idx, "employee")}
+                                  className="w-full bg-background border border-border-soft px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
+                                >
+                                  <option value="" disabled hidden>Choose Employee</option>
+                                  {employees.map((emp) => (
+                                    <option key={emp.id} value={emp.id}>
+                                      {emp.first_name} {emp.last_name || ""}
+                                    </option>
+                                  ))}
+                                </select>
+
+                                {/* Selected Employee Name Chips */}
+                                <div className="flex flex-wrap gap-1">
+                                  {(item.employee_ids || []).map((empId) => {
+                                    const empObj = employees.find((e) => e.id === empId);
+                                    if (!empObj) return null;
                                     return (
-                                      <label
-                                        key={emp.id}
-                                        className="flex items-center space-x-2 text-[11px] font-semibold text-slate-800 cursor-pointer hover:text-primary"
+                                      <span
+                                        key={empId}
+                                        className="inline-flex items-center space-x-1 text-[11px] font-bold bg-pink-50 text-pink-700 border border-pink-200 px-2 py-0.5 rounded-full"
                                       >
-                                        <input
-                                          type="checkbox"
-                                          checked={isChecked}
-                                          onChange={() => handleToggleEmployee(idx, emp.id)}
-                                          className="rounded text-primary focus:ring-primary h-3.5 w-3.5"
-                                        />
-                                        <span>
-                                          {emp.first_name} {emp.last_name || ""}
-                                        </span>
-                                      </label>
+                                        <span>{empObj.first_name} {empObj.last_name || ""}</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRemoveEmployeeTag(idx, empId)}
+                                          className="text-pink-500 hover:text-pink-900 ml-1 font-black"
+                                          title="Remove employee"
+                                        >
+                                          ×
+                                        </button>
+                                      </span>
                                     );
-                                  })
-                                )}
+                                  })}
+                                </div>
                               </div>
                             )}
                           </td>
@@ -1735,23 +2022,14 @@ function Billing() {
             </div>
           </div>
 
-          {/* Invoice Summary & Action Buttons */}
-          <div className="grid md:grid-cols-2 gap-6 items-start">
-            <div className="bg-surface border border-border-soft p-6 rounded-2xl shadow-xs space-y-4">
-              <h4 className="text-xs font-extrabold text-slate-900 uppercase">Billing Remarks & Instructions</h4>
-              <textarea
-                rows={4}
-                placeholder="Special treatment notes or customer preferences..."
-                className="w-full bg-background border border-border-soft p-3 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-primary"
-              />
-            </div>
-
+          {/* Invoice Summary Card */}
+          <div className="max-w-2xl mx-auto w-full">
             <div className="bg-surface border border-border-soft p-6 rounded-2xl shadow-xs space-y-4">
               <h4 className="text-xs font-extrabold text-slate-900 uppercase border-b border-border-soft pb-2">
                 Invoice Summary
               </h4>
 
-              <div className="space-y-2 text-xs">
+              <div className="space-y-3 text-xs">
                 <div className="flex justify-between text-text-secondary">
                   <span>Gross Total:</span>
                   <span className="font-bold text-slate-900">{currencySymbol} {grossTotal.toFixed(2)}</span>
@@ -1764,9 +2042,25 @@ function Billing() {
                   <span>Net Total (after discount):</span>
                   <span>{currencySymbol} {netTotal.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-text-secondary">
-                  <span>Tax Amount:</span>
-                  <span className="font-bold text-slate-900">{currencySymbol} {totalTaxAmount.toFixed(2)}</span>
+                
+                {/* Editable Tax Amount Input */}
+                <div className="flex justify-between items-center text-text-secondary pt-1">
+                  <span className="font-bold text-slate-700">Tax Amount ({taxRate}%):</span>
+                  <div className="flex items-center space-x-1">
+                    <span className="text-xs text-slate-400 font-bold">{currencySymbol}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={isTaxAmountOverridden ? invoiceTaxAmount : totalTaxAmount.toFixed(2)}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => {
+                        setIsTaxAmountOverridden(true);
+                        setInvoiceTaxAmount(e.target.value);
+                      }}
+                      className="w-28 bg-background border border-border-soft px-3 py-1.5 rounded-xl text-xs font-extrabold text-slate-900 text-right focus:border-primary focus:outline-none"
+                    />
+                  </div>
                 </div>
 
                 <div className="flex justify-between text-base font-extrabold text-primary border-t-2 border-primary/20 pt-3">
@@ -1775,28 +2069,19 @@ function Billing() {
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-border-soft grid grid-cols-3 gap-3">
+              <div className="pt-4 border-t border-border-soft">
                 <button
-                  onClick={handleSaveDraft}
-                  className="bg-background hover:bg-slate-100 border border-border-soft text-slate-700 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1"
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                  <span>Save Draft</span>
-                </button>
-
-                <button
-                  onClick={handleReset}
-                  className="bg-background hover:bg-slate-100 border border-border-soft text-slate-700 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Reset</span>
-                </button>
-
-                <button
+                  ref={settlementBtnRef}
                   onClick={handleProceedToPayment}
-                  className="bg-primary hover:bg-primary-hover text-white py-2.5 rounded-xl text-xs font-extrabold shadow-md shadow-pink-500/20 transition flex items-center justify-center space-x-1"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === "Space") {
+                      e.preventDefault();
+                      handleProceedToPayment();
+                    }
+                  }}
+                  className="w-full bg-primary hover:bg-primary-hover text-white py-3 rounded-xl text-xs font-extrabold shadow-md shadow-pink-500/20 transition flex items-center justify-center space-x-2"
                 >
-                  <CreditCard className="w-3.5 h-3.5" />
+                  <CreditCard className="w-4 h-4" />
                   <span>Proceed to Payment</span>
                 </button>
               </div>
@@ -2003,6 +2288,12 @@ function Billing() {
                       value={paymentAmounts[mId] || ""}
                       onFocus={(e) => e.target.select()}
                       onChange={(e) => handleUpdatePaymentAmount(mId, e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === "ArrowRight") {
+                          e.preventDefault();
+                          if (submitInvoiceBtnRef.current) submitInvoiceBtnRef.current.focus();
+                        }
+                      }}
                       placeholder="0.00"
                       className="w-32 bg-white border border-border-soft px-3 py-1.5 rounded-lg text-xs font-extrabold text-slate-900 text-right focus:border-primary focus:outline-none"
                     />
@@ -2019,8 +2310,15 @@ function Billing() {
                   Cancel
                 </button>
                 <button
+                  ref={submitInvoiceBtnRef}
                   type="button"
                   onClick={handleCheckoutSubmit}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === "Space") {
+                      e.preventDefault();
+                      handleCheckoutSubmit();
+                    }
+                  }}
                   className="px-6 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-extrabold shadow-md shadow-pink-500/20"
                 >
                   Save Bill
@@ -2407,11 +2705,13 @@ function Billing() {
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">First Name *</label>
                   <input
+                    ref={quickFirstNameRef}
                     type="text"
                     required
                     placeholder="e.g. Mahalakshmi"
                     value={quickCustomerForm.first_name}
                     onChange={(e) => setQuickCustomerForm({ ...quickCustomerForm, first_name: e.target.value })}
+                    onKeyDown={(e) => handleQuickInputKeyDown(e, quickLastNameRef, null)}
                     className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
                   />
                 </div>
@@ -2419,10 +2719,12 @@ function Billing() {
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Last Name</label>
                   <input
+                    ref={quickLastNameRef}
                     type="text"
                     placeholder="e.g. S"
                     value={quickCustomerForm.last_name}
                     onChange={(e) => setQuickCustomerForm({ ...quickCustomerForm, last_name: e.target.value })}
+                    onKeyDown={(e) => handleQuickInputKeyDown(e, quickPhoneRef, quickFirstNameRef)}
                     className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
                   />
                 </div>
@@ -2431,11 +2733,13 @@ function Billing() {
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Mobile Number *</label>
                 <input
+                  ref={quickPhoneRef}
                   type="tel"
                   required
                   placeholder="e.g. 9876543210"
                   value={quickCustomerForm.phone}
                   onChange={(e) => setQuickCustomerForm({ ...quickCustomerForm, phone: e.target.value })}
+                  onKeyDown={(e) => handleQuickInputKeyDown(e, quickGenderRef, quickLastNameRef)}
                   className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
                 />
               </div>
@@ -2444,10 +2748,22 @@ function Billing() {
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Gender *</label>
                   <select
+                    ref={quickGenderRef}
+                    required
                     value={quickCustomerForm.gender}
                     onChange={(e) => setQuickCustomerForm({ ...quickCustomerForm, gender: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === "ArrowRight" || e.key === "Enter") {
+                        e.preventDefault();
+                        quickDobRef.current?.focus();
+                      } else if (e.key === "ArrowLeft") {
+                        e.preventDefault();
+                        quickPhoneRef.current?.focus();
+                      }
+                    }}
                     className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
                   >
+                    <option value="" disabled hidden>Choose Gender</option>
                     <option value="Female">Female</option>
                     <option value="Male">Male</option>
                     <option value="Other">Other</option>
@@ -2455,44 +2771,25 @@ function Billing() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Date of Birth</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Date of Birth (Optional)</label>
                   <input
+                    ref={quickDobRef}
                     type="date"
                     value={quickCustomerForm.date_of_birth}
                     onChange={(e) => setQuickCustomerForm({ ...quickCustomerForm, date_of_birth: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === "ArrowRight" || e.key === "Enter") {
+                        e.preventDefault();
+                        quickSubmitRef.current?.focus();
+                      } else if (e.key === "ArrowLeft") {
+                        e.preventDefault();
+                        quickGenderRef.current?.focus();
+                      }
+                    }}
                     className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
                   />
                 </div>
               </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Email (Optional)</label>
-                <input
-                  type="email"
-                  placeholder="client@gmail.com"
-                  value={quickCustomerForm.email}
-                  onChange={(e) => setQuickCustomerForm({ ...quickCustomerForm, email: e.target.value })}
-                  className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
-                />
-              </div>
-
-              {!quickCustomerEditId && (
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Add Membership Plan (Optional)</label>
-                  <select
-                    value={quickCustomerForm.plan_id}
-                    onChange={(e) => setQuickCustomerForm({ ...quickCustomerForm, plan_id: e.target.value })}
-                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
-                  >
-                    <option value="">-- No Membership / Normal Customer --</option>
-                    {membershipPlans.map((plan) => (
-                      <option key={plan.id} value={plan.id}>
-                        {plan.name} ({plan.service_discount_percentage}% discount)
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
 
               <div className="pt-4 border-t border-border-soft flex justify-end space-x-3">
                 <button
@@ -2503,6 +2800,7 @@ function Billing() {
                   Cancel
                 </button>
                 <button
+                  ref={quickSubmitRef}
                   type="submit"
                   disabled={quickCustomerSaving}
                   className="px-5 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-extrabold shadow-md disabled:opacity-50"

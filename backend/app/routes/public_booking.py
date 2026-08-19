@@ -309,12 +309,20 @@ def get_public_available_slots(tenant_identifier):
                 employee_id = None
 
         booking_type_override = request.args.get("booking_type", "").strip() or None
+        
+        branch_id = request.args.get("branch_id")
+        if branch_id:
+            try:
+                branch_id = int(branch_id)
+            except ValueError:
+                branch_id = None
 
         ok, result, status_code = BookingService.get_available_slots(
             tenant_id=tenant.id,
             date_str=date_str,
             employee_id=employee_id,
-            booking_type_override=booking_type_override
+            booking_type_override=booking_type_override,
+            branch_id=branch_id
         )
 
         if not ok:
@@ -324,6 +332,44 @@ def get_public_available_slots(tenant_identifier):
     except Exception as e:
         logger.exception("Failed to fetch available slots")
         return error_response("SERVER_ERROR", f"Failed to compute availability: {str(e)}", 500)
+
+
+@public_booking_bp.route("/branch/<branch_identifier>/slots", methods=["GET"])
+def get_public_branch_booking_slots(branch_identifier):
+    """Compute available tokens/slots for a specific branch."""
+    try:
+        branch = resolve_branch(branch_identifier)
+        if not branch or branch.status != "active":
+            return error_response("INVALID_BRANCH", "Branch not found or account inactive.", 404)
+
+        date_str = request.args.get("date", "").strip()
+        if not date_str:
+            return error_response("VALIDATION_FAILED", "Query parameter 'date' is required.", 400)
+
+        employee_id = request.args.get("employee_id")
+        if employee_id:
+            try:
+                employee_id = int(employee_id)
+            except ValueError:
+                employee_id = None
+
+        booking_type_override = request.args.get("booking_type", "").strip() or None
+
+        ok, result, status_code = BookingService.get_available_slots(
+            tenant_id=branch.tenant_id,
+            date_str=date_str,
+            employee_id=employee_id,
+            booking_type_override=booking_type_override,
+            branch_id=branch.id
+        )
+
+        if not ok:
+            return error_response("VALIDATION_FAILED", result, status_code)
+
+        return success_response(data=result)
+    except Exception as e:
+        logger.exception("Failed to fetch branch available slots")
+        return error_response("SERVER_ERROR", f"Failed to compute branch availability: {str(e)}", 500)
 
 
 @public_booking_bp.route("/<tenant_identifier>/customer-lookup", methods=["GET"])

@@ -112,23 +112,34 @@ def customer_lookup():
 
 
 @appointments_bp.route("", methods=["POST"])
-@require_role(["ParlourAdmin", "Receptionist", "Employee"])
+@require_role(["ParlourAdmin", "BranchAdmin", "Receptionist", "Employee"])
 def create_manual_appointment():
     """
     Create a manual appointment (Phone Call, WhatsApp, Walk-in, Instagram, Facebook).
     Validates working hours, working days, break times, duplicate bookings, and daily limits.
+    Enforces branch multi-tenant isolation.
     """
     try:
         payload = request.get_json() or {}
         booking_source = payload.get("booking_source", "Walk-in").strip() or "Walk-in"
         booking_channel = payload.get("booking_channel", "Walk-in").strip() or "Walk-in"
 
+        target_branch_id = None
+        if hasattr(g, "branch_id") and g.branch_id:
+            target_branch_id = g.branch_id
+        elif payload.get("branch_id"):
+            try:
+                target_branch_id = int(payload["branch_id"])
+            except (ValueError, TypeError):
+                pass
+
         from app.services.booking_service import BookingService
         ok, res, status_code = BookingService.validate_and_create_appointment(
             tenant_id=g.parlour_id,
             payload=payload,
             booking_source=booking_source,
-            default_channel=booking_channel
+            default_channel=booking_channel,
+            target_branch_id=target_branch_id
         )
 
         if not ok:

@@ -59,15 +59,15 @@
     padding: 0;
   }
 
-  /* Global Keyboard Focus-Visible Indicator */
-  input:focus-visible,
-  select:focus-visible,
-  textarea:focus-visible,
+  /* Global Keyboard Focus-Visible & Active Focus Ring Indicator */
+  input:focus,
+  select:focus,
+  textarea:focus,
   button:focus-visible,
-  a:focus-visible,
   [tabindex="0"]:focus-visible {
-    outline: 2px solid var(--primary-color) !important;
-    outline-offset: 2px !important;
-    box-shadow: 0 0 0 3px var(--primary-border-soft) !important;
+    outline: none !important;
+    border-color: #EC4899 !important;
+    box-shadow: 0 0 0 3.5px rgba(236, 72, 153, 0.25), 0 2px 8px -2px rgba(236, 72, 153, 0.18) !important;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out !important;
   }
 }

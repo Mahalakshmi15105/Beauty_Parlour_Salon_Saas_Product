@@ -20,7 +20,7 @@ def get_products():
     cursor = request.args.get("cursor")
     sort = request.args.get("sort", "name")
 
-    query = get_tenant_query(Product)
+    query = get_branch_query(Product)
 
     if q:
         query = query.filter(
@@ -64,7 +64,7 @@ def get_products():
             "barcode": p.barcode,
             "cost_price": float(p.cost_price),
             "selling_price": float(p.selling_price),
-            "mrp": float(p.mrp) if p.mrp else 0.00,
+            "mrp": float(p.mrp),
             "stock_quantity": p.stock_quantity,
             "low_stock_threshold": p.low_stock_threshold,
             "status": p.status,
@@ -81,7 +81,7 @@ def get_products():
 @products_bp.route("/products/<int:product_id>", methods=["GET"])
 @require_role(["ParlourAdmin", "BranchAdmin"])
 def get_product(product_id):
-    product = get_tenant_query(Product).filter_by(id=product_id).first()
+    product = get_branch_query(Product).filter_by(id=product_id).first()
     if not product:
         return error_response(
             error_code="PRODUCT_NOT_FOUND",
@@ -96,7 +96,7 @@ def get_product(product_id):
         "barcode": product.barcode,
         "cost_price": float(product.cost_price),
         "selling_price": float(product.selling_price),
-        "mrp": float(product.mrp) if product.mrp else 0.00,
+        "mrp": float(product.mrp),
         "stock_quantity": product.stock_quantity,
         "low_stock_threshold": product.low_stock_threshold,
         "status": product.status,
@@ -114,8 +114,8 @@ def create_product():
     cost_price = data.get("cost_price", 0.00)
     selling_price = data.get("selling_price", 0.00)
     mrp = data.get("mrp", 0.00)
-    stock = data.get("stock_quantity", 0)
-    threshold = data.get("low_stock_threshold", 5)
+    stock_quantity = data.get("stock_quantity", 0)
+    low_stock_threshold = data.get("low_stock_threshold", 5)
 
     if not name:
         return error_response(
@@ -128,21 +128,21 @@ def create_product():
     try:
         cp_val = float(cost_price)
         sp_val = float(selling_price)
-        mrp_val = float(mrp)
-        stock_val = int(stock)
-        thresh_val = int(threshold)
+        mrp_val = float(mrp) if mrp else sp_val
+        stock_val = int(stock_quantity)
+        thresh_val = int(low_stock_threshold)
         if cp_val < 0 or sp_val < 0 or mrp_val < 0 or stock_val < 0 or thresh_val < 0:
             raise ValueError()
     except ValueError:
         return error_response(
             error_code="VALIDATION_FAILED",
-            message="Prices, stock levels, and stock thresholds must be positive values.",
+            message="Prices, stock, and threshold must be valid non-negative numbers.",
             status_code=400
         )
 
     # Check unique constraints (SKU and Barcode) in tenant context
     if sku:
-        dup_sku = get_tenant_query(Product).filter_by(sku=sku).first()
+        dup_sku = get_branch_query(Product).filter_by(sku=sku).first()
         if dup_sku:
             return error_response(
                 error_code="DUPLICATE_RECORD",
@@ -151,7 +151,7 @@ def create_product():
             )
 
     if barcode:
-        dup_bar = get_tenant_query(Product).filter_by(barcode=barcode).first()
+        dup_bar = get_branch_query(Product).filter_by(barcode=barcode).first()
         if dup_bar:
             return error_response(
                 error_code="DUPLICATE_RECORD",
@@ -159,9 +159,12 @@ def create_product():
                 status_code=400
             )
 
+    target_branch_id = g.branch_id if (hasattr(g, "branch_id") and g.branch_id) else (int(data["branch_id"]) if data.get("branch_id") else None)
+
     try:
         product = Product(
             tenant_id=g.parlour_id,
+            branch_id=target_branch_id,
             name=name,
             category=data.get("category"),
             sku=sku,

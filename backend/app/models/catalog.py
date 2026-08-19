@@ -6,6 +6,7 @@ class ServiceCategory(db.Model, TimestampMixin, SoftDeleteMixin):
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     name = db.Column(db.String(100), nullable=False)
 
     # Relationships
@@ -20,6 +21,7 @@ class Service(db.Model, TimestampMixin, SoftDeleteMixin):
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     category_id = db.Column(db.Integer, db.ForeignKey("service_categories.id"), nullable=False, index=True)
     name = db.Column(db.String(150), nullable=False)
     price = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
@@ -40,6 +42,7 @@ class Product(db.Model, TimestampMixin, SoftDeleteMixin):
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     name = db.Column(db.String(150), nullable=False)
     category = db.Column(db.String(100), nullable=True)
     sku = db.Column(db.String(100), nullable=True, index=True)
@@ -61,6 +64,7 @@ class Supplier(db.Model, TimestampMixin, SoftDeleteMixin):
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     name = db.Column(db.String(150), nullable=False)
     contact_name = db.Column(db.String(150), nullable=True)
     phone = db.Column(db.String(50), nullable=False)

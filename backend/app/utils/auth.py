@@ -21,10 +21,13 @@ def get_tenant_query_with_deleted(model):
 
 def get_branch_query(model):
     """
-    Returns a query object for the model filtered by tenant_id and branch_id for BranchAdmin,
-    or just tenant_id for ParlourAdmin/SuperAdmin.
-    Branch-specific models will be filtered by branch_id when user is BranchAdmin.
-    Shared models (like Services, Products) will only be filtered by tenant_id.
+    Returns a query object for the model filtered by tenant_id and branch_id.
+    - If user is logged into a Branch (g.branch_id):
+        Filters strictly by model.branch_id == g.branch_id (or shared branch_id IS NULL for catalog/services).
+    - If user is Parlour Owner (g.parlour_id without g.branch_id):
+        - branch_id="all": Returns all records for tenant across main parlour & branches.
+        - branch_id=X (integer): Returns records for Branch X.
+        - default (no branch_id specified): Returns records for Main Parlour (branch_id IS NULL).
     """
     if not hasattr(g, "parlour_id"):
         raise RuntimeError("Attempted to run branch query outside a tenant-authenticated context.")
@@ -32,27 +35,57 @@ def get_branch_query(model):
     # Start with tenant filtering
     query = model.query.filter_by(tenant_id=g.parlour_id, is_deleted=False) if hasattr(model, "is_deleted") else model.query.filter_by(tenant_id=g.parlour_id)
     
-    # If BranchAdmin and model has branch_id, filter by branch_id
-    if g.role == "BranchAdmin" and hasattr(g, "branch_id") and g.branch_id and hasattr(model, "branch_id"):
-        query = query.filter_by(branch_id=g.branch_id)
-    
+    # If model has branch_id column:
+    if hasattr(model, "branch_id"):
+        if hasattr(g, "branch_id") and g.branch_id:
+            # For catalog items (Service, Product, ServiceCategory, MembershipPlan), allow branch_id == g.branch_id OR branch_id IS NULL
+            model_name = model.__name__ if hasattr(model, "__name__") else ""
+            if model_name in ("Service", "Product", "ServiceCategory", "MembershipPlan", "Supplier"):
+                query = query.filter((model.branch_id == g.branch_id) | (model.branch_id.is_(None)))
+            else:
+                query = query.filter(model.branch_id == g.branch_id)
+        else:
+            from flask import request
+            b_param = request.args.get("branch_id") if request else None
+            if b_param == "all":
+                pass
+            elif b_param and b_param not in ("main", "null", "0", "None"):
+                try:
+                    bid = int(b_param)
+                    query = query.filter(model.branch_id == bid)
+                except (ValueError, TypeError):
+                    query = query.filter(model.branch_id.is_(None))
+            else:
+                query = query.filter(model.branch_id.is_(None))
+
     return query
 
 def get_branch_query_with_deleted(model):
     """
-    Returns a query object for the model filtered by tenant_id and branch_id (for BranchAdmin),
-    including soft deleted records.
+    Returns a query object for the model filtered by tenant_id and branch_id, including soft deleted records.
     """
     if not hasattr(g, "parlour_id"):
         raise RuntimeError("Attempted to run branch query outside a tenant-authenticated context.")
     
-    # Start with tenant filtering
     query = model.query.filter_by(tenant_id=g.parlour_id)
     
-    # If BranchAdmin and model has branch_id, filter by branch_id
-    if g.role == "BranchAdmin" and hasattr(g, "branch_id") and g.branch_id and hasattr(model, "branch_id"):
-        query = query.filter_by(branch_id=g.branch_id)
-    
+    if hasattr(model, "branch_id"):
+        if hasattr(g, "branch_id") and g.branch_id:
+            query = query.filter(model.branch_id == g.branch_id)
+        else:
+            from flask import request
+            b_param = request.args.get("branch_id") if request else None
+            if b_param == "all":
+                pass
+            elif b_param and b_param not in ("main", "null", "0", "None"):
+                try:
+                    bid = int(b_param)
+                    query = query.filter(model.branch_id == bid)
+                except (ValueError, TypeError):
+                    query = query.filter(model.branch_id.is_(None))
+            else:
+                query = query.filter(model.branch_id.is_(None))
+
     return query
 
 def require_role(roles):
