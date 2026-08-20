@@ -46,15 +46,10 @@ import { useModalFocusTrap, advanceToNextRef, isElementNavigable } from "../util
 
 const SUPPORTED_PAYMENT_METHODS = [
   { id: "Cash", label: "Cash", icon: DollarSign, color: "text-emerald-600 bg-emerald-50" },
-  { id: "Credit Card", label: "Credit Card", icon: CreditCard, color: "text-blue-600 bg-blue-50" },
-  { id: "Debit Card", label: "Debit Card", icon: CreditCard, color: "text-indigo-600 bg-indigo-50" },
-  { id: "UPI", label: "UPI (Generic)", icon: Smartphone, color: "text-purple-600 bg-purple-50" },
+  { id: "Card", label: "Card", icon: CreditCard, color: "text-blue-600 bg-blue-50" },
   { id: "Google Pay", label: "Google Pay", icon: Smartphone, color: "text-amber-600 bg-amber-50" },
   { id: "PhonePe", label: "PhonePe", icon: Smartphone, color: "text-violet-600 bg-violet-50" },
   { id: "Paytm", label: "Paytm", icon: Smartphone, color: "text-sky-600 bg-sky-50" },
-  { id: "Amazon Pay", label: "Amazon Pay", icon: Smartphone, color: "text-orange-600 bg-orange-50" },
-  { id: "Bank Transfer", label: "Bank Transfer", icon: Landmark, color: "text-slate-700 bg-slate-100" },
-  { id: "Wallet", label: "Salon Wallet", icon: WalletIcon, color: "text-pink-600 bg-pink-50" },
 ];
 
 function Billing() {
@@ -72,6 +67,8 @@ function Billing() {
   const receiptModalRef = useRef(null);
   const settlementBtnRef = useRef(null);
   const submitInvoiceBtnRef = useRef(null);
+  const productSelectRef = useRef(null);
+  const addProductBtnRef = useRef(null);
 
   // Master Datasets
   const [categories, setCategories] = useState([]);
@@ -87,11 +84,6 @@ function Billing() {
   const [selectedServiceId, setSelectedServiceId] = useState("");
   const [activeMembership, setActiveMembership] = useState(null);
   const [useMembership, setUseMembership] = useState(true);
-  const [selectedProductId, setSelectedProductId] = useState("");
-
-  const productSelectRef = useRef(null);
-  const addProductBtnRef = useRef(null);
-
   // POS Cart State
   const [cart, setCart] = useState([]);
 
@@ -99,6 +91,149 @@ function Billing() {
   const [taxRate, setTaxRate] = useState(18.0);
   const [invoiceTaxAmount, setInvoiceTaxAmount] = useState(0);
   const [isTaxAmountOverridden, setIsTaxAmountOverridden] = useState(false);
+
+  // Customer Combobox State
+  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
+  const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
+  const [customerHighlightedIndex, setCustomerHighlightedIndex] = useState(0);
+
+  // Multi-Tab Billing State
+  const [billingTabs, setBillingTabs] = useState([
+    {
+      id: "tab-1",
+      name: "Bill #1",
+      selectedCustomerId: "walkin",
+      customerSearchQuery: "Walk-in Customer",
+      selectedGender: "Female",
+      selectedCategoryId: "",
+      selectedServiceId: "",
+      cart: [],
+      invoiceTaxAmount: 0,
+      isTaxAmountOverridden: false,
+      useMembership: true,
+      activeMembership: null,
+    },
+  ]);
+  const [activeTabId, setActiveTabId] = useState("tab-1");
+  const [tabCounter, setTabCounter] = useState(2);
+
+  // Helper to sync current active state into billingTabs array
+  const syncCurrentStateToTabs = (targetTabs = billingTabs, currentId = activeTabId) => {
+    return targetTabs.map((tab) => {
+      if (tab.id === currentId) {
+        return {
+          ...tab,
+          selectedCustomerId,
+          customerSearchQuery,
+          selectedGender,
+          selectedCategoryId,
+          selectedServiceId,
+          cart,
+          invoiceTaxAmount,
+          isTaxAmountOverridden,
+          useMembership,
+          activeMembership,
+        };
+      }
+      return tab;
+    });
+  };
+
+  // Switch to another bill tab
+  const handleSwitchTab = (targetTabId) => {
+    if (targetTabId === activeTabId && activeSubTab === "checkout") return;
+
+    // 1. Sync current active state to billingTabs
+    const updatedTabs = syncCurrentStateToTabs();
+    setBillingTabs(updatedTabs);
+
+    // 2. Find target tab
+    const targetTab = updatedTabs.find((t) => t.id === targetTabId);
+    if (targetTab) {
+      setSelectedCustomerId(targetTab.selectedCustomerId || "walkin");
+      setCustomerSearchQuery(targetTab.customerSearchQuery || "Walk-in Customer");
+      setSelectedGender(targetTab.selectedGender || "Female");
+      setSelectedCategoryId(targetTab.selectedCategoryId || "");
+      setSelectedServiceId(targetTab.selectedServiceId || "");
+      setCart(targetTab.cart || []);
+      setInvoiceTaxAmount(targetTab.invoiceTaxAmount || 0);
+      setIsTaxAmountOverridden(targetTab.isTaxAmountOverridden || false);
+      setUseMembership(targetTab.useMembership !== undefined ? targetTab.useMembership : true);
+      setActiveMembership(targetTab.activeMembership || null);
+
+      setActiveTabId(targetTabId);
+      setActiveSubTab("checkout");
+    }
+  };
+
+  // Create a new bill tab (+)
+  const handleCreateNewTab = () => {
+    // 1. Sync current active state
+    const updatedTabs = syncCurrentStateToTabs();
+    const newTabId = `tab-${Date.now()}`;
+    const newTabName = `Bill #${tabCounter}`;
+
+    const newTabObj = {
+      id: newTabId,
+      name: newTabName,
+      selectedCustomerId: "walkin",
+      customerSearchQuery: "Walk-in Customer",
+      selectedGender: "Female",
+      selectedCategoryId: categories.length > 0 ? categories[0].id.toString() : "",
+      selectedServiceId: "",
+      cart: [],
+      invoiceTaxAmount: 0,
+      isTaxAmountOverridden: false,
+      useMembership: true,
+      activeMembership: null,
+    };
+
+    setBillingTabs([...updatedTabs, newTabObj]);
+    setTabCounter((prev) => prev + 1);
+
+    // 2. Load clean new tab state
+    setSelectedCustomerId("walkin");
+    setCustomerSearchQuery("Walk-in Customer");
+    setSelectedGender("Female");
+    setSelectedCategoryId(categories.length > 0 ? categories[0].id.toString() : "");
+    setSelectedServiceId("");
+    setCart([]);
+    setInvoiceTaxAmount(0);
+    setIsTaxAmountOverridden(false);
+    setUseMembership(true);
+    setActiveMembership(null);
+
+    setActiveTabId(newTabId);
+    setActiveSubTab("checkout");
+  };
+
+  // Close a bill tab
+  const handleCloseTab = (tabIdToClose) => {
+    if (billingTabs.length <= 1) return;
+
+    const remainingTabs = billingTabs.filter((t) => t.id !== tabIdToClose);
+    setBillingTabs(remainingTabs);
+
+    if (activeTabId === tabIdToClose) {
+      const nextTab = remainingTabs[remainingTabs.length - 1];
+
+      setSelectedCustomerId(nextTab.selectedCustomerId || "walkin");
+      setCustomerSearchQuery(nextTab.customerSearchQuery || "Walk-in Customer");
+      setSelectedGender(nextTab.selectedGender || "Female");
+      setSelectedCategoryId(nextTab.selectedCategoryId || "");
+      setSelectedServiceId(nextTab.selectedServiceId || "");
+      setCart(nextTab.cart || []);
+      setInvoiceTaxAmount(nextTab.invoiceTaxAmount || 0);
+      setIsTaxAmountOverridden(nextTab.isTaxAmountOverridden || false);
+      setUseMembership(nextTab.useMembership !== undefined ? nextTab.useMembership : true);
+      setActiveMembership(nextTab.activeMembership || null);
+
+      setActiveTabId(nextTab.id);
+      setActiveSubTab("checkout");
+    }
+  };
+
+
 
   // Payment Settlement State
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -179,10 +314,7 @@ function Billing() {
   const [newMembershipSaving, setNewMembershipSaving] = useState(false);
   const newMembershipModalRef = useRef(null);
 
-  // Customer Combobox State
-  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
-  const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
-  const [customerHighlightedIndex, setCustomerHighlightedIndex] = useState(0);
+
 
   // Customer History Modal State
   const [showCustomerHistoryModal, setShowCustomerHistoryModal] = useState(false);
@@ -193,6 +325,8 @@ function Billing() {
   const [readOnlyInvoiceDetail, setReadOnlyInvoiceDetail] = useState(null);
 
   const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [modalProductId, setModalProductId] = useState("");
+  const [modalProductQty, setModalProductQty] = useState(1);
   const [productSearchQuery, setProductSearchQuery] = useState("");
   const [selectedProductIds, setSelectedProductIds] = useState([]);
   const [productQuantities, setProductQuantities] = useState({});
@@ -204,6 +338,10 @@ function Billing() {
   const customerHistoryModalRef = useRef(null);
   const addProductModalRef = useRef(null);
   const productDropdownRef = useRef(null);
+  const modalProductSelectRef = useRef(null);
+  const modalProductQtyRef = useRef(null);
+  const modalAddProductBtnRef = useRef(null);
+  const modalCancelBtnRef = useRef(null);
 
   const quickFirstNameRef = useRef(null);
   const quickLastNameRef = useRef(null);
@@ -688,6 +826,19 @@ function Billing() {
       });
   }, []);
 
+  // Auto-focus & select default product when Add Product modal opens
+  useEffect(() => {
+    if (showAddProductModal) {
+      setModalProductId("");
+      setModalProductQty(1);
+      setTimeout(() => {
+        if (modalProductSelectRef.current) {
+          modalProductSelectRef.current.focus();
+        }
+      }, 100);
+    }
+  }, [showAddProductModal]);
+
   // Fetch Category Services
   useEffect(() => {
     if (!selectedCategoryId) {
@@ -748,12 +899,48 @@ function Billing() {
       .catch((err) => console.error("Failed to load customer membership detail:", err));
   };
 
+  // Helper to determine discount percentage for a service given active customer membership
+  const getMembershipDiscountForService = (serviceObj, activeMem) => {
+    if (!useMembership || !activeMem || activeMem.isDayRestricted) return 0;
+    const planId = activeMem.membership_plan_id || activeMem.plan_id;
+    if (!planId) return 0;
+
+    const discounts = serviceObj?.membership_discounts || [];
+    const match = discounts.find((d) => String(d.plan_id) === String(planId));
+    if (!match) return 0;
+
+    if (match.percentage !== undefined && match.percentage !== null && parseFloat(match.percentage) > 0) {
+      return parseFloat(match.percentage);
+    }
+    if (match.amount !== undefined && match.amount !== null && parseFloat(match.amount) > 0 && serviceObj.price) {
+      return (parseFloat(match.amount) / parseFloat(serviceObj.price)) * 100;
+    }
+    return 0;
+  };
+
+  // Auto-recalculate cart service item discounts when useMembership, activeMembership, or services change
+  useEffect(() => {
+    setCart((prevCart) =>
+      prevCart.map((item) => {
+        if (item.type !== "service") return item;
+        const svcObj = services.find((s) => s.id === item.item_id);
+        const calcDiscount = svcObj ? getMembershipDiscountForService(svcObj, activeMembership) : 0;
+        return {
+          ...item,
+          discount_percent: calcDiscount,
+        };
+      })
+    );
+  }, [useMembership, activeMembership, services]);
+
   const handleAddServiceToCart = (serviceIdToUse) => {
     const targetId = serviceIdToUse || selectedServiceId;
     if (!targetId) return;
 
     const serviceObj = services.find((s) => s.id === parseInt(targetId));
     if (!serviceObj) return;
+
+    const initialDiscount = getMembershipDiscountForService(serviceObj, activeMembership);
 
     setCart((prevCart) => {
       const existingIndex = prevCart.findIndex(
@@ -766,6 +953,7 @@ function Billing() {
         updated[existingIndex] = {
           ...updated[existingIndex],
           quantity: updated[existingIndex].quantity + 1,
+          discount_percent: initialDiscount,
         };
         return updated;
       }
@@ -777,7 +965,7 @@ function Billing() {
         name: serviceObj.name,
         gross_amount: parseFloat(serviceObj.price),
         quantity: 1,
-        discount_percent: 0,
+        discount_percent: initialDiscount,
         tax_rate: taxRate,
         employee_ids: [],
       };
@@ -1033,24 +1221,66 @@ function Billing() {
         alert("At least one payment method must remain selected.");
         return;
       }
-      setSelectedPaymentMethods(selectedPaymentMethods.filter((m) => m !== methodId));
-      const updated = { ...paymentAmounts };
-      delete updated[methodId];
-      setPaymentAmounts(updated);
+      const updatedMethods = selectedPaymentMethods.filter((m) => m !== methodId);
+      setSelectedPaymentMethods(updatedMethods);
+      const updatedAmounts = { ...paymentAmounts };
+      delete updatedAmounts[methodId];
+
+      if (updatedMethods.length === 1) {
+        updatedAmounts[updatedMethods[0]] = netPayable.toFixed(2);
+      }
+      setPaymentAmounts(updatedAmounts);
     } else {
       const updatedMethods = [...selectedPaymentMethods, methodId];
       setSelectedPaymentMethods(updatedMethods);
-      const currentAllocated = Object.values(paymentAmounts).reduce(
-        (sum, v) => sum + (parseFloat(v) || 0),
-        0
-      );
-      const remaining = Math.max(0, netPayable - currentAllocated);
-      setPaymentAmounts({ ...paymentAmounts, [methodId]: remaining.toFixed(2) });
+      
+      if (updatedMethods.length === 2) {
+        const firstMethod = updatedMethods[0];
+        const firstAmt = parseFloat(paymentAmounts[firstMethod]) || netPayable;
+        const remaining = Math.max(0, netPayable - firstAmt);
+        setPaymentAmounts({
+          ...paymentAmounts,
+          [firstMethod]: firstAmt.toFixed(2),
+          [methodId]: remaining.toFixed(2),
+        });
+      } else {
+        const currentAllocated = Object.values(paymentAmounts).reduce(
+          (sum, v) => sum + (parseFloat(v) || 0),
+          0
+        );
+        const remaining = Math.max(0, netPayable - currentAllocated);
+        setPaymentAmounts({ ...paymentAmounts, [methodId]: remaining.toFixed(2) });
+      }
     }
   };
 
-  const handleUpdatePaymentAmount = (methodId, val) => {
-    setPaymentAmounts({ ...paymentAmounts, [methodId]: val });
+  const handleUpdatePaymentAmount = (changedMethodId, val) => {
+    const newAmounts = { ...paymentAmounts, [changedMethodId]: val };
+    const numVal = parseFloat(val) || 0;
+
+    if (selectedPaymentMethods.length === 2) {
+      const firstMethod = selectedPaymentMethods[0];
+      const secondMethod = selectedPaymentMethods[1];
+
+      if (changedMethodId === secondMethod) {
+        const remainingForFirst = Math.max(0, netPayable - numVal);
+        newAmounts[firstMethod] = remainingForFirst.toFixed(2);
+      } else if (changedMethodId === firstMethod) {
+        const remainingForSecond = Math.max(0, netPayable - numVal);
+        newAmounts[secondMethod] = remainingForSecond.toFixed(2);
+      }
+    } else if (selectedPaymentMethods.length > 2) {
+      const otherMethods = selectedPaymentMethods.filter((m) => m !== changedMethodId);
+      const targetMethod = otherMethods[otherMethods.length - 1];
+      const sumOthers = selectedPaymentMethods
+        .filter((m) => m !== targetMethod)
+        .reduce((sum, m) => sum + (parseFloat(m === changedMethodId ? val : newAmounts[m]) || 0), 0);
+
+      const remainingForTarget = Math.max(0, netPayable - sumOthers);
+      newAmounts[targetMethod] = remainingForTarget.toFixed(2);
+    }
+
+    setPaymentAmounts(newAmounts);
   };
 
   const totalAllocatedPayment = Object.values(paymentAmounts).reduce(
@@ -1320,7 +1550,7 @@ function Billing() {
   );
 
   return (
-    <div className="space-y-6 pb-12 font-sans text-slate-800">
+    <div className="space-y-3 pb-12 font-sans text-slate-800">
       {/* Toast Notification */}
       {actionNotice && (
         <div className="fixed top-5 right-5 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl text-xs font-bold z-50 flex items-center space-x-2 animate-bounce">
@@ -1329,20 +1559,68 @@ function Billing() {
         </div>
       )}
 
-      {/* Main Mode Navigation Tabs */}
-      <div className="flex justify-between items-center bg-surface border border-border-soft p-4 rounded-2xl shadow-xs">
-        <div className="flex space-x-2">
+      {/* Main Mode Navigation Tabs (Multi-Tab POS Billing) */}
+      <div className="flex justify-between items-center bg-surface border border-border-soft p-2.5 rounded-2xl shadow-xs overflow-x-auto">
+        <div className="flex items-center space-x-2">
+          {/* Active Bill Tabs */}
+          {billingTabs.map((tab) => {
+            const isTabActive = activeSubTab === "checkout" && activeTabId === tab.id;
+            const tabCartCount = tab.id === activeTabId ? cart.length : (tab.cart ? tab.cart.length : 0);
+
+            return (
+              <div key={tab.id} className="flex items-center space-x-1">
+                <button
+                  onClick={() => handleSwitchTab(tab.id)}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center space-x-2 ${
+                    isTabActive
+                      ? "bg-primary text-white shadow-md shadow-pink-500/20"
+                      : "bg-background text-slate-700 border border-border-soft hover:bg-slate-100"
+                  }`}
+                >
+                  <ShoppingCart className="w-3.5 h-3.5" />
+                  <span>{tab.name}</span>
+                  {tabCartCount > 0 && (
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                        isTabActive ? "bg-white text-primary" : "bg-pink-100 text-pink-700"
+                      }`}
+                    >
+                      {tabCartCount}
+                    </span>
+                  )}
+                </button>
+
+                {billingTabs.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCloseTab(tab.id);
+                    }}
+                    className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                    title="Close Bill Tab"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Plus (+) Button to Open Another Billing Page Tab */}
           <button
-            onClick={() => setActiveSubTab("checkout")}
-            className={`px-5 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center space-x-2 ${
-              activeSubTab === "checkout"
-                ? "bg-primary text-white shadow-md shadow-pink-500/20"
-                : "bg-background text-slate-700 border border-border-soft hover:bg-slate-100"
-            }`}
+            type="button"
+            onClick={handleCreateNewTab}
+            className="p-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-extrabold transition flex items-center space-x-1 shadow-xs ml-1"
+            title="Open New Bill Tab (+)"
           >
-            <ShoppingCart className="w-4 h-4" />
-            <span>POS Billing & Service Invoicing</span>
+            <Plus className="w-4 h-4" />
+            <span className="text-xs">New Bill</span>
           </button>
+
+          <div className="h-6 w-px bg-border-soft mx-2" />
+
+          {/* Billing History Tab */}
           <button
             onClick={() => setActiveSubTab("history")}
             className={`px-5 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center space-x-2 ${
@@ -1368,9 +1646,9 @@ function Billing() {
 
       {/* MODE 1: CHECKOUT SCREEN */}
       {activeSubTab === "checkout" && (
-        <div className="space-y-6">
+        <div className="space-y-3">
           {/* Step 1 & 2: Customer & Gender Selection */}
-          <div className="bg-surface border border-border-soft p-6 rounded-2xl shadow-xs space-y-4">
+          <div className="bg-surface border border-border-soft p-4 rounded-2xl shadow-xs space-y-3">
             <div className="flex items-center space-x-2 text-xs font-extrabold text-primary uppercase tracking-wider">
               <User className="w-4 h-4 text-primary" />
               <span>Step 1 & 2: Customer & Gender Selection</span>
@@ -1570,7 +1848,7 @@ function Billing() {
                               >
                                 <Plus className="w-3.5 h-3.5" />
                                 <span>
-                                  + Add New Customer {customerSearchQuery && customerSearchQuery !== "Walk-in Customer" ? `"${customerSearchQuery}"` : ""}
+                                  Add New Customer {customerSearchQuery && customerSearchQuery !== "Walk-in Customer" ? `"${customerSearchQuery}"` : ""}
                                 </span>
                               </button>
                             );
@@ -1658,8 +1936,8 @@ function Billing() {
                         </span>
                       )}
                     </div>
-                    <p className="text-[10px] text-slate-500">
-                      Benefits: {activeMembership.service_discount_percentage}% Service Discount • Expires: {activeMembership.expiry_date}
+                    <p className="text-[10px] text-slate-500 font-medium">
+                      Benefits: {activeMembership.service_discount_percentage && parseFloat(activeMembership.service_discount_percentage) > 0 ? `${activeMembership.service_discount_percentage}% Service Discount` : `${activeMembership.plan_name || 'Membership'} Discounts Applicable`} • Expires: {activeMembership.expiry_date}
                     </p>
                     {activeMembership.isDayRestricted && (
                       <p className="text-[10px] text-red-500 font-medium mt-0.5">
@@ -1700,7 +1978,7 @@ function Billing() {
           </div>
 
           {/* Step 3 & 4: Category & Service Selection */}
-          <div className="bg-surface border border-border-soft p-6 rounded-2xl shadow-xs space-y-4">
+          <div className="bg-surface border border-border-soft p-4 rounded-2xl shadow-xs space-y-3">
             <div className="flex items-center space-x-2 text-xs font-extrabold text-primary uppercase tracking-wider">
               <Scissors className="w-4 h-4 text-primary" />
               <span>Step 3 & 4: Category & Service Selection</span>
@@ -1815,7 +2093,7 @@ function Billing() {
 
           {/* Step 5: Billing Line Items Table */}
           <div className="bg-surface border border-border-soft rounded-2xl shadow-xs overflow-hidden">
-            <div className="p-6 border-b border-border-soft flex justify-between items-center">
+            <div className="py-3 px-4 border-b border-border-soft flex justify-between items-center">
               <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center space-x-2">
                 <FileText className="w-4 h-4 text-primary" />
                 <span>Billing Line Items Table (Services & Products)</span>
@@ -1952,57 +2230,53 @@ function Billing() {
                             {currencySymbol} {rowNet.toFixed(2)}
                           </td>
 
-                          {/* Employee Select Dropdown + Selected Employee Name Tags below */}
+                          {/* Employee Select Dropdown + Selected Employee Name Tags below (For both Services & Products) */}
                           <td className="px-4 py-3">
-                            {item.type === "product" ? (
-                              <span className="text-slate-400 font-bold italic text-center block">—</span>
-                            ) : (
-                              <div className="space-y-1.5 min-w-[180px]">
-                                <select
-                                  data-row={idx}
-                                  data-field="employee"
-                                  value=""
-                                  onChange={(e) => {
-                                    if (e.target.value) {
-                                      handleSelectEmployee(idx, e.target.value);
-                                    }
-                                  }}
-                                  onKeyDown={(e) => handleLineItemKeyDown(e, idx, "employee")}
-                                  className="w-full bg-background border border-border-soft px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
-                                >
-                                  <option value="" disabled hidden>Choose Employee</option>
-                                  {employees.map((emp) => (
-                                    <option key={emp.id} value={emp.id}>
-                                      {emp.first_name} {emp.last_name || ""}
-                                    </option>
-                                  ))}
-                                </select>
+                            <div className="space-y-1.5 min-w-[180px]">
+                              <select
+                                data-row={idx}
+                                data-field="employee"
+                                value=""
+                                onChange={(e) => {
+                                  if (e.target.value) {
+                                    handleSelectEmployee(idx, e.target.value);
+                                  }
+                                }}
+                                onKeyDown={(e) => handleLineItemKeyDown(e, idx, "employee")}
+                                className="w-full bg-background border border-border-soft px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
+                              >
+                                <option value="" disabled hidden>Choose Employee</option>
+                                {employees.map((emp) => (
+                                  <option key={emp.id} value={emp.id}>
+                                    {emp.first_name} {emp.last_name || ""}
+                                  </option>
+                                ))}
+                              </select>
 
-                                {/* Selected Employee Name Chips */}
-                                <div className="flex flex-wrap gap-1">
-                                  {(item.employee_ids || []).map((empId) => {
-                                    const empObj = employees.find((e) => e.id === empId);
-                                    if (!empObj) return null;
-                                    return (
-                                      <span
-                                        key={empId}
-                                        className="inline-flex items-center space-x-1 text-[11px] font-bold bg-pink-50 text-pink-700 border border-pink-200 px-2 py-0.5 rounded-full"
+                              {/* Selected Employee Name Chips */}
+                              <div className="flex flex-wrap gap-1">
+                                {(item.employee_ids || []).map((empId) => {
+                                  const empObj = employees.find((e) => e.id === empId);
+                                  if (!empObj) return null;
+                                  return (
+                                    <span
+                                      key={empId}
+                                      className="inline-flex items-center space-x-1 text-[11px] font-bold bg-pink-50 text-pink-700 border border-pink-200 px-2 py-0.5 rounded-full"
+                                    >
+                                      <span>{empObj.first_name} {empObj.last_name || ""}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveEmployeeTag(idx, empId)}
+                                        className="text-pink-500 hover:text-pink-900 ml-1 font-black"
+                                        title="Remove employee"
                                       >
-                                        <span>{empObj.first_name} {empObj.last_name || ""}</span>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleRemoveEmployeeTag(idx, empId)}
-                                          className="text-pink-500 hover:text-pink-900 ml-1 font-black"
-                                          title="Remove employee"
-                                        >
-                                          ×
-                                        </button>
-                                      </span>
-                                    );
-                                  })}
-                                </div>
+                                        ×
+                                      </button>
+                                    </span>
+                                  );
+                                })}
                               </div>
-                            )}
+                            </div>
                           </td>
 
                           <td className="px-4 py-3 text-right">
@@ -2252,7 +2526,7 @@ function Billing() {
                         key={pm.id}
                         type="button"
                         onClick={() => handleTogglePaymentMethod(pm.id)}
-                        className={`p-3 rounded-xl border text-left flex items-center justify-between transition ${
+                        className={`p-3 rounded-xl border text-left flex items-center justify-between transition focus:outline-none focus:border-primary focus:ring-2 focus:ring-pink-500/20 ${
                           isSelected
                             ? "border-primary bg-primary-light/50 ring-1 ring-primary"
                             : "border-border-soft bg-background hover:bg-slate-50"
@@ -2295,7 +2569,7 @@ function Billing() {
                         }
                       }}
                       placeholder="0.00"
-                      className="w-32 bg-white border border-border-soft px-3 py-1.5 rounded-lg text-xs font-extrabold text-slate-900 text-right focus:border-primary focus:outline-none"
+                      className="w-32 bg-white border border-border-soft px-3 py-1.5 rounded-lg text-xs font-extrabold text-slate-900 text-right focus:outline-none focus:border-primary focus:ring-2 focus:ring-pink-500/20"
                     />
                   </div>
                 ))}
@@ -3338,12 +3612,12 @@ function Billing() {
         </div>
       )}
 
-      {/* ADD PRODUCT MODAL */}
+      {/* ADD SALON RETAIL PRODUCT MODAL */}
       {showAddProductModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 animate-fade-in">
           <div
             ref={addProductModalRef}
-            className="bg-surface border border-border-soft rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5 animate-scaleUp text-xs"
+            className="bg-surface max-w-xl w-full rounded-2xl shadow-2xl border border-border-soft overflow-hidden p-6 space-y-5"
           >
             <div className="flex justify-between items-center border-b border-border-soft pb-3">
               <div className="flex items-center space-x-2">
@@ -3360,154 +3634,129 @@ function Billing() {
             </div>
 
             <div className="space-y-4">
-              {/* Searchable Multi-Select Product Dropdown */}
-              <div className="relative" ref={productDropdownRef}>
+              {/* Single Product Dropdown */}
+              <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Product *</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Search or Select Product ▼"
-                    value={getProductInputValue()}
-                    onFocus={() => setIsProductDropdownOpen(true)}
-                    onClick={() => setIsProductDropdownOpen(true)}
-                    onChange={(e) => {
-                      setProductSearchQuery(e.target.value);
-                      setIsProductDropdownOpen(true);
-                    }}
-                    className="w-full bg-background border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary pr-10 truncate cursor-pointer"
-                  />
-                  <div
-                    onClick={() => setIsProductDropdownOpen((prev) => !prev)}
-                    className="absolute right-2.5 top-2.5 p-0.5 text-slate-400 hover:text-slate-600 cursor-pointer"
-                  >
-                    <ChevronDown className="w-4 h-4" />
-                  </div>
-
-                  {/* Multi-select checklist dropdown */}
-                  {isProductDropdownOpen && (
-                    <div className="absolute left-0 right-0 top-full mt-1 bg-surface border border-border-soft rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-border-soft p-1 z-30 space-y-0.5">
-                      {products.filter((p) => p.name?.toLowerCase().includes(productSearchQuery.toLowerCase())).length === 0 ? (
-                        <div className="p-3 text-center text-slate-400 font-medium">No matching products found</div>
-                      ) : (
-                        products
-                          .filter((p) => p.name?.toLowerCase().includes(productSearchQuery.toLowerCase()))
-                          .map((prod) => {
-                            const isChecked = selectedProductIds.includes(prod.id);
-                            const isOutOfStock = prod.stock_quantity !== undefined && prod.stock_quantity <= 0;
-
-                            return (
-                              <label
-                                key={prod.id}
-                                className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition text-xs ${
-                                  isOutOfStock
-                                    ? "opacity-50 cursor-not-allowed bg-slate-50 text-slate-400"
-                                    : isChecked
-                                    ? "bg-emerald-50 text-emerald-900 font-bold"
-                                    : "hover:bg-background text-slate-800"
-                                }`}
-                              >
-                                <div className="flex items-center space-x-2.5 truncate">
-                                  <input
-                                    type="checkbox"
-                                    disabled={isOutOfStock}
-                                    checked={isChecked}
-                                    onChange={() => {
-                                      if (isOutOfStock) return;
-                                      if (isChecked) {
-                                        setSelectedProductIds((prev) => prev.filter((id) => id !== prod.id));
-                                      } else {
-                                        setSelectedProductIds((prev) => [...prev, prod.id]);
-                                        setProductQuantities((prev) => ({ ...prev, [prod.id]: prev[prod.id] || 1 }));
-                                      }
-                                    }}
-                                    className="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4"
-                                  />
-                                  <span className="truncate">{prod.name}</span>
-                                </div>
-                                <div className="text-[11px] text-right font-medium whitespace-nowrap ml-2">
-                                  {prod.mrp && parseFloat(prod.mrp) > 0 ? `MRP: ${currencySymbol}${parseFloat(prod.mrp).toFixed(2)} | ` : ""}
-                                  Selling: {currencySymbol}{parseFloat(prod.selling_price || prod.price || 0).toFixed(2)}{" "}
-                                  <span className="text-slate-400 font-normal">
-                                    (Stock: {prod.stock_quantity !== undefined ? prod.stock_quantity : "Avail"})
-                                  </span>
-                                </div>
-                              </label>
-                            );
-                          })
-                      )}
-                    </div>
-                  )}
-                </div>
+                <select
+                  ref={modalProductSelectRef}
+                  value={modalProductId}
+                  onChange={(e) => setModalProductId(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === "ArrowRight") {
+                      e.preventDefault();
+                      if (modalProductQtyRef.current) {
+                        modalProductQtyRef.current.focus();
+                        if (typeof modalProductQtyRef.current.select === "function") {
+                          modalProductQtyRef.current.select();
+                        }
+                      }
+                    } else if (e.key === "Escape") {
+                      setShowAddProductModal(false);
+                    }
+                  }}
+                  className="w-full bg-background border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
+                >
+                  <option value="">-- Choose Product --</option>
+                  {products.map((prod) => (
+                    <option key={prod.id} value={prod.id}>
+                      {prod.name} - {currencySymbol} {parseFloat(prod.selling_price || prod.price || 0).toFixed(2)} (Stock: {prod.stock_quantity !== undefined ? prod.stock_quantity : "Avail"})
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              {/* Quantity Field */}
-              {selectedProductIds.length > 0 ? (
-                <div className="space-y-2 pt-2 border-t border-border-soft">
-                  <label className="block text-xs font-bold text-slate-700">Quantity *</label>
-                  <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
-                    {selectedProductIds.map((pId) => {
-                      const prod = products.find((p) => p.id === pId);
-                      if (!prod) return null;
-                      const currentQty = productQuantities[pId] || 1;
-
-                      return (
-                        <div key={pId} className="flex justify-between items-center bg-background border border-border-soft p-2.5 rounded-xl">
-                          <span className="font-bold text-slate-900 truncate max-w-[180px]">{prod.name}</span>
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="number"
-                              min="1"
-                              value={currentQty}
-                              onFocus={(e) => e.target.select()}
-                              onChange={(e) => {
-                                const val = Math.max(1, parseInt(e.target.value, 10) || 1);
-                                setProductQuantities((prev) => ({ ...prev, [pId]: val }));
-                              }}
-                              className="w-16 bg-surface border border-border-soft px-2 py-1 rounded-lg text-xs font-bold text-slate-900 text-center focus:border-primary focus:outline-none"
-                            />
-                            <span className="text-[10px] font-medium text-slate-400">/ Stock: {prod.stock_quantity}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Quantity *</label>
-                  <input
-                    type="number"
-                    min="1"
-                    defaultValue={1}
-                    disabled
-                    className="w-full bg-background border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-400 cursor-not-allowed"
-                  />
-                </div>
-              )}
+              {/* Quantity Field (Always Visible Below Product Field) */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Quantity *</label>
+                <input
+                  ref={modalProductQtyRef}
+                  type="number"
+                  min="1"
+                  value={modalProductQty}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => setModalProductQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === "ArrowRight") {
+                      e.preventDefault();
+                      if (modalAddProductBtnRef.current) modalAddProductBtnRef.current.focus();
+                    } else if (e.key === "ArrowLeft") {
+                      e.preventDefault();
+                      if (modalProductSelectRef.current) modalProductSelectRef.current.focus();
+                    } else if (e.key === "Escape") {
+                      setShowAddProductModal(false);
+                    }
+                  }}
+                  className="w-full bg-background border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-primary"
+                />
+              </div>
             </div>
 
+            {/* Modal Action Buttons */}
             <div className="pt-3 border-t border-border-soft flex justify-end space-x-3">
               <button
+                ref={modalCancelBtnRef}
                 type="button"
                 onClick={() => setShowAddProductModal(false)}
-                className="px-4 py-2 bg-background hover:bg-slate-100 border border-border-soft rounded-xl font-bold text-slate-700"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === "Space") {
+                    e.preventDefault();
+                    setShowAddProductModal(false);
+                  } else if (e.key === "ArrowLeft") {
+                    e.preventDefault();
+                    if (modalProductQtyRef.current) {
+                      modalProductQtyRef.current.focus();
+                      if (typeof modalProductQtyRef.current.select === "function") modalProductQtyRef.current.select();
+                    }
+                  } else if (e.key === "ArrowRight") {
+                    e.preventDefault();
+                    if (modalAddProductBtnRef.current) modalAddProductBtnRef.current.focus();
+                  } else if (e.key === "Escape") {
+                    setShowAddProductModal(false);
+                  }
+                }}
+                className="px-4 py-2 bg-background hover:bg-slate-100 border border-border-soft rounded-xl font-bold text-slate-700 focus:outline-none focus:border-primary"
               >
                 Cancel
               </button>
+
               <button
+                ref={modalAddProductBtnRef}
                 type="button"
-                disabled={selectedProductIds.length === 0}
+                disabled={!modalProductId}
                 onClick={() => {
-                  if (selectedProductIds.length === 0) return;
-
-                  selectedProductIds.forEach((pId) => {
-                    const qty = productQuantities[pId] || 1;
-                    handleAddProductToCart(pId, qty);
-                  });
-
+                  if (!modalProductId) return;
+                  handleAddProductToCart(modalProductId, modalProductQty);
                   setShowAddProductModal(false);
+                  setTimeout(() => {
+                    const firstRowGross = document.querySelector('[data-row="0"][data-field="gross_amount"]');
+                    if (firstRowGross) {
+                      firstRowGross.focus();
+                      if (typeof firstRowGross.select === "function") firstRowGross.select();
+                    }
+                  }, 50);
                 }}
-                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-extrabold shadow-md shadow-emerald-600/20 disabled:opacity-50"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === "Space") {
+                    e.preventDefault();
+                    if (modalProductId) {
+                      handleAddProductToCart(modalProductId, modalProductQty);
+                      setShowAddProductModal(false);
+                      setTimeout(() => {
+                        const firstRowGross = document.querySelector('[data-row="0"][data-field="gross_amount"]');
+                        if (firstRowGross) {
+                          firstRowGross.focus();
+                          if (typeof firstRowGross.select === "function") firstRowGross.select();
+                        }
+                      }, 50);
+                    }
+                  } else if (e.key === "ArrowLeft") {
+                    e.preventDefault();
+                    if (modalCancelBtnRef.current) modalCancelBtnRef.current.focus();
+                  } else if (e.key === "Escape") {
+                    setShowAddProductModal(false);
+                  }
+                }}
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-extrabold shadow-md shadow-emerald-600/20 disabled:opacity-50 focus:outline-none focus:border-primary"
               >
                 Add Product
               </button>

@@ -554,6 +554,8 @@ def get_customer_history(customer_id):
 
         memberships_data.append({
             "id": m.id,
+            "membership_plan_id": m.membership_plan_id,
+            "plan_id": m.membership_plan_id,
             "plan_name": plan_name,
             "start_date": m.created_at.strftime("%Y-%m-%d"),
             "expiry_date": m.expires_at.strftime("%Y-%m-%d") if m.expires_at else "N/A",

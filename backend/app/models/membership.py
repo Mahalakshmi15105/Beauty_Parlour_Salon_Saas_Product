@@ -31,6 +31,8 @@ class MembershipPlanService(db.Model, TimestampMixin):
     tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
     membership_plan_id = db.Column(db.Integer, db.ForeignKey("membership_plans.id"), nullable=False, index=True)
     service_id = db.Column(db.Integer, db.ForeignKey("services.id"), nullable=False, index=True)
+    discount_percentage = db.Column(db.Numeric(5, 2), nullable=True, default=0.00)
+    discount_amount = db.Column(db.Numeric(10, 2), nullable=True, default=0.00)
 
     # Relationships
     plan = db.relationship("MembershipPlan", back_populates="eligible_services")
@@ -50,6 +52,7 @@ class CustomerMembership(db.Model, TimestampMixin):
     membership_plan_id = db.Column(db.Integer, db.ForeignKey("membership_plans.id"), nullable=False, index=True)
     expires_at = db.Column(db.DateTime, nullable=False)
     status = db.Column(db.String(50), nullable=False, default="active")  # active, expired, cancelled, suspended
+    renew_count = db.Column(db.Integer, nullable=False, default=0)
 
     # Relationships
     customer = db.relationship("Customer", back_populates="memberships")

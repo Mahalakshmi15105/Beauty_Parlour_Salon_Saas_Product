@@ -333,9 +333,9 @@ def assign_membership():
             status_code=400
         )
 
-    # Verify customer and plan
-    customer = get_tenant_query(Customer).filter_by(id=customer_id).first()
-    plan = get_tenant_query(MembershipPlan).filter_by(id=plan_id, status="active").first()
+    # Verify customer and plan across tenant context
+    customer = Customer.query.filter_by(id=customer_id, tenant_id=g.parlour_id, is_deleted=False).first()
+    plan = MembershipPlan.query.filter_by(id=plan_id, tenant_id=g.parlour_id, is_deleted=False).first()
 
     if not customer or not plan:
         return error_response(
@@ -344,8 +344,17 @@ def assign_membership():
             status_code=400
         )
 
-    # Auto calculate expiry date
-    expiry_date = datetime.now() + timedelta(days=plan.duration_days)
+    # Auto calculate expiry date with safe fallback for duration_days
+    days = getattr(plan, 'duration_days', None)
+    if not days or days <= 0:
+        duration_cnt = getattr(plan, 'duration_count', 1) or 1
+        validity_p = getattr(plan, 'validity_plan', 'Yearly') or 'Yearly'
+        if str(validity_p).lower() == 'monthly':
+            days = duration_cnt * 30
+        else:
+            days = duration_cnt * 365
+
+    expiry_date = datetime.now() + timedelta(days=days)
 
     try:
         # Create linkage
@@ -367,7 +376,7 @@ def assign_membership():
                 continue
             
             # Verify service
-            svc = get_tenant_query(Service).filter_by(id=svc_id).first()
+            svc = Service.query.filter_by(id=svc_id, tenant_id=g.parlour_id).first()
             if not svc:
                 raise ValueError(f"Service ID {svc_id} is invalid.")
 
@@ -386,7 +395,7 @@ def assign_membership():
         logger.error(f"Error assigning membership: {str(e)}")
         return error_response(
             error_code="TRANSACTION_FAILED",
-            message=str(e) if isinstance(e, ValueError) else "Failed to assign membership.",
+            message=str(e) if isinstance(e, ValueError) else f"Failed to assign membership: {str(e)}",
             status_code=400 if isinstance(e, ValueError) else 500
         )
 
@@ -408,10 +417,11 @@ def renew_membership(cm_id):
     if not plan:
         raise ValueError("Membership Plan associated is invalid.")
 
-    # Extend expiration
+    # Extend expiration & increment renewal count
     base_date = max(datetime.now(), cm.expires_at)
     cm.expires_at = base_date + timedelta(days=plan.duration_days)
     cm.status = "active"
+    cm.renew_count = (getattr(cm, 'renew_count', 0) or 0) + 1
 
     # Reset benefits
     try:
@@ -550,6 +560,7 @@ def get_all_memberships():
             "plan_name": cm.plan.name if cm.plan else "Default Membership",
             "expires_at": cm.expires_at.isoformat(),
             "status": cm.status,
+            "renew_count": getattr(cm, "renew_count", 0) or 0,
             "benefits": benefits
         })
     return success_response(results)

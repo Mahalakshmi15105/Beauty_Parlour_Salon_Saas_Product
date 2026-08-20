@@ -524,7 +524,7 @@ function CustomerMemberships() {
                             onClick={() => handleRenew(m.id)}
                             className="text-text-primary hover:underline font-semibold"
                           >
-                            Renew
+                            Renew ({m.renew_count || 0})
                           </button>
                           <button
                             onClick={() => handleCancel(m.id)}
@@ -653,41 +653,6 @@ function CustomerMemberships() {
                     </option>
                   ))}
                 </select>
-              </div>
-
-              {/* Free Service Perks Entry */}
-              <div className="space-y-2 border-t border-border-soft pt-3">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-semibold text-text-secondary">Free Service Perks</label>
-                  <button
-                    type="button"
-                    onClick={() => handleAddBenefitRow(false)}
-                    className="text-xs text-primary font-medium hover:underline"
-                  >
-                    + Add Free Service
-                  </button>
-                </div>
-                {(assignForm.benefits || []).map((row, idx) => (
-                  <div key={idx} className="flex space-x-2 items-center">
-                    <select
-                      value={row.service_id}
-                      onChange={(e) => handleBenefitChange(idx, "service_id", e.target.value, false)}
-                      className="flex-1 bg-background border border-border-soft px-2 py-1.5 rounded text-xs focus:outline-none"
-                    >
-                      {services.map((s) => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
-                    <input
-                      type="number"
-                      min="1"
-                      placeholder="Qty"
-                      value={row.quantity}
-                      onChange={(e) => handleBenefitChange(idx, "quantity", e.target.value, false)}
-                      className="w-20 bg-background border border-border-soft px-2 py-1.5 rounded text-xs focus:outline-none"
-                    />
-                  </div>
-                ))}
               </div>
 
               <div className="pt-4 border-t border-border-soft flex justify-end space-x-3">

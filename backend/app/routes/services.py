@@ -1,6 +1,7 @@
 from flask import Blueprint, request, g
 from app.database import db
 from app.models.catalog import ServiceCategory, Service
+from app.models.membership import MembershipPlanService
 from app.utils.responses import success_response, error_response
 from app.utils.auth import require_role, get_tenant_query, get_branch_query
 from app.utils.query import paginate_query
@@ -123,6 +124,49 @@ def create_category():
     return success_response({"id": category.id, "name": category.name}, 201)
 
 
+@services_bp.route("/service-categories/<int:category_id>", methods=["PUT"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
+def update_category(category_id):
+    category = get_branch_query(ServiceCategory).filter_by(id=category_id).first()
+    if not category:
+        return error_response(
+            error_code="CATEGORY_NOT_FOUND",
+            message="Category not found or access denied.",
+            status_code=404
+        )
+
+    data = request.get_json() or {}
+    name = data.get("name", "").strip()
+    if not name:
+        return error_response(
+            error_code="VALIDATION_FAILED",
+            message="Category name is required.",
+            status_code=400
+        )
+
+    dup = get_branch_query(ServiceCategory).filter(ServiceCategory.name == name, ServiceCategory.id != category_id).first()
+    if dup:
+        return error_response(
+            error_code="DUPLICATE_RECORD",
+            message=f"Category '{name}' already exists.",
+            status_code=400
+        )
+
+    try:
+        category.name = name
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error updating category: {str(e)}")
+        return error_response(
+            error_code="DATABASE_ERROR",
+            message="Failed to update category.",
+            status_code=500
+        )
+
+    return success_response({"id": category.id, "name": category.name})
+
+
 @services_bp.route("/service-categories/<int:category_id>", methods=["DELETE"])
 @require_role(["ParlourAdmin", "BranchAdmin"])
 def delete_category(category_id):
@@ -204,8 +248,18 @@ def get_services():
         sort_desc=sort_desc
     )
 
-    data = [
-        {
+    data = []
+    for s in services:
+        discounts = [
+            {
+                "plan_id": mps.membership_plan_id,
+                "plan_name": mps.plan.name if mps.plan else f"Plan #{mps.membership_plan_id}",
+                "percentage": float(mps.discount_percentage or 0.0),
+                "amount": float(mps.discount_amount or 0.0)
+            }
+            for mps in MembershipPlanService.query.filter_by(service_id=s.id).all()
+        ]
+        data.append({
             "id": s.id,
             "name": s.name,
             "price": float(s.price),
@@ -214,9 +268,9 @@ def get_services():
             "description": s.description,
             "category_id": s.category_id,
             "category_name": s.category.name if s.category else None,
+            "membership_discounts": discounts,
             "created_at": s.created_at.isoformat()
-        } for s in services
-    ]
+        })
 
     return success_response({
         "items": data,
@@ -234,6 +288,15 @@ def get_service(service_id):
             message="Service not found or access denied.",
             status_code=404
         )
+    discounts = [
+        {
+            "plan_id": mps.membership_plan_id,
+            "plan_name": mps.plan.name if mps.plan else f"Plan #{mps.membership_plan_id}",
+            "percentage": float(mps.discount_percentage or 0.0),
+            "amount": float(mps.discount_amount or 0.0)
+        }
+        for mps in MembershipPlanService.query.filter_by(service_id=service.id).all()
+    ]
     return success_response({
         "id": service.id,
         "name": service.name,
@@ -243,6 +306,7 @@ def get_service(service_id):
         "description": service.description,
         "category_id": service.category_id,
         "category_name": service.category.name if service.category else None,
+        "membership_discounts": discounts,
         "created_at": service.created_at.isoformat()
     })
 
@@ -308,6 +372,26 @@ def create_service():
             status=data.get("status", "active")
         )
         db.session.add(service)
+        db.session.flush()
+
+        # Save membership discounts mapping
+        membership_discounts = data.get("membership_discounts", [])
+        if isinstance(membership_discounts, list):
+            for d in membership_discounts:
+                p_id = d.get("plan_id")
+                if not p_id:
+                    continue
+                pct = float(d.get("percentage") or 0.0)
+                amt = float(d.get("amount") or 0.0)
+                mps = MembershipPlanService(
+                    tenant_id=g.parlour_id,
+                    membership_plan_id=int(p_id),
+                    service_id=service.id,
+                    discount_percentage=pct,
+                    discount_amount=amt
+                )
+                db.session.add(mps)
+
         db.session.commit()
     except Exception as e:
         db.session.rollback()
@@ -386,6 +470,27 @@ def update_service(service_id):
         service.duration_minutes = dur_val
         service.description = data.get("description")
         service.status = data.get("status", "active")
+
+        # Update membership discounts mapping
+        if "membership_discounts" in data:
+            MembershipPlanService.query.filter_by(service_id=service.id).delete()
+            membership_discounts = data.get("membership_discounts", [])
+            if isinstance(membership_discounts, list):
+                for d in membership_discounts:
+                    p_id = d.get("plan_id")
+                    if not p_id:
+                        continue
+                    pct = float(d.get("percentage") or 0.0)
+                    amt = float(d.get("amount") or 0.0)
+                    mps = MembershipPlanService(
+                        tenant_id=g.parlour_id,
+                        membership_plan_id=int(p_id),
+                        service_id=service.id,
+                        discount_percentage=pct,
+                        discount_amount=amt
+                    )
+                    db.session.add(mps)
+
         db.session.commit()
     except Exception as e:
         db.session.rollback()
@@ -411,6 +516,7 @@ def delete_service(service_id):
         )
 
     try:
+        MembershipPlanService.query.filter_by(service_id=service.id).delete()
         service.soft_delete()
         db.session.commit()
     except Exception as e:

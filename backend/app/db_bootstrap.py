@@ -70,6 +70,23 @@ def ensure_database_exists(database_uri: str):
         with engine.connect() as conn:
             conn.execute(text(create_sql))
             conn.commit()
+            
+            # Ensure missing columns in existing tables are safely patched
+            try:
+                conn.execute(text("USE `" + dbname + "`;"))
+                conn.execute(text("ALTER TABLE customer_memberships ADD COLUMN IF NOT EXISTS renew_count INT NOT NULL DEFAULT 0;"))
+                conn.execute(text("ALTER TABLE membership_plan_services ADD COLUMN IF NOT EXISTS discount_percentage DECIMAL(5,2) DEFAULT 0.00;"))
+                conn.execute(text("ALTER TABLE membership_plan_services ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(10,2) DEFAULT 0.00;"))
+                conn.commit()
+            except Exception:
+                try:
+                    conn.execute(text("ALTER TABLE customer_memberships ADD COLUMN renew_count INT NOT NULL DEFAULT 0;"))
+                    conn.execute(text("ALTER TABLE membership_plan_services ADD COLUMN discount_percentage DECIMAL(5,2) DEFAULT 0.00;"))
+                    conn.execute(text("ALTER TABLE membership_plan_services ADD COLUMN discount_amount DECIMAL(10,2) DEFAULT 0.00;"))
+                    conn.commit()
+                except Exception:
+                    pass
+
         logger.info(f"SUCCESS: Database '{dbname}' is ready (auto-created if missing).")
     except Exception as e:
         logger.warning(f"Could not auto-create database '{dbname}': {e}")
