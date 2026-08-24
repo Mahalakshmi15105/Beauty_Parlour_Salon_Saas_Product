@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -27,6 +27,7 @@ import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 
 function Appointments() {
   const { formatCurrency } = useLanguageCurrency();
+  const pageRef = useRef(null);
   const [activeSubTab, setActiveSubTab] = useState("todays");
   const [appointments, setAppointments] = useState([]);
   const [servicesList, setServicesList] = useState([]);
@@ -290,8 +291,128 @@ function Appointments() {
       });
   };
 
+  // ─────────────────────────────────────────────────────────────
+  // CONTEXT-AWARE KEYBOARD NAVIGATION
+  // Behavior depends on the currently focused element type. We only
+  // intercept keys where the browser's native behavior is insufficient
+  // and never override native cursor/option navigation.
+  // ─────────────────────────────────────────────────────────────
+  const focusAdjacentButton = (currentEl, direction) => {
+    // Walk up to find the nearest container that groups multiple buttons so
+    // arrow-key navigation stays within the current logical button group
+    // (e.g. an appointment card's status workflow, the sub-navigation tabs,
+    // the Booking Mode picker) instead of jumping to unrelated page buttons.
+    let container = currentEl.parentElement;
+    while (container && container !== pageRef.current) {
+      const siblings = Array.from(container.querySelectorAll("button")).filter(
+        (b) => b.offsetParent !== null
+      );
+      if (siblings.length >= 2) {
+        const idx = siblings.indexOf(currentEl);
+        if (idx !== -1) {
+          let next = idx + direction;
+          while (next >= 0 && next < siblings.length) {
+            const candidate = siblings[next];
+            if (!candidate.disabled) {
+              candidate.focus();
+              return;
+            }
+            next += direction;
+          }
+        }
+        break;
+      }
+      container = container.parentElement;
+    }
+  };
+
+  const focusNextFormField = (form, currentEl) => {
+    const fields = Array.from(form.querySelectorAll("input, select, textarea, button"));
+    const idx = fields.indexOf(currentEl);
+    if (idx === -1) return;
+    for (let i = idx + 1; i < fields.length; i++) {
+      const f = fields[i];
+      if (!f.disabled && !f.readOnly && f.type !== "hidden" && (f.type !== "submit" || i === fields.length - 1)) {
+        f.focus();
+        return;
+      }
+    }
+    // Reached the end: focus the submit button so a second Enter submits.
+    const submit = form.querySelector('button[type="submit"]');
+    if (submit) submit.focus();
+  };
+
+  const handlePageKeyDown = (e) => {
+    const el = e.target;
+    if (!el) return;
+    const tag = el.tagName;
+    const type = el.type || "";
+    const key = e.key;
+
+    // 1. SELECT FIELDS — native dropdown behavior:
+    //    ↓/↑ highlight options, Enter confirms, Esc closes, and when the
+    //    dropdown is open the Arrow keys control options (not other fields).
+    if (tag === "SELECT") {
+      return; // keep native behavior entirely
+    }
+
+    // 4. CHECKBOX / TOGGLE — native Space toggles; keep native Enter too.
+    if (tag === "INPUT" && type === "checkbox") {
+      return;
+    }
+
+    // Native submit/reset buttons keep their native activation.
+    if (tag === "INPUT" && (type === "button" || type === "submit" || type === "reset")) {
+      return;
+    }
+
+    // 2. TEXT / NUMBER / DATE / TIME INPUTS — allow normal typing & editing.
+    //    ↑/↓/←/→ are left native (cursor movement, number spinner) so we never
+    //    unexpectedly change fields. Enter moves to the next logical field only
+    //    when inside a form (prevents premature/implicit form submission).
+    if (tag === "INPUT") {
+      if (key === "Enter") {
+        const form = el.closest("form");
+        if (form) {
+          e.preventDefault();
+          focusNextFormField(form, el);
+        }
+        // Outside a form (e.g. filter bar / search / phone lookup): keep native
+        // behavior — no suggestion list exists, so nothing is triggered.
+      }
+      return;
+    }
+
+    // TEXTAREA — Enter inserts a newline; arrows move the caret. Never intercept.
+    if (tag === "TEXTAREA") {
+      return;
+    }
+
+    // 3. BUTTONS — Enter/Space perform the button's existing action natively.
+    //    → / ← (and ↓ / ↑) move between logically arranged buttons in DOM order.
+    if (tag === "BUTTON") {
+      if (key === "Enter" || key === " ") {
+        return; // native activation
+      }
+      if (key === "ArrowRight" || key === "ArrowDown") {
+        e.preventDefault();
+        focusAdjacentButton(el, 1);
+        return;
+      }
+      if (key === "ArrowLeft" || key === "ArrowUp") {
+        e.preventDefault();
+        focusAdjacentButton(el, -1);
+        return;
+      }
+    }
+  };
+
   return (
-    <div className="space-y-6 pb-12">
+    <div
+      ref={pageRef}
+      onKeyDown={handlePageKeyDown}
+      className="space-y-6 pb-12"
+    >
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

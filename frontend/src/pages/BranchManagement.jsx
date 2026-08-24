@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
 import { Building2, Plus, Edit, Trash2, AlertTriangle, Check, X, Clock, Phone, Mail, MapPin } from "lucide-react";
+import { useModalFocusTrap, useFormKeyboardNavigation } from "../utils/keyboardNavigation";
 
 function BranchManagement() {
   const modalRef = useRef(null);
@@ -140,6 +141,18 @@ function BranchManagement() {
     });
     setShowCreateModal(true);
   };
+
+  // Modal focus trap for create/edit branch modals.
+  useModalFocusTrap(showCreateModal || showEditModal, modalRef, () => {
+    setShowCreateModal(false);
+    setShowEditModal(false);
+  });
+
+  // Keyboard navigation: Enter advances through the branch form fields.
+  useFormKeyboardNavigation(formRef, () => {
+    const submitBtn = formRef.current?.querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.focus();
+  });
 
   if (loading) {
     return (

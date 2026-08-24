@@ -312,6 +312,10 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
   const showAddress = settings.show_address !== false;
   const showPhone = settings.show_phone !== false;
   const showGst = settings.show_gst !== false && businessProfile.gst_number;
+  const showQty = settings.show_qty !== false;
+  const showRate = settings.show_rate !== false;
+  const showMrp = settings.show_mrp !== false;
+  const showTax = settings.show_tax !== false;
   const thankYouMsg = "Thank you for visiting. Please visit again.";
 
   const customerName = invoice.customer_name || (invoice.customer ? `${invoice.customer.first_name || ''} ${invoice.customer.last_name || ''}`.trim() : "Walk-in Customer") || "Walk-in Customer";
@@ -457,7 +461,7 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
       {/* SEPARATOR 2 */}
       <div className="border-b border-dashed border-slate-300 my-1.5" />
 
-      {/* 3. ITEM TABLE HEADER (QTY column removed) */}
+      {/* 3. ITEM TABLE HEADER */}
       <div className="text-xs">
         {(() => {
           const lineItems = invoice.line_items || invoice.items || [];
@@ -487,9 +491,11 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
                             <span className="w-2/3 break-words leading-tight">{itemName}</span>
                             <span className="w-1/3 text-right font-extrabold">{formatCurrency(amount)}</span>
                           </div>
-                          {staffName && (
-                            <div className="text-[11px] text-black italic">
-                              Staff: {staffName}
+                          {(showQty || showRate || staffName) && (
+                            <div className="text-[11px] text-black space-x-2">
+                              {showQty && <span>Qty: {qty}</span>}
+                              {showRate && <span>Rate: {formatCurrency(rate)}</span>}
+                              {staffName && <span className="italic">Staff: {staffName}</span>}
                             </div>
                           )}
                           {item.discount > 0 && (
@@ -516,6 +522,7 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
                       const itemName = (item.item_name || item.name || item.product_name || `Product #${idx + 1}`).toUpperCase();
                       const qty = item.quantity || item.qty || 1;
                       const rate = item.unit_price || item.rate || (item.price || 0);
+                      const mrp = item.mrp || item.unit_price || item.rate || (item.price || 0);
                       const amount = item.line_total || item.total || (rate * qty);
 
                       return (
@@ -524,6 +531,13 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
                             <span className="w-2/3 break-words leading-tight font-bold">{itemName}</span>
                             <span className="w-1/3 text-right font-extrabold">{formatCurrency(amount)}</span>
                           </div>
+                          {(showQty || showRate || showMrp) && (
+                            <div className="text-[11px] text-black space-x-2">
+                              {showQty && <span>Qty: {qty}</span>}
+                              {showRate && <span>Rate: {formatCurrency(rate)}</span>}
+                              {showMrp && <span>MRP: {formatCurrency(mrp)}</span>}
+                            </div>
+                          )}
                           {item.discount > 0 && (
                             <div className="text-[11px] text-black text-right">
                               Disc: -{formatCurrency(item.discount)}
@@ -564,7 +578,7 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
           </div>
         )}
 
-        {(invoice.tax || 0) > 0 && (
+        {showTax && (invoice.tax || 0) > 0 && (
           <div className="flex justify-between">
             <span>GST (Service):</span>
             <span>{formatCurrency(invoice.tax)}</span>

@@ -124,6 +124,10 @@ function Settings() {
       show_email: true,
       show_website: true,
       show_qr_code: false,
+      show_qty: true,
+      show_rate: true,
+      show_mrp: true,
+      show_tax: true,
       auto_print: false,
       thank_you_message: "Thank you for visiting. Please visit again.",
       receipt_header: "",
@@ -1097,9 +1101,13 @@ function Settings() {
 
                   {/* Section Display Toggles */}
                   <div className="p-4 bg-background/50 border border-border-soft rounded-xl space-y-3">
-                    <label className="block text-xs font-bold text-slate-800">Visible Information Toggles</label>
+                    <label className="block text-xs font-bold text-slate-800">Invoice Display Settings</label>
                     <div className="grid grid-cols-2 gap-3 text-xs font-semibold text-slate-700">
                       {[
+                        { key: "show_qty", label: "Show QTY" },
+                        { key: "show_rate", label: "Show RATE" },
+                        { key: "show_mrp", label: "Show MRP" },
+                        { key: "show_tax", label: "Show TAX" },
                         { key: "show_logo", label: "Show Parlour Logo" },
                         { key: "show_gst", label: "Show GSTIN / Tax ID" },
                         { key: "show_address", label: "Show Salon Address" },
@@ -1112,7 +1120,7 @@ function Settings() {
                         <label key={item.key} className="flex items-center space-x-2 cursor-pointer p-1.5 rounded hover:bg-surface">
                           <input
                             type="checkbox"
-                            checked={!!settingsData.receipt_settings[item.key]}
+                            checked={settingsData.receipt_settings[item.key] !== false}
                             onChange={(e) =>
                               setSettingsData({
                                 ...settingsData,

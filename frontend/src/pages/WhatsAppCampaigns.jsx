@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Send,
   Users,
@@ -24,9 +24,11 @@ import {
 } from "lucide-react";
 import API from "../services/api";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
+import { useModalFocusTrap } from "../utils/keyboardNavigation";
 
 export default function WhatsAppCampaigns() {
   const { t } = useLanguageCurrency();
+  const detailModalRef = useRef(null);
   const [activeTab, setActiveTab] = useState("create"); // create, progress, history
   const [loading, setLoading] = useState(false);
 
@@ -192,6 +194,9 @@ export default function WhatsAppCampaigns() {
       })
       .catch((err) => alert(err.response?.data?.message || "Failed to load details."));
   };
+
+  // Modal focus trap for the campaign detail modal.
+  useModalFocusTrap(showDetailModal, detailModalRef, () => setShowDetailModal(false));
 
   return (
     <div className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto">
@@ -678,7 +683,7 @@ export default function WhatsAppCampaigns() {
 
       {/* Recipient Audit Log Modal */}
       {showDetailModal && selectedHistoryCampaign && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div ref={detailModalRef} className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-surface border border-border-soft rounded-3xl max-w-4xl w-full max-h-[85vh] overflow-hidden flex flex-col shadow-2xl">
             <div className="p-6 border-b border-border-soft flex justify-between items-center bg-slate-50">
               <div>

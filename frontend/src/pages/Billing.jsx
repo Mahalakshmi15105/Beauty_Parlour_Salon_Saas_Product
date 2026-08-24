@@ -255,6 +255,10 @@ function Billing() {
     show_email: true,
     show_website: true,
     show_qr_code: false,
+    show_qty: true,
+    show_rate: true,
+    show_mrp: true,
+    show_tax: true,
     auto_print: false,
     thank_you_message: "Thank you for visiting. Please visit again.",
   });
@@ -375,6 +379,44 @@ function Billing() {
         nextRef.current.focus();
       }
     }
+  };
+
+  // Automatically open a native <select> dropdown when keyboard focus reaches it.
+  // Uses the browser's native showPicker() when available (Chrome/Edge), with a
+  // synthetic ArrowDown keydown fallback for browsers without it (e.g. Firefox).
+  const openNativeSelectDropdown = (selectEl) => {
+    if (!selectEl || selectEl.tagName !== "SELECT" || selectEl.disabled) return;
+    try {
+      if (typeof selectEl.showPicker === "function") {
+        selectEl.showPicker();
+        return;
+      }
+    } catch (e) {
+      // Some browsers throw if called outside a user gesture; fall through.
+    }
+    try {
+      selectEl.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowDown",
+          code: "ArrowDown",
+          bubbles: true,
+          cancelable: true,
+        })
+      );
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  // Advance focus to the next Billing field and, if that field is a native
+  // select/dropdown, automatically open its options so the user can immediately
+  // pick with ↑/↓/Enter without pressing an extra key.
+  const advanceAndOpenSelect = (currentEl, nextRef) => {
+    const moved = advanceToNextRef(currentEl, nextRef);
+    if (moved && nextRef && nextRef.current) {
+      openNativeSelectDropdown(nextRef.current);
+    }
+    return moved;
   };
 
   useEffect(() => {
@@ -1310,6 +1352,34 @@ function Billing() {
     setShowPaymentModal(true);
   };
 
+  const handleProceedToPaymentRef = useRef(handleProceedToPayment);
+  handleProceedToPaymentRef.current = handleProceedToPayment;
+
+  // F9 / Ctrl+Enter → Proceed to Payment (Billing page only)
+  // Reuses the existing handleProceedToPayment flow — validates the form,
+  // calculates totals, preserves membership discounts/taxes, and opens the
+  // existing Payment modal. Registered in capture phase on window to prevent
+  // input keydown handlers or browser defaults from swallowing the shortcut.
+  useEffect(() => {
+    const handlePaymentShortcut = (e) => {
+      if (activeSubTab !== "checkout") return;
+      if (showPaymentModal || showReceipt) return;
+
+      const isF9 = e.key === "F9" || e.code === "F9" || e.keyCode === 120;
+      const isCtrlEnter = (e.ctrlKey || e.metaKey) && (e.key === "Enter" || e.code === "Enter" || e.keyCode === 13);
+
+      if (isF9 || isCtrlEnter) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (handleProceedToPaymentRef.current) {
+          handleProceedToPaymentRef.current();
+        }
+      }
+    };
+    window.addEventListener("keydown", handlePaymentShortcut, true);
+    return () => window.removeEventListener("keydown", handlePaymentShortcut, true);
+  }, [activeSubTab, showPaymentModal, showReceipt]);
+
   // Submit Save Bill
   const handleCheckoutSubmit = () => {
     if (Math.abs(totalAllocatedPayment - netPayable) > 0.5) {
@@ -1739,19 +1809,19 @@ function Billing() {
                             handleCustomerChange("walkin");
                             setCustomerSearchQuery("Walk-in Customer");
                             setIsCustomerDropdownOpen(false);
-                            advanceToNextRef(e.target, genderSelectRef);
+                            advanceAndOpenSelect(e.target, genderSelectRef);
                           } else if (targetOpt.type === "customer") {
                             const c = targetOpt.data;
                             handleCustomerChange(String(c.id));
                             setCustomerSearchQuery(`${c.first_name} ${c.last_name || ""} (${c.phone || "No Phone"})`);
                             setIsCustomerDropdownOpen(false);
-                            advanceToNextRef(e.target, genderSelectRef);
+                            advanceAndOpenSelect(e.target, genderSelectRef);
                           } else if (targetOpt.type === "add_new") {
                             openQuickAddCustomer(customerSearchQuery !== "Walk-in Customer" ? customerSearchQuery : "");
                             setIsCustomerDropdownOpen(false);
                           }
                         } else {
-                          advanceToNextRef(e.target, genderSelectRef);
+                          advanceAndOpenSelect(e.target, genderSelectRef);
                         }
                       } else if (e.key === "Escape") {
                         setIsCustomerDropdownOpen(false);
@@ -1791,7 +1861,7 @@ function Billing() {
                                   handleCustomerChange("walkin");
                                   setCustomerSearchQuery("Walk-in Customer");
                                   setIsCustomerDropdownOpen(false);
-                                  setTimeout(() => advanceToNextRef(customerSelectRef.current, genderSelectRef), 50);
+                                  setTimeout(() => advanceAndOpenSelect(customerSelectRef.current, genderSelectRef), 50);
                                 }}
                                 className={`w-full text-left px-4 py-2.5 flex items-center justify-between border-b border-border-soft font-bold ${
                                   isHighlighted ? "bg-pink-100 text-primary border-l-4 border-primary" : "hover:bg-primary-light/50 text-primary"
@@ -1816,7 +1886,7 @@ function Billing() {
                                   handleCustomerChange(String(c.id));
                                   setCustomerSearchQuery(`${c.first_name} ${c.last_name || ""} (${c.phone || "No Phone"})`);
                                   setIsCustomerDropdownOpen(false);
-                                  setTimeout(() => advanceToNextRef(customerSelectRef.current, genderSelectRef), 50);
+                                  setTimeout(() => advanceAndOpenSelect(customerSelectRef.current, genderSelectRef), 50);
                                 }}
                                 className={`w-full text-left px-4 py-2 flex items-center justify-between border-b border-border-soft/40 ${
                                   isHighlighted ? "bg-pink-100 text-slate-900 border-l-4 border-primary" : "hover:bg-background"
@@ -1871,7 +1941,7 @@ function Billing() {
                   onKeyDown={(e) => {
                     if (e.key === "ArrowRight" || e.key === "Enter") {
                       e.preventDefault();
-                      advanceToNextRef(e.target, categorySelectRef);
+                      advanceAndOpenSelect(e.target, categorySelectRef);
                     } else if (e.key === "ArrowLeft") {
                       e.preventDefault();
                       advanceToNextRef(e.target, customerSelectRef);
@@ -1994,7 +2064,7 @@ function Billing() {
                   onKeyDown={(e) => {
                     if (e.key === "ArrowRight" || e.key === "Enter") {
                       e.preventDefault();
-                      advanceToNextRef(e.target, serviceSelectRef);
+                      advanceAndOpenSelect(e.target, serviceSelectRef);
                     } else if (e.key === "ArrowLeft") {
                       e.preventDefault();
                       advanceToNextRef(e.target, genderSelectRef);
@@ -2020,28 +2090,28 @@ function Billing() {
                     setSelectedServiceId(e.target.value);
                   }}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") {
+                    if (e.key === "Enter" || e.key === "ArrowRight") {
                       e.preventDefault();
                       if (selectedServiceId) {
+                        // Add the selected service to the billing line-item table
                         handleAddServiceToCart(selectedServiceId);
+                        setSelectedServiceId("");
+                        // After the service is successfully added, loop back to
+                        // the first Billing field (Customer Name) so the user can
+                        // repeatedly add services without touching the mouse.
                         setTimeout(() => {
-                          const firstRowGross = document.querySelector('[data-row="0"][data-field="gross_amount"]');
-                          if (firstRowGross) {
-                            firstRowGross.focus();
-                            if (typeof firstRowGross.select === "function") firstRowGross.select();
-                          } else if (addProductBtnRef.current) {
-                            addProductBtnRef.current.focus();
+                          if (customerSelectRef.current) {
+                            customerSelectRef.current.focus();
+                            setIsCustomerDropdownOpen(true);
+                            setCustomerHighlightedIndex(0);
                           }
                         }, 50);
                       } else {
                         advanceToNextRef(e.target, addProductBtnRef);
                       }
-                    } else if (e.key === "ArrowRight") {
-                      e.preventDefault();
-                      advanceToNextRef(e.target, addProductBtnRef);
                     } else if (e.key === "ArrowLeft") {
                       e.preventDefault();
-                      advanceToNextRef(e.target, categorySelectRef);
+                      advanceAndOpenSelect(e.target, categorySelectRef);
                     }
                   }}
                   disabled={!selectedCategoryId}
@@ -2109,12 +2179,13 @@ function Billing() {
                   <tr className="bg-primary-light border-b border-border-soft text-slate-700">
                     <th className="px-3 py-3 font-extrabold w-12 text-center">S.No</th>
                     <th className="px-4 py-3 font-extrabold">Item Description (Service / Product)</th>
+                    <th className="px-3 py-3 font-extrabold w-20">QTY</th>
+                    <th className="px-4 py-3 font-extrabold">RATE (Unit Price)</th>
                     <th className="px-4 py-3 font-extrabold">MRP</th>
-                    <th className="px-4 py-3 font-extrabold">Gross Amount</th>
-                    <th className="px-3 py-3 font-extrabold w-20">Qty</th>
                     <th className="px-4 py-3 font-extrabold">Gross × Qty</th>
                     <th className="px-3 py-3 font-extrabold w-24">Discount (%)</th>
                     <th className="px-4 py-3 font-extrabold">Discount Amount</th>
+                    <th className="px-4 py-3 font-extrabold">Tax</th>
                     <th className="px-4 py-3 font-extrabold">Net Amount</th>
                     <th className="px-4 py-3 font-extrabold min-w-[200px]">Employee (Stylist / Seller) Multi-Select *</th>
                     <th className="px-4 py-3 font-extrabold text-right">Action</th>
@@ -2123,7 +2194,7 @@ function Billing() {
                 <tbody className="divide-y divide-border-soft">
                   {cart.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="p-8 text-center text-text-secondary font-medium">
+                      <td colSpan={12} className="p-8 text-center text-text-secondary font-medium">
                         Table is empty. Select a <strong>Service</strong> or <strong>Product</strong> above, then click <strong>"Add to Table"</strong>.
                       </td>
                     </tr>
@@ -2131,6 +2202,7 @@ function Billing() {
                     cart.map((item, idx) => {
                       const lineGross = item.gross_amount * item.quantity;
                       const discAmt = calculateRowDiscountAmount(item);
+                      const rowTax = calculateRowTaxAmount(item);
                       const rowNet = calculateRowNet(item);
 
                       return (
@@ -2148,11 +2220,23 @@ function Billing() {
                               <span>{item.name}</span>
                             </div>
                           </td>
-                          <td className="px-4 py-3 font-medium text-slate-500">
-                            {item.type === "product" ? `${currencySymbol} ${parseFloat(item.mrp || item.gross_amount || 0).toFixed(2)}` : "—"}
+
+                          {/* Qty Input */}
+                          <td className="px-3 py-3">
+                            <input
+                              type="number"
+                              min="1"
+                              data-row={idx}
+                              data-field="qty"
+                              value={item.quantity}
+                              onFocus={(e) => e.target.select()}
+                              onChange={(e) => handleUpdateQty(idx, e.target.value)}
+                              onKeyDown={(e) => handleLineItemKeyDown(e, idx, "qty")}
+                              className="w-16 bg-background border border-border-soft px-2 py-1 rounded-lg text-xs font-bold text-slate-900 text-center focus:border-primary focus:outline-none"
+                            />
                           </td>
 
-                          {/* Editable Gross Amount Input */}
+                          {/* Editable Gross Amount / Selling RATE Input */}
                           <td className="px-3 py-3">
                             <div className="flex items-center space-x-1">
                               <span className="text-xs text-slate-400 font-bold">{currencySymbol}</span>
@@ -2171,19 +2255,9 @@ function Billing() {
                             </div>
                           </td>
 
-                          {/* Qty Input */}
-                          <td className="px-3 py-3">
-                            <input
-                              type="number"
-                              min="1"
-                              data-row={idx}
-                              data-field="qty"
-                              value={item.quantity}
-                              onFocus={(e) => e.target.select()}
-                              onChange={(e) => handleUpdateQty(idx, e.target.value)}
-                              onKeyDown={(e) => handleLineItemKeyDown(e, idx, "qty")}
-                              className="w-16 bg-background border border-border-soft px-2 py-1 rounded-lg text-xs font-bold text-slate-900 text-center focus:border-primary focus:outline-none"
-                            />
+                          {/* MRP Column */}
+                          <td className="px-4 py-3 font-medium text-slate-500">
+                            {item.type === "product" ? `${currencySymbol} ${parseFloat(item.mrp || item.gross_amount || 0).toFixed(2)}` : "—"}
                           </td>
 
                           <td className="px-4 py-3 font-bold text-slate-900">
@@ -2224,6 +2298,11 @@ function Billing() {
                                 className="w-20 bg-background border border-border-soft px-2 py-1 rounded-lg text-xs font-bold text-danger text-center focus:border-primary focus:outline-none"
                               />
                             </div>
+                          </td>
+
+                          {/* Tax Column */}
+                          <td className="px-4 py-3 font-medium text-slate-600">
+                            {item.type === "product" ? "—" : `${currencySymbol} ${rowTax.toFixed(2)}`}
                           </td>
 
                           <td className="px-4 py-3 font-extrabold text-slate-900">

@@ -65,6 +65,10 @@ class TenantSetting(db.Model, TimestampMixin):
     show_email = db.Column(db.Boolean, nullable=False, default=True)
     show_website = db.Column(db.Boolean, nullable=False, default=True)
     show_qr_code = db.Column(db.Boolean, nullable=False, default=False)
+    show_qty = db.Column(db.Boolean, nullable=False, default=True)
+    show_rate = db.Column(db.Boolean, nullable=False, default=True)
+    show_mrp = db.Column(db.Boolean, nullable=False, default=True)
+    show_tax = db.Column(db.Boolean, nullable=False, default=True)
     auto_print = db.Column(db.Boolean, nullable=False, default=False)
     thank_you_message = db.Column(db.String(255), nullable=True, default="Thank you for visiting. Please visit again.")
 

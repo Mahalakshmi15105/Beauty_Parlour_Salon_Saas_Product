@@ -104,6 +104,10 @@ def get_settings():
             "show_email": bool(_get("show_email", True)),
             "show_website": bool(_get("show_website", True)),
             "show_qr_code": bool(_get("show_qr_code", False)),
+            "show_qty": bool(_get("show_qty", True)),
+            "show_rate": bool(_get("show_rate", True)),
+            "show_mrp": bool(_get("show_mrp", True)),
+            "show_tax": bool(_get("show_tax", True)),
             "auto_print": bool(_get("auto_print", False)),
             "thank_you_message": _get("thank_you_message", "Thank you for visiting. Please visit again.") or "Thank you for visiting. Please visit again.",
             "receipt_header": _get("receipt_header"),
@@ -167,6 +171,39 @@ def update_settings():
             setting.postal_code = biz.get("postal_code")
             setting.website = biz.get("website")
             setting.description = biz.get("description")
+
+        # Update Receipt Settings
+        if rec:
+            if "receipt_template" in rec:
+                setting.receipt_template = rec["receipt_template"]
+            if "paper_size" in rec:
+                setting.paper_size = rec["paper_size"]
+            if "show_logo" in rec:
+                setting.show_logo = bool(rec["show_logo"])
+            if "show_gst" in rec:
+                setting.show_gst = bool(rec["show_gst"])
+            if "show_address" in rec:
+                setting.show_address = bool(rec["show_address"])
+            if "show_phone" in rec:
+                setting.show_phone = bool(rec["show_phone"])
+            if "show_email" in rec:
+                setting.show_email = bool(rec["show_email"])
+            if "show_website" in rec:
+                setting.show_website = bool(rec["show_website"])
+            if "show_qr_code" in rec:
+                setting.show_qr_code = bool(rec["show_qr_code"])
+            if "show_qty" in rec:
+                setting.show_qty = bool(rec["show_qty"])
+            if "show_rate" in rec:
+                setting.show_rate = bool(rec["show_rate"])
+            if "show_mrp" in rec:
+                setting.show_mrp = bool(rec["show_mrp"])
+            if "show_tax" in rec:
+                setting.show_tax = bool(rec["show_tax"])
+            if "auto_print" in rec:
+                setting.auto_print = bool(rec["auto_print"])
+            if "thank_you_message" in rec:
+                setting.thank_you_message = rec["thank_you_message"]
 
         # Update Theme Settings
         if thm:

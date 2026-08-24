@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   LayoutDashboard,
   Receipt,
@@ -29,6 +29,7 @@ import { useTheme } from "../context/ThemeContext";
 import ThemeSelector from "./ThemeSelector";
 import { getFullImageUrl } from "../utils/imageUrl";
 import { getShopNameStyle } from "../utils/fontLoader";
+import { useSidebarKeyboardNavigation } from "../utils/keyboardNavigation";
 
 const getMenuIcon = (id) => {
   switch (id) {
@@ -68,6 +69,7 @@ const getMenuIcon = (id) => {
 
 function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, user }) {
   const { t } = useLanguageCurrency();
+  const sidebarRef = useRef(null);
 
   // Desktop Collapsed State from localStorage
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -95,6 +97,10 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
       });
     }
   };
+
+  // Sidebar keyboard navigation: ArrowUp/Down move between nav items,
+  // ArrowLeft/Right toggle collapse — only when a sidebar item is focused.
+  useSidebarKeyboardNavigation(sidebarRef, toggleSidebar);
 
   // Parlour Branding & Logo State
   const [logoUrl, setLogoUrl] = useState("");
@@ -223,6 +229,7 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
 
       {/* SIDEBAR COMPONENT (DESKTOP + MOBILE DRAWER) */}
       <aside
+        ref={sidebarRef}
         className={`bg-surface border-r border-border-soft flex flex-col z-50 transition-all duration-300 ease-in-out ${
           // Desktop behavior
           `hidden md:flex ${isCollapsed ? "w-20" : "w-64"}`
@@ -315,6 +322,7 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
             return (
               <div key={item.id} className="relative group">
                 <button
+                  data-sidebar-nav="true"
                   onClick={() => setActiveTab(item.id)}
                   className={`w-full flex items-center ${
                     isCollapsed ? "justify-center px-2 py-3" : "space-x-3 px-3.5 py-2.5"

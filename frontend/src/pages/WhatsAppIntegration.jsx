@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   MessageSquare,
   CheckCircle2,
@@ -17,9 +17,13 @@ import {
 } from "lucide-react";
 import API from "../services/api";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
+import { useFormKeyboardNavigation, useModalFocusTrap } from "../utils/keyboardNavigation";
 
 export default function WhatsAppIntegration() {
   const { t } = useLanguageCurrency();
+  const directMsgFormRef = useRef(null);
+  const editModalRef = useRef(null);
+  const editFormRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [settings, setSettings] = useState({
@@ -264,6 +268,21 @@ export default function WhatsAppIntegration() {
       });
   };
 
+  // Keyboard navigation: Enter advances through the direct-message form fields.
+  useFormKeyboardNavigation(directMsgFormRef, () => {
+    const submitBtn = directMsgFormRef.current?.querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.focus();
+  });
+
+  // Modal focus trap for the Edit Credentials modal.
+  useModalFocusTrap(showEditModal, editModalRef, () => setShowEditModal(false));
+
+  // Keyboard navigation for the Edit Credentials form.
+  useFormKeyboardNavigation(editFormRef, () => {
+    const submitBtn = editFormRef.current?.querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.focus();
+  });
+
   const isConnected = settings.status === "CONNECTED";
 
   return (
@@ -469,7 +488,7 @@ export default function WhatsAppIntegration() {
           </p>
         </div>
 
-        <form onSubmit={handleSendDirectMessage} className="space-y-4 max-w-2xl">
+        <form ref={directMsgFormRef} onSubmit={handleSendDirectMessage} className="space-y-4 max-w-2xl">
           <div>
             <label className="block text-xs font-extrabold text-slate-700 mb-1">
               Recipient Phone Number *
@@ -664,7 +683,7 @@ export default function WhatsAppIntegration() {
 
       {/* Edit Credentials Modal */}
       {showEditModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div ref={editModalRef} className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-surface border border-border-soft rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5">
             <div className="flex justify-between items-center">
               <h3 className="text-base font-black text-slate-900 flex items-center space-x-2">
@@ -679,7 +698,7 @@ export default function WhatsAppIntegration() {
               </button>
             </div>
 
-            <form onSubmit={handleSaveEditCredentials} className="space-y-4 text-xs font-semibold">
+            <form ref={editFormRef} onSubmit={handleSaveEditCredentials} className="space-y-4 text-xs font-semibold">
               <div>
                 <label className="block text-slate-700 font-bold mb-1">Business Name</label>
                 <input

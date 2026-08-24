@@ -59,6 +59,18 @@ def create_app(config_class=Config):
 
             db.create_all()
 
+            # Ensure new columns exist on tenant_settings for existing database
+            try:
+                from sqlalchemy import text
+                for col in ["show_qty", "show_rate", "show_mrp", "show_tax"]:
+                    try:
+                        db.session.execute(text(f"ALTER TABLE tenant_settings ADD COLUMN {col} BOOLEAN NOT NULL DEFAULT 1;"))
+                        db.session.commit()
+                    except Exception:
+                        db.session.rollback()
+            except Exception:
+                pass
+
             # AUTO-SEED: if the database is empty, seed default data
             from app.models.global_models import Tenant
             tenant_count = Tenant.query.count()

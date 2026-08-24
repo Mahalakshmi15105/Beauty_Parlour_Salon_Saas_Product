@@ -208,6 +208,70 @@ export function useModalFocusTrap(isOpen, modalRef, onClose) {
 }
 
 /**
+ * Custom React Hook: Sidebar Keyboard Navigation
+ * Enables ArrowUp/ArrowDown to move between sidebar navigation items when a
+ * sidebar item is focused, and ArrowLeft/ArrowRight to expand/collapse the
+ * sidebar (since this sidebar has no nested submenus, ←/→ toggle collapse).
+ *
+ * Only acts when the currently focused element is a sidebar navigation button
+ * (identified by the `data-sidebar-nav` attribute). Never interferes with
+ * forms, inputs, dropdowns, or other controls.
+ */
+export function useSidebarKeyboardNavigation(sidebarRef, onToggleCollapse) {
+  const onToggleCollapseRef = useRef(onToggleCollapse);
+  onToggleCollapseRef.current = onToggleCollapse;
+
+  useEffect(() => {
+    const sidebar = sidebarRef?.current;
+    if (!sidebar) return;
+
+    const handleKeyDown = (e) => {
+      const activeEl = document.activeElement;
+      if (!activeEl) return;
+
+      // Only act when a sidebar navigation item is focused
+      if (activeEl.getAttribute("data-sidebar-nav") !== "true") return;
+
+      // Preserve native system/browser key combinations
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+      // ArrowUp / ArrowDown → move between sidebar items
+      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+        e.preventDefault();
+        const navButtons = Array.from(
+          sidebar.querySelectorAll('button[data-sidebar-nav="true"]')
+        ).filter(isElementNavigable);
+
+        if (navButtons.length === 0) return;
+        const idx = navButtons.indexOf(activeEl);
+        if (idx === -1) return;
+
+        const nextIdx = e.key === "ArrowDown" ? idx + 1 : idx - 1;
+        if (nextIdx >= 0 && nextIdx < navButtons.length) {
+          try {
+            navButtons[nextIdx].focus();
+          } catch (err) {
+            // ignore
+          }
+        }
+        return;
+      }
+
+      // ArrowLeft / ArrowRight → expand/collapse the sidebar
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.preventDefault();
+        if (onToggleCollapseRef.current && typeof onToggleCollapseRef.current === "function") {
+          onToggleCollapseRef.current();
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [sidebarRef]);
+}
+
+/**
  * Utility: Advances focus directly to a target ref if current element is valid.
  */
 export function advanceToNextRef(currentEl, nextRef, onSubmit) {
