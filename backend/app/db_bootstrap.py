@@ -77,12 +77,16 @@ def ensure_database_exists(database_uri: str):
                 conn.execute(text("ALTER TABLE customer_memberships ADD COLUMN IF NOT EXISTS renew_count INT NOT NULL DEFAULT 0;"))
                 conn.execute(text("ALTER TABLE membership_plan_services ADD COLUMN IF NOT EXISTS discount_percentage DECIMAL(5,2) DEFAULT 0.00;"))
                 conn.execute(text("ALTER TABLE membership_plan_services ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(10,2) DEFAULT 0.00;"))
+                conn.execute(text("ALTER TABLE whatsapp_campaigns ADD COLUMN IF NOT EXISTS template_name VARCHAR(100) NULL;"))
+                conn.execute(text("ALTER TABLE whatsapp_campaigns ADD COLUMN IF NOT EXISTS template_params_json TEXT NULL;"))
                 conn.commit()
             except Exception:
                 try:
                     conn.execute(text("ALTER TABLE customer_memberships ADD COLUMN renew_count INT NOT NULL DEFAULT 0;"))
                     conn.execute(text("ALTER TABLE membership_plan_services ADD COLUMN discount_percentage DECIMAL(5,2) DEFAULT 0.00;"))
                     conn.execute(text("ALTER TABLE membership_plan_services ADD COLUMN discount_amount DECIMAL(10,2) DEFAULT 0.00;"))
+                    conn.execute(text("ALTER TABLE whatsapp_campaigns ADD COLUMN template_name VARCHAR(100) NULL;"))
+                    conn.execute(text("ALTER TABLE whatsapp_campaigns ADD COLUMN template_params_json TEXT NULL;"))
                     conn.commit()
                 except Exception:
                     pass

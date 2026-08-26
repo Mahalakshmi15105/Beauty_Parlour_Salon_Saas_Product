@@ -103,8 +103,8 @@ class WhatsAppService:
     def _resolve_credentials(tenant_setting: WhatsAppSetting):
         """Resolves the best available token & phone number ID.
         
-        Priority: Real env credentials (MET A .env) > tenant stored credentials.
-        Env credentials take precedence because they are the verified live Meta API keys.
+        Priority: Tenant stored credentials > System env default fallback.
+        Ensures multi-tenant isolation: each tenant uses their own WABA token & Phone Number ID if configured.
         """
         env_token = current_app.config.get("WHATSAPP_PERMANENT_ACCESS_TOKEN") or os.getenv("WHATSAPP_PERMANENT_ACCESS_TOKEN", "")
         env_phone_id = current_app.config.get("WHATSAPP_PHONE_NUMBER_ID") or os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
@@ -114,27 +114,26 @@ class WhatsAppService:
         tenant_phone_id = tenant_setting.meta_phone_number_id if tenant_setting else ""
         tenant_waba_id = tenant_setting.meta_waba_id if tenant_setting else ""
 
-        # Determine the best token: prefer real env token (starts with EAA), then tenant token
+        # Multi-Tenant Token Priority: prefer tenant's stored token if valid; fallback to system env
         token = ""
-        if env_token and env_token.startswith("EAA") and len(env_token) > 30:
-            token = env_token
-        elif tenant_token and tenant_token.startswith("EAA") and not tenant_token.startswith("SIMULATED"):
+        if tenant_token and len(tenant_token) > 10 and not tenant_token.startswith("SIMULATED"):
             token = tenant_token
+        elif env_token:
+            token = env_token
         else:
-            # Fallback: any token that isn't simulated
-            token = env_token or tenant_token
+            token = tenant_token
 
-        # Determine the best phone number ID: prefer real env phone ID, then tenant phone ID
+        # Multi-Tenant Phone ID Priority: prefer tenant's phone_id if valid; fallback to system env
         phone_id = ""
-        if env_phone_id and env_phone_id not in ["982304918237465", "109283746591023"] and len(env_phone_id) > 5:
-            phone_id = env_phone_id
-        elif tenant_phone_id and tenant_phone_id not in ["982304918237465", "109283746591023"] and len(tenant_phone_id) > 5:
+        if tenant_phone_id and tenant_phone_id not in ["982304918237465", "109283746591023"] and len(tenant_phone_id) > 5:
             phone_id = tenant_phone_id
+        elif env_phone_id:
+            phone_id = env_phone_id
         else:
-            phone_id = env_phone_id or tenant_phone_id
+            phone_id = tenant_phone_id
 
         # Also resolve WABA for context
-        waba_id = env_waba_id or tenant_waba_id
+        waba_id = tenant_waba_id if tenant_waba_id else env_waba_id
 
         return token, phone_id, waba_id
 
