@@ -629,7 +629,7 @@ function Billing() {
       })
       .then((savedCust) => {
         // Refresh customer list
-        return API.get("/customers?limit=100").then((resList) => {
+        return API.get("/customers?limit=10000").then((resList) => {
           setCustomers(resList.data.items || []);
           return savedCust;
         });
@@ -777,7 +777,7 @@ function Billing() {
       .then((res) => res.data?.data || res.data)
       .then((savedCust) => {
         // Refresh customer list
-        return API.get("/customers?limit=100").then((resList) => {
+        return API.get("/customers?limit=10000").then((resList) => {
           setCustomers(resList.data.items || []);
           return savedCust;
         });
@@ -833,8 +833,8 @@ function Billing() {
     Promise.all([
       API.get("/service-categories"),
       API.get("/employees?limit=100"),
-      API.get("/customers?limit=100"),
-      API.get("/products?limit=100"),
+      API.get("/customers?limit=10000"),
+      API.get("/products?limit=10000"),
       API.get("/settings"),
       API.get("/membership-plans?status=active&limit=100"),
     ])

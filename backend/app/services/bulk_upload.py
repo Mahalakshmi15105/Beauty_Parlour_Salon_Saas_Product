@@ -2,8 +2,6 @@
 Bulk Upload Service
 Shared functionality for processing Excel bulk uploads for Customers, Employees, Services, and Products
 """
-import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment
 from io import BytesIO
 import logging
 from datetime import datetime
@@ -79,6 +77,8 @@ def generate_excel_template(module_name):
     Returns the Excel file as bytes
     """
     try:
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = f"{module_name.capitalize()} Template"
@@ -186,6 +186,7 @@ def parse_excel_file(file_data, module_name):
     Returns: (success, data, errors)
     """
     try:
+        import openpyxl
         wb = openpyxl.load_workbook(BytesIO(file_data))
         ws = wb.active
         

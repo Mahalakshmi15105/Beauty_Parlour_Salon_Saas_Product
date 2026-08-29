@@ -4,7 +4,7 @@ def paginate_query(query, model, limit_val=20, cursor=None, sort_field="id", sor
     """
     # Parse limit
     try:
-        limit_val = min(int(limit_val), 100)
+        limit_val = min(int(limit_val), 10000)
     except (ValueError, TypeError):
         limit_val = 20
 

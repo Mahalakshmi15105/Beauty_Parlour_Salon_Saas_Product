@@ -51,12 +51,7 @@ def create_app(config_class=Config):
         # a clear error until the DB becomes available.
         # ------------------------------------------------------------------
         try:
-            # If RESET_DATABASE=true, drop ALL tables and recreate fresh
-            if app.config.get("RESET_DATABASE", False):
-                app.logger.warning("RESET_DATABASE=true: Dropping ALL tables and recreating fresh...")
-                db.drop_all()
-                app.logger.warning("All tables dropped.")
-
+            # Create tables if they do not exist (safe operation, will not overwrite/delete data)
             db.create_all()
 
             # Ensure new columns exist on tenant_settings for existing database

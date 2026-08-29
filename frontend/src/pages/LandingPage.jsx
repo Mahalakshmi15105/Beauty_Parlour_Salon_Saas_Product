@@ -98,9 +98,23 @@ function LandingPage({ isLoggedIn, onNavigateLogin, onNavigateRegister, onNaviga
         </p>
 
         <p className="max-w-2xl mx-auto text-sm text-slate-600 leading-relaxed font-medium">
-          Transform your beauty salon operations with our intuitive all-in-one software.
-          Effortlessly handle client appointments, POS checkout billing, stylist commissions, inventory reordering, membership packages, and real-time revenue analytics.
+          SmartGoNext Beauty Parlour is an all-in-one salon management software platform for
+          beauty salon owners, parlour admins, and multi-location chains in India. It brings
+          online appointments, POS checkout billing, stylist commissions, inventory reordering,
+          membership packages, and real-time revenue analytics into one simple dashboard.
         </p>
+
+        {/* Key takeaway / bottom-line summary for AI-answer extraction */}
+        <div className="relative max-w-3xl mx-auto bg-white border border-pink-200 rounded-2xl px-5 py-4 text-left shadow-sm text-sm">
+          <p className="text-xs uppercase font-extrabold tracking-widest text-pink-600 mb-1">
+            Key takeaway
+          </p>
+          <p className="text-slate-700 font-medium leading-relaxed">
+            Compared with juggling paper registers, Excel sheets, and separate apps, SmartGoNext
+            gives salon owners one place to run bookings, billing, commissions, and memberships —
+            so less time is wasted on admin and more revenue and client repeat visits are captured.
+          </p>
+        </div>
 
         <div className="relative flex flex-col sm:flex-row justify-center items-center gap-4 pt-4">
           {isLoggedIn ? (
@@ -136,6 +150,19 @@ function LandingPage({ isLoggedIn, onNavigateLogin, onNavigateRegister, onNaviga
               </button>
             </>
           )}
+        </div>
+
+        {/* Hero dashboard illustration with descriptive alt text */}
+        <div className="relative pt-10">
+          <img
+            src="/hero-dashboard.svg"
+            alt="SmartGoNext salon management dashboard showing appointments, POS billing, stylist commissions, and analytics"
+            width="600"
+            height="420"
+            className="mx-auto w-full max-w-2xl h-auto rounded-2xl border border-pink-100 shadow-xl shadow-pink-500/10"
+            loading="eager"
+            fetchPriority="high"
+          />
         </div>
 
         {/* Feature Pills */}
@@ -293,6 +320,123 @@ function LandingPage({ isLoggedIn, onNavigateLogin, onNavigateRegister, onNaviga
               Contact Enterprise
             </button>
           </div>
+        </div>
+      </section>
+
+      {/* Who should use SmartGoNext - audience & use-case clarity + internal links */}
+      <section id="about" className="px-6 lg:px-12 py-20 bg-white">
+        <div className="max-w-4xl mx-auto space-y-8">
+          <h2 className="text-center text-3xl font-extrabold text-slate-900">
+            Who is SmartGoNext salon software for?
+          </h2>
+          <p className="text-center text-slate-600 font-medium max-w-3xl mx-auto">
+            SmartGoNext is built for Indian beauty salon owners, parlour admins, franchise owners,
+            and multi-location salon chains. Whether you run a single boutique parlour or manage
+            several branches, the platform gives you one dashboard to run{" "}
+            <a href="#features" className="text-pink-600 font-bold hover:underline">
+              appointments, billing, commissions, and analytics
+            </a>
+            .
+          </p>
+          <div className="grid md:grid-cols-3 gap-6 text-sm">
+            <div className="bg-white border border-pink-100 p-6 rounded-2xl space-y-2">
+              <h3 className="font-bold text-slate-900">Boutique salons</h3>
+              <p className="text-slate-600 leading-relaxed">
+                Keep booking, billing, and client records organised without extra admin staff.
+              </p>
+            </div>
+            <div className="bg-white border border-pink-100 p-6 rounded-2xl space-y-2">
+              <h3 className="font-bold text-slate-900">Parlour owners &amp; managers</h3>
+              <p className="text-slate-600 leading-relaxed">
+                Track stylist commissions, expiry reminders, and daily sales from a simple dashboard.
+              </p>
+            </div>
+            <div className="bg-white border border-pink-100 p-6 rounded-2xl space-y-2">
+              <h3 className="font-bold text-slate-900">Multi-branch salon chains</h3>
+              <p className="text-slate-600 leading-relaxed">
+                Manage multiple locations with central controls, bulk data upload, and consistent
+                receipts. Compare{" "}
+                <a href="#pricing" className="text-pink-600 font-bold hover:underline">
+                  plans and pricing
+                </a>{" "}
+                to find the fit.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section - question headings with direct answers */}
+      <section id="faq" className="px-6 lg:px-12 py-20 bg-gradient-to-b from-white to-pink-50/40">
+        <div className="max-w-4xl mx-auto space-y-8">
+          <div className="text-center space-y-3">
+            <h2 className="text-xs uppercase font-extrabold tracking-widest text-pink-600">FAQ</h2>
+            <p className="text-3xl font-extrabold text-slate-900">
+              Frequently Asked Questions About SmartGoNext
+            </p>
+          </div>
+
+          <div className="space-y-6">
+            <div className="bg-white border border-pink-100 p-6 rounded-2xl">
+              <h3 className="font-bold text-slate-900">What is SmartGoNext salon management software?</h3>
+              <p className="text-sm text-slate-600 leading-relaxed mt-2">
+                SmartGoNext is an all-in-one SaaS platform for beauty parlours and salons. It handles
+                online appointments, point-of-sale billing, stylist commissions, client VIP memberships,
+                inventory, and real-time revenue analytics in one dashboard.
+              </p>
+            </div>
+
+            <div className="bg-white border border-pink-100 p-6 rounded-2xl">
+              <h3 className="font-bold text-slate-900">How does salon management software help my parlour?</h3>
+              <p className="text-sm text-slate-600 leading-relaxed mt-2">
+                It replaces manual registers and scattered spreadsheets. You reduce double-bookings,
+                cut billing errors, track every stylist&apos;s commission automatically, and see daily
+                revenue and top services at a glance — so you spend less time on admin and more on clients.
+              </p>
+            </div>
+
+            <div className="bg-white border border-pink-100 p-6 rounded-2xl">
+              <h3 className="font-bold text-slate-900">Can multiple stylists track commissions in SmartGoNext?</h3>
+              <p className="text-sm text-slate-600 leading-relaxed mt-2">
+                Yes. Assign stylists to each treatment line item during checkout and SmartGoNext
+                automatically computes accurate commission payouts per stylist.
+              </p>
+            </div>
+
+            <div className="bg-white border border-pink-100 p-6 rounded-2xl">
+              <h3 className="font-bold text-slate-900">How much does SmartGoNext cost?</h3>
+              <p className="text-sm text-slate-600 leading-relaxed mt-2">
+                Monthly plans start at INR 999 for Starter Salon, INR 1,999 for Pro Parlour, and INR
+                3,999 for Enterprise Chain. Choosing yearly billing saves 20%. You can compare options
+                on the{" "}
+                <a href="#pricing" className="text-pink-600 font-bold hover:underline">pricing</a>{" "}
+                section above.
+              </p>
+            </div>
+
+            <div className="bg-white border border-pink-100 p-6 rounded-2xl">
+              <h3 className="font-bold text-slate-900">Does SmartGoNext support client memberships and split payments?</h3>
+              <p className="text-sm text-slate-600 leading-relaxed mt-2">
+                Yes. It supports client VIP memberships with free-service redemptions and renewal
+                reminders, and lets you split a bill across Cash, Card, and UPI during checkout.
+              </p>
+            </div>
+          </div>
+
+          <p className="text-center text-xs text-slate-500 max-w-3xl mx-auto leading-relaxed">
+            India&apos;s beauty and personal care industry is one of the fastest-growing consumer
+            markets in the region, which is why more salon owners are adopting digital management
+            tools. Source:{" "}
+            <a
+              href="https://www.ibef.org/industry/services"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-pink-600 font-bold hover:underline"
+            >
+              IBEF — India Brand Equity Foundation
+            </a>
+            .
+          </p>
         </div>
       </section>
 

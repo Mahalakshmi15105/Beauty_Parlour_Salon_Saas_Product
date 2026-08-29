@@ -54,8 +54,8 @@ class Config:
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_pre_ping": True,
         "pool_recycle": 280,
-        "pool_size": 10,
-        "max_overflow": 20,
+        "pool_size": 3,
+        "max_overflow": 2,
     }
     
     # CORS
