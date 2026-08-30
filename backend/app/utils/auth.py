@@ -146,8 +146,20 @@ def require_role(roles):
             g.role = role
 
             if parlour_id:
-                from app.models.global_models import Tenant
-                tenant_exists = Tenant.query.filter_by(id=parlour_id).first()
+                from app.services.cache import cache
+                t_cache_key = f"tenant_valid:{parlour_id}"
+                tenant_exists = cache.get(t_cache_key)
+                if tenant_exists is None:
+                    try:
+                        from app.models.global_models import Tenant
+                        t_obj = Tenant.query.filter_by(id=parlour_id).first()
+                        tenant_exists = bool(t_obj)
+                        cache.set(t_cache_key, tenant_exists, timeout=1800)
+                    except Exception as e:
+                        import logging
+                        logging.getLogger(__name__).warning(f"Tenant verification fallback triggered: {e}")
+                        tenant_exists = True
+
                 if not tenant_exists:
                     return error_response(
                         error_code="INVALID_TENANT",
@@ -156,8 +168,20 @@ def require_role(roles):
                     )
 
             if branch_id:
-                from app.models.branch import Branch
-                branch_exists = Branch.query.filter_by(id=branch_id, tenant_id=parlour_id).first()
+                from app.services.cache import cache
+                b_cache_key = f"branch_valid:{parlour_id}:{branch_id}"
+                branch_exists = cache.get(b_cache_key)
+                if branch_exists is None:
+                    try:
+                        from app.models.branch import Branch
+                        b_obj = Branch.query.filter_by(id=branch_id, tenant_id=parlour_id).first()
+                        branch_exists = bool(b_obj)
+                        cache.set(b_cache_key, branch_exists, timeout=1800)
+                    except Exception as e:
+                        import logging
+                        logging.getLogger(__name__).warning(f"Branch verification fallback triggered: {e}")
+                        branch_exists = True
+
                 if not branch_exists:
                     return error_response(
                         error_code="INVALID_BRANCH",

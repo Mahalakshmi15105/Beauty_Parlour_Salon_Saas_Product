@@ -29,20 +29,32 @@ class Config:
     # ---------------------------------------------------------------
     # SINGLE-THREAD MODE
     # One thread serves ALL users sequentially (no multi-threading).
-    # Set SINGLE_THREAD=false only if you intentionally want multi.
+    # Minimizes CPU overhead and thread memory usage.
     # ---------------------------------------------------------------
-    SINGLE_THREAD = os.getenv("SINGLE_THREAD", "false").lower() in ("true", "1", "yes")
-    THREADS = 1 if SINGLE_THREAD else int(os.getenv("THREADS", 4))
+    SINGLE_THREAD = os.getenv("SINGLE_THREAD", "true").lower() in ("true", "1", "yes")
+    THREADS = 1 if SINGLE_THREAD else int(os.getenv("THREADS", 1))
 
     # ---------------------------------------------------------------
     # AUTO-SLEEP MODE
     # After AUTO_SLEEP_MINUTES of NO API activity, the backend kills
     # itself (and therefore ALL its threads) to save server resources.
-    # DISABLED for continuous 24-hour access
+    # Re-activates automatically on next incoming request.
     # ---------------------------------------------------------------
-    AUTO_SLEEP_ENABLED = os.getenv("AUTO_SLEEP_ENABLED", "false").lower() in ("true", "1", "yes")
-    AUTO_SLEEP_MINUTES = int(os.getenv("AUTO_SLEEP_MINUTES", 5))
+    AUTO_SLEEP_ENABLED = os.getenv("AUTO_SLEEP_ENABLED", "true").lower() in ("true", "1", "yes")
+    AUTO_SLEEP_MINUTES = int(os.getenv("AUTO_SLEEP_MINUTES", 30))
     AUTO_SLEEP_CHECK_INTERVAL = int(os.getenv("AUTO_SLEEP_CHECK_INTERVAL", 30))  # seconds
+
+    # ---------------------------------------------------------------
+    # REDIS CACHE CONFIGURATION
+    # IP Address: 127.0.0.1 | Port: 38215 | Password: dwVmwxCL4XoHTesUR7u
+    # Max Memory target: 128m
+    # ---------------------------------------------------------------
+    REDIS_ENABLED = os.getenv("REDIS_ENABLED", "true").lower() in ("true", "1", "yes")
+    REDIS_HOST = os.getenv("REDIS_HOST", "127.0.0.1")
+    REDIS_PORT = int(os.getenv("REDIS_PORT", 38215))
+    REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "dwVmwxCL4XoHTesUR7u")
+    REDIS_DB = int(os.getenv("REDIS_DB", 0))
+    REDIS_MAX_MEMORY = os.getenv("REDIS_MAX_MEMORY", "128m")
 
     # Database
     DATABASE_URL = os.getenv(
@@ -51,11 +63,17 @@ class Config:
     )
     SQLALCHEMY_DATABASE_URI = DATABASE_URL
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    # Optimized low-memory database pool with auto-reconnect and connection health pre-ping
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_pre_ping": True,
-        "pool_recycle": 280,
-        "pool_size": 3,
-        "max_overflow": 2,
+        "pool_recycle": 120,
+        "pool_size": 1 if SINGLE_THREAD else 3,
+        "max_overflow": 1 if SINGLE_THREAD else 2,
+        "connect_args": {
+            "connect_timeout": 10,
+            "read_timeout": 30,
+            "write_timeout": 30
+        }
     }
     
     # CORS

@@ -39,6 +39,11 @@ def ensure_tenant_categories(tenant_id):
     if not tenant_id:
         return
     try:
+        # Fast exit check: If tenant already has categories, skip checks
+        existing_cat = ServiceCategory.query.filter_by(tenant_id=tenant_id, is_deleted=False).first()
+        if existing_cat:
+            return
+
         tenant = Tenant.query.get(tenant_id)
         if not tenant:
             return
@@ -76,17 +81,27 @@ def ensure_tenant_categories(tenant_id):
 # --- SERVICE CATEGORY CRUD ---
 
 @services_bp.route("/service-categories", methods=["GET"])
-@require_role(["ParlourAdmin", "BranchAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin", "Receptionist", "Employee"])
 def get_categories():
+    from app.services.cache import cache
+
+    cache_key = f"categories:tenant:{g.parlour_id}"
+    cached_cats = cache.get(cache_key)
+    if cached_cats is not None:
+        return success_response(cached_cats)
+
     ensure_tenant_categories(g.parlour_id)
     categories = ServiceCategory.query.filter_by(tenant_id=g.parlour_id, is_deleted=False).order_by(ServiceCategory.name.asc()).all()
     data = [{"id": c.id, "name": c.name} for c in categories]
+    cache.set(cache_key, data, timeout=600)
     return success_response(data)
 
 
 @services_bp.route("/service-categories", methods=["POST"])
 @require_role(["ParlourAdmin", "BranchAdmin"])
 def create_category():
+    from app.services.cache import cache
+
     data = request.get_json() or {}
     name = data.get("name", "").strip()
 
@@ -112,6 +127,7 @@ def create_category():
         category = ServiceCategory(tenant_id=g.parlour_id, branch_id=target_branch_id, name=name)
         db.session.add(category)
         db.session.commit()
+        cache.delete(f"categories:tenant:{g.parlour_id}")
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error creating category: {str(e)}")
@@ -155,6 +171,8 @@ def update_category(category_id):
     try:
         category.name = name
         db.session.commit()
+        from app.services.cache import cache
+        cache.delete(f"categories:tenant:{g.parlour_id}")
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error updating category: {str(e)}")
@@ -190,6 +208,8 @@ def delete_category(category_id):
     try:
         category.soft_delete()
         db.session.commit()
+        from app.services.cache import cache
+        cache.delete(f"categories:tenant:{g.parlour_id}")
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error deleting category: {str(e)}")

@@ -19,11 +19,21 @@ def health_check():
         db_status = "unhealthy"
         db_error = str(e)
 
+    from app.services.cache import cache
+    from app.config import Config
+
     status_code = 200 if db_status == "healthy" else 500
     
     health_data = {
         "status": "healthy" if db_status == "healthy" else "degraded",
-        "database": db_status
+        "database": db_status,
+        "single_thread": Config.SINGLE_THREAD,
+        "threads": Config.THREADS,
+        "auto_sleep": {
+            "enabled": Config.AUTO_SLEEP_ENABLED,
+            "timeout_minutes": Config.AUTO_SLEEP_MINUTES,
+        },
+        "redis_cache": cache.get_status(),
     }
     
     if db_status == "healthy":

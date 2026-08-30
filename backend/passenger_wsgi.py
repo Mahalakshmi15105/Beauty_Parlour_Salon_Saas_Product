@@ -49,7 +49,15 @@ def _create_application():
     """
     try:
         from app import create_app
-        return create_app()
+        from app.database import db
+        app_instance = create_app()
+        # Cleanly dispose pooled connection initialized during startup so child WSGI workers create fresh connections
+        try:
+            with app_instance.app_context():
+                db.engine.dispose()
+        except Exception:
+            pass
+        return app_instance
     except Exception as exc:
         error_message = str(exc)
         logger.error(f"Failed to create full application: {error_message}")

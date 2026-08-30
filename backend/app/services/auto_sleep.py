@@ -38,19 +38,30 @@ def get_idle_seconds() -> float:
 
 
 def _shutdown_server():
-    """Kill the current process, terminating ALL threads."""
+    """Kill the current process, terminating ALL threads and releasing all memory."""
     logger.warning(
         "AUTO-SLEEP: No activity for %d minute(s). "
-        "Terminating server to save resources. "
-        "It will wake automatically on the next request.",
+        "Terminating server process & threads to reduce process footprint. "
+        "It will wake automatically on the next incoming request.",
         Config.AUTO_SLEEP_MINUTES,
     )
-    print("\n[AUTO-SLEEP] Idle timeout reached. Server going to sleep...", flush=True)
+    print(f"\n[AUTO-SLEEP] Idle timeout reached ({Config.AUTO_SLEEP_MINUTES} min). Server going to sleep...", flush=True)
     print("[AUTO-SLEEP] Next request will automatically restart it.", flush=True)
     sys.stdout.flush()
-    # Small delay so the log lines flush before dying
+    try:
+        from app.database import db
+        db.session.remove()
+        db.engine.dispose()
+    except Exception:
+        pass
     time.sleep(1)
-    os.kill(os.getpid(), signal.SIGTERM)
+    try:
+        if hasattr(signal, "SIGTERM"):
+            os.kill(os.getpid(), signal.SIGTERM)
+        else:
+            os._exit(0)
+    except Exception:
+        os._exit(0)
 
 
 def _sleep_monitor():

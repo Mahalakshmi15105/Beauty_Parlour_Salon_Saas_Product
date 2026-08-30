@@ -54,17 +54,9 @@ def create_app(config_class=Config):
             # Create tables if they do not exist (safe operation, will not overwrite/delete data)
             db.create_all()
 
-            # Ensure new columns exist on tenant_settings for existing database
-            try:
-                from sqlalchemy import text
-                for col in ["show_qty", "show_rate", "show_mrp", "show_tax"]:
-                    try:
-                        db.session.execute(text(f"ALTER TABLE tenant_settings ADD COLUMN {col} BOOLEAN NOT NULL DEFAULT 1;"))
-                        db.session.commit()
-                    except Exception:
-                        db.session.rollback()
-            except Exception:
-                pass
+            # Ensure all new/missing columns exist across existing database tables
+            from app.utils.db_migrations import run_auto_migrations
+            run_auto_migrations()
 
             # AUTO-SEED: if the database is empty, seed default data
             from app.models.global_models import Tenant
@@ -191,12 +183,19 @@ def create_app(config_class=Config):
         )
 
     # ------------------------------------------------------------------
+    # REDIS CACHE INITIALIZATION
+    # IP Address: 127.0.0.1 | Port: 38215 | Password: dwVmwxCL4XoHTesUR7u
+    # ------------------------------------------------------------------
+    from app.services.cache import cache
+    cache.init_app(app)
+
+    # ------------------------------------------------------------------
     # AUTO-SLEEP MODE
     # Starts the idle-monitor after ALL blueprints are registered so
     # the before_request hook sees every route.
-    # DISABLED for continuous 24-hour access
+    # Kills inactive process/threads after 30 minutes of idle time.
     # ------------------------------------------------------------------
-    # from app.services.auto_sleep import start_sleep_monitor
-    # start_sleep_monitor(app)
+    from app.services.auto_sleep import start_sleep_monitor
+    start_sleep_monitor(app)
 
     return app
