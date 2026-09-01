@@ -23,32 +23,34 @@ def resolve_tenant(identifier):
       - "zeros-lan-3" (slug ending with -ID)
       - "zeros-lan" (pure slug matching tenant name)
     """
+    from flask import g
+    g.use_master_db = True
+
+    tenant = None
     if isinstance(identifier, int):
-        return Tenant.query.filter_by(id=identifier, is_deleted=False).first()
+        tenant = Tenant.query.filter_by(id=identifier, is_deleted=False).first()
+    else:
+        raw = str(identifier).strip()
+        if raw.isdigit():
+            tenant = Tenant.query.filter_by(id=int(raw), is_deleted=False).first()
+        else:
+            match = re.search(r"-(\d+)$", raw)
+            if match:
+                tid = int(match.group(1))
+                tenant = Tenant.query.filter_by(id=tid, is_deleted=False).first()
+            if not tenant:
+                all_tenants = Tenant.query.filter_by(is_deleted=False).all()
+                for t in all_tenants:
+                    if t.slug == raw or t.name.lower() == raw.lower():
+                        tenant = t
+                        break
 
-    raw = str(identifier).strip()
-    if not raw:
-        return None
+    if tenant:
+        g.use_master_db = False
+        g.tenant_db_uri = tenant.db_connection_uri
+        g.parlour_id = tenant.id
 
-    # 1. Direct Integer check
-    if raw.isdigit():
-        return Tenant.query.filter_by(id=int(raw), is_deleted=False).first()
-
-    # 2. Extract trailing -ID if present (e.g. "zeros-lan-3")
-    match = re.search(r"-(\d+)$", raw)
-    if match:
-        tid = int(match.group(1))
-        t = Tenant.query.filter_by(id=tid, is_deleted=False).first()
-        if t:
-            return t
-
-    # 3. Match by tenant slug / name
-    all_tenants = Tenant.query.filter_by(is_deleted=False).all()
-    for t in all_tenants:
-        if t.slug == raw or t.name.lower() == raw.lower():
-            return t
-
-    return None
+    return tenant
 
 
 def resolve_branch(identifier):

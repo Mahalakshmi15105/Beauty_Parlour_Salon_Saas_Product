@@ -109,7 +109,9 @@ def create_plan():
             status_code=400
         )
     # Verify tenant exists
+    g.use_master_db = True
     tenant = Tenant.query.filter_by(id=g.parlour_id, is_deleted=False).first()
+    g.use_master_db = False
     if not tenant:
         return error_response(
             error_code="TENANT_NOT_FOUND",
@@ -212,7 +214,9 @@ def update_plan(plan_id):
             status_code=400
         )
     # Verify tenant exists
+    g.use_master_db = True
     tenant = Tenant.query.filter_by(id=g.parlour_id, is_deleted=False).first()
+    g.use_master_db = False
     if not tenant:
         return error_response(
             error_code="TENANT_NOT_FOUND",

@@ -5,7 +5,7 @@ class ServiceCategory(db.Model, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "service_categories"
 
     id = db.Column(db.Integer, primary_key=True)
-    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id = db.Column(db.Integer, nullable=False, index=True)
     branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     name = db.Column(db.String(100), nullable=False)
 
@@ -20,7 +20,7 @@ class Service(db.Model, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "services"
 
     id = db.Column(db.Integer, primary_key=True)
-    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id = db.Column(db.Integer, nullable=False, index=True)
     branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     category_id = db.Column(db.Integer, db.ForeignKey("service_categories.id"), nullable=False, index=True)
     name = db.Column(db.String(150), nullable=False)
@@ -41,7 +41,7 @@ class Product(db.Model, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "products"
 
     id = db.Column(db.Integer, primary_key=True)
-    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id = db.Column(db.Integer, nullable=False, index=True)
     branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     name = db.Column(db.String(150), nullable=False)
     category = db.Column(db.String(100), nullable=True)
@@ -63,7 +63,7 @@ class Supplier(db.Model, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "suppliers"
 
     id = db.Column(db.Integer, primary_key=True)
-    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id = db.Column(db.Integer, nullable=False, index=True)
     branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     name = db.Column(db.String(150), nullable=False)
     contact_name = db.Column(db.String(150), nullable=True)
@@ -81,7 +81,7 @@ class StockReorderLog(db.Model, TimestampMixin):
     __tablename__ = "stock_reorder_logs"
 
     id = db.Column(db.Integer, primary_key=True)
-    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id = db.Column(db.Integer, nullable=False, index=True)
     product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False, index=True)
     supplier_id = db.Column(db.Integer, db.ForeignKey("suppliers.id"), nullable=True, index=True)
     quantity = db.Column(db.Integer, nullable=False)

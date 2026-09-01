@@ -5,7 +5,7 @@ class MembershipPlan(db.Model, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "membership_plans"
 
     id = db.Column(db.Integer, primary_key=True)
-    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id = db.Column(db.Integer, nullable=False, index=True)
     branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text, nullable=True)
@@ -28,7 +28,7 @@ class MembershipPlanService(db.Model, TimestampMixin):
     __tablename__ = "membership_plan_services"
 
     id = db.Column(db.Integer, primary_key=True)
-    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id = db.Column(db.Integer, nullable=False, index=True)
     membership_plan_id = db.Column(db.Integer, db.ForeignKey("membership_plans.id"), nullable=False, index=True)
     service_id = db.Column(db.Integer, db.ForeignKey("services.id"), nullable=False, index=True)
     discount_percentage = db.Column(db.Numeric(5, 2), nullable=True, default=0.00)
@@ -46,7 +46,7 @@ class CustomerMembership(db.Model, TimestampMixin):
     __tablename__ = "customer_memberships"
 
     id = db.Column(db.Integer, primary_key=True)
-    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id = db.Column(db.Integer, nullable=False, index=True)
     branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     customer_id = db.Column(db.Integer, db.ForeignKey("customers.id"), nullable=False, index=True)
     membership_plan_id = db.Column(db.Integer, db.ForeignKey("membership_plans.id"), nullable=False, index=True)
@@ -67,7 +67,7 @@ class MembershipBenefit(db.Model, TimestampMixin):
     __tablename__ = "membership_benefits"
 
     id = db.Column(db.Integer, primary_key=True)
-    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id = db.Column(db.Integer, nullable=False, index=True)
     branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     customer_membership_id = db.Column(db.Integer, db.ForeignKey("customer_memberships.id"), nullable=False, index=True)
     service_id = db.Column(db.Integer, db.ForeignKey("services.id"), nullable=False, index=True)

@@ -5,7 +5,7 @@ class Invoice(db.Model, TimestampMixin):
     __tablename__ = "invoices"
 
     id = db.Column(db.Integer, primary_key=True)
-    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id = db.Column(db.Integer, nullable=False, index=True)
     branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     invoice_number = db.Column(db.String(100), nullable=False, unique=True, index=True)
     customer_id = db.Column(db.Integer, db.ForeignKey("customers.id"), nullable=False, index=True)
@@ -30,7 +30,7 @@ class InvoiceLineItem(db.Model, TimestampMixin):
     __tablename__ = "invoice_line_items"
 
     id = db.Column(db.Integer, primary_key=True)
-    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id = db.Column(db.Integer, nullable=False, index=True)
     branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     invoice_id = db.Column(db.Integer, db.ForeignKey("invoices.id"), nullable=False, index=True)
     service_id = db.Column(db.Integer, db.ForeignKey("services.id"), nullable=True, index=True)
@@ -55,7 +55,7 @@ class InvoicePayment(db.Model, TimestampMixin):
     __tablename__ = "invoice_payments"
 
     id = db.Column(db.Integer, primary_key=True)
-    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id = db.Column(db.Integer, nullable=False, index=True)
     invoice_id = db.Column(db.Integer, db.ForeignKey("invoices.id"), nullable=False, index=True)
     method = db.Column(db.String(50), nullable=False)  # cash, card, online
     amount = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)

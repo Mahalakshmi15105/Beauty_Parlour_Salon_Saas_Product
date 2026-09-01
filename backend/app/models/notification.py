@@ -5,7 +5,7 @@ class Notification(db.Model, TimestampMixin):
     __tablename__ = "notifications"
 
     id = db.Column(db.Integer, primary_key=True)
-    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id = db.Column(db.Integer, nullable=False, index=True)
     customer_id = db.Column(db.Integer, db.ForeignKey("customers.id"), nullable=True, index=True)
     customer_membership_id = db.Column(db.Integer, db.ForeignKey("customer_memberships.id"), nullable=True, index=True)
     

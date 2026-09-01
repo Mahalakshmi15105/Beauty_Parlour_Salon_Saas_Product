@@ -110,7 +110,9 @@ def bulk_upload_customers():
         
         # Check subscription plan customer limit
         from app.models.global_models import Tenant
+        g.use_master_db = True
         tenant = Tenant.query.get(g.parlour_id)
+        g.use_master_db = False
         if tenant and tenant.subscription_plan:
             plan = tenant.subscription_plan
             current_count = get_tenant_query(Customer).count()
@@ -245,7 +247,9 @@ def bulk_upload_employees():
         
         # Check subscription plan employee limit
         from app.models.global_models import Tenant
+        g.use_master_db = True
         tenant = Tenant.query.get(g.parlour_id)
+        g.use_master_db = False
         if tenant and tenant.subscription_plan:
             plan = tenant.subscription_plan
             current_count = get_tenant_query(Employee).count()
@@ -382,7 +386,9 @@ def bulk_upload_services():
         
         # Check subscription plan service limit
         from app.models.global_models import Tenant
+        g.use_master_db = True
         tenant = Tenant.query.get(g.parlour_id)
+        g.use_master_db = False
         if tenant and tenant.subscription_plan:
             plan = tenant.subscription_plan
             current_count = get_tenant_query(Service).count()

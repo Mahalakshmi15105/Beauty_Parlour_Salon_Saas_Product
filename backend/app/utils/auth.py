@@ -5,35 +5,28 @@ from app.utils.responses import error_response
 
 def get_tenant_query(model):
     """
-    Returns a query object for the model filtered automatically by the current request's tenant_id.
+    Returns a query object for the model scoped to the active tenant database.
+    Since each tenant has a physical database instance, tenant filtering is implicit.
     """
-    if not hasattr(g, "parlour_id"):
-        raise RuntimeError("Attempted to run tenant query outside a tenant-authenticated context.")
-    return model.query.filter_by(tenant_id=g.parlour_id, is_deleted=False) if hasattr(model, "is_deleted") else model.query.filter_by(tenant_id=g.parlour_id)
+    return model.query.filter_by(is_deleted=False) if hasattr(model, "is_deleted") else model.query
 
 def get_tenant_query_with_deleted(model):
     """
-    Returns a query object for the model filtered automatically by the current request's tenant_id, including soft deleted records.
+    Returns a query object for the model scoped to the active tenant database, including soft deleted records.
     """
-    if not hasattr(g, "parlour_id"):
-        raise RuntimeError("Attempted to run tenant query outside a tenant-authenticated context.")
-    return model.query.filter_by(tenant_id=g.parlour_id)
+    return model.query
 
 def get_branch_query(model):
     """
-    Returns a query object for the model filtered by tenant_id and branch_id.
+    Returns a query object for the model filtered by branch_id within the active tenant database.
     - If user is logged into a Branch (g.branch_id):
         Filters strictly by model.branch_id == g.branch_id (or shared branch_id IS NULL for catalog/services).
     - If user is Parlour Owner (g.parlour_id without g.branch_id):
-        - branch_id="all": Returns all records for tenant across main parlour & branches.
+        - branch_id="all": Returns all records across main parlour & branches.
         - branch_id=X (integer): Returns records for Branch X.
         - default (no branch_id specified): Returns records for Main Parlour (branch_id IS NULL).
     """
-    if not hasattr(g, "parlour_id"):
-        raise RuntimeError("Attempted to run branch query outside a tenant-authenticated context.")
-    
-    # Start with tenant filtering
-    query = model.query.filter_by(tenant_id=g.parlour_id, is_deleted=False) if hasattr(model, "is_deleted") else model.query.filter_by(tenant_id=g.parlour_id)
+    query = model.query.filter_by(is_deleted=False) if hasattr(model, "is_deleted") else model.query
     
     # If model has branch_id column:
     if hasattr(model, "branch_id"):
@@ -62,12 +55,9 @@ def get_branch_query(model):
 
 def get_branch_query_with_deleted(model):
     """
-    Returns a query object for the model filtered by tenant_id and branch_id, including soft deleted records.
+    Returns a query object for the model filtered by branch_id, including soft deleted records.
     """
-    if not hasattr(g, "parlour_id"):
-        raise RuntimeError("Attempted to run branch query outside a tenant-authenticated context.")
-    
-    query = model.query.filter_by(tenant_id=g.parlour_id)
+    query = model.query
     
     if hasattr(model, "branch_id"):
         if hasattr(g, "branch_id") and g.branch_id:
@@ -90,7 +80,7 @@ def get_branch_query_with_deleted(model):
 
 def require_role(roles):
     """
-    Decorator to enforce role permissions and bind tenant/branch context to flask.g.
+    Decorator to enforce role permissions and bind tenant/branch database context to flask.g.
     Accepts a single role string or a list of role strings.
     """
     if isinstance(roles, str):
@@ -105,6 +95,7 @@ def require_role(roles):
             
             user_id = int(identity) if identity else None
             parlour_id = claims.get("parlour_id")
+            tenant_db_uri = claims.get("tenant_db_uri")
             branch_id = claims.get("branch_id")
             role = claims.get("role")
 
@@ -115,6 +106,13 @@ def require_role(roles):
                     message="You do not have permission to perform this action.",
                     status_code=403
                 )
+
+            # SuperAdmin requests use Master DB
+            if role == "SuperAdmin":
+                g.use_master_db = True
+                g.user_id = user_id
+                g.role = role
+                return fn(*args, **kwargs)
 
             # Enforce that ParlourAdmin must have a parlour_id
             if "ParlourAdmin" in roles and role == "ParlourAdmin" and not parlour_id:
@@ -139,12 +137,25 @@ def require_role(roles):
                         status_code=403
                     )
 
+            # Resolve tenant database URI if not embedded directly in JWT
+            if parlour_id and not tenant_db_uri:
+                g.use_master_db = True
+                from app.models.global_models import Tenant
+                tenant_record = Tenant.query.filter_by(id=parlour_id, is_deleted=False).first()
+                if not tenant_record or tenant_record.status != "active":
+                    return error_response(
+                        error_code="INVALID_TENANT",
+                        message="The associated parlour tenant does not exist, is deleted, or is suspended.",
+                        status_code=400
+                    )
+                tenant_db_uri = tenant_record.db_connection_uri
+
             # Bind contexts to thread-local g
             g.user_id = user_id
             g.parlour_id = parlour_id
+            g.tenant_db_uri = tenant_db_uri
             g.branch_id = branch_id
             g.role = role
-
             if parlour_id:
                 from app.services.cache import cache
                 t_cache_key = f"tenant_valid:{parlour_id}"
@@ -152,7 +163,9 @@ def require_role(roles):
                 if tenant_exists is None:
                     try:
                         from app.models.global_models import Tenant
+                        g.use_master_db = True
                         t_obj = Tenant.query.filter_by(id=parlour_id).first()
+                        g.use_master_db = False
                         tenant_exists = bool(t_obj)
                         cache.set(t_cache_key, tenant_exists, timeout=1800)
                     except Exception as e:
@@ -189,6 +202,8 @@ def require_role(roles):
                         status_code=400
                     )
 
+            g.use_master_db = False
             return fn(*args, **kwargs)
         return wrapper
     return decorator
+

@@ -44,9 +44,18 @@ def get_super_admin_dashboard():
     arr = mrr * Decimal("12.00")
 
     # 3. Platform-Wide Aggregates
-    total_customers = Customer.query.count()
-    total_employees = Employee.query.count()
-    total_invoices = Invoice.query.count()
+    total_customers = 0
+    total_employees = 0
+    total_invoices = 0
+    active_tenants_list = Tenant.query.filter_by(status="active").all()
+    for t in active_tenants_list:
+        if t.db_connection_uri:
+            g.use_master_db = False
+            g.tenant_db_uri = t.db_connection_uri
+            total_customers += Customer.query.count()
+            total_employees += Employee.query.count()
+            total_invoices += Invoice.query.count()
+    g.use_master_db = True
 
     # 4. Recent Tenants
     recent_tenants_query = Tenant.query.order_by(Tenant.created_at.desc()).limit(5).all()

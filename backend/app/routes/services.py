@@ -44,7 +44,9 @@ def ensure_tenant_categories(tenant_id):
         if existing_cat:
             return
 
+        g.use_master_db = True
         tenant = Tenant.query.get(tenant_id)
+        g.use_master_db = False
         if not tenant:
             return
         added = False

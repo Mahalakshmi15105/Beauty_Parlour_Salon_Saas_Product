@@ -28,12 +28,11 @@ class Tenant(db.Model, TimestampMixin, SoftDeleteMixin):
     status = db.Column(db.String(50), nullable=False, default="active")  # active, suspended, closed
     subscription_plan_id = db.Column(db.Integer, db.ForeignKey("subscription_plans.id"), nullable=False)
     subscription_expires_at = db.Column(db.DateTime, nullable=True)
+    db_name = db.Column(db.String(150), nullable=True)
+    db_connection_uri = db.Column(db.String(500), nullable=True)
 
     # Relationships
     subscription_plan = db.relationship("SubscriptionPlan", back_populates="tenants")
-    users = db.relationship("User", back_populates="tenant", cascade="all, delete-orphan")
-    settings = db.relationship("TenantSetting", back_populates="tenant", cascade="all, delete-orphan", uselist=False)
-    branches = db.relationship("Branch", back_populates="tenant", cascade="all, delete-orphan")
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

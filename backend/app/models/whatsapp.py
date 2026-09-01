@@ -28,7 +28,7 @@ class WhatsAppSetting(db.Model, TimestampMixin):
     __tablename__ = "whatsapp_settings"
 
     id = db.Column(db.Integer, primary_key=True)
-    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, unique=True, index=True)
+    tenant_id = db.Column(db.Integer, nullable=False, unique=True, index=True)
     meta_waba_id = db.Column(db.String(100), nullable=True)
     meta_phone_number_id = db.Column(db.String(100), nullable=True)
     encrypted_access_token = db.Column(db.Text, nullable=True)
@@ -68,7 +68,7 @@ class WhatsAppCampaign(db.Model, TimestampMixin):
     __tablename__ = "whatsapp_campaigns"
 
     id = db.Column(db.Integer, primary_key=True)
-    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id = db.Column(db.Integer, nullable=False, index=True)
     created_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     title = db.Column(db.String(200), nullable=False)
     template_type = db.Column(db.String(50), nullable=False, default="TEXT_ONLY")  # TEXT_ONLY, IMAGE_WITH_CAPTION
@@ -130,7 +130,7 @@ class WhatsAppCampaignRecipient(db.Model, TimestampMixin):
     __tablename__ = "whatsapp_campaign_recipients"
 
     id = db.Column(db.Integer, primary_key=True)
-    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id = db.Column(db.Integer, nullable=False, index=True)
     campaign_id = db.Column(db.Integer, db.ForeignKey("whatsapp_campaigns.id"), nullable=False, index=True)
     customer_id = db.Column(db.Integer, db.ForeignKey("customers.id"), nullable=True, index=True)
     customer_name = db.Column(db.String(150), nullable=False)
@@ -171,7 +171,7 @@ class WhatsAppLog(db.Model, TimestampMixin):
     __tablename__ = "whatsapp_logs"
 
     id = db.Column(db.Integer, primary_key=True)
-    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id = db.Column(db.Integer, nullable=False, index=True)
     campaign_id = db.Column(db.Integer, db.ForeignKey("whatsapp_campaigns.id"), nullable=True, index=True)
     recipient_id = db.Column(db.Integer, db.ForeignKey("whatsapp_campaign_recipients.id"), nullable=True, index=True)
     event_type = db.Column(db.String(50), nullable=False)  # OAUTH_CONNECT, API_REQUEST, META_WEBHOOK, RETRY_ATTEMPT, ERROR

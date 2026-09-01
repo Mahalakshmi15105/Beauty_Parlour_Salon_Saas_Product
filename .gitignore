@@ -19,6 +19,8 @@ dist/
 # Environment Variables & Logs
 .env
 *.log
+*.sql
+audit_output.txt
 
 # IDE & System Files
 .vscode/

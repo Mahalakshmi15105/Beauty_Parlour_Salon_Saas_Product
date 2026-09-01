@@ -53,7 +53,9 @@ def create_branch():
         )
 
     # Check branch limit
+    g.use_master_db = True
     tenant = Tenant.query.get(g.parlour_id)
+    g.use_master_db = False
     if not tenant:
         return error_response(
             error_code="TENANT_NOT_FOUND",
@@ -273,7 +275,9 @@ def delete_branch(branch_id):
 @require_role(["ParlourAdmin"])
 def check_branch_limit():
     """Check if tenant can create more branches"""
+    g.use_master_db = True
     tenant = Tenant.query.get(g.parlour_id)
+    g.use_master_db = False
     if not tenant:
         return error_response(
             error_code="TENANT_NOT_FOUND",

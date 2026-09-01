@@ -33,14 +33,28 @@ def create_app(config_class=Config):
             allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
             methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         )
+    # Configure Database-per-Tenant URI defaults
+    master_uri = app.config.get("MASTER_DATABASE_URI") or app.config.get("SQLALCHEMY_DATABASE_URI", "mysql+pymysql://root:root@localhost:3306/parlour_master?charset=utf8mb4")
+    app.config["MASTER_DATABASE_URI"] = master_uri
+    app.config["MYSQL_BASE_URI"] = app.config.get("MYSQL_BASE_URI", "mysql+pymysql://root:root@localhost:3306/")
+
     db.init_app(app)
     migrate.init_app(app, db)
 
+    @app.before_request
+    def set_default_request_context():
+        from flask import g
+        g.use_master_db = True
+
+    @app.teardown_request
+    def teardown_request_context(exception=None):
+        db.session.remove()
+
     # ------------------------------------------------------------------
     # AUTO DATABASE CREATION
-    # If the database does not exist (fresh server), create it first.
+    # If the master database does not exist (fresh server), create it first.
     # ------------------------------------------------------------------
-    ensure_database_exists(app.config["SQLALCHEMY_DATABASE_URI"])
+    ensure_database_exists(app.config["MASTER_DATABASE_URI"])
 
     with app.app_context():
         # ------------------------------------------------------------------

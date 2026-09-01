@@ -34,7 +34,9 @@ def get_settings():
         branch = Branch.query.filter_by(id=g.branch_id, tenant_id=g.parlour_id).first()
 
     setting = main_setting
+    g.use_master_db = True
     tenant = Tenant.query.get(g.parlour_id)
+    g.use_master_db = False
 
     def _get(attr, default=""):
         val = getattr(setting, attr, None) if setting else None
@@ -142,7 +144,9 @@ def update_settings():
     if g.role == "BranchAdmin" and g.branch_id:
         branch = Branch.query.filter_by(id=g.branch_id, tenant_id=g.parlour_id).first()
 
+    g.use_master_db = True
     tenant = Tenant.query.get(g.parlour_id)
+    g.use_master_db = False
 
     biz = data.get("business_profile", {})
     inv = data.get("invoice_settings", {})

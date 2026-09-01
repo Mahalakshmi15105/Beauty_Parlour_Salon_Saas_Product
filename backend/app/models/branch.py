@@ -5,7 +5,7 @@ class Branch(db.Model, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "branches"
 
     id = db.Column(db.Integer, primary_key=True)
-    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id = db.Column(db.Integer, nullable=False, index=True)
     name = db.Column(db.String(150), nullable=False)
     address = db.Column(db.Text, nullable=True)
     phone = db.Column(db.String(30), nullable=True)
@@ -22,7 +22,6 @@ class Branch(db.Model, TimestampMixin, SoftDeleteMixin):
     accent_color = db.Column(db.String(50), nullable=True)
 
     # Relationships
-    tenant = db.relationship("Tenant", back_populates="branches")
     users = db.relationship("User", back_populates="branch")
 
     def __init__(self, **kwargs):
