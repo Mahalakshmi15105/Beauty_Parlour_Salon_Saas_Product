@@ -24,10 +24,10 @@ def checkout():
     payments_data = data.get("payments", [])
     notes = data.get("notes")
 
-    if not customer_id or not line_items_data or not payments_data:
+    if not line_items_data or not payments_data:
         return error_response(
             error_code="VALIDATION_FAILED",
-            message="Customer ID, line items, and payment allocations are required.",
+            message="Line items and payment allocations are required.",
             status_code=400
         )
 

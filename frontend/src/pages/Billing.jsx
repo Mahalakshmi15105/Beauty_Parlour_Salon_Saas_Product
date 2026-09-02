@@ -61,6 +61,7 @@ function Billing() {
   const genderSelectRef = useRef(null);
   const categorySelectRef = useRef(null);
   const serviceSelectRef = useRef(null);
+  const shouldFocusServiceRef = useRef(false);
   const addServiceBtnRef = useRef(null);
   const checkoutContainerRef = useRef(null);
   const paymentModalRef = useRef(null);
@@ -894,6 +895,15 @@ function Billing() {
         const svcs = res.data.items || [];
         setServices(svcs);
         setSelectedServiceId("");
+        if (shouldFocusServiceRef.current) {
+          shouldFocusServiceRef.current = false;
+          setTimeout(() => {
+            if (serviceSelectRef.current) {
+              serviceSelectRef.current.focus();
+              openNativeSelectDropdown(serviceSelectRef.current);
+            }
+          }, 60);
+        }
       })
       .catch((err) => console.error("Error fetching category services:", err));
   }, [selectedCategoryId]);
@@ -918,10 +928,15 @@ function Billing() {
   const handleCustomerChange = (customerIdStr) => {
     setSelectedCustomerId(customerIdStr);
     setActiveMembership(null);
-    if (!customerIdStr || customerIdStr === "walkin") return;
+    if (!customerIdStr || customerIdStr === "walkin") {
+      setSelectedGender("Female");
+      return;
+    }
     const cust = customers.find((c) => c.id === parseInt(customerIdStr));
     if (cust && cust.gender) {
       setSelectedGender(cust.gender);
+    } else {
+      setSelectedGender("Female");
     }
 
     API.get(`/customers/${customerIdStr}/history`)
@@ -1332,18 +1347,36 @@ function Billing() {
 
   const handleProceedToPayment = () => {
     if (!selectedCustomerId) {
-      alert("Please select a Customer before proceeding.");
+      if (customerSelectRef.current) {
+        customerSelectRef.current.focus();
+        setIsCustomerDropdownOpen(true);
+        setCustomerHighlightedIndex(0);
+      }
       return;
     }
     if (cart.length === 0) {
-      alert("Please add at least one service to the billing table.");
+      if (!selectedCategoryId) {
+        if (categorySelectRef.current) {
+          categorySelectRef.current.focus();
+          openNativeSelectDropdown(categorySelectRef.current);
+        }
+      } else {
+        if (serviceSelectRef.current) {
+          serviceSelectRef.current.focus();
+          openNativeSelectDropdown(serviceSelectRef.current);
+        }
+      }
       return;
     }
-    const missingEmp = cart.some(
+    const missingEmpIdx = cart.findIndex(
       (item) => item.type === "service" && (!item.employee_ids || item.employee_ids.length === 0)
     );
-    if (missingEmp) {
-      alert("Stylist employee selection is mandatory for every service line item before payment.");
+    if (missingEmpIdx !== -1) {
+      const empSelect = document.querySelector(`[data-row="${missingEmpIdx}"][data-field="employee"]`);
+      if (empSelect) {
+        empSelect.focus();
+        openNativeSelectDropdown(empSelect);
+      }
       return;
     }
 
@@ -1355,30 +1388,7 @@ function Billing() {
   const handleProceedToPaymentRef = useRef(handleProceedToPayment);
   handleProceedToPaymentRef.current = handleProceedToPayment;
 
-  // F9 / Ctrl+Enter → Proceed to Payment (Billing page only)
-  // Reuses the existing handleProceedToPayment flow — validates the form,
-  // calculates totals, preserves membership discounts/taxes, and opens the
-  // existing Payment modal. Registered in capture phase on window to prevent
-  // input keydown handlers or browser defaults from swallowing the shortcut.
-  useEffect(() => {
-    const handlePaymentShortcut = (e) => {
-      if (activeSubTab !== "checkout") return;
-      if (showPaymentModal || showReceipt) return;
-
-      const isF9 = e.key === "F9" || e.code === "F9" || e.keyCode === 120;
-      const isCtrlEnter = (e.ctrlKey || e.metaKey) && (e.key === "Enter" || e.code === "Enter" || e.keyCode === 13);
-
-      if (isF9 || isCtrlEnter) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (handleProceedToPaymentRef.current) {
-          handleProceedToPaymentRef.current();
-        }
-      }
-    };
-    window.addEventListener("keydown", handlePaymentShortcut, true);
-    return () => window.removeEventListener("keydown", handlePaymentShortcut, true);
-  }, [activeSubTab, showPaymentModal, showReceipt]);
+  const handleCheckoutSubmitRef = useRef(null);
 
   // Submit Save Bill
   const handleCheckoutSubmit = () => {
@@ -1394,7 +1404,7 @@ function Billing() {
     }
 
     const payload = {
-      customer_id: parseInt(selectedCustomerId),
+      customer_id: selectedCustomerId === "walkin" || !selectedCustomerId ? "walkin" : parseInt(selectedCustomerId),
       line_items: cart.map((x) => ({
         type: x.type,
         item_id: x.item_id,
@@ -1437,6 +1447,45 @@ function Billing() {
         setLoading(false);
       });
   };
+
+  handleCheckoutSubmitRef.current = handleCheckoutSubmit;
+
+  // Ctrl+Enter / Cmd+Enter / F9 / Alt+S → Proceed to Payment / Save Bill (Billing page only)
+  useEffect(() => {
+    const handlePaymentShortcut = (e) => {
+      if (activeSubTab !== "checkout") return;
+      if (showReceipt) return;
+
+      const isF9 = e.key === "F9" || e.code === "F9" || e.keyCode === 120;
+      const isCtrlEnter = (e.ctrlKey || e.metaKey) && (e.key === "Enter" || e.code === "Enter" || e.keyCode === 13);
+      const isAltS = e.altKey && (e.key === "s" || e.key === "S" || e.code === "KeyS");
+
+      if (isCtrlEnter || isF9 || isAltS) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        console.log("[Billing Shortcut Triggered]", {
+          shortcut: isCtrlEnter ? "Ctrl+Enter" : isF9 ? "F9" : "Alt+S",
+          showPaymentModal,
+          target: e.target?.tagName
+        });
+
+        if (showPaymentModal) {
+          // Payment modal is open -> submit Save Bill
+          if (handleCheckoutSubmitRef.current) {
+            handleCheckoutSubmitRef.current();
+          }
+        } else {
+          // Payment modal is closed -> validate form and open Payment modal
+          if (handleProceedToPaymentRef.current) {
+            handleProceedToPaymentRef.current();
+          }
+        }
+      }
+    };
+    window.addEventListener("keydown", handlePaymentShortcut, true);
+    return () => window.removeEventListener("keydown", handlePaymentShortcut, true);
+  }, [activeSubTab, showPaymentModal, showReceipt]);
 
   const handlePrintThermalReceipt = (inv = null) => {
     if (isPrintingRef.current) return;
@@ -1809,19 +1858,19 @@ function Billing() {
                             handleCustomerChange("walkin");
                             setCustomerSearchQuery("Walk-in Customer");
                             setIsCustomerDropdownOpen(false);
-                            advanceAndOpenSelect(e.target, genderSelectRef);
+                            advanceAndOpenSelect(e.target, categorySelectRef);
                           } else if (targetOpt.type === "customer") {
                             const c = targetOpt.data;
                             handleCustomerChange(String(c.id));
                             setCustomerSearchQuery(`${c.first_name} ${c.last_name || ""} (${c.phone || "No Phone"})`);
                             setIsCustomerDropdownOpen(false);
-                            advanceAndOpenSelect(e.target, genderSelectRef);
+                            advanceAndOpenSelect(e.target, categorySelectRef);
                           } else if (targetOpt.type === "add_new") {
                             openQuickAddCustomer(customerSearchQuery !== "Walk-in Customer" ? customerSearchQuery : "");
                             setIsCustomerDropdownOpen(false);
                           }
                         } else {
-                          advanceAndOpenSelect(e.target, genderSelectRef);
+                          advanceAndOpenSelect(e.target, categorySelectRef);
                         }
                       } else if (e.key === "Escape") {
                         setIsCustomerDropdownOpen(false);
@@ -1861,7 +1910,7 @@ function Billing() {
                                   handleCustomerChange("walkin");
                                   setCustomerSearchQuery("Walk-in Customer");
                                   setIsCustomerDropdownOpen(false);
-                                  setTimeout(() => advanceAndOpenSelect(customerSelectRef.current, genderSelectRef), 50);
+                                  setTimeout(() => advanceAndOpenSelect(customerSelectRef.current, categorySelectRef), 50);
                                 }}
                                 className={`w-full text-left px-4 py-2.5 flex items-center justify-between border-b border-border-soft font-bold ${
                                   isHighlighted ? "bg-pink-100 text-primary border-l-4 border-primary" : "hover:bg-primary-light/50 text-primary"
@@ -1886,7 +1935,7 @@ function Billing() {
                                   handleCustomerChange(String(c.id));
                                   setCustomerSearchQuery(`${c.first_name} ${c.last_name || ""} (${c.phone || "No Phone"})`);
                                   setIsCustomerDropdownOpen(false);
-                                  setTimeout(() => advanceAndOpenSelect(customerSelectRef.current, genderSelectRef), 50);
+                                  setTimeout(() => advanceAndOpenSelect(customerSelectRef.current, categorySelectRef), 50);
                                 }}
                                 className={`w-full text-left px-4 py-2 flex items-center justify-between border-b border-border-soft/40 ${
                                   isHighlighted ? "bg-pink-100 text-slate-900 border-l-4 border-primary" : "hover:bg-background"
@@ -1933,26 +1982,14 @@ function Billing() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Gender *</label>
-                <select
-                  ref={genderSelectRef}
-                  value={selectedGender}
-                  onChange={(e) => setSelectedGender(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "ArrowRight" || e.key === "Enter") {
-                      e.preventDefault();
-                      advanceAndOpenSelect(e.target, categorySelectRef);
-                    } else if (e.key === "ArrowLeft") {
-                      e.preventDefault();
-                      advanceToNextRef(e.target, customerSelectRef);
-                    }
-                  }}
-                  className="w-full bg-background border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
-                >
-                  <option value="Female">Female</option>
-                  <option value="Male">Male</option>
-                  <option value="Other">Other</option>
-                </select>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Gender (Auto-fetched)</label>
+                <input
+                  type="text"
+                  readOnly
+                  tabIndex={-1}
+                  value={selectedGender || "Female"}
+                  className="w-full bg-slate-100 border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 cursor-not-allowed focus:outline-none"
+                />
               </div>
 
               <div className="bg-primary-light border border-primary/20 p-3 rounded-xl flex items-center justify-between">
@@ -2060,14 +2097,28 @@ function Billing() {
                 <select
                   ref={categorySelectRef}
                   value={selectedCategoryId}
-                  onChange={(e) => setSelectedCategoryId(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedCategoryId(val);
+                    setSelectedServiceId("");
+                    if (val) {
+                      shouldFocusServiceRef.current = true;
+                    }
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "ArrowRight" || e.key === "Enter") {
                       e.preventDefault();
-                      advanceAndOpenSelect(e.target, serviceSelectRef);
+                      if (selectedCategoryId) {
+                        shouldFocusServiceRef.current = true;
+                        advanceAndOpenSelect(e.target, serviceSelectRef);
+                      }
                     } else if (e.key === "ArrowLeft") {
                       e.preventDefault();
-                      advanceToNextRef(e.target, genderSelectRef);
+                      if (customerSelectRef.current) {
+                        customerSelectRef.current.focus();
+                        setIsCustomerDropdownOpen(true);
+                        setCustomerHighlightedIndex(0);
+                      }
                     }
                   }}
                   className="w-full bg-background border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
@@ -2087,31 +2138,42 @@ function Billing() {
                   ref={serviceSelectRef}
                   value={selectedServiceId}
                   onChange={(e) => {
-                    setSelectedServiceId(e.target.value);
+                    const val = e.target.value;
+                    if (val) {
+                      setSelectedServiceId(val);
+                      handleAddServiceToCart(val);
+                      setTimeout(() => {
+                        const empSelects = document.querySelectorAll('[data-field="employee"]');
+                        if (empSelects.length > 0) {
+                          const lastEmpSelect = empSelects[empSelects.length - 1];
+                          lastEmpSelect.focus();
+                          openNativeSelectDropdown(lastEmpSelect);
+                        }
+                      }, 100);
+                    }
                   }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === "ArrowRight") {
                       e.preventDefault();
                       if (selectedServiceId) {
-                        // Add the selected service to the billing line-item table
                         handleAddServiceToCart(selectedServiceId);
-                        setSelectedServiceId("");
-                        // After the service is successfully added, loop back to
-                        // the first Billing field (Customer Name) so the user can
-                        // repeatedly add services without touching the mouse.
                         setTimeout(() => {
-                          if (customerSelectRef.current) {
-                            customerSelectRef.current.focus();
-                            setIsCustomerDropdownOpen(true);
-                            setCustomerHighlightedIndex(0);
+                          const empSelects = document.querySelectorAll('[data-field="employee"]');
+                          if (empSelects.length > 0) {
+                            const lastEmpSelect = empSelects[empSelects.length - 1];
+                            lastEmpSelect.focus();
+                            openNativeSelectDropdown(lastEmpSelect);
                           }
-                        }, 50);
+                        }, 100);
                       } else {
                         advanceToNextRef(e.target, addProductBtnRef);
                       }
                     } else if (e.key === "ArrowLeft") {
                       e.preventDefault();
-                      advanceAndOpenSelect(e.target, categorySelectRef);
+                      if (categorySelectRef.current) {
+                        categorySelectRef.current.focus();
+                        openNativeSelectDropdown(categorySelectRef.current);
+                      }
                     }
                   }}
                   disabled={!selectedCategoryId}
@@ -2317,11 +2379,32 @@ function Billing() {
                                 data-field="employee"
                                 value=""
                                 onChange={(e) => {
-                                  if (e.target.value) {
-                                    handleSelectEmployee(idx, e.target.value);
+                                  const val = e.target.value;
+                                  if (val) {
+                                    handleSelectEmployee(idx, val);
+                                    setSelectedServiceId("");
+                                    setTimeout(() => {
+                                      if (categorySelectRef.current) {
+                                        categorySelectRef.current.focus();
+                                        openNativeSelectDropdown(categorySelectRef.current);
+                                      }
+                                    }, 100);
                                   }
                                 }}
-                                onKeyDown={(e) => handleLineItemKeyDown(e, idx, "employee")}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" && e.target.value) {
+                                    handleSelectEmployee(idx, e.target.value);
+                                    setSelectedServiceId("");
+                                    setTimeout(() => {
+                                      if (categorySelectRef.current) {
+                                        categorySelectRef.current.focus();
+                                        openNativeSelectDropdown(categorySelectRef.current);
+                                      }
+                                    }, 100);
+                                  } else {
+                                    handleLineItemKeyDown(e, idx, "employee");
+                                  }
+                                }}
                                 className="w-full bg-background border border-border-soft px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
                               >
                                 <option value="" disabled hidden>Choose Employee</option>
@@ -2435,7 +2518,7 @@ function Billing() {
                   className="w-full bg-primary hover:bg-primary-hover text-white py-3 rounded-xl text-xs font-extrabold shadow-md shadow-pink-500/20 transition flex items-center justify-center space-x-2"
                 >
                   <CreditCard className="w-4 h-4" />
-                  <span>Proceed to Payment</span>
+                  <span>Proceed to Payment (Ctrl + Enter)</span>
                 </button>
               </div>
             </div>
@@ -2674,7 +2757,7 @@ function Billing() {
                   }}
                   className="px-6 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-extrabold shadow-md shadow-pink-500/20"
                 >
-                  Save Bill
+                  Save Bill (Ctrl + Enter)
                 </button>
               </div>
             </div>

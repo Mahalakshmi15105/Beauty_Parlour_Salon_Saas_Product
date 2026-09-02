@@ -40,9 +40,14 @@ class Config:
     # itself (and therefore ALL its threads) to save server resources.
     # Re-activates automatically on next incoming request.
     # ---------------------------------------------------------------
-    AUTO_SLEEP_ENABLED = os.getenv("AUTO_SLEEP_ENABLED", "true").lower() in ("true", "1", "yes")
+    AUTO_SLEEP_ENABLED = os.getenv("AUTO_SLEEP_ENABLED", "false").lower() in ("true", "1", "yes")
     AUTO_SLEEP_MINUTES = int(os.getenv("AUTO_SLEEP_MINUTES", 30))
     AUTO_SLEEP_CHECK_INTERVAL = int(os.getenv("AUTO_SLEEP_CHECK_INTERVAL", 30))  # seconds
+
+    # JWT Expiration
+    from datetime import timedelta
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(days=30)
+    JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=90)
 
     # ---------------------------------------------------------------
     # REDIS CACHE CONFIGURATION

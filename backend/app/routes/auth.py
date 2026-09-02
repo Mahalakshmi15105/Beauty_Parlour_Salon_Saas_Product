@@ -99,13 +99,13 @@ def login():
         "role": user.role
     }
     
-    access_token = create_access_token(identity=str(user.id), additional_claims=additional_claims, expires_delta=timedelta(hours=2))
-    refresh_token = create_refresh_token(identity=str(user.id), additional_claims=additional_claims, expires_delta=timedelta(days=7))
+    access_token = create_access_token(identity=str(user.id), additional_claims=additional_claims, expires_delta=timedelta(days=30))
+    refresh_token = create_refresh_token(identity=str(user.id), additional_claims=additional_claims, expires_delta=timedelta(days=90))
 
     return success_response({
         "token": access_token,
         "refresh_token": refresh_token,
-        "expires_in": 7200,
+        "expires_in": 2592000,
         "user": build_user_payload(user, tenant_name=tenant.name)
     })
 
@@ -153,10 +153,10 @@ def refresh():
         "branch_id": claims.get("branch_id"),
         "role": claims.get("role")
     }
-    new_access_token = create_access_token(identity=identity, additional_claims=additional_claims, expires_delta=timedelta(hours=2))
+    new_access_token = create_access_token(identity=identity, additional_claims=additional_claims, expires_delta=timedelta(days=30))
     return success_response({
         "token": new_access_token,
-        "expires_in": 7200
+        "expires_in": 2592000
     })
 
 
@@ -302,13 +302,13 @@ def register():
             "branch_id": None,
             "role": user.role
         }
-        access_token = create_access_token(identity=str(user.id), additional_claims=additional_claims, expires_delta=timedelta(hours=2))
-        refresh_token = create_refresh_token(identity=str(user.id), additional_claims=additional_claims, expires_delta=timedelta(days=7))
+        access_token = create_access_token(identity=str(user.id), additional_claims=additional_claims, expires_delta=timedelta(days=30))
+        refresh_token = create_refresh_token(identity=str(user.id), additional_claims=additional_claims, expires_delta=timedelta(days=90))
 
         return success_response({
             "token": access_token,
             "refresh_token": refresh_token,
-            "expires_in": 7200,
+            "expires_in": 2592000,
             "user": {
                 "id": user.id,
                 "email": user.email,
