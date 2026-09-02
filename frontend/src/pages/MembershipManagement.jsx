@@ -1,11 +1,53 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import API from "../services/api";
 import MembershipPlans from "./MembershipPlans";
 import CustomerMemberships from "./CustomerMemberships";
+import VisitMembershipRecords from "../components/VisitMembershipRecords";
 import { Award, CreditCard } from "lucide-react";
 
 function MembershipManagement() {
+  const [membershipMode, setMembershipMode] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("plans"); // "plans" or "customer_memberships"
 
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const activeBranchId = user.branch_id || null;
+
+  useEffect(() => {
+    fetchMembershipSettings();
+  }, []);
+
+  const fetchMembershipSettings = async () => {
+    setLoading(true);
+    try {
+      const res = await API.get("/visit-membership/settings", {
+        params: { branch_id: activeBranchId }
+      });
+      const data = res.data || res || {};
+      setMembershipMode(data.membership_mode || "paid_plan");
+    } catch (err) {
+      console.error("Failed to fetch membership settings:", err);
+      setMembershipMode("paid_plan");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-12 text-center text-xs font-bold text-slate-500 space-y-2">
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+        <p>Loading Membership System...</p>
+      </div>
+    );
+  }
+
+  // Type B: Visit-Based Free Service Loyalty View
+  if (membershipMode === "visit_based") {
+    return <VisitMembershipRecords />;
+  }
+
+  // Type A (Default): Paid Discount Plan & Subscription Packages View
   return (
     <div className="space-y-6">
       {/* Top Segmented Tab Switcher */}

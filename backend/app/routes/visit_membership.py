@@ -135,3 +135,142 @@ def get_customer_status(customer_id):
         "free_services": free_services_list,
         "last_visit_date": counter.last_visit_date.isoformat() if counter and counter.last_visit_date else None
     })
+
+
+@visit_membership_bp.route("/visit-membership/customer-records", methods=["GET"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
+def get_customer_records():
+    branch_id = get_active_branch_id(request.args.get("branch_id"))
+    search_q = request.args.get("search", "").strip()
+    sort_by = request.args.get("sort", "last_visit")
+    
+    try:
+        page = int(request.args.get("page", 1))
+        limit = int(request.args.get("limit", 50))
+    except (ValueError, TypeError):
+        page, limit = 1, 50
+
+    # 1. Fetch branch setting
+    setting = VisitMembershipSetting.query.filter_by(
+        tenant_id=g.parlour_id,
+        branch_id=branch_id
+    ).first()
+
+    req_visits = setting.required_visits if setting else 6
+    membership_mode = setting.membership_mode if setting else "paid_plan"
+
+    # 2. Outer join Customer with CustomerVisitCounter for branch_id
+    query = db.session.query(Customer, CustomerVisitCounter).select_from(Customer).outerjoin(
+        CustomerVisitCounter,
+        db.and_(
+            CustomerVisitCounter.customer_id == Customer.id,
+            CustomerVisitCounter.tenant_id == g.parlour_id,
+            CustomerVisitCounter.branch_id == branch_id
+        )
+    ).filter(Customer.tenant_id == g.parlour_id)
+
+    if search_q:
+        search_filter = f"%{search_q}%"
+        query = query.filter(
+            db.or_(
+                Customer.first_name.ilike(search_filter),
+                Customer.last_name.ilike(search_filter),
+                Customer.phone.ilike(search_filter)
+            )
+        )
+
+    # Apply Sorting
+    if sort_by == "visit_count":
+        query = query.order_by(db.coalesce(CustomerVisitCounter.current_visit_count, 0).desc(), Customer.id.desc())
+    elif sort_by == "name":
+        query = query.order_by(Customer.first_name.asc())
+    else:  # "last_visit"
+        query = query.order_by(
+            db.case((CustomerVisitCounter.last_visit_date.is_(None), 1), else_=0),
+            CustomerVisitCounter.last_visit_date.desc(),
+            Customer.id.desc()
+        )
+
+    total_records = query.count()
+    results = query.offset((page - 1) * limit).limit(limit).all()
+
+    items = []
+    for cust, counter in results:
+        curr_count = counter.current_visit_count if counter else 0
+        claimed_count = counter.total_free_services_claimed if counter else 0
+        is_eligible = curr_count >= req_visits
+
+        if is_eligible:
+            status = "🎁 Reward Ready"
+        elif curr_count > 0:
+            status = "In Progress"
+        elif claimed_count > 0:
+            status = "Redeemed"
+        else:
+            status = "New Client"
+
+        items.append({
+            "customer_id": cust.id,
+            "customer_name": f"{cust.first_name} {cust.last_name or ''}".strip(),
+            "phone": cust.phone,
+            "current_visit_count": curr_count,
+            "required_visits": req_visits,
+            "total_free_services_claimed": claimed_count,
+            "is_eligible": is_eligible,
+            "status": status,
+            "last_visit_date": counter.last_visit_date.isoformat() if counter and counter.last_visit_date else None
+        })
+
+    return success_response({
+        "items": items,
+        "total": total_records,
+        "page": page,
+        "limit": limit,
+        "membership_mode": membership_mode,
+        "required_visits": req_visits
+    })
+
+
+@visit_membership_bp.route("/visit-membership/reset-counter", methods=["POST"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
+def reset_counter():
+    data = request.get_json() or {}
+    customer_id = data.get("customer_id")
+    branch_id = get_active_branch_id(data.get("branch_id"))
+    
+    try:
+        new_count = int(data.get("new_count", 0))
+        if new_count < 0:
+            new_count = 0
+    except (ValueError, TypeError):
+        new_count = 0
+
+    if not customer_id:
+        return error_response("MISSING_CUSTOMER", "Customer ID is required.", 400)
+
+    counter = CustomerVisitCounter.query.filter_by(
+        tenant_id=g.parlour_id,
+        branch_id=branch_id,
+        customer_id=customer_id
+    ).first()
+
+    if not counter:
+        counter = CustomerVisitCounter(
+            tenant_id=g.parlour_id,
+            branch_id=branch_id,
+            customer_id=customer_id,
+            current_visit_count=new_count
+        )
+        db.session.add(counter)
+    else:
+        counter.current_visit_count = new_count
+
+    db.session.commit()
+    logger.info(f"Manually reset/set visit counter for customer {customer_id} at branch {branch_id} to {new_count}")
+
+    return success_response({
+        "customer_id": customer_id,
+        "branch_id": branch_id,
+        "current_visit_count": counter.current_visit_count,
+        "message": f"Customer visit count set to {new_count}."
+    })
