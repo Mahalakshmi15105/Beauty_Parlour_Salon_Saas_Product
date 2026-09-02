@@ -28,11 +28,10 @@ class Config:
 
     # ---------------------------------------------------------------
     # SINGLE-THREAD MODE
-    # One thread serves ALL users sequentially (no multi-threading).
-    # Minimizes CPU overhead and thread memory usage.
+    # If false (default), multi-threading is enabled for fast concurrent requests.
     # ---------------------------------------------------------------
-    SINGLE_THREAD = os.getenv("SINGLE_THREAD", "true").lower() in ("true", "1", "yes")
-    THREADS = 1 if SINGLE_THREAD else int(os.getenv("THREADS", 1))
+    SINGLE_THREAD = os.getenv("SINGLE_THREAD", "false").lower() in ("true", "1", "yes")
+    THREADS = 1 if SINGLE_THREAD else int(os.getenv("THREADS", 10))
 
     # ---------------------------------------------------------------
     # AUTO-SLEEP MODE

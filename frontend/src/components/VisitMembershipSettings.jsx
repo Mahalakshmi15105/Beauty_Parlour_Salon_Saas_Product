@@ -27,21 +27,29 @@ export default function VisitMembershipSettings() {
     setLoading(true);
     setErrorMsg(null);
     try {
-      // 1. Fetch Services List
-      const svcRes = await API.get("/services");
-      const svcList = svcRes.data?.items || svcRes.items || [];
+      const [svcRes, setRes] = await Promise.all([
+        API.get("/services").catch((err) => {
+          console.warn("Could not fetch services:", err);
+          return null;
+        }),
+        API.get("/visit-membership/settings", {
+          params: { branch_id: activeBranchId }
+        }).catch((err) => {
+          console.warn("Could not fetch visit membership settings:", err);
+          return null;
+        })
+      ]);
+
+      const svcList = svcRes?.data?.items || svcRes?.items || [];
       setServices(svcList);
 
-      // 2. Fetch Visit Membership Settings
-      const setRes = await API.get("/visit-membership/settings", {
-        params: { branch_id: activeBranchId }
-      });
-      const data = setRes.data || {};
+      const data = setRes?.data || setRes || {};
       setMembershipMode(data.membership_mode || "paid_plan");
       setRequiredVisits(data.required_visits || 6);
       setQualifyingServiceIds(data.qualifying_service_ids || []);
       setFreeServiceIds(data.free_service_ids || []);
     } catch (err) {
+      console.error("Failed to load visit membership settings:", err);
       setErrorMsg(err.message || "Failed to load membership settings.");
     } finally {
       setLoading(false);
