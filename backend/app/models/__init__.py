@@ -11,6 +11,8 @@ from app.models.notification import Notification
 from app.models.whatsapp import WhatsAppSetting, WhatsAppCampaign, WhatsAppCampaignRecipient, WhatsAppLog
 from app.models.appointment import Appointment, AppointmentItem
 
+from app.models.visit_membership import VisitMembershipSetting, CustomerVisitCounter
+
 __all__ = [
     "SubscriptionPlan",
     "Tenant",
@@ -40,7 +42,9 @@ __all__ = [
     "WhatsAppCampaignRecipient",
     "WhatsAppLog",
     "Appointment",
-    "AppointmentItem"
+    "AppointmentItem",
+    "VisitMembershipSetting",
+    "CustomerVisitCounter"
 ]
 
 

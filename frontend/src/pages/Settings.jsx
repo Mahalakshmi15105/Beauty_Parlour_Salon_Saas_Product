@@ -32,9 +32,11 @@ import {
   RotateCcw,
   Sliders,
   Network,
+  Award,
 } from "lucide-react";
 import WhatsAppIntegration from "./WhatsAppIntegration";
 import BranchManagement from "./BranchManagement";
+import VisitMembershipSettings from "../components/VisitMembershipSettings";
 import { CURATED_FONTS, DEFAULT_TYPOGRAPHY, getShopNameStyle, loadGoogleFont } from "../utils/fontLoader";
 
 function Settings() {
@@ -392,6 +394,7 @@ function Settings() {
           {(() => {
             const tabs = [
               { id: "business", label: "Parlour Profile", icon: Building2 },
+              { id: "membership", label: "Membership System", icon: Award },
               { id: "whatsapp", label: "WhatsApp Integration", icon: MessageSquare },
               { id: "receipt", label: "Receipt & Thermal Printing", icon: Printer },
               { id: "invoice", label: "Invoice & Taxes", icon: Receipt },
@@ -403,7 +406,7 @@ function Settings() {
             
             // Add Branch Management tab only for ParlourAdmin
             if (user.role !== "BranchAdmin") {
-              tabs.splice(1, 0, { id: "branches", label: "Branch Management", icon: Network });
+              tabs.splice(2, 0, { id: "branches", label: "Branch Management", icon: Network });
             }
             
             return tabs.map((tab) => {
@@ -428,6 +431,11 @@ function Settings() {
 
         {/* Settings Form Panel */}
         <div ref={formRef} className="col-span-9 bg-surface border border-border-soft p-8 rounded-lg space-y-6">
+          {/* Membership System Tab */}
+          {activeTab === "membership" && (
+            <VisitMembershipSettings />
+          )}
+
           {/* WhatsApp Integration Tab */}
           {activeTab === "whatsapp" && (
             <WhatsAppIntegration />

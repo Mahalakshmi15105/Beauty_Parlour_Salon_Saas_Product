@@ -111,6 +111,7 @@ def create_app(config_class=Config):
     from app.routes.public_booking import public_booking_bp
     from app.routes.branches import branches_bp
     from app.routes.bulk_upload import bulk_upload_bp
+    from app.routes.visit_membership import visit_membership_bp
     app.register_blueprint(health_bp, url_prefix="/api/v1")
     app.register_blueprint(auth_bp, url_prefix="/api/v1")
     app.register_blueprint(customers_bp, url_prefix="/api/v1")
@@ -130,6 +131,7 @@ def create_app(config_class=Config):
     app.register_blueprint(public_booking_bp)
     app.register_blueprint(branches_bp, url_prefix="/api/v1")
     app.register_blueprint(bulk_upload_bp, url_prefix="/api/v1")
+    app.register_blueprint(visit_membership_bp, url_prefix="/api/v1")
 
     from flask import send_from_directory
     import os

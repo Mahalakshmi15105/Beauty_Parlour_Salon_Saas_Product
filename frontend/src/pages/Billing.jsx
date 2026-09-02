@@ -39,6 +39,7 @@ import {
   Receipt,
   ChevronDown,
   Award,
+  Gift,
 } from "lucide-react";
 
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
@@ -85,6 +86,10 @@ function Billing() {
   const [selectedServiceId, setSelectedServiceId] = useState("");
   const [activeMembership, setActiveMembership] = useState(null);
   const [useMembership, setUseMembership] = useState(true);
+  const [visitMembershipStatus, setVisitMembershipStatus] = useState(null);
+
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const activeBranchId = user.branch_id || null;
   // POS Cart State
   const [cart, setCart] = useState([]);
 
@@ -928,6 +933,8 @@ function Billing() {
   const handleCustomerChange = (customerIdStr) => {
     setSelectedCustomerId(customerIdStr);
     setActiveMembership(null);
+    setVisitMembershipStatus(null);
+
     if (!customerIdStr || customerIdStr === "walkin") {
       setSelectedGender("Female");
       return;
@@ -939,6 +946,7 @@ function Billing() {
       setSelectedGender("Female");
     }
 
+    // Fetch Type A % discount active membership
     API.get(`/customers/${customerIdStr}/history`)
       .then((res) => {
         const memberships = res.data.memberships || [];
@@ -954,6 +962,17 @@ function Billing() {
         }
       })
       .catch((err) => console.error("Failed to load customer membership detail:", err));
+
+    // Fetch Type B Visit-Based membership status for active branch
+    API.get(`/visit-membership/customer-status/${customerIdStr}`, {
+      params: { branch_id: activeBranchId }
+    })
+      .then((res) => {
+        if (res.data) {
+          setVisitMembershipStatus(res.data);
+        }
+      })
+      .catch((err) => console.error("Failed to load visit membership status:", err));
   };
 
   // Helper to determine discount percentage for a service given active customer membership
@@ -1243,6 +1262,9 @@ function Billing() {
 
   const calculateRowDiscountAmount = (item) => {
     const lineGross = item.gross_amount * item.quantity;
+    if (item.is_free_visit_reward) {
+      return lineGross;
+    }
     if (item.discount_amount_override !== undefined && item.discount_amount_override !== null) {
       return Math.min(lineGross, Math.max(0, parseFloat(item.discount_amount_override) || 0));
     }
@@ -1450,22 +1472,28 @@ function Billing() {
 
   handleCheckoutSubmitRef.current = handleCheckoutSubmit;
 
-  // Ctrl+Enter / Cmd+Enter / F9 / Alt+S → Proceed to Payment / Save Bill (Billing page only)
+  // Single Key: F2 (Primary POS key), F4, F5 (Safeguarded against page reload)
+  // Backup Combo: Ctrl+Enter / Cmd+Enter / Alt+S
   useEffect(() => {
     const handlePaymentShortcut = (e) => {
       if (activeSubTab !== "checkout") return;
       if (showReceipt) return;
 
+      const isF2 = e.key === "F2" || e.code === "F2" || e.keyCode === 113;
+      const isF4 = e.key === "F4" || e.code === "F4" || e.keyCode === 115;
+      const isF5 = e.key === "F5" || e.code === "F5" || e.keyCode === 116;
       const isF9 = e.key === "F9" || e.code === "F9" || e.keyCode === 120;
       const isCtrlEnter = (e.ctrlKey || e.metaKey) && (e.key === "Enter" || e.code === "Enter" || e.keyCode === 13);
       const isAltS = e.altKey && (e.key === "s" || e.key === "S" || e.code === "KeyS");
 
-      if (isCtrlEnter || isF9 || isAltS) {
+      if (isF2 || isF4 || isF5 || isF9 || isCtrlEnter || isAltS) {
+        // ALWAYS block browser defaults (prevents F5 page refresh & losing bill data)
         e.preventDefault();
         e.stopPropagation();
 
         console.log("[Billing Shortcut Triggered]", {
-          shortcut: isCtrlEnter ? "Ctrl+Enter" : isF9 ? "F9" : "Alt+S",
+          key: e.key,
+          code: e.code,
           showPaymentModal,
           target: e.target?.tagName
         });
@@ -1483,6 +1511,7 @@ function Billing() {
         }
       }
     };
+
     window.addEventListener("keydown", handlePaymentShortcut, true);
     return () => window.removeEventListener("keydown", handlePaymentShortcut, true);
   }, [activeSubTab, showPaymentModal, showReceipt]);
@@ -2076,10 +2105,42 @@ function Billing() {
                           : "bg-white text-slate-600 border border-border-soft hover:bg-slate-50"
                       }`}
                     >
-                      Pay Normally
+                      Don't Use
                     </button>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Visit-Based Membership Status Banner (Type B - Branch Scoped) */}
+            {visitMembershipStatus && visitMembershipStatus.membership_mode === "visit_based" && (
+              <div className="mt-4 border-t border-border-soft/60 pt-4 flex flex-col md:flex-row justify-between items-start md:items-center bg-emerald-50/50 p-4 rounded-xl border border-emerald-200 space-y-3 md:space-y-0 animate-fade-in">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2.5 bg-emerald-500/10 text-emerald-600 rounded-xl">
+                    <Gift className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wide">
+                        Visit Loyalty Program
+                      </h4>
+                      {visitMembershipStatus.is_eligible ? (
+                        <span className="bg-emerald-600 text-white text-[10px] px-2.5 py-0.5 rounded-full font-extrabold shadow-2xs animate-pulse">
+                          🎉 FREE SERVICE ELIGIBLE!
+                        </span>
+                      ) : (
+                        <span className="bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10px] px-2.5 py-0.5 rounded-full font-bold">
+                          Progress: {visitMembershipStatus.current_visit_count} / {visitMembershipStatus.required_visits} Visits
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-600 font-medium mt-0.5">
+                      {visitMembershipStatus.is_eligible
+                        ? `Customer completed ${visitMembershipStatus.current_visit_count} qualifying visits! Add an eligible service to claim 100% FREE.`
+                        : `Customer needs ${Math.max(0, visitMembershipStatus.required_visits - visitMembershipStatus.current_visit_count)} more qualifying visit(s) for a 100% FREE service.`}
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -2518,7 +2579,7 @@ function Billing() {
                   className="w-full bg-primary hover:bg-primary-hover text-white py-3 rounded-xl text-xs font-extrabold shadow-md shadow-pink-500/20 transition flex items-center justify-center space-x-2"
                 >
                   <CreditCard className="w-4 h-4" />
-                  <span>Proceed to Payment (Ctrl + Enter)</span>
+                  <span>Proceed to Payment (F2 / Ctrl + Enter)</span>
                 </button>
               </div>
             </div>
@@ -2757,7 +2818,7 @@ function Billing() {
                   }}
                   className="px-6 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-extrabold shadow-md shadow-pink-500/20"
                 >
-                  Save Bill (Ctrl + Enter)
+                  Save Bill (F2 / Ctrl + Enter)
                 </button>
               </div>
             </div>

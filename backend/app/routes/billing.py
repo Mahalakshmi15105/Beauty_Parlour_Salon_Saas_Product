@@ -128,6 +128,9 @@ def checkout():
                     benefit.remaining_quantity -= qty
                     # Apply 100% discount for redeemed benefit
                     discount_amount = line_subtotal
+                elif item.get("is_free_visit_reward") or item.get("is_free_reward"):
+                    # Apply 100% discount for Visit-Based Free Reward Service
+                    discount_amount = line_subtotal
                 else:
                     # Apply standard optional flat discount from item payload
                     disc_val = item.get("discount", 0)
@@ -256,9 +259,55 @@ def checkout():
         for line in line_items_to_save:
             line.invoice_id = invoice.id
             db.session.add(line)
-        for pay in payments_to_save:
-            pay.invoice_id = invoice.id
-            db.session.add(pay)
+        # 7. Visit-Based Membership Counter Logic (Branch Scoped)
+        if customer_id and str(customer_id) not in ["walkin", "0"]:
+            from app.models.visit_membership import VisitMembershipSetting, CustomerVisitCounter
+            from datetime import datetime, timezone
+
+            v_setting = VisitMembershipSetting.query.filter_by(
+                tenant_id=g.parlour_id,
+                branch_id=target_branch_id
+            ).first()
+
+            if v_setting and v_setting.membership_mode == "visit_based":
+                # Check if a free visit service was redeemed
+                free_redeemed = any(
+                    item.get("is_free_visit_reward") or item.get("is_free_reward")
+                    for item in line_items_data
+                )
+
+                v_counter = CustomerVisitCounter.query.filter_by(
+                    tenant_id=g.parlour_id,
+                    branch_id=target_branch_id,
+                    customer_id=customer_id
+                ).first()
+
+                if not v_counter:
+                    v_counter = CustomerVisitCounter(
+                        tenant_id=g.parlour_id,
+                        branch_id=target_branch_id,
+                        customer_id=customer_id,
+                        current_visit_count=0
+                    )
+                    db.session.add(v_counter)
+
+                if free_redeemed:
+                    v_counter.current_visit_count = 0
+                    v_counter.total_free_services_claimed += 1
+                    v_counter.last_visit_date = datetime.now(timezone.utc)
+                    logger.info(f"Visit Membership: Free service claimed for customer {customer_id} at Branch {target_branch_id}. Counter reset to 0.")
+                else:
+                    # Check if checkout contains a qualifying service
+                    qualifying_ids = v_setting.qualifying_service_ids or []
+                    has_qualifying = any(
+                        item.get("type") == "service" and item.get("item_id") in qualifying_ids
+                        for item in line_items_data
+                    )
+                    if has_qualifying or not qualifying_ids:  # If no qualifying list specified, all services count
+                        if v_counter.current_visit_count < v_setting.required_visits:
+                            v_counter.current_visit_count += 1
+                        v_counter.last_visit_date = datetime.now(timezone.utc)
+                        logger.info(f"Visit Membership: Incremented visit count for customer {customer_id} at Branch {target_branch_id} to {v_counter.current_visit_count}.")
 
         # Commit everything atomically
         db.session.commit()

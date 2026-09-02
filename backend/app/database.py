@@ -57,13 +57,18 @@ class MySQLMultiTenantSQLAlchemy(SQLAlchemy):
         
         if db_uri not in self._engine_cache:
             logger.info(f"Initializing MySQL connection pool for tenant: {db_uri}")
-            self._engine_cache[db_uri] = create_engine(
+            engine = create_engine(
                 db_uri,
                 pool_pre_ping=True,
                 pool_recycle=1800,
                 pool_size=5,
                 max_overflow=10
             )
+            self._engine_cache[db_uri] = engine
+            try:
+                self.metadata.create_all(bind=engine)
+            except Exception as e:
+                logger.warning(f"Auto create_all notice for tenant {db_uri}: {e}")
         return self._engine_cache[db_uri]
 
     def get_engine(self, app=None, bind=None):

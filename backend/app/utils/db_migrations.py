@@ -48,8 +48,11 @@ TENANT_SETTINGS_SCHEMA = [
 
 
 def run_auto_migrations():
-    """Auto-migrate database schema to ensure all multi-branch and settings columns exist."""
+    """Auto-migrate database schema to ensure all multi-branch, new tables and settings columns exist."""
     try:
+        # 0. Create any new missing tables
+        db.create_all()
+
         # 1. Add branch_id to all relevant tables if missing
         for table in BRANCH_TABLES:
             try:
