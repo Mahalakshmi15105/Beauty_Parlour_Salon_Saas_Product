@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import API from "../services/api";
+import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { Award, Gift, Check, Sparkles, AlertCircle, Save, Layers } from "lucide-react";
 
 export default function VisitMembershipSettings() {
+  const { formatCurrency } = useLanguageCurrency();
   const [membershipMode, setMembershipMode] = useState("paid_plan");
   const [requiredVisits, setRequiredVisits] = useState(6);
   const [qualifyingServiceIds, setQualifyingServiceIds] = useState([]);
