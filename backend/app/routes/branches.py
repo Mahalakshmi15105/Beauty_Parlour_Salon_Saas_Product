@@ -55,7 +55,9 @@ def create_branch():
     # Check branch limit
     g.use_master_db = True
     tenant = Tenant.query.get(g.parlour_id)
+    plan = tenant.subscription_plan if tenant else None
     g.use_master_db = False
+
     if not tenant:
         return error_response(
             error_code="TENANT_NOT_FOUND",
@@ -64,7 +66,7 @@ def create_branch():
         )
 
     # Get branch limit from subscription plan
-    max_branches = tenant.subscription_plan.max_branches if tenant.subscription_plan else 3
+    max_branches = plan.max_branches if plan else 3
     current_branch_count = Branch.query.filter_by(tenant_id=g.parlour_id, is_deleted=False).count()
 
     if current_branch_count >= max_branches:
@@ -277,7 +279,9 @@ def check_branch_limit():
     """Check if tenant can create more branches"""
     g.use_master_db = True
     tenant = Tenant.query.get(g.parlour_id)
+    plan = tenant.subscription_plan if tenant else None
     g.use_master_db = False
+
     if not tenant:
         return error_response(
             error_code="TENANT_NOT_FOUND",
@@ -285,7 +289,7 @@ def check_branch_limit():
             status_code=404
         )
 
-    max_branches = tenant.subscription_plan.max_branches if tenant.subscription_plan else 3
+    max_branches = plan.max_branches if plan else 3
     current_branch_count = Branch.query.filter_by(tenant_id=g.parlour_id, is_deleted=False).count()
     can_create = current_branch_count < max_branches
 
