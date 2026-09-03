@@ -87,7 +87,13 @@ def create_branch():
 
     # Check if admin email provided and validate
     if admin_email:
-        if User.query.filter_by(email=admin_email).first():
+        from app.models.global_models import TenantLookup
+        was_master = getattr(g, "use_master_db", False)
+        g.use_master_db = True
+        existing_lookup = TenantLookup.query.filter_by(email=admin_email).first()
+        g.use_master_db = was_master
+
+        if existing_lookup or User.query.filter_by(email=admin_email).first():
             return error_response(
                 error_code="DUPLICATE_RECORD",
                 message=f"User with email '{admin_email}' already exists.",
@@ -131,7 +137,20 @@ def create_branch():
             )
             branch_admin.set_password(admin_password)
             db.session.add(branch_admin)
+            db.session.flush()
             logger.info("BranchAdmin added to session")
+
+            # Insert TenantLookup mapping into Master DB for auth login routing
+            from app.models.global_models import TenantLookup
+            g.use_master_db = True
+            lookup = TenantLookup(
+                tenant_id=g.parlour_id,
+                email=admin_email,
+                db_name=tenant.db_name,
+                db_connection_uri=tenant.db_connection_uri
+            )
+            db.session.add(lookup)
+            g.use_master_db = False
 
         logger.info("Committing transaction...")
         db.session.commit()
