@@ -1,13 +1,17 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
-import { useModalFocusTrap, useFormKeyboardNavigation } from "../utils/keyboardNavigation";
+import { useModalFocusTrap, useFormKeyboardNavigation, focusAndOpenSelect } from "../utils/keyboardNavigation";
 import { UserRoundX, X, MessageSquare, Phone, AlertTriangle, Calendar, Settings as SettingsIcon, Printer, FileSpreadsheet, FileText, Upload } from "lucide-react";
-import { exportToCSV, printDataList, exportToPDF } from "../utils/exportUtils";
+import { exportToCSV, printDataList, exportToPDF, exportToExcel } from "../utils/exportUtils";
 import BulkUploadModal from "../components/BulkUploadModal";
+import { useToast } from "../context/ToastContext";
 
 function Customers() {
+  const { showSuccess, showError } = useToast();
   const modalRef = useRef(null);
   const formRef = useRef(null);
+  const firstNameInputRef = useRef(null);
+  const phoneInputRef = useRef(null);
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -51,23 +55,16 @@ function Customers() {
 
   const fetchDormantCustomers = () => {
     setDormantLoading(true);
-    API.get("/customers/dormant")
+    API.get(`/customers/dormant?days=${churnThreshold}`)
       .then((res) => {
-        setDormantCustomers(res.data.items || []);
-        setChurnThreshold(res.data.threshold_days || 45);
+        setDormantCustomers(res.data || []);
         setDormantLoading(false);
       })
       .catch((err) => {
-        console.error("Failed to load dormant customers:", err);
+        showError(err.message || "Failed to load dormant clients.");
         setDormantLoading(false);
       });
   };
-
-  useEffect(() => {
-    if (activeSubTab === "dormant") {
-      fetchDormantCustomers();
-    }
-  }, [activeSubTab]);
 
   const fetchCustomers = (currentCursor = null) => {
     setLoading(true);
@@ -78,8 +75,8 @@ function Customers() {
 
     API.get(url)
       .then((res) => {
-        setCustomers(res.data.items);
-        setNextCursor(res.data.next_cursor);
+        setCustomers(res.data.items || []);
+        setNextCursor(res.data.next_cursor || null);
         setLoading(false);
       })
       .catch((err) => {
@@ -89,8 +86,12 @@ function Customers() {
   };
 
   useEffect(() => {
-    fetchCustomers();
-  }, [search, gender]);
+    if (activeSubTab === "all") {
+      fetchCustomers();
+    } else if (activeSubTab === "dormant") {
+      fetchDormantCustomers();
+    }
+  }, [search, gender, activeSubTab, churnThreshold]);
 
   const handlePrint = () => {
     const columns = [
@@ -98,29 +99,44 @@ function Customers() {
       { header: "Phone", accessor: "phone" },
       { header: "Email", accessor: "email" },
       { header: "Gender", accessor: "gender" },
-      { header: "Registered At", accessor: (row) => new Date(row.created_at).toLocaleDateString() }
+      { header: "DOB", accessor: "date_of_birth" }
     ];
     printDataList("Customers List", customers, columns);
   };
 
-  const handleExportExcel = () => {
+  const handleExportCSV = () => {
     const columns = [
-      { header: "Name", accessor: (row) => `${row.first_name || ""} ${row.last_name || ""}`.trim() },
+      { header: "First Name", accessor: "first_name" },
+      { header: "Last Name", accessor: "last_name" },
       { header: "Phone", accessor: "phone" },
       { header: "Email", accessor: "email" },
       { header: "Gender", accessor: "gender" },
-      { header: "Registered At", accessor: (row) => new Date(row.created_at).toLocaleDateString() }
+      { header: "DOB", accessor: "date_of_birth" },
+      { header: "Address", accessor: "address" }
     ];
-    exportToCSV(customers, columns, "customers_list");
+    exportToCSV("Customers List", customers, columns, "customers_list");
+  };
+
+  const handleExportExcel = () => {
+    const columns = [
+      { header: "First Name", accessor: "first_name" },
+      { header: "Last Name", accessor: "last_name" },
+      { header: "Phone", accessor: "phone" },
+      { header: "Email", accessor: "email" },
+      { header: "Gender", accessor: "gender" },
+      { header: "DOB", accessor: "date_of_birth" },
+      { header: "Address", accessor: "address" }
+    ];
+    exportToExcel("Customers List", customers, columns, "customers_list");
   };
 
   const handleExportPDF = () => {
     const columns = [
-      { header: "Name", accessor: (row) => `${row.first_name || ""} ${row.last_name || ""}`.trim(), width: 50 },
-      { header: "Phone", accessor: "phone", width: 35 },
-      { header: "Email", accessor: "email", width: 55 },
-      { header: "Gender", accessor: "gender", width: 25 },
-      { header: "Registered", accessor: (row) => new Date(row.created_at).toLocaleDateString(), width: 25 }
+      { header: "Name", accessor: (row) => `${row.first_name || ""} ${row.last_name || ""}`.trim(), width: 35 },
+      { header: "Phone", accessor: "phone", width: 25 },
+      { header: "Email", accessor: "email", width: 35 },
+      { header: "Gender", accessor: "gender", width: 20 },
+      { header: "DOB", accessor: "date_of_birth", width: 25 }
     ];
     exportToPDF("Customers List", customers, columns, "customers_list");
   };
@@ -175,28 +191,37 @@ function Customers() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (!formData.first_name.trim()) {
+      if (firstNameInputRef.current) firstNameInputRef.current.focus();
+      return;
+    }
+    if (!formData.phone.trim()) {
+      if (phoneInputRef.current) phoneInputRef.current.focus();
+      return;
+    }
+
     const action = editId ? API.put(`/customers/${editId}`, formData) : API.post("/customers", formData);
 
     action
       .then(() => {
         setShowModal(false);
+        showSuccess(editId ? "Customer updated successfully!" : "Customer registered successfully!");
         fetchCustomers(cursor);
       })
       .catch((err) => {
-        alert(err.message || "Operation failed.");
+        showError(err.response?.data?.message || err.message || "Operation failed.");
       });
   };
 
   const handleDelete = (id) => {
-    if (window.confirm("Are you sure you want to delete this customer?")) {
-      API.delete(`/customers/${id}`)
-        .then(() => {
-          fetchCustomers(cursor);
-        })
-        .catch((err) => {
-          alert(err.message || "Failed to delete.");
-        });
-    }
+    API.delete(`/customers/${id}`)
+      .then(() => {
+        showSuccess("Customer record deleted.");
+        fetchCustomers(cursor);
+      })
+      .catch((err) => {
+        showError(err.response?.data?.message || err.message || "Failed to delete customer.");
+      });
   };
 
   return (

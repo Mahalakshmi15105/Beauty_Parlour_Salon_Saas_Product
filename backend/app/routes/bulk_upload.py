@@ -35,8 +35,8 @@ def get_template(module_name):
                 status_code=400
             )
         
-        # Generate template
-        excel_data = generate_excel_template(module_name)
+        branch_id = request.args.get("branch_id")
+        excel_data = generate_excel_template(module_name, tenant_id=getattr(g, "parlour_id", None), branch_id=branch_id)
         
         # Return file
         return send_file(
@@ -112,9 +112,9 @@ def bulk_upload_customers():
         from app.models.global_models import Tenant
         g.use_master_db = True
         tenant = Tenant.query.get(g.parlour_id)
+        plan = tenant.subscription_plan if tenant else None
         g.use_master_db = False
-        if tenant and tenant.subscription_plan:
-            plan = tenant.subscription_plan
+        if plan:
             current_count = get_tenant_query(Customer).count()
             if current_count + len(valid_customers) > plan.max_customers:
                 remaining = max(0, plan.max_customers - current_count)
@@ -249,9 +249,9 @@ def bulk_upload_employees():
         from app.models.global_models import Tenant
         g.use_master_db = True
         tenant = Tenant.query.get(g.parlour_id)
+        plan = tenant.subscription_plan if tenant else None
         g.use_master_db = False
-        if tenant and tenant.subscription_plan:
-            plan = tenant.subscription_plan
+        if plan:
             current_count = get_tenant_query(Employee).count()
             if current_count + len(valid_employees) > plan.max_employees:
                 remaining = max(0, plan.max_employees - current_count)
@@ -388,9 +388,9 @@ def bulk_upload_services():
         from app.models.global_models import Tenant
         g.use_master_db = True
         tenant = Tenant.query.get(g.parlour_id)
+        plan = tenant.subscription_plan if tenant else None
         g.use_master_db = False
-        if tenant and tenant.subscription_plan:
-            plan = tenant.subscription_plan
+        if plan:
             current_count = get_tenant_query(Service).count()
             if current_count + len(valid_services) > plan.max_services:
                 remaining = max(0, plan.max_services - current_count)
@@ -416,6 +416,35 @@ def bulk_upload_services():
                     status=service_data.get('status', 'active')
                 )
                 db.session.add(service)
+                db.session.flush()
+
+                # Process optional membership plan discount mapping if provided
+                plan_name = service_data.get('membership_plan_name')
+                if plan_name:
+                    from app.models.membership import MembershipPlan, MembershipPlanService
+                    plan_obj = MembershipPlan.query.filter_by(tenant_id=g.parlour_id, status='active').filter(
+                        MembershipPlan.name.ilike(plan_name)
+                    ).first()
+                    if plan_obj:
+                        disc_pct = float(service_data.get('membership_discount_percentage') or 0)
+                        disc_amt = float(service_data.get('membership_discount_amount') or 0)
+                        price_val = float(service_data.get('price', 0))
+
+                        # Vice-versa auto calculation if one is left blank
+                        if disc_pct > 0 and disc_amt == 0 and price_val > 0:
+                            disc_amt = round(price_val * (disc_pct / 100.0), 2)
+                        elif disc_amt > 0 and disc_pct == 0 and price_val > 0:
+                            disc_pct = round((disc_amt / price_val) * 100.0, 2)
+
+                        mps = MembershipPlanService(
+                            tenant_id=g.parlour_id,
+                            membership_plan_id=plan_obj.id,
+                            service_id=service.id,
+                            discount_percentage=disc_pct,
+                            discount_amount=disc_amt
+                        )
+                        db.session.add(mps)
+
                 successful_count += 1
             except Exception as e:
                 logger.error(f"Error inserting service: {str(e)}")

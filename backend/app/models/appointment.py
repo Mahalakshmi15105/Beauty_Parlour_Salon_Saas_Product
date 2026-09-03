@@ -1,8 +1,9 @@
-from app.database import db
+from app.database import db, tenant_metadata
 from app.models.mixins import TimestampMixin, SoftDeleteMixin
 
 class Appointment(db.Model, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "appointments"
+    metadata = tenant_metadata
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, nullable=False, index=True)
@@ -60,6 +61,7 @@ class Appointment(db.Model, TimestampMixin, SoftDeleteMixin):
 
 class AppointmentItem(db.Model, TimestampMixin):
     __tablename__ = "appointment_items"
+    metadata = tenant_metadata
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, nullable=False, index=True)

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import API from "../services/api";
+import { useToast } from "../context/ToastContext";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { useTheme } from "../context/ThemeContext";
 import { exportToCSV, printDataList, exportToPDF } from "../utils/exportUtils";
@@ -18,6 +19,7 @@ import {
 } from "lucide-react";
 
 function Reports() {
+  const { showSuccess, showError } = useToast();
   const { formatCurrency, currencySymbol, t } = useLanguageCurrency();
   const { getChartColors } = useTheme();
   const chartColors = getChartColors();
@@ -156,19 +158,19 @@ function Reports() {
 
   const handlePrint = () => {
     const { columns, data, title } = getExportConfig();
-    if (data.length === 0) return alert("No data available to print.");
+    if (data.length === 0) return showError("No data available to print.");
     printDataList(title, data, columns);
   };
 
   const handleExportExcel = () => {
     const { columns, data, filename } = getExportConfig();
-    if (data.length === 0) return alert("No data available to export.");
+    if (data.length === 0) return showError("No data available to export.");
     exportToCSV(data, columns, filename);
   };
 
   const handleExportPDF = () => {
     const { columns, data, title, filename } = getExportConfig();
-    if (data.length === 0) return alert("No data available to export.");
+    if (data.length === 0) return showError("No data available to export.");
     
     // Set column widths based on type
     const pdfColumns = columns.map(c => ({

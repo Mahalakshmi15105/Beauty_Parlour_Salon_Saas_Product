@@ -3,9 +3,13 @@ from flask import g, current_app
 from flask_sqlalchemy import SQLAlchemy
 from flask_sqlalchemy.session import Session as BaseSession
 from flask_migrate import Migrate
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, MetaData
 
 logger = logging.getLogger(__name__)
+
+# Two distinct MetaData collections to isolate Master DB tables from Tenant DB tables
+master_metadata = MetaData()
+tenant_metadata = MetaData()
 
 class DynamicMultiTenantSession(BaseSession):
     def get_bind(self, mapper=None, clause=None, bind=None, **kwargs):
@@ -33,22 +37,24 @@ class MySQLMultiTenantSQLAlchemy(SQLAlchemy):
 
     @property
     def engines(self):
-        """
-        Dynamically yield current active engine as default engine to Flask-SQLAlchemy internals.
-        """
         return {None: self.get_engine(), "master": self.get_master_engine()}
 
     def get_master_engine(self):
         master_uri = current_app.config.get("MASTER_DATABASE_URI", "mysql+pymysql://root:root@localhost:3306/parlour_master?charset=utf8mb4")
         if "master" not in self._engine_cache:
             logger.info("Connecting to MySQL Master DB...")
-            self._engine_cache["master"] = create_engine(
+            engine = create_engine(
                 master_uri,
                 pool_pre_ping=True,
                 pool_recycle=1800,
                 pool_size=10,
                 max_overflow=20
             )
+            self._engine_cache["master"] = engine
+            try:
+                master_metadata.create_all(bind=engine)
+            except Exception as e:
+                logger.warning(f"Notice auto-creating master tables: {e}")
         return self._engine_cache["master"]
 
     def get_tenant_engine(self, db_uri):
@@ -66,15 +72,12 @@ class MySQLMultiTenantSQLAlchemy(SQLAlchemy):
             )
             self._engine_cache[db_uri] = engine
             try:
-                self.metadata.create_all(bind=engine)
+                tenant_metadata.create_all(bind=engine)
             except Exception as e:
-                logger.warning(f"Auto create_all notice for tenant {db_uri}: {e}")
+                logger.warning(f"Notice auto-creating tenant tables for {db_uri}: {e}")
         return self._engine_cache[db_uri]
 
     def get_engine(self, app=None, bind=None):
-        """
-        Dynamically return engine based on request context `g`.
-        """
         if getattr(g, "use_master_db", False) or bind == "master":
             return self.get_master_engine()
         
@@ -84,6 +87,15 @@ class MySQLMultiTenantSQLAlchemy(SQLAlchemy):
         
         return self.get_master_engine()
 
+    def create_all_master(self):
+        """Helper to create only master DB tables."""
+        master_engine = self.get_master_engine()
+        master_metadata.create_all(bind=master_engine)
+
+    def create_all_tenant(self, tenant_db_uri):
+        """Helper to create only tenant DB tables."""
+        engine = self.get_tenant_engine(tenant_db_uri)
+        tenant_metadata.create_all(bind=engine)
+
 db = MySQLMultiTenantSQLAlchemy()
 migrate = Migrate()
-

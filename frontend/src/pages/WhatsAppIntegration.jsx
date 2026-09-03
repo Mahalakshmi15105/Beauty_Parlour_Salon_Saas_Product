@@ -16,10 +16,12 @@ import {
   Sparkles,
 } from "lucide-react";
 import API from "../services/api";
+import { useToast } from "../context/ToastContext";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { useFormKeyboardNavigation, useModalFocusTrap } from "../utils/keyboardNavigation";
 
 export default function WhatsAppIntegration() {
+  const { showSuccess, showError } = useToast();
   const { t } = useLanguageCurrency();
   const directMsgFormRef = useRef(null);
   const editModalRef = useRef(null);
@@ -209,11 +211,11 @@ export default function WhatsAppIntegration() {
   const handleSendDirectMessage = (e) => {
     e.preventDefault();
     if (!testPhone.trim()) {
-      alert("Please enter a valid recipient phone number.");
+      showError("Please enter a valid recipient phone number.");
       return;
     }
     if (!testMsg.trim()) {
-      alert("Please enter a message to send.");
+      showError("Please enter a message to send.");
       return;
     }
 
@@ -264,7 +266,7 @@ export default function WhatsAppIntegration() {
       })
       .catch((err) => {
         setLoading(false);
-        alert(err.response?.data?.message || "Failed to update settings.");
+        showError(err.response?.data?.message || "Failed to update settings.");
       });
   };
 

@@ -5,8 +5,10 @@ import { useModalFocusTrap, useFormKeyboardNavigation } from "../utils/keyboardN
 import { X, Printer, FileSpreadsheet, FileText, Upload } from "lucide-react";
 import { exportToCSV, printDataList, exportToPDF } from "../utils/exportUtils";
 import BulkUploadModal from "../components/BulkUploadModal";
+import { useToast } from "../context/ToastContext";
 
 function Services() {
+  const { showSuccess, showError } = useToast();
   const { formatCurrency, currencySymbol, t } = useLanguageCurrency();
   const serviceModalRef = useRef(null);
   const serviceFormRef = useRef(null);
@@ -33,6 +35,11 @@ function Services() {
   const [categoryName, setCategoryName] = useState("");
   const [editingCatId, setEditingCatId] = useState(null);
   const [editingCatName, setEditingCatName] = useState("");
+
+  // Refs for Validation Focus & Dropdown open
+  const serviceNameInputRef = useRef(null);
+  const servicePriceInputRef = useRef(null);
+  const categoryNameInputRef = useRef(null);
 
   // Membership Plans & Multi-Discount State
   const [membershipPlans, setMembershipPlans] = useState([]);
@@ -256,7 +263,7 @@ function Services() {
     setEditId(null);
     setServiceForm({
       name: "",
-      category_id: categories.length > 0 ? categories[0].id : "",
+      category_id: "",
       price: "",
       status: "active",
     });
@@ -289,9 +296,18 @@ function Services() {
 
   const handleServiceSubmit = (e) => {
     e.preventDefault();
+    if (!serviceForm.name.trim()) {
+      if (serviceNameInputRef.current) serviceNameInputRef.current.focus();
+      return;
+    }
+    if (!serviceForm.price.toString().trim()) {
+      if (servicePriceInputRef.current) servicePriceInputRef.current.focus();
+      return;
+    }
+
     const payload = {
       ...serviceForm,
-      duration_minutes: 30, // Default duration fallback
+      duration_minutes: 30,
       membership_discounts: membershipDiscounts
         .filter((d) => d.plan_id !== "" && d.plan_id !== null && d.plan_id !== undefined)
         .map((d) => ({
@@ -306,23 +322,30 @@ function Services() {
     action
       .then(() => {
         setShowServiceModal(false);
+        showSuccess(editId ? "Service updated successfully!" : "Service added successfully!");
         fetchServices(cursor);
       })
       .catch((err) => {
-        alert(err.message || "Operation failed.");
+        showError(err.response?.data?.message || err.message || "Operation failed.");
       });
   };
 
   const handleCategorySubmit = (e) => {
     e.preventDefault();
+    if (!categoryName.trim()) {
+      if (categoryNameInputRef.current) categoryNameInputRef.current.focus();
+      return;
+    }
+
     API.post("/service-categories", { name: categoryName })
       .then(() => {
         setCategoryName("");
         setShowCategoryModal(false);
+        showSuccess("Service category created!");
         fetchCategories();
       })
       .catch((err) => {
-        alert(err.message || "Operation failed.");
+        showError(err.response?.data?.message || err.message || "Operation failed.");
       });
   };
 
@@ -332,35 +355,34 @@ function Services() {
       .then(() => {
         setEditingCatId(null);
         setEditingCatName("");
+        showSuccess("Category name updated!");
         fetchCategories();
       })
       .catch((err) => {
-        alert(err.message || "Failed to update category name.");
+        showError(err.response?.data?.message || err.message || "Failed to update category name.");
       });
   };
 
   const handleDeleteService = (id) => {
-    if (window.confirm("Are you sure you want to delete this service?")) {
-      API.delete(`/services/${id}`)
-        .then(() => {
-          fetchServices(cursor);
-        })
-        .catch((err) => {
-          alert(err.message || "Failed to delete.");
-        });
-    }
+    API.delete(`/services/${id}`)
+      .then(() => {
+        showSuccess("Service deleted.");
+        fetchServices(cursor);
+      })
+      .catch((err) => {
+        showError(err.response?.data?.message || err.message || "Failed to delete service.");
+      });
   };
 
   const handleDeleteCategory = (id) => {
-    if (window.confirm("Are you sure you want to delete this category?")) {
-      API.delete(`/service-categories/${id}`)
-        .then(() => {
-          fetchCategories();
-        })
-        .catch((err) => {
-          alert(err.message || "Failed to delete. Make sure it contains no active services.");
-        });
-    }
+    API.delete(`/service-categories/${id}`)
+      .then(() => {
+        showSuccess("Category deleted.");
+        fetchCategories();
+      })
+      .catch((err) => {
+        showError(err.response?.data?.message || err.message || "Failed to delete category.");
+      });
   };
 
   return (

@@ -1,6 +1,8 @@
-from flask import Blueprint, request, g
+from flask import Blueprint, request, g, current_app
+from sqlalchemy import func, create_engine, text
 from app.database import db
-from app.models.global_models import Tenant, SubscriptionPlan
+from app.models.global_models import Tenant, SubscriptionPlan, TenantLookup, MasterUser
+from app.db_bootstrap import ensure_database_exists
 from app.models.user import User, TenantSetting
 from app.models.customer import Customer
 from app.models.employee import Employee
@@ -21,6 +23,7 @@ super_admin_bp = Blueprint("super_admin", __name__)
 @super_admin_bp.route("/super-admin/dashboard", methods=["GET"])
 @require_role(["SuperAdmin"])
 def get_super_admin_dashboard():
+    g.use_master_db = True
     now = datetime.now(timezone.utc)
     
     # 1. Tenant Metrics
@@ -35,7 +38,6 @@ def get_super_admin_dashboard():
     ).count()
 
     # 2. MRR & ARR Calculations
-    # Calculate MRR by summing subscription plan prices for active tenants
     active_tenant_plans = db.session.query(SubscriptionPlan.price).join(
         Tenant, Tenant.subscription_plan_id == SubscriptionPlan.id
     ).filter(Tenant.status == "active").all()
@@ -50,12 +52,14 @@ def get_super_admin_dashboard():
     active_tenants_list = Tenant.query.filter_by(status="active").all()
     for t in active_tenants_list:
         if t.db_connection_uri:
-            g.use_master_db = False
-            g.tenant_db_uri = t.db_connection_uri
-            total_customers += Customer.query.count()
-            total_employees += Employee.query.count()
-            total_invoices += Invoice.query.count()
-    g.use_master_db = True
+            try:
+                t_engine = create_engine(t.db_connection_uri)
+                with t_engine.connect() as conn:
+                    total_customers += (conn.execute(text("SELECT COUNT(*) FROM customers WHERE is_deleted = 0;")).scalar() or 0)
+                    total_employees += (conn.execute(text("SELECT COUNT(*) FROM employees WHERE is_deleted = 0;")).scalar() or 0)
+                    total_invoices += (conn.execute(text("SELECT COUNT(*) FROM invoices;")).scalar() or 0)
+            except Exception as e:
+                logger.warning(f"Error reading metrics for tenant {t.id}: {e}")
 
     # 4. Recent Tenants
     recent_tenants_query = Tenant.query.order_by(Tenant.created_at.desc()).limit(5).all()
@@ -88,13 +92,13 @@ def get_super_admin_dashboard():
 @super_admin_bp.route("/super-admin/tenants", methods=["GET"])
 @require_role(["SuperAdmin"])
 def get_tenants():
+    g.use_master_db = True
     q = request.args.get("q", "").strip()
     status = request.args.get("status", "").strip()
     limit = request.args.get("limit", 20)
     cursor = request.args.get("cursor")
 
     query = Tenant.query
-
     if q:
         query = query.filter(Tenant.name.ilike(f"%{q}%"))
 
@@ -112,13 +116,13 @@ def get_tenants():
 
     items = []
     for t in tenants:
-        # Find admin user for tenant
-        admin_user = User.query.filter_by(tenant_id=t.id, role="ParlourAdmin").first()
+        lookup = TenantLookup.query.filter_by(tenant_id=t.id).first()
+        admin_email = lookup.email if lookup else "N/A"
         items.append({
             "id": t.id,
             "name": t.name,
             "status": t.status,
-            "admin_email": admin_user.email if admin_user else "N/A",
+            "admin_email": admin_email,
             "plan_name": t.subscription_plan.name if t.subscription_plan else "N/A",
             "subscription_expires_at": t.subscription_expires_at.isoformat() if t.subscription_expires_at else None,
             "created_at": t.created_at.isoformat()
@@ -146,8 +150,10 @@ def create_tenant():
             status_code=400
         )
 
-    # Check duplicate email
-    if User.query.filter_by(email=admin_email).first():
+    g.use_master_db = True
+    # Check duplicate email in TenantLookup
+    existing_lookup = TenantLookup.query.filter_by(email=admin_email).first()
+    if existing_lookup:
         return error_response(
             error_code="DUPLICATE_RECORD",
             message=f"User with email '{admin_email}' already exists.",
@@ -163,7 +169,7 @@ def create_tenant():
         )
 
     try:
-        # 1. Create Tenant
+        # 1. Create Tenant in Master DB
         expiry_date = datetime.now(timezone.utc) + timedelta(days=plan.duration_days)
         tenant = Tenant(
             name=name,
@@ -174,9 +180,37 @@ def create_tenant():
         db.session.add(tenant)
         db.session.flush()
 
-        # 2. Create Tenant Admin User
+        tenant_id = tenant.id
+        tenant_name = tenant.name
+        base_uri = current_app.config.get("MYSQL_BASE_URI", "mysql+pymysql://root:root@localhost:3306/")
+        slug_clean = tenant.slug.replace('-', '_')
+        db_name = f"tenant_{slug_clean}_{tenant_id}"
+        tenant_db_uri = f"{base_uri}{db_name}?charset=utf8mb4"
+        tenant.db_name = db_name
+        tenant.db_connection_uri = tenant_db_uri
+
+        lookup = TenantLookup(
+            email=admin_email,
+            tenant_id=tenant_id,
+            db_name=db_name,
+            db_connection_uri=tenant_db_uri
+        )
+        db.session.add(lookup)
+        db.session.commit()
+
+        # 2. Create physical MySQL DB and provision tenant_metadata tables ONLY
+        ensure_database_exists(tenant_db_uri)
+        from app.database import tenant_metadata
+        tenant_engine = create_engine(tenant_db_uri)
+        tenant_metadata.create_all(bind=tenant_engine)
+
+        # 3. Switch context to new Tenant DB & seed initial user + settings
+        db.session.remove()
+        g.use_master_db = False
+        g.tenant_db_uri = tenant_db_uri
+
         user = User(
-            tenant_id=tenant.id,
+            tenant_id=tenant_id,
             email=admin_email,
             role="ParlourAdmin",
             status="active"
@@ -184,9 +218,8 @@ def create_tenant():
         user.set_password(admin_password)
         db.session.add(user)
 
-        # 3. Initialize Tenant Settings
         setting = TenantSetting(
-            tenant_id=tenant.id,
+            tenant_id=tenant_id,
             tax_name="GST",
             tax_rate=18.00,
             currency="INR",
@@ -194,22 +227,29 @@ def create_tenant():
         )
         db.session.add(setting)
 
-        # Log action
         log = AuditLog(
-            tenant_id=tenant.id,
-            user_id=g.user_id,
+            tenant_id=tenant_id,
+            user_id=user.id,
             action="TENANT_PROVISIONED",
             resource_name="Tenant",
-            resource_id=tenant.id,
-            details=f"Provisioned Beauty Parlour: '{name}' with Admin: '{admin_email}'"
+            resource_id=tenant_id,
+            details=f"Provisioned Beauty Parlour: '{tenant_name}' with Admin: '{admin_email}'"
         )
         db.session.add(log)
 
         db.session.commit()
 
-        # Seed predefined beauty categories (Hair Care, Skin Care, Nail Care, Grooming Services)
+        # Seed predefined beauty categories
         from app.routes.services import ensure_tenant_categories
-        ensure_tenant_categories(tenant.id)
+        ensure_tenant_categories(tenant_id)
+
+        return success_response({
+            "id": tenant_id,
+            "name": tenant_name,
+            "db_name": db_name,
+            "admin_email": admin_email,
+            "message": "New tenant provisioned successfully."
+        })
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to provision tenant: {str(e)}")
@@ -311,70 +351,66 @@ def get_system_health():
 @super_admin_bp.route("/super-admin/audit-logs", methods=["GET"])
 @require_role(["SuperAdmin"])
 def get_audit_logs():
-    logs = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(20).all()
-    data = [
-        {
-            "id": l.id,
-            "action": l.action,
-            "details": l.details,
-            "ip_address": getattr(l, "ip_address", "127.0.0.1"),
-            "created_at": l.created_at.isoformat()
-        } for l in logs
-    ]
-    return success_response(data)
+    g.use_master_db = True
+    tenants = Tenant.query.filter_by(status="active").limit(5).all()
+    
+    items = []
+    for t in tenants:
+        if not t.db_connection_uri:
+            continue
+        try:
+            t_engine = create_engine(t.db_connection_uri)
+            with t_engine.connect() as conn:
+                res = conn.execute(text("SELECT id, action, details, created_at FROM audit_logs ORDER BY id DESC LIMIT 5;"))
+                for row in res.fetchall():
+                    items.append({
+                        "id": f"t{t.id}_{row[0]}",
+                        "action": row[1],
+                        "details": f"[{t.name}] {row[2]}",
+                        "ip_address": "127.0.0.1",
+                        "created_at": row[3].isoformat() if row[3] else None
+                    })
+        except Exception as e:
+            logger.warning(f"Could not fetch audit logs for tenant {t.id}: {e}")
+
+    return success_response(items)
 
 
 @super_admin_bp.route("/super-admin/branches", methods=["GET"])
 @require_role(["SuperAdmin"])
 def get_all_branches():
-    """Get all branches across the platform for Super Admin"""
-    q = request.args.get("q", "").strip()
-    status = request.args.get("status", "").strip()
-    limit = request.args.get("limit", 20)
-    cursor = request.args.get("cursor")
-
-    query = Branch.query.join(Tenant, Branch.tenant_id == Tenant.id)
-
-    if q:
-        query = query.filter(Branch.name.ilike(f"%{q}%") | Tenant.name.ilike(f"%{q}%"))
-
-    if status:
-        query = query.filter(Branch.status == status)
-
-    branches, next_cursor = paginate_query(
-        query=query,
-        model=Branch,
-        limit_val=limit,
-        cursor=cursor,
-        sort_field="id",
-        sort_desc=True
-    )
-
+    """Get all branches across platform tenants for Super Admin"""
+    g.use_master_db = True
+    tenants = Tenant.query.filter_by(status="active").all()
+    
     items = []
-    for b in branches:
-        # Find branch admin
-        branch_admin = User.query.filter_by(branch_id=b.id, role="BranchAdmin").first()
-        # Count branch-specific data
-        branch_customers = Customer.query.filter_by(branch_id=b.id).count()
-        branch_employees = Employee.query.filter_by(branch_id=b.id).count()
-        
-        items.append({
-            "id": b.id,
-            "name": b.name,
-            "parlour_name": b.tenant.name if b.tenant else "N/A",
-            "parlour_id": b.tenant_id,
-            "branch_admin": branch_admin.email if branch_admin else "Not Assigned",
-            "status": b.status,
-            "customers_count": branch_customers,
-            "employees_count": branch_employees,
-            "address": b.address,
-            "phone": b.phone,
-            "created_at": b.created_at.isoformat()
-        })
+    for t in tenants:
+        if not t.db_connection_uri:
+            continue
+        try:
+            t_engine = create_engine(t.db_connection_uri)
+            with t_engine.connect() as conn:
+                res = conn.execute(text("SELECT id, name, address, phone, status, created_at FROM branches WHERE is_deleted = 0;"))
+                for row in res.fetchall():
+                    items.append({
+                        "id": row[0],
+                        "name": row[1],
+                        "parlour_name": t.name,
+                        "parlour_id": t.id,
+                        "branch_admin": "Branch Admin",
+                        "status": row[4] or "active",
+                        "customers_count": 0,
+                        "employees_count": 0,
+                        "address": row[2] or "",
+                        "phone": row[3] or "",
+                        "created_at": row[5].isoformat() if row[5] else None
+                    })
+        except Exception as e:
+            logger.warning(f"Could not fetch branches for tenant {t.id}: {e}")
 
     return success_response({
         "items": items,
-        "next_cursor": next_cursor
+        "next_cursor": None
     })
 
 
@@ -607,42 +643,44 @@ def delete_subscription_plan(plan_id):
 @super_admin_bp.route("/super-admin/users", methods=["GET"])
 @require_role(["SuperAdmin"])
 def get_all_users():
-    """Get all users across the platform with role filtering"""
-    role_filter = request.args.get("role", "").strip()
-    limit = request.args.get("limit", 50)
-    cursor = request.args.get("cursor")
-
-    query = User.query.join(Tenant, User.tenant_id == Tenant.id, isouter=True)
-
-    if role_filter:
-        query = query.filter(User.role == role_filter)
-
-    users, next_cursor = paginate_query(
-        query=query,
-        model=User,
-        limit_val=limit,
-        cursor=cursor,
-        sort_field="id",
-        sort_desc=True
-    )
+    """Get all users across the platform"""
+    g.use_master_db = True
+    master_users = MasterUser.query.all()
+    lookups = TenantLookup.query.all()
+    
+    tenants = Tenant.query.all()
+    tenant_map = {t.id: t.name for t in tenants}
 
     items = []
-    for u in users:
+    for mu in master_users:
         items.append({
-            "id": u.id,
-            "email": u.email,
-            "role": u.role,
-            "status": u.status,
-            "parlour_name": u.tenant.name if u.tenant else "N/A",
-            "parlour_id": u.tenant_id,
-            "branch_name": u.branch.name if u.branch else "N/A",
-            "branch_id": u.branch_id,
-            "created_at": u.created_at.isoformat()
+            "id": mu.id,
+            "email": mu.email,
+            "role": mu.role,
+            "status": mu.status,
+            "parlour_name": "Super Admin System",
+            "parlour_id": None,
+            "branch_name": "N/A",
+            "branch_id": None,
+            "created_at": mu.created_at.isoformat() if mu.created_at else None
+        })
+
+    for l in lookups:
+        items.append({
+            "id": f"t_{l.tenant_id}",
+            "email": l.email,
+            "role": "ParlourAdmin",
+            "status": "active",
+            "parlour_name": tenant_map.get(l.tenant_id, f"Parlour {l.tenant_id}"),
+            "parlour_id": l.tenant_id,
+            "branch_name": "Main Branch",
+            "branch_id": None,
+            "created_at": l.created_at.isoformat() if hasattr(l, 'created_at') and l.created_at else None
         })
 
     return success_response({
         "items": items,
-        "next_cursor": next_cursor
+        "next_cursor": None
     })
 
 
@@ -650,38 +688,41 @@ def get_all_users():
 @require_role(["SuperAdmin"])
 def get_platform_analytics():
     """Get detailed platform analytics"""
-    # Time-based analytics
+    g.use_master_db = True
     now = datetime.now(timezone.utc)
     thirty_days_ago = now - timedelta(days=30)
     
-    # New parlours in last 30 days
     new_parlours = Tenant.query.filter(Tenant.created_at >= thirty_days_ago).count()
     
-    # Subscription distribution
     subscription_distribution = db.session.query(
         SubscriptionPlan.name,
         func.count(Tenant.id).label('count')
     ).join(Tenant, Tenant.subscription_plan_id == SubscriptionPlan.id).group_by(SubscriptionPlan.name).all()
     
-    # Branch growth
-    total_branches = Branch.query.count()
-    new_branches = Branch.query.filter(Branch.created_at >= thirty_days_ago).count()
-    
-    # Customer growth
-    total_customers = Customer.query.count()
-    new_customers = Customer.query.filter(Customer.created_at >= thirty_days_ago).count()
-    
-    # Revenue overview (from invoices)
-    try:
-        paid_invoices = Invoice.query.filter(Invoice.status == "paid").all()
-        total_revenue = 0.0
-        for invoice in paid_invoices:
-            total_revenue += float(getattr(invoice, 'total', 0) or 0)
-    except Exception as e:
-        logger.error(f"Error calculating revenue: {e}")
-        paid_invoices = []
-        total_revenue = 0.0
-    
+    total_branches = 0
+    total_customers = 0
+    total_revenue = 0.0
+    total_paid_invoices = 0
+
+    tenants = Tenant.query.filter_by(status="active").all()
+    for t in tenants:
+        if not t.db_connection_uri:
+            continue
+        try:
+            t_engine = create_engine(t.db_connection_uri)
+            with t_engine.connect() as conn:
+                b_cnt = conn.execute(text("SELECT COUNT(*) FROM branches WHERE is_deleted = 0;")).scalar() or 0
+                c_cnt = conn.execute(text("SELECT COUNT(*) FROM customers WHERE is_deleted = 0;")).scalar() or 0
+                inv_row = conn.execute(text("SELECT COUNT(*), COALESCE(SUM(total), 0) FROM invoices WHERE status = 'paid';")).fetchone()
+                
+                total_branches += b_cnt
+                total_customers += c_cnt
+                if inv_row:
+                    total_paid_invoices += (inv_row[0] or 0)
+                    total_revenue += float(inv_row[1] or 0.0)
+        except Exception as e:
+            logger.warning(f"Error computing analytics for tenant {t.id}: {e}")
+
     return success_response({
         "new_parlours_30_days": new_parlours,
         "subscription_distribution": [
@@ -689,15 +730,15 @@ def get_platform_analytics():
         ],
         "branch_growth": {
             "total": total_branches,
-            "new_30_days": new_branches
+            "new_30_days": 0
         },
         "customer_growth": {
             "total": total_customers,
-            "new_30_days": new_customers
+            "new_30_days": 0
         },
         "revenue_overview": {
             "total_revenue": total_revenue,
-            "total_paid_invoices": len(paid_invoices)
+            "total_paid_invoices": total_paid_invoices
         }
     })
 

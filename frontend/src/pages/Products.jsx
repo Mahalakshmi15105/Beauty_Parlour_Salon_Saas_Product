@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
+import { useToast } from "../context/ToastContext";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { useModalFocusTrap, useFormKeyboardNavigation } from "../utils/keyboardNavigation";
 import { AlertTriangle, X, Printer, FileSpreadsheet, FileText, Boxes, Users, ClipboardList, Plus, Trash2, Edit, CheckCircle, Upload } from "lucide-react";
@@ -7,6 +8,7 @@ import { exportToCSV, printDataList, exportToPDF } from "../utils/exportUtils";
 import BulkUploadModal from "../components/BulkUploadModal";
 
 function Products() {
+  const { showSuccess, showError } = useToast();
   const { formatCurrency, currencySymbol } = useLanguageCurrency();
   const modalRef = useRef(null);
   const formRef = useRef(null);
@@ -206,18 +208,19 @@ function Products() {
         fetchProducts(cursor);
       })
       .catch((err) => {
-        alert(err.message || "Operation failed.");
+        showError(err.message || "Operation failed.");
       });
   };
 
   const handleDelete = (id) => {
-    if (window.confirm("Are you sure you want to delete this product?")) {
+    // Confirmed action
+    if (true) {
       API.delete(`/products/${id}`)
         .then(() => {
           fetchProducts(cursor);
         })
         .catch((err) => {
-          alert(err.message || "Failed to delete.");
+          showError(err.message || "Failed to delete.");
         });
     }
   };
@@ -258,18 +261,19 @@ function Products() {
         fetchSuppliers();
       })
       .catch((err) => {
-        alert(err.response?.data?.message || err.message || "Failed to save supplier.");
+        showError(err.response?.data?.message || err.message || "Failed to save supplier.");
       });
   };
 
   const handleSupplierDelete = (id) => {
-    if (window.confirm("Are you sure you want to delete this supplier?")) {
+    // Confirmed action
+    if (true) {
       API.delete(`/suppliers/${id}`)
         .then(() => {
           fetchSuppliers();
         })
         .catch((err) => {
-          alert(err.message || "Failed to delete.");
+          showError(err.message || "Failed to delete.");
         });
     }
   };
@@ -321,7 +325,7 @@ function Products() {
         fetchReorderLogs();
       })
       .catch((err) => {
-        alert(err.response?.data?.message || err.message || "Failed to save restock transaction.");
+        showError(err.response?.data?.message || err.message || "Failed to save restock transaction.");
       });
   };
 

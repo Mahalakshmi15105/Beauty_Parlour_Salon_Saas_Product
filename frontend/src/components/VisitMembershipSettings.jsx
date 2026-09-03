@@ -16,6 +16,28 @@ export default function VisitMembershipSettings() {
   const [successMsg, setSuccessMsg] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
 
+  const [showSwitchModal, setShowSwitchModal] = useState(false);
+  const [pendingMode, setPendingMode] = useState(null);
+
+  const handleRequestModeChange = (newMode) => {
+    if (newMode === membershipMode) return;
+    setPendingMode(newMode);
+    setShowSwitchModal(true);
+  };
+
+  const handleConfirmModeChange = () => {
+    if (pendingMode) {
+      setMembershipMode(pendingMode);
+    }
+    setShowSwitchModal(false);
+    setPendingMode(null);
+  };
+
+  const handleCancelModeChange = () => {
+    setShowSwitchModal(false);
+    setPendingMode(null);
+  };
+
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const activeBranchId = user.branch_id || null;
 
@@ -25,7 +47,21 @@ export default function VisitMembershipSettings() {
 
   const fetchData = async () => {
     setLoading(true);
-    setErrorMsg(null);
+    if (typeof setErrorMsg === "function") setErrorMsg(null);
+
+    // Safeguard: 10-second max loading timeout
+    const timeoutId = setTimeout(() => {
+      setLoading((prevLoading) => {
+        if (prevLoading) {
+          if (typeof setErrorMsg === "function") {
+            setErrorMsg("Couldn't load membership settings in time. Please check backend connection and retry.");
+          }
+          return false;
+        }
+        return false;
+      });
+    }, 10000);
+
     try {
       const [svcRes, setRes] = await Promise.all([
         API.get("/services").catch((err) => {
@@ -50,8 +86,11 @@ export default function VisitMembershipSettings() {
       setFreeServiceIds(data.free_service_ids || []);
     } catch (err) {
       console.error("Failed to load visit membership settings:", err);
-      setErrorMsg(err.message || "Failed to load membership settings.");
+      if (typeof setErrorMsg === "function") {
+        setErrorMsg(err.message || "Failed to load membership settings.");
+      }
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   };
@@ -146,7 +185,7 @@ export default function VisitMembershipSettings() {
           <div className="grid md:grid-cols-2 gap-4">
             {/* Type A: Paid Discount Plan */}
             <div
-              onClick={() => setMembershipMode("paid_plan")}
+              onClick={() => handleRequestModeChange("paid_plan")}
               className={`p-5 rounded-2xl border-2 cursor-pointer transition flex flex-col justify-between space-y-3 ${
                 membershipMode === "paid_plan"
                   ? "border-primary bg-primary/5 ring-2 ring-primary/20"
@@ -167,7 +206,7 @@ export default function VisitMembershipSettings() {
                   type="radio"
                   name="membership_mode"
                   checked={membershipMode === "paid_plan"}
-                  onChange={() => setMembershipMode("paid_plan")}
+                  onChange={() => handleRequestModeChange("paid_plan")}
                   className="mt-1 text-primary focus:ring-primary"
                 />
               </div>
@@ -178,7 +217,7 @@ export default function VisitMembershipSettings() {
 
             {/* Type B: Visit-Based Free Service */}
             <div
-              onClick={() => setMembershipMode("visit_based")}
+              onClick={() => handleRequestModeChange("visit_based")}
               className={`p-5 rounded-2xl border-2 cursor-pointer transition flex flex-col justify-between space-y-3 ${
                 membershipMode === "visit_based"
                   ? "border-primary bg-primary/5 ring-2 ring-primary/20"
@@ -199,7 +238,7 @@ export default function VisitMembershipSettings() {
                   type="radio"
                   name="membership_mode"
                   checked={membershipMode === "visit_based"}
-                  onChange={() => setMembershipMode("visit_based")}
+                  onChange={() => handleRequestModeChange("visit_based")}
                   className="mt-1 text-primary focus:ring-primary"
                 />
               </div>
@@ -302,7 +341,10 @@ export default function VisitMembershipSettings() {
         )}
 
         {/* Submit Save Button */}
-        <div className="pt-3 border-t border-border-soft flex justify-end">
+        <div className="pt-3 border-t border-border-soft flex items-center justify-between">
+          <p className="text-[11px] text-slate-500 font-medium italic">
+            🛡️ Data Safeguard: Switching modes changes active billing rules only. All existing membership plans and customer visit counters remain 100% intact in the database.
+          </p>
           <button
             type="submit"
             disabled={saving}
@@ -313,6 +355,49 @@ export default function VisitMembershipSettings() {
           </button>
         </div>
       </form>
+
+      {/* Confirmation Modal Popup when Switching Membership Mode */}
+      {showSwitchModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div className="flex items-center space-x-3 text-amber-600 border-b border-slate-100 pb-3">
+              <div className="p-2.5 bg-amber-100 rounded-xl">
+                <AlertCircle className="w-6 h-6 text-amber-600" />
+              </div>
+              <div>
+                <h4 className="text-sm font-extrabold text-slate-900">Switch Membership Method?</h4>
+                <p className="text-xs text-slate-500 font-medium">Confirmation Required</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-700 font-medium leading-relaxed">
+              Are you sure you want to switch membership methods? This will change how memberships work for this location.
+            </p>
+
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-600 space-y-1">
+              <p className="font-bold text-slate-800">✅ Data Safety Confirmation:</p>
+              <p>No customer memberships or visit history will be lost. You can switch back at any time without losing any data.</p>
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={handleCancelModeChange}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmModeChange}
+                className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-extrabold shadow-md shadow-pink-500/20 transition"
+              >
+                Yes, switch method
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

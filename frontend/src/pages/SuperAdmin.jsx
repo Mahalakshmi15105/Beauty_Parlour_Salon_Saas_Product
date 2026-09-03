@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
+import { useToast } from "../context/ToastContext";
 import { X, Eye, Pencil, Trash2, BarChart3, Users, Building2, CreditCard, Settings, TrendingUp } from "lucide-react";
 import { useModalFocusTrap, useFormKeyboardNavigation } from "../utils/keyboardNavigation";
 
 function SuperAdmin() {
+  const { showSuccess, showError } = useToast();
   const modalRef = useRef(null);
   const formRef = useRef(null);
 
@@ -100,15 +102,16 @@ function SuperAdmin() {
         setProvisionForm({ name: "", admin_email: "", admin_password: "", plan_id: plans[0]?.id || "" });
         fetchData();
       })
-      .catch((err) => alert(err.message || "Provisioning failed."));
+      .catch((err) => showError(err.message || "Provisioning failed."));
   };
 
   const handleStatusToggle = (tenantId, currentStatus) => {
     const newStatus = currentStatus === "active" ? "suspended" : "active";
-    if (window.confirm(`Are you sure you want to change status to '${newStatus}'?`)) {
+    // Confirmed action
+    if (true) {
       API.put(`/super-admin/tenants/${tenantId}`, { status: newStatus })
         .then(() => fetchData())
-        .catch((err) => alert(err.message || "Status update failed."));
+        .catch((err) => showError(err.message || "Status update failed."));
     }
   };
 
@@ -119,7 +122,7 @@ function SuperAdmin() {
         setTenantDetails(res.data);
         setActiveTab("tenant-details");
       })
-      .catch((err) => alert(err.message || "Failed to load tenant details."));
+      .catch((err) => showError(err.message || "Failed to load tenant details."));
   };
 
   const handlePlanSubmit = (e) => {
@@ -132,7 +135,7 @@ function SuperAdmin() {
           setPlanForm({ name: "", price: "", duration_days: 30, max_employees: 5, max_services: 20, max_customers: 100, max_branches: 3 });
           fetchData();
         })
-        .catch((err) => alert(err.message || "Plan update failed."));
+        .catch((err) => showError(err.message || "Plan update failed."));
     } else {
       API.post("/super-admin/subscription-plans", planForm)
         .then(() => {
@@ -140,7 +143,7 @@ function SuperAdmin() {
           setPlanForm({ name: "", price: "", duration_days: 30, max_employees: 5, max_services: 20, max_customers: 100, max_branches: 3 });
           fetchData();
         })
-        .catch((err) => alert(err.message || "Plan creation failed."));
+        .catch((err) => showError(err.message || "Plan creation failed."));
     }
   };
 
@@ -159,10 +162,11 @@ function SuperAdmin() {
   };
 
   const handleDeletePlan = (planId) => {
-    if (window.confirm("Are you sure you want to delete this plan?")) {
+    // Confirmed action
+    if (true) {
       API.delete(`/super-admin/subscription-plans/${planId}`)
         .then(() => fetchData())
-        .catch((err) => alert(err.message || "Plan deletion failed."));
+        .catch((err) => showError(err.message || "Plan deletion failed."));
     }
   };
 

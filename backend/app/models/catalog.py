@@ -1,8 +1,9 @@
-from app.database import db
+from app.database import db, tenant_metadata
 from app.models.mixins import TimestampMixin, SoftDeleteMixin
 
 class ServiceCategory(db.Model, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "service_categories"
+    metadata = tenant_metadata
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, nullable=False, index=True)
@@ -18,6 +19,7 @@ class ServiceCategory(db.Model, TimestampMixin, SoftDeleteMixin):
 
 class Service(db.Model, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "services"
+    metadata = tenant_metadata
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, nullable=False, index=True)
@@ -39,6 +41,7 @@ class Service(db.Model, TimestampMixin, SoftDeleteMixin):
 
 class Product(db.Model, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "products"
+    metadata = tenant_metadata
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, nullable=False, index=True)
@@ -61,6 +64,7 @@ class Product(db.Model, TimestampMixin, SoftDeleteMixin):
 
 class Supplier(db.Model, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "suppliers"
+    metadata = tenant_metadata
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, nullable=False, index=True)
@@ -79,6 +83,7 @@ class Supplier(db.Model, TimestampMixin, SoftDeleteMixin):
 
 class StockReorderLog(db.Model, TimestampMixin):
     __tablename__ = "stock_reorder_logs"
+    metadata = tenant_metadata
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, nullable=False, index=True)

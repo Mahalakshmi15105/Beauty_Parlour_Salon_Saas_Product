@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
+import { useToast } from "../context/ToastContext";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { useTheme } from "../context/ThemeContext";
 import { SUPPORTED_LANGUAGES } from "../utils/translations";
@@ -40,6 +41,7 @@ import VisitMembershipSettings from "../components/VisitMembershipSettings";
 import { CURATED_FONTS, DEFAULT_TYPOGRAPHY, getShopNameStyle, loadGoogleFont } from "../utils/fontLoader";
 
 function Settings() {
+  const { showSuccess, showError } = useToast();
   const formRef = useRef(null);
   const fileInputRef = useRef(null);
   const {
@@ -321,12 +323,13 @@ function Settings() {
     API.put("/settings", payload)
       .then(() => {
         setSaving(false);
+        showSuccess("Settings updated successfully!");
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 3000);
       })
       .catch((err) => {
         setSaving(false);
-        alert(err.message || "Failed to save settings.");
+        showError(err.message || "Failed to save settings.");
       });
   };
 
@@ -1470,7 +1473,7 @@ function Settings() {
               <p>Database backups run automatically every 24 hours. You can trigger an instant snapshot export below.</p>
               <button
                 type="button"
-                onClick={() => alert("Manual database backup requested. Backup file saved to server storage.")}
+                onClick={() => showError("Manual database backup requested. Backup file saved to server storage.")}
                 className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg font-medium transition"
               >
                 💾 Trigger Manual Database Backup

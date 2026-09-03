@@ -1,8 +1,9 @@
-from app.database import db
+from app.database import db, tenant_metadata
 from app.models.mixins import TimestampMixin, SoftDeleteMixin
 
 class Branch(db.Model, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "branches"
+    metadata = tenant_metadata
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, nullable=False, index=True)

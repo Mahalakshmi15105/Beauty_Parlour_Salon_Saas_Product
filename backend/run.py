@@ -49,7 +49,7 @@ def run_development():
         port=Config.PORT,
         debug=True,
         threaded=not is_single,   # <-- False when SINGLE_THREAD=true
-        use_reloader=False,
+        use_reloader=True,
     )
 
 

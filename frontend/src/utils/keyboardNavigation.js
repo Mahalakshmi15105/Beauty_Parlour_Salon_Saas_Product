@@ -4,6 +4,23 @@ import { useEffect, useRef } from "react";
  * Checks if a DOM element is navigable and focusable via keyboard navigation.
  * Skips disabled, read-only, hidden, or non-editable elements.
  */
+if (typeof window !== "undefined" && typeof document !== "undefined") {
+  document.addEventListener(
+    "focusin",
+    (e) => {
+      if (e.target && e.target.tagName === "SELECT") {
+        if (typeof e.target.showPicker === "function") {
+          try {
+            e.target.showPicker();
+          } catch (err) {
+            // ignore if already open or restricted by browser
+          }
+        }
+      }
+    },
+    true
+  );
+}
 export function isElementNavigable(el) {
   if (!el || typeof el.getBoundingClientRect !== "function") return false;
   if (el.disabled || el.readOnly) return false;
@@ -272,6 +289,35 @@ export function useSidebarKeyboardNavigation(sidebarRef, onToggleCollapse) {
 }
 
 /**
+ * Utility: Focuses an element directly. If the element is a <select> dropdown,
+ * automatically opens its dropdown options immediately.
+ */
+export function focusAndOpenSelect(element) {
+  if (!element) return false;
+  try {
+    element.focus();
+    if (typeof element.select === "function" && element.tagName === "INPUT") {
+      element.select();
+    }
+    if (element.tagName === "SELECT") {
+      if (typeof element.showPicker === "function") {
+        try {
+          element.showPicker();
+          return true;
+        } catch (e) {
+          // fallback
+        }
+      }
+      const event = new MouseEvent("mousedown", { bubbles: true, cancelable: true, view: window });
+      element.dispatchEvent(event);
+    }
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+/**
  * Utility: Advances focus directly to a target ref if current element is valid.
  */
 export function advanceToNextRef(currentEl, nextRef, onSubmit) {
@@ -279,13 +325,7 @@ export function advanceToNextRef(currentEl, nextRef, onSubmit) {
     return false;
   }
   if (nextRef && nextRef.current && isElementNavigable(nextRef.current)) {
-    try {
-      nextRef.current.focus();
-      if (typeof nextRef.current.select === "function" && nextRef.current.tagName === "INPUT") {
-        nextRef.current.select();
-      }
-    } catch (err) {}
-    return true;
+    return focusAndOpenSelect(nextRef.current);
   } else if (onSubmit && typeof onSubmit === "function") {
     onSubmit();
     return true;

@@ -6,6 +6,7 @@ from io import BytesIO
 import logging
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
+from flask import g
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,10 @@ FIELD_MAPPINGS = {
         'Price': 'price',
         'Duration (minutes)': 'duration_minutes',
         'Description': 'description',
-        'Status': 'status'
+        'Status': 'status',
+        'Membership Plan Name': 'membership_plan_name',
+        'Membership Discount (%)': 'membership_discount_percentage',
+        'Membership Discount Amount': 'membership_discount_amount'
     },
     'products': {
         'Product Name': 'name',
@@ -59,7 +63,7 @@ FIELD_MAPPINGS = {
 REQUIRED_FIELDS = {
     'customers': ['First Name', 'Phone Number'],
     'employees': ['First Name', 'Phone Number', 'Salary'],
-    'services': ['Service Name', 'Category Name', 'Price', 'Duration (minutes)'],
+    'services': ['Service Name', 'Category Name', 'Price'],
     'products': ['Product Name', 'Cost Price', 'Selling Price', 'MRP', 'Stock Quantity']
 }
 
@@ -67,11 +71,27 @@ REQUIRED_FIELDS = {
 OPTIONAL_FIELDS = {
     'customers': ['Last Name', 'Email', 'Gender', 'Date of Birth', 'Address', 'Notes', 'Spot'],
     'employees': ['Last Name', 'Specialization', 'Role', 'Commission %', 'Joining Date', 'Status'],
-    'services': ['Description', 'Status'],
+    'services': ['Description', 'Status', 'Membership Plan Name', 'Membership Discount (%)', 'Membership Discount Amount'],
     'products': ['Category', 'SKU', 'Barcode', 'Low Stock Threshold', 'Status']
 }
 
-def generate_excel_template(module_name):
+def get_membership_mode(tenant_id, branch_id=None):
+    if not tenant_id:
+        return "paid_plan"
+    try:
+        from app.models.visit_membership import VisitMembershipSetting
+        from app.utils.auth import get_tenant_query
+        was_master = getattr(g, 'use_master_db', False)
+        g.use_master_db = False
+        setting = get_tenant_query(VisitMembershipSetting).filter_by(tenant_id=tenant_id).first()
+        g.use_master_db = was_master
+        if setting and setting.membership_mode:
+            return setting.membership_mode
+    except Exception:
+        pass
+    return "paid_plan"
+
+def generate_excel_template(module_name, tenant_id=None, branch_id=None):
     """
     Generate an Excel template for the specified module
     Returns the Excel file as bytes
@@ -85,7 +105,12 @@ def generate_excel_template(module_name):
         
         # Get field mapping for this module
         field_mapping = FIELD_MAPPINGS.get(module_name, {})
-        headers = list(field_mapping.keys())
+        mode = get_membership_mode(tenant_id, branch_id)
+
+        if module_name == 'services' and mode not in ['paid_plan', 'discount_plan']:
+            headers = ['Service Name', 'Category Name', 'Price', 'Duration (minutes)', 'Description', 'Status']
+        else:
+            headers = list(field_mapping.keys())
         
         # Style the header row
         header_font = Font(bold=True, color="FFFFFF")
@@ -100,18 +125,130 @@ def generate_excel_template(module_name):
             cell.alignment = header_alignment
         
         # Add sample data row
-        sample_data = get_sample_data(module_name)
+        sample_data = get_sample_data(module_name, membership_mode=mode)
         if sample_data:
             for row_num, row_data in enumerate(sample_data, 2):
                 for col_num, header in enumerate(headers, 1):
                     field_key = field_mapping[header]
                     value = row_data.get(field_key, '')
                     ws.cell(row=row_num, column=col_num, value=value)
+                
+                # Pre-fill dynamic Excel formula for Membership Discount Amount if present
+                if module_name == 'services' and 'Membership Discount Amount' in headers and 'Price' in headers and 'Membership Discount (%)' in headers:
+                    price_col = openpyxl.utils.get_column_letter(headers.index('Price') + 1)
+                    pct_col = openpyxl.utils.get_column_letter(headers.index('Membership Discount (%)') + 1)
+                    amt_col_idx = headers.index('Membership Discount Amount') + 1
+                    formula_str = f"=IF(AND(ISNUMBER({price_col}{row_num}), ISNUMBER({pct_col}{row_num})), ROUND({price_col}{row_num}*({pct_col}{row_num}/100), 2), \"\")"
+                    ws.cell(row=row_num, column=amt_col_idx, value=formula_str)
         
-        # Adjust column widths
-        for col_num, header in enumerate(headers, 1):
-            ws.column_dimensions[chr(64 + col_num)].width = 20
+        # Add Excel Data Validation Dropdowns
+        from openpyxl.worksheet.datavalidation import DataValidation
+        from app.utils.auth import get_tenant_query
         
+        if module_name == 'services' and tenant_id:
+            from app.models.membership import MembershipPlan
+            from app.models.catalog import ServiceCategory
+            was_master = getattr(g, 'use_master_db', False)
+            g.use_master_db = False
+
+            # Category Name Dropdown (Col B)
+            try:
+                cats = get_tenant_query(ServiceCategory).filter_by(tenant_id=tenant_id, is_deleted=False).all()
+                cat_names = [c.name.replace('"', '').strip() for c in cats if c.name]
+                if cat_names:
+                    cat_formula = f'"{",".join(cat_names)}"'
+                    dv_cat = DataValidation(type="list", formula1=cat_formula, allow_blank=True)
+                    dv_cat.hide_drop_down = None
+                    dv_cat.showInputMessage = True
+                    dv_cat.promptTitle = "Category Selection"
+                    dv_cat.prompt = "Select an existing category from the dropdown or type a new category name."
+                    dv_cat.showErrorMessage = True
+                    dv_cat.errorStyle = "information"
+                    dv_cat.errorTitle = "Category Notice"
+                    dv_cat.error = f"Existing categories: {', '.join(cat_names)}. You can also type a new category name."
+                    ws.add_data_validation(dv_cat)
+                    dv_cat.add("B2:B500")
+            except Exception as e:
+                logger.error(f"Error adding category validation dropdown: {e}")
+
+            # Status Dropdown
+            try:
+                dv_status = DataValidation(type="list", formula1='"active,inactive"', allow_blank=True)
+                dv_status.hide_drop_down = None
+                dv_status.showInputMessage = True
+                dv_status.promptTitle = "Status Selection"
+                dv_status.prompt = "Select 'active' or 'inactive'."
+                dv_status.showErrorMessage = True
+                dv_status.errorStyle = "information"
+                dv_status.errorTitle = "Status Selection"
+                dv_status.error = "Please select either 'active' or 'inactive'."
+                ws.add_data_validation(dv_status)
+                status_idx = headers.index('Status') + 1 if 'Status' in headers else 6
+                status_col = openpyxl.utils.get_column_letter(status_idx) if hasattr(openpyxl.utils, 'get_column_letter') else chr(64 + status_idx)
+                dv_status.add(f"{status_col}2:{status_col}500")
+            except Exception as e:
+                logger.error(f"Error adding status validation dropdown: {e}")
+
+            # Membership Plan Name Dropdown (Col G when in paid_plan mode)
+            if 'Membership Plan Name' in headers:
+                try:
+                    plans = get_tenant_query(MembershipPlan).filter_by(tenant_id=tenant_id, status='active').all()
+                    plan_names = [p.name or p.plan_name for p in plans if (p.name or p.plan_name)]
+                    plan_names = [p.replace('"', '').strip() for p in plan_names if p]
+                    if plan_names:
+                        plan_formula = f'"{",".join(plan_names)}"'
+                        dv_plan = DataValidation(type="list", formula1=plan_formula, allow_blank=True)
+                        dv_plan.hide_drop_down = None
+                        dv_plan.showInputMessage = True
+                        dv_plan.promptTitle = "Membership Plan Selection"
+                        dv_plan.prompt = f"Select an active plan from dropdown: {', '.join(plan_names)}"
+                        dv_plan.showErrorMessage = True
+                        dv_plan.errorStyle = "information"
+                        dv_plan.errorTitle = "Membership Plan Selection"
+                        dv_plan.error = f"Active membership plans: {', '.join(plan_names)}"
+                        ws.add_data_validation(dv_plan)
+                        plan_idx = headers.index('Membership Plan Name') + 1
+                        plan_col = openpyxl.utils.get_column_letter(plan_idx) if hasattr(openpyxl.utils, 'get_column_letter') else chr(64 + plan_idx)
+                        dv_plan.add(f"{plan_col}2:{plan_col}500")
+                except Exception as e:
+                    logger.error(f"Error adding membership plan validation dropdown: {e}")
+
+            g.use_master_db = was_master
+
+        elif module_name == 'customers':
+            try:
+                dv_gender = DataValidation(type="list", formula1='"Female,Male,Other"', allow_blank=True)
+                dv_gender.hide_drop_down = None
+                dv_gender.showInputMessage = True
+                dv_gender.promptTitle = "Gender Selection"
+                dv_gender.prompt = "Select Female, Male, or Other."
+                dv_gender.showErrorMessage = True
+                dv_gender.errorStyle = "information"
+                dv_gender.errorTitle = "Gender Selection"
+                dv_gender.error = "Please select Female, Male, or Other."
+                ws.add_data_validation(dv_gender)
+                dv_gender.add("E2:E500")
+            except Exception as e:
+                logger.error(f"Error adding customer gender dropdown: {e}")
+
+        elif module_name in ['employees', 'products']:
+            try:
+                dv_status = DataValidation(type="list", formula1='"active,inactive"', allow_blank=True)
+                dv_status.hide_drop_down = None
+                dv_status.showInputMessage = True
+                dv_status.promptTitle = "Status Selection"
+                dv_status.prompt = "Select 'active' or 'inactive'."
+                dv_status.showErrorMessage = True
+                dv_status.errorStyle = "information"
+                dv_status.errorTitle = "Status Selection"
+                dv_status.error = "Please select either 'active' or 'inactive'."
+                ws.add_data_validation(dv_status)
+                status_idx = headers.index('Status') + 1 if 'Status' in headers else len(headers)
+                status_col = openpyxl.utils.get_column_letter(status_idx) if hasattr(openpyxl.utils, 'get_column_letter') else chr(64 + status_idx)
+                dv_status.add(f"{status_col}2:{status_col}500")
+            except Exception as e:
+                logger.error(f"Error adding status dropdown: {e}")
+
         # Save to bytes
         file_stream = BytesIO()
         wb.save(file_stream)
@@ -122,7 +259,7 @@ def generate_excel_template(module_name):
         logger.error(f"Error generating Excel template for {module_name}: {str(e)}")
         raise
 
-def get_sample_data(module_name):
+def get_sample_data(module_name, membership_mode="paid_plan"):
     """Get sample data for the template"""
     if module_name == 'customers':
         return [
@@ -153,16 +290,19 @@ def get_sample_data(module_name):
             }
         ]
     elif module_name == 'services':
-        return [
-            {
-                'name': 'Haircut',
-                'category_name': 'Hair Services',
-                'price': '500',
-                'duration_minutes': '30',
-                'description': 'Basic haircut',
-                'status': 'active'
-            }
-        ]
+        sample = {
+            'name': 'Haircut',
+            'category_name': 'Hair Services',
+            'price': '500',
+            'duration_minutes': '30',
+            'description': 'Basic haircut',
+            'status': 'active'
+        }
+        if membership_mode in ['paid_plan', 'discount_plan']:
+            sample['membership_plan_name'] = 'SUPER PLAN'
+            sample['membership_discount_percentage'] = '10'
+            sample['membership_discount_amount'] = '50'
+        return [sample]
     elif module_name == 'products':
         return [
             {
@@ -253,7 +393,7 @@ def convert_cell_value(value, field_name):
         return None
     
     # Handle different field types
-    if field_name in ['salary', 'price', 'cost_price', 'selling_price', 'mrp', 'commission_percentage']:
+    if field_name in ['salary', 'price', 'cost_price', 'selling_price', 'mrp', 'commission_percentage', 'membership_discount_percentage', 'membership_discount_amount']:
         try:
             return float(str(value))
         except (ValueError, TypeError):

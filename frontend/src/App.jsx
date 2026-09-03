@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Layout from "./components/Layout";
 import { ThemeProvider } from "./context/ThemeContext";
+import { ToastProvider } from "./context/ToastContext";
 import Customers from "./pages/Customers";
 import Employees from "./pages/Employees";
 import Services from "./pages/Services";
@@ -22,7 +23,7 @@ import LandingPage from "./pages/LandingPage";
 import Register from "./pages/Register";
 import PublicBookingPage from "./pages/PublicBookingPage";
 import API from "./services/api";
-import { LogOut, Sparkles, ShieldCheck } from "lucide-react";
+import { LogOut, Sparkles, ShieldCheck, Eye, EyeOff } from "lucide-react";
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem("token"));
@@ -72,6 +73,7 @@ function App() {
   const [activeTab, setActiveTab] = useState(initialActiveTab);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loginError, setLoginError] = useState(null);
 
@@ -222,25 +224,36 @@ function App() {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Password</label>
-              <input
-                id="login-password-input"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    if (e.target.checkValidity && !e.target.checkValidity()) {
-                      e.target.reportValidity();
-                      return;
+              <div className="relative">
+                <input
+                  id="login-password-input"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      if (e.target.checkValidity && !e.target.checkValidity()) {
+                        e.target.reportValidity();
+                        return;
+                      }
+                      handleLogin(e);
                     }
-                    handleLogin(e);
-                  }
-                }}
-                placeholder="••••••••"
-                className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm text-slate-800 focus:outline-none focus:border-pink-500 focus:bg-white transition font-medium"
-              />
+                  }}
+                  placeholder="••••••••"
+                  className="w-full bg-slate-50 border border-slate-200 px-4 py-3 pr-10 rounded-xl text-sm text-slate-800 focus:outline-none focus:border-pink-500 focus:bg-white transition font-medium"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-md transition"
+                  tabIndex={-1}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <button
@@ -342,15 +355,17 @@ function App() {
 
   return (
     <ThemeProvider>
-      <Layout
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        onLogout={handleLogout}
-        onNavigateHome={() => setCurrentView("landing")}
-        user={user}
-      >
-        {renderContent()}
-      </Layout>
+      <ToastProvider>
+        <Layout
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          onLogout={handleLogout}
+          onNavigateHome={() => setCurrentView("landing")}
+          user={user}
+        >
+          {renderContent()}
+        </Layout>
+      </ToastProvider>
     </ThemeProvider>
   );
 }

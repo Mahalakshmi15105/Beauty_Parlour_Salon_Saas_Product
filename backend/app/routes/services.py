@@ -58,22 +58,6 @@ def ensure_tenant_categories(tenant_id):
                 db.session.flush()
                 added = True
             
-            # Check if category has default starter services
-            existing_svcs = Service.query.filter_by(tenant_id=tenant_id, category_id=cat.id, is_deleted=False).count()
-            if existing_svcs == 0 and cat_name in DEFAULT_CATEGORY_SERVICES:
-                for s_info in DEFAULT_CATEGORY_SERVICES[cat_name]:
-                    s_obj = Service(
-                        tenant_id=tenant_id,
-                        category_id=cat.id,
-                        name=s_info["name"],
-                        price=s_info["price"],
-                        duration_minutes=s_info["duration"],
-                        status="active",
-                        is_deleted=False
-                    )
-                    db.session.add(s_obj)
-                    added = True
-
         if added:
             db.session.commit()
     except Exception as e:

@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
+import { useToast } from "../context/ToastContext";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { useModalFocusTrap, useFormKeyboardNavigation } from "../utils/keyboardNavigation";
 import { X, Printer, FileSpreadsheet, FileText } from "lucide-react";
 import { exportToCSV, printDataList, exportToPDF } from "../utils/exportUtils";
 
 function MembershipPlans() {
+  const { showSuccess, showError } = useToast();
   const { formatCurrency, currencySymbol, t } = useLanguageCurrency();
   const modalRef = useRef(null);
   const formRef = useRef(null);
@@ -191,7 +193,7 @@ function MembershipPlans() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!validityType) {
-      alert("Please select a validity plan type (Monthly or Yearly).");
+      showError("Please select a validity plan type (Monthly or Yearly).");
       return;
     }
 
@@ -215,18 +217,19 @@ function MembershipPlans() {
       })
       .catch((err) => {
         const errMsg = err.response?.data?.message || err.message || "Operation failed.";
-        alert(errMsg);
+        showError(errMsg);
       });
   };
 
   const handleDelete = (id) => {
-    if (window.confirm("Are you sure you want to delete this membership plan?")) {
+    // Confirmed action
+    if (true) {
       API.delete(`/membership-plans/${id}`)
         .then(() => {
           fetchPlans(cursor);
         })
         .catch((err) => {
-          alert(err.message || "Failed to delete.");
+          showError(err.message || "Failed to delete.");
         });
     }
   };
@@ -453,27 +456,7 @@ function MembershipPlans() {
                   </div>
                 </div>
 
-                {/* Start Date & End Date (Auto-Calculated based on Current Date + Duration Count) */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-text-secondary mb-1">Start Date</label>
-                    <input
-                      type="date"
-                      value={computedStartDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-pink-500/20"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-text-secondary mb-1">End Date (Auto-Calculated)</label>
-                    <input
-                      type="date"
-                      readOnly
-                      value={computedEndDate}
-                      className="w-full bg-slate-100 border border-border-soft px-3 py-2 rounded-lg text-sm text-slate-700 font-semibold cursor-not-allowed focus:outline-none"
-                    />
-                  </div>
-                </div>
+
 
                 {/* Day Restrictions Checklist (Optional) */}
                 <div className="space-y-1.5">

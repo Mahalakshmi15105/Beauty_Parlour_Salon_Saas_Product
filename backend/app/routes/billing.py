@@ -203,7 +203,8 @@ def checkout():
                 "discount": float(discount_amount),
                 "line_total": float(line_total),
                 "staff_name": emp_name,
-                "employee_name": emp_name
+                "employee_name": emp_name,
+                "is_free_reward": bool(item.get("is_free_visit_reward") or item.get("is_free_reward"))
             })
 
         # 3. Calculate Global Taxes & Grand Total
@@ -292,6 +293,13 @@ def checkout():
                     db.session.add(v_counter)
 
                 if free_redeemed:
+                    free_item_obj = next(
+                        (item for item in response_line_items if item.get("is_free_reward")),
+                        None
+                    )
+                    free_svc_name = free_item_obj.get("item_name") if free_item_obj else "Free Reward Service"
+                    invoice.membership_name = f"Visit Loyalty Reward (Visit {v_setting.required_visits} of {v_setting.required_visits}) - Claimed: {free_svc_name} (FREE)"
+                    invoice.membership_discount = invoice.discount
                     v_counter.current_visit_count = 0
                     v_counter.total_free_services_claimed += 1
                     v_counter.last_visit_date = datetime.now(timezone.utc)
@@ -308,6 +316,8 @@ def checkout():
                             v_counter.current_visit_count += 1
                         v_counter.last_visit_date = datetime.now(timezone.utc)
                         logger.info(f"Visit Membership: Incremented visit count for customer {customer_id} at Branch {target_branch_id} to {v_counter.current_visit_count}.")
+                    
+                    invoice.membership_name = f"Visit Loyalty (Visit {v_counter.current_visit_count} of {v_setting.required_visits})"
 
         # Commit everything atomically
         db.session.commit()

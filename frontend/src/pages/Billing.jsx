@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
+import { useToast } from "../context/ToastContext";
 import { ThermalReceipt, printThermalReceiptElement, downloadThermalReceiptPDF } from "../components/ThermalReceipt";
 import { getFullImageUrl } from "../utils/imageUrl";
 import {
@@ -54,6 +55,7 @@ const SUPPORTED_PAYMENT_METHODS = [
 ];
 
 function Billing() {
+  const { showSuccess, showError } = useToast();
   const { formatCurrency, currencySymbol, t } = useLanguageCurrency();
   const [activeSubTab, setActiveSubTab] = useState("checkout");
 
@@ -81,7 +83,7 @@ function Billing() {
 
   // Selection Filters
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
-  const [selectedGender, setSelectedGender] = useState("Female");
+  const [selectedGender, setSelectedGender] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [selectedServiceId, setSelectedServiceId] = useState("");
   const [activeMembership, setActiveMembership] = useState(null);
@@ -108,9 +110,9 @@ function Billing() {
     {
       id: "tab-1",
       name: "Bill #1",
-      selectedCustomerId: "walkin",
-      customerSearchQuery: "Walk-in Customer",
-      selectedGender: "Female",
+      selectedCustomerId: "",
+      customerSearchQuery: "",
+      selectedGender: "",
       selectedCategoryId: "",
       selectedServiceId: "",
       cart: [],
@@ -156,9 +158,9 @@ function Billing() {
     // 2. Find target tab
     const targetTab = updatedTabs.find((t) => t.id === targetTabId);
     if (targetTab) {
-      setSelectedCustomerId(targetTab.selectedCustomerId || "walkin");
-      setCustomerSearchQuery(targetTab.customerSearchQuery || "Walk-in Customer");
-      setSelectedGender(targetTab.selectedGender || "Female");
+      setSelectedCustomerId(targetTab.selectedCustomerId || "");
+      setCustomerSearchQuery(targetTab.customerSearchQuery || "");
+      setSelectedGender(targetTab.selectedGender || "");
       setSelectedCategoryId(targetTab.selectedCategoryId || "");
       setSelectedServiceId(targetTab.selectedServiceId || "");
       setCart(targetTab.cart || []);
@@ -182,9 +184,9 @@ function Billing() {
     const newTabObj = {
       id: newTabId,
       name: newTabName,
-      selectedCustomerId: "walkin",
-      customerSearchQuery: "Walk-in Customer",
-      selectedGender: "Female",
+      selectedCustomerId: "",
+      customerSearchQuery: "",
+      selectedGender: "",
       selectedCategoryId: categories.length > 0 ? categories[0].id.toString() : "",
       selectedServiceId: "",
       cart: [],
@@ -198,9 +200,9 @@ function Billing() {
     setTabCounter((prev) => prev + 1);
 
     // 2. Load clean new tab state
-    setSelectedCustomerId("walkin");
-    setCustomerSearchQuery("Walk-in Customer");
-    setSelectedGender("Female");
+    setSelectedCustomerId("");
+    setCustomerSearchQuery("");
+    setSelectedGender("");
     setSelectedCategoryId(categories.length > 0 ? categories[0].id.toString() : "");
     setSelectedServiceId("");
     setCart([]);
@@ -457,7 +459,7 @@ function Billing() {
 
   const openCustomerHistory = () => {
     if (!selectedCustomerId || selectedCustomerId === "walkin") {
-      alert("Walk-in customers do not have a stored history profile. Select a registered customer to view history.");
+      showError("Walk-in customers do not have a stored history profile. Select a registered customer to view history.");
       return;
     }
     setCustomerHistoryData(null);
@@ -671,7 +673,7 @@ function Billing() {
         setNewMembershipSaving(false);
         const dupData = err.response?.data?.details?.existing_customer;
         if (dupData && dupData.id) {
-          alert(`Customer with mobile number ${phone} already exists (${dupData.first_name}). Automatically selecting existing customer.`);
+          showError(`Customer with mobile number ${phone} already exists (${dupData.first_name}). Automatically selecting existing customer.`);
           setSelectedCustomerId(String(dupData.id));
           setCustomerSearchQuery(`${dupData.first_name} ${dupData.last_name || ""} (${dupData.phone})`);
           setShowNewMembershipModal(false);
@@ -757,7 +759,7 @@ function Billing() {
       (c) => c.phone && c.phone.trim() === phone && c.id !== quickCustomerEditId
     );
     if (dupLoc) {
-      alert(`Customer with mobile number ${phone} already exists (${dupLoc.first_name} ${dupLoc.last_name || ""}). Automatically selecting existing customer.`);
+      showError(`Customer with mobile number ${phone} already exists (${dupLoc.first_name} ${dupLoc.last_name || ""}). Automatically selecting existing customer.`);
       setSelectedCustomerId(String(dupLoc.id));
       setSelectedGender(dupLoc.gender || "Female");
       setCustomerSearchQuery(`${dupLoc.first_name} ${dupLoc.last_name || ""} (${dupLoc.phone})`);
@@ -822,7 +824,7 @@ function Billing() {
         setQuickCustomerSaving(false);
         const dupData = err.response?.data?.details?.existing_customer;
         if (dupData && dupData.id) {
-          alert(`Customer with mobile number ${phone} already exists (${dupData.first_name}). Automatically selecting existing customer.`);
+          showError(`Customer with mobile number ${phone} already exists (${dupData.first_name}). Automatically selecting existing customer.`);
           setSelectedCustomerId(String(dupData.id));
           setCustomerSearchQuery(`${dupData.first_name} ${dupData.last_name || ""} (${dupData.phone})`);
           setShowQuickCustomerModal(false);
@@ -935,22 +937,26 @@ function Billing() {
     setActiveMembership(null);
     setVisitMembershipStatus(null);
 
-    if (!customerIdStr || customerIdStr === "walkin") {
-      setSelectedGender("Female");
+    if (!customerIdStr) {
+      setSelectedGender("");
+      return;
+    }
+    if (customerIdStr === "walkin") {
+      setSelectedGender("Walk-in");
       return;
     }
     const cust = customers.find((c) => c.id === parseInt(customerIdStr));
     if (cust && cust.gender) {
       setSelectedGender(cust.gender);
     } else {
-      setSelectedGender("Female");
+      setSelectedGender("Unspecified");
     }
 
     // Fetch Type A % discount active membership
     API.get(`/customers/${customerIdStr}/history`)
       .then((res) => {
-        const memberships = res.data.memberships || [];
-        const active = memberships.find((m) => m.status === "active");
+        const membershipsData = res.memberships || res.data?.memberships || (Array.isArray(res.data) ? res.data : []);
+        const active = membershipsData.find((m) => m.status === "active");
         if (active) {
           const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
           const todayName = weekdays[new Date().getDay()];
@@ -959,9 +965,14 @@ function Billing() {
             ...active,
             isDayRestricted
           });
+        } else {
+          setActiveMembership(null);
         }
       })
-      .catch((err) => console.error("Failed to load customer membership detail:", err));
+      .catch((err) => {
+        console.error("Failed to load customer membership detail:", err);
+        setActiveMembership(null);
+      });
 
     // Fetch Type B Visit-Based membership status for active branch
     API.get(`/visit-membership/customer-status/${customerIdStr}`, {
@@ -979,35 +990,69 @@ function Billing() {
   const getMembershipDiscountForService = (serviceObj, activeMem) => {
     if (!useMembership || !activeMem || activeMem.isDayRestricted) return 0;
     const planId = activeMem.membership_plan_id || activeMem.plan_id;
-    if (!planId) return 0;
 
+    // 1. Check if serviceObj has specific mapped membership discounts
     const discounts = serviceObj?.membership_discounts || [];
-    const match = discounts.find((d) => String(d.plan_id) === String(planId));
-    if (!match) return 0;
-
-    if (match.percentage !== undefined && match.percentage !== null && parseFloat(match.percentage) > 0) {
-      return parseFloat(match.percentage);
+    if (planId && Array.isArray(discounts) && discounts.length > 0) {
+      const match = discounts.find((d) => String(d.plan_id) === String(planId));
+      if (match) {
+        if (match.percentage !== undefined && match.percentage !== null && parseFloat(match.percentage) > 0) {
+          return parseFloat(match.percentage);
+        }
+        if (match.amount !== undefined && match.amount !== null && parseFloat(match.amount) > 0 && (serviceObj.price || serviceObj.rate)) {
+          const price = parseFloat(serviceObj.price || serviceObj.rate || 1);
+          return (parseFloat(match.amount) / price) * 100;
+        }
+      }
     }
-    if (match.amount !== undefined && match.amount !== null && parseFloat(match.amount) > 0 && serviceObj.price) {
-      return (parseFloat(match.amount) / parseFloat(serviceObj.price)) * 100;
+
+    // 2. Check activeMem plan-level service_discount_percentage (e.g. 10%, 20%, 50%)
+    if (activeMem.service_discount_percentage !== undefined && activeMem.service_discount_percentage !== null) {
+      const planPercent = parseFloat(activeMem.service_discount_percentage);
+      if (planPercent > 0) {
+        const eligibleList = activeMem.eligible_services || activeMem.plan?.eligible_services || [];
+        const isEligible = !eligibleList.length || eligibleList.includes(serviceObj.id) || eligibleList.includes(String(serviceObj.id));
+        if (isEligible) {
+          return planPercent;
+        }
+      }
+    }
+
+    // 3. Fallback check on activeMem.discount_percentage
+    if (activeMem.discount_percentage && parseFloat(activeMem.discount_percentage) > 0) {
+      return parseFloat(activeMem.discount_percentage);
+    }
+
+    return 0;
+  };
+
+  const getMembershipDiscountForProduct = (productObj, activeMem) => {
+    if (!useMembership || !activeMem || activeMem.isDayRestricted) return 0;
+    if (activeMem.product_discount_percentage !== undefined && activeMem.product_discount_percentage !== null) {
+      return parseFloat(activeMem.product_discount_percentage) || 0;
     }
     return 0;
   };
 
-  // Auto-recalculate cart service item discounts when useMembership, activeMembership, or services change
+  // Auto-recalculate cart item discounts when useMembership, activeMembership, services, or products change
   useEffect(() => {
     setCart((prevCart) =>
       prevCart.map((item) => {
-        if (item.type !== "service") return item;
-        const svcObj = services.find((s) => s.id === item.item_id);
-        const calcDiscount = svcObj ? getMembershipDiscountForService(svcObj, activeMembership) : 0;
+        let calcDiscount = 0;
+        if (item.type === "service") {
+          const svcObj = services.find((s) => s.id === item.item_id || s.id === item.id);
+          calcDiscount = svcObj ? getMembershipDiscountForService(svcObj, activeMembership) : (useMembership && activeMembership ? parseFloat(activeMembership.service_discount_percentage || 0) : 0);
+        } else if (item.type === "product") {
+          const prodObj = products.find((p) => p.id === item.item_id || p.id === item.id);
+          calcDiscount = prodObj ? getMembershipDiscountForProduct(prodObj, activeMembership) : (useMembership && activeMembership ? parseFloat(activeMembership.product_discount_percentage || 0) : 0);
+        }
         return {
           ...item,
           discount_percent: calcDiscount,
         };
       })
     );
-  }, [useMembership, activeMembership, services]);
+  }, [useMembership, activeMembership, services, products]);
 
   const handleAddServiceToCart = (serviceIdToUse) => {
     const targetId = serviceIdToUse || selectedServiceId;
@@ -1058,7 +1103,7 @@ function Billing() {
     if (!prodObj) return;
 
     if (prodObj.stock_quantity !== undefined && prodObj.stock_quantity <= 0) {
-      alert(`Product "${prodObj.name}" is out of stock (Available: 0). Unable to add.`);
+      showError(`Product "${prodObj.name}" is out of stock (Available: 0). Unable to add.`);
       return;
     }
 
@@ -1070,7 +1115,7 @@ function Billing() {
       if (existingIndex >= 0) {
         const currentQty = prevCart[existingIndex].quantity;
         if (prodObj.stock_quantity !== undefined && currentQty + qtyToAdd > prodObj.stock_quantity) {
-          alert(`Cannot add ${qtyToAdd} more "${prodObj.name}". Total quantity (${currentQty + qtyToAdd}) exceeds available stock (${prodObj.stock_quantity}).`);
+          showError(`Cannot add ${qtyToAdd} more "${prodObj.name}". Total quantity (${currentQty + qtyToAdd}) exceeds available stock (${prodObj.stock_quantity}).`);
           return prevCart;
         }
         const updated = [...prevCart];
@@ -1082,7 +1127,7 @@ function Billing() {
       }
 
       if (prodObj.stock_quantity !== undefined && qtyToAdd > prodObj.stock_quantity) {
-        alert(`Quantity (${qtyToAdd}) exceeds available stock (${prodObj.stock_quantity}) for "${prodObj.name}".`);
+        showError(`Quantity (${qtyToAdd}) exceeds available stock (${prodObj.stock_quantity}) for "${prodObj.name}".`);
         return prevCart;
       }
 
@@ -1126,7 +1171,7 @@ function Billing() {
     const parsed = val === "" ? 1 : Math.max(1, parseInt(val, 10) || 1);
 
     if (item.type === "product" && item.stock_quantity !== undefined && parsed > item.stock_quantity) {
-      alert(`Quantity (${parsed}) exceeds available stock (${item.stock_quantity}) for "${item.name}". Quantity set to stock limit.`);
+      showError(`Quantity (${parsed}) exceeds available stock (${item.stock_quantity}) for "${item.name}". Quantity set to stock limit.`);
       item.quantity = item.stock_quantity;
     } else {
       item.quantity = parsed;
@@ -1246,14 +1291,31 @@ function Billing() {
 
   // Computations
   const getEffectiveDiscountPercent = (item) => {
+    if (visitMembershipStatus?.membership_mode === "visit_based" || visitMembershipStatus?.membership_mode === "disabled") {
+      return item.discount_percent || 0;
+    }
     if (useMembership && activeMembership && !activeMembership.isDayRestricted) {
       if (item.type === "service") {
+        const svcObj = services.find((s) => s.id === (item.item_id || item.id));
+        const mappedDisc = svcObj ? getMembershipDiscountForService(svcObj, activeMembership) : 0;
+        if (mappedDisc > 0) {
+          return mappedDisc;
+        }
         // If eligible_services is empty/null, it applies to all services.
         const isEligible = !activeMembership.eligible_services || 
                           activeMembership.eligible_services.length === 0 || 
                           activeMembership.eligible_services.includes(item.item_id || item.id);
-        if (isEligible) {
-          return parseFloat(activeMembership.service_discount_percentage || 0);
+        if (isEligible && parseFloat(activeMembership.service_discount_percentage || 0) > 0) {
+          return parseFloat(activeMembership.service_discount_percentage);
+        }
+      } else if (item.type === "product") {
+        const prodObj = products.find((p) => p.id === (item.item_id || item.id));
+        const mappedDisc = prodObj ? getMembershipDiscountForProduct(prodObj, activeMembership) : 0;
+        if (mappedDisc > 0) {
+          return mappedDisc;
+        }
+        if (parseFloat(activeMembership.product_discount_percentage || 0) > 0) {
+          return parseFloat(activeMembership.product_discount_percentage);
         }
       }
     }
@@ -1297,7 +1359,7 @@ function Billing() {
   const handleTogglePaymentMethod = (methodId) => {
     if (selectedPaymentMethods.includes(methodId)) {
       if (selectedPaymentMethods.length === 1) {
-        alert("At least one payment method must remain selected.");
+        showError("At least one payment method must remain selected.");
         return;
       }
       const updatedMethods = selectedPaymentMethods.filter((m) => m !== methodId);
@@ -1465,7 +1527,7 @@ function Billing() {
         }
       })
       .catch((err) => {
-        alert(err.message || "Checkout transaction failed.");
+        showError(err.message || "Checkout transaction failed.");
         setLoading(false);
       });
   };
@@ -1543,7 +1605,7 @@ function Billing() {
     const targetInvoice = inv || invoiceResult || selectedInvoiceDetail || draftFromCart;
 
     if (!targetInvoice) {
-      alert("No invoice data available to print.");
+      showError("No invoice data available to print.");
       return;
     }
 
@@ -1585,7 +1647,7 @@ function Billing() {
 
   const handleSaveDraft = () => {
     if (cart.length === 0) {
-      alert("Cart is empty. Add services or products before saving draft.");
+      showError("Cart is empty. Add services or products before saving draft.");
       return;
     }
     setDraftSaved(true);
@@ -1597,7 +1659,7 @@ function Billing() {
       .then((res) => {
         setSelectedInvoiceDetail(res.data);
       })
-      .catch((err) => alert(err.message || "Failed to load invoice details."));
+      .catch((err) => showError(err.message || "Failed to load invoice details."));
   };
 
   // --- BILL ACTIONS IMPLEMENTATIONS ---
@@ -1607,7 +1669,7 @@ function Billing() {
     const phone = targetInv?.customer_phone || targetInv?.customer?.phone || targetCust?.phone || "";
 
     if (!phone || phone.trim() === "" || phone === "0000000000") {
-      alert("Customer mobile number not available or Walk-in customer.");
+      showError("Customer mobile number not available or Walk-in customer.");
       return;
     }
 
@@ -1619,7 +1681,7 @@ function Billing() {
     const smsMsg = `Hello ${customerName}, thank you for visiting ${parlourName}! Bill No: ${billNo}, Amount Paid: ${amountStr}. Thank you!`;
 
     // Trigger SMS dispatch alert / Web SMS link
-    alert(`SMS Bill Notification:\n\nTo: ${phone}\nMessage: ${smsMsg}`);
+    showError(`SMS Bill Notification:\n\nTo: ${phone}\nMessage: ${smsMsg}`);
   };
 
   const triggerWhatsAppWeb = (inv = null) => {
@@ -1629,7 +1691,7 @@ function Billing() {
     let cleanPhone = rawPhone.replace(/[^0-9]/g, "");
 
     if (!cleanPhone || cleanPhone.length < 5 || cleanPhone === "0000000000") {
-      alert("Customer mobile number not available or Walk-in customer.");
+      showError("Customer mobile number not available or Walk-in customer.");
       return;
     }
 
@@ -1658,7 +1720,7 @@ function Billing() {
 
   const handleSaveReminderSubmit = () => {
     if (!reminderDate) {
-      alert("Please select a valid reminder date.");
+      showError("Please select a valid reminder date.");
       return;
     }
     API.post("/reminders", {
@@ -1673,7 +1735,7 @@ function Billing() {
         setActionNotice(`Reminder saved for ${selectedInvoiceDetail?.customer?.first_name || "Guest"} on ${reminderDate}!`);
         setTimeout(() => setActionNotice(null), 4000);
       })
-      .catch((err) => alert(err.message || "Failed to save reminder."));
+      .catch((err) => showError(err.message || "Failed to save reminder."));
   };
 
   const handleSaveFeedbackSubmit = () => {
@@ -1688,7 +1750,7 @@ function Billing() {
         setActionNotice(`Feedback rating of ${feedbackRating}⭐ recorded in database!`);
         setTimeout(() => setActionNotice(null), 4000);
       })
-      .catch((err) => alert(err.message || "Failed to record feedback."));
+      .catch((err) => showError(err.message || "Failed to record feedback."));
   };
 
   const filteredHistory = invoicesHistory.filter(
@@ -2016,7 +2078,8 @@ function Billing() {
                   type="text"
                   readOnly
                   tabIndex={-1}
-                  value={selectedGender || "Female"}
+                  placeholder="Auto-fetched on customer selection"
+                  value={selectedGender || ""}
                   className="w-full bg-slate-100 border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 cursor-not-allowed focus:outline-none"
                 />
               </div>
@@ -2043,17 +2106,19 @@ function Billing() {
                       ? (customers.find((c) => c.id === parseInt(selectedCustomerId))?.first_name || "") +
                         " " +
                         (customers.find((c) => c.id === parseInt(selectedCustomerId))?.last_name || "")
-                      : "Walk-in Customer"}
+                      : selectedCustomerId === "walkin"
+                      ? "Walk-in Customer"
+                      : "No Customer Selected"}
                   </p>
                 </div>
                 <span className="text-xs font-bold bg-white text-primary px-3 py-1 rounded-full border border-primary/20">
-                  {selectedGender}
+                  {selectedGender || "No Customer Selected"}
                 </span>
               </div>
             </div>
 
-            {/* Membership Info & Decision Section */}
-            {activeMembership && (
+            {/* Membership Info & Decision Section (Type A % Discount Plan - Only when mode is not visit_based/disabled) */}
+            {activeMembership && visitMembershipStatus?.membership_mode !== "visit_based" && visitMembershipStatus?.membership_mode !== "disabled" && (
               <div className="mt-4 border-t border-border-soft/60 pt-4 flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-50/50 p-4 rounded-xl border border-slate-100 space-y-3 md:space-y-0">
                 <div className="flex items-center space-x-3">
                   <div className="p-2 bg-pink-100 text-pink-700 rounded-lg">
@@ -2114,33 +2179,73 @@ function Billing() {
 
             {/* Visit-Based Membership Status Banner (Type B - Branch Scoped) */}
             {visitMembershipStatus && visitMembershipStatus.membership_mode === "visit_based" && (
-              <div className="mt-4 border-t border-border-soft/60 pt-4 flex flex-col md:flex-row justify-between items-start md:items-center bg-emerald-50/50 p-4 rounded-xl border border-emerald-200 space-y-3 md:space-y-0 animate-fade-in">
+              <div className="mt-4 border-t border-border-soft/60 pt-4 flex flex-col md:flex-row justify-between items-start md:items-center bg-emerald-50/70 p-4 rounded-xl border border-emerald-200 space-y-3 md:space-y-0 animate-fade-in shadow-xs">
                 <div className="flex items-center space-x-3">
-                  <div className="p-2.5 bg-emerald-500/10 text-emerald-600 rounded-xl">
+                  <div className="p-2.5 bg-emerald-600 text-white rounded-xl shadow-xs">
                     <Gift className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                       <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wide">
-                        Visit Loyalty Program
+                        Visit Loyalty Status:
                       </h4>
-                      {visitMembershipStatus.is_eligible ? (
-                        <span className="bg-emerald-600 text-white text-[10px] px-2.5 py-0.5 rounded-full font-extrabold shadow-2xs animate-pulse">
-                          🎉 FREE SERVICE ELIGIBLE!
-                        </span>
-                      ) : (
-                        <span className="bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10px] px-2.5 py-0.5 rounded-full font-bold">
-                          Progress: {visitMembershipStatus.current_visit_count} / {visitMembershipStatus.required_visits} Visits
+                      <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] px-2.5 py-0.5 rounded-full font-bold">
+                        Visit {visitMembershipStatus.current_visit_count} of {visitMembershipStatus.required_visits}
+                      </span>
+                      <span className="bg-blue-50 text-blue-700 border border-blue-200 text-[10px] px-2.5 py-0.5 rounded-full font-bold">
+                        Renewed {visitMembershipStatus.total_free_services_claimed || 0} times
+                      </span>
+                      {visitMembershipStatus.is_eligible && (
+                        <span className="bg-amber-500 text-white text-[10px] px-2.5 py-0.5 rounded-full font-extrabold shadow-xs animate-pulse flex items-center space-x-1">
+                          <span>🎁 Reward Ready - Free service available</span>
                         </span>
                       )}
                     </div>
-                    <p className="text-[11px] text-slate-600 font-medium mt-0.5">
+                    <p className="text-[11px] text-slate-600 font-medium mt-1">
                       {visitMembershipStatus.is_eligible
-                        ? `Customer completed ${visitMembershipStatus.current_visit_count} qualifying visits! Add an eligible service to claim 100% FREE.`
-                        : `Customer needs ${Math.max(0, visitMembershipStatus.required_visits - visitMembershipStatus.current_visit_count)} more qualifying visit(s) for a 100% FREE service.`}
+                        ? `Customer completed ${visitMembershipStatus.current_visit_count} qualifying visits! Select an eligible service below to claim for FREE.`
+                        : `Customer needs ${Math.max(0, visitMembershipStatus.required_visits - visitMembershipStatus.current_visit_count)} more qualifying visit(s) to unlock next free reward.`}
                     </p>
                   </div>
                 </div>
+
+                {visitMembershipStatus.is_eligible && visitMembershipStatus.free_services && visitMembershipStatus.free_services.length > 0 && (
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const freeSvc = visitMembershipStatus.free_services[0];
+                        if (freeSvc) {
+                          setCart((prevCart) => {
+                            const exists = prevCart.some((i) => i.is_free_visit_reward);
+                            if (exists) {
+                              showError("Free reward service is already added to cart.");
+                              return prevCart;
+                            }
+                            return [
+                              ...prevCart,
+                              {
+                                type: "service",
+                                item_id: freeSvc.id,
+                                name: `${freeSvc.name} (100% FREE REWARD)`,
+                                gross_amount: parseFloat(freeSvc.price),
+                                quantity: 1,
+                                discount_percent: 100,
+                                is_free_visit_reward: true,
+                                tax_rate: taxRate,
+                                employee_ids: [],
+                              },
+                            ];
+                          });
+                        }
+                      }}
+                      className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-extrabold rounded-lg shadow-xs transition flex items-center space-x-1"
+                    >
+                      <Gift className="w-3.5 h-3.5" />
+                      <span>Claim Free Reward ({visitMembershipStatus.free_services[0]?.name || "Free Service"})</span>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -2184,7 +2289,7 @@ function Billing() {
                   }}
                   className="w-full bg-background border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
                 >
-                  <option value="">-- Select Category --</option>
+                  <option value="">Select Category</option>
                   {categories.map((cat) => (
                     <option key={cat.id} value={cat.id}>
                       {cat.name}
@@ -2396,7 +2501,7 @@ function Billing() {
                               step="0.01"
                               data-row={idx}
                               data-field="discount_percent"
-                              value={item.discount_percent !== undefined ? (Math.round(item.discount_percent * 100) / 100) : 0}
+                              value={getEffectiveDiscountPercent(item) !== undefined ? (Math.round(getEffectiveDiscountPercent(item) * 100) / 100) : 0}
                               onFocus={(e) => e.target.select()}
                               onChange={(e) => handleUpdateDiscountPercent(idx, e.target.value)}
                               onKeyDown={(e) => handleLineItemKeyDown(e, idx, "discount_percent")}

@@ -23,9 +23,11 @@ import {
   ChevronRight,
 } from "lucide-react";
 import API from "../services/api";
+import { useToast } from "../context/ToastContext";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 
 function Appointments() {
+  const { showSuccess, showError } = useToast();
   const { formatCurrency } = useLanguageCurrency();
   const pageRef = useRef(null);
   const [activeSubTab, setActiveSubTab] = useState("todays");
@@ -287,7 +289,7 @@ function Appointments() {
         fetchAppointments();
       })
       .catch((err) => {
-        alert(err.response?.data?.message || "Failed to update status.");
+        showError(err.response?.data?.message || "Failed to update status.");
       });
   };
 

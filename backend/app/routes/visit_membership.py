@@ -122,6 +122,8 @@ def get_customer_status(customer_id):
         services = get_tenant_query(Service).filter(Service.id.in_(free_ids), Service.status == "active").all()
         free_services_list = [{"id": s.id, "name": s.name, "price": float(s.price)} for s in services]
 
+    total_claimed = counter.total_free_services_claimed if counter else 0
+
     return success_response({
         "customer_id": customer_id,
         "tenant_id": g.parlour_id,
@@ -129,6 +131,7 @@ def get_customer_status(customer_id):
         "membership_mode": mode,
         "current_visit_count": curr_count,
         "required_visits": req_visits,
+        "total_free_services_claimed": total_claimed,
         "is_eligible": is_eligible,
         "qualifying_service_ids": qual_ids,
         "free_service_ids": free_ids,

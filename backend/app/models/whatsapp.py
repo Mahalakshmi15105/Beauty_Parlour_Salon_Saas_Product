@@ -1,7 +1,7 @@
 import base64
 import os
 from datetime import datetime, timezone
-from app.database import db
+from app.database import db, tenant_metadata
 from app.models.mixins import TimestampMixin
 
 def encrypt_token(plain_token: str) -> str:
@@ -26,6 +26,7 @@ def decrypt_token(enc_token: str) -> str:
 
 class WhatsAppSetting(db.Model, TimestampMixin):
     __tablename__ = "whatsapp_settings"
+    metadata = tenant_metadata
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, nullable=False, unique=True, index=True)
@@ -66,6 +67,7 @@ class WhatsAppSetting(db.Model, TimestampMixin):
 
 class WhatsAppCampaign(db.Model, TimestampMixin):
     __tablename__ = "whatsapp_campaigns"
+    metadata = tenant_metadata
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, nullable=False, index=True)
@@ -128,6 +130,7 @@ class WhatsAppCampaign(db.Model, TimestampMixin):
 
 class WhatsAppCampaignRecipient(db.Model, TimestampMixin):
     __tablename__ = "whatsapp_campaign_recipients"
+    metadata = tenant_metadata
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, nullable=False, index=True)
@@ -169,6 +172,7 @@ class WhatsAppCampaignRecipient(db.Model, TimestampMixin):
 
 class WhatsAppLog(db.Model, TimestampMixin):
     __tablename__ = "whatsapp_logs"
+    metadata = tenant_metadata
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, nullable=False, index=True)

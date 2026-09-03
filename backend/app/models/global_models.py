@@ -1,8 +1,10 @@
-from app.database import db
+from app.database import db, master_metadata
 from app.models.mixins import TimestampMixin, SoftDeleteMixin
+from werkzeug.security import generate_password_hash, check_password_hash
 
 class SubscriptionPlan(db.Model, TimestampMixin):
     __tablename__ = "subscription_plans"
+    metadata = master_metadata
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False, unique=True)
@@ -22,6 +24,7 @@ class SubscriptionPlan(db.Model, TimestampMixin):
 
 class Tenant(db.Model, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "tenants"
+    metadata = master_metadata
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(150), nullable=False)
@@ -43,3 +46,39 @@ class Tenant(db.Model, TimestampMixin, SoftDeleteMixin):
         s = re.sub(r'[^a-z0-9]+', '-', (self.name or "").lower()).strip('-')
         return s or f"parlour-{self.id}"
 
+
+class TenantLookup(db.Model, TimestampMixin):
+    __tablename__ = "tenant_lookups"
+    metadata = master_metadata
+
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), nullable=False, unique=True, index=True)
+    tenant_id = db.Column(db.Integer, nullable=False, index=True)
+    db_name = db.Column(db.String(150), nullable=True)
+    db_connection_uri = db.Column(db.String(500), nullable=True)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+
+class MasterUser(db.Model, TimestampMixin, SoftDeleteMixin):
+    """
+    Platform SuperAdmin Users stored in parlour_master DB.
+    """
+    __tablename__ = "users"
+    metadata = master_metadata
+
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), nullable=False, unique=True, index=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.String(50), nullable=False, default="SuperAdmin")
+    status = db.Column(db.String(50), nullable=False, default="active")
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)

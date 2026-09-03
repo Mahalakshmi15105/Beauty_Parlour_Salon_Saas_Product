@@ -1,9 +1,10 @@
 import json
-from app.database import db
+from app.database import db, tenant_metadata
 from app.models.mixins import TimestampMixin
 
 class VisitMembershipSetting(db.Model, TimestampMixin):
     __tablename__ = "visit_membership_settings"
+    metadata = tenant_metadata
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, nullable=False, index=True)
@@ -58,6 +59,7 @@ class VisitMembershipSetting(db.Model, TimestampMixin):
 
 class CustomerVisitCounter(db.Model, TimestampMixin):
     __tablename__ = "customer_visit_counters"
+    metadata = tenant_metadata
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, nullable=False, index=True)

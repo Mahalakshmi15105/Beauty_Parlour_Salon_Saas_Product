@@ -10,9 +10,9 @@ from sqlalchemy import text, create_engine
 import re
 from datetime import datetime, timedelta, timezone
 
-from app.database import db
+from app.database import db, tenant_metadata, master_metadata
 from app.models.user import User, TenantSetting
-from app.models.global_models import Tenant, SubscriptionPlan
+from app.models.global_models import Tenant, SubscriptionPlan, TenantLookup, MasterUser
 from app.utils.responses import success_response, error_response
 from app.utils.auth import require_role
 
@@ -37,39 +37,58 @@ def login():
 
     # 1. Look up user's home tenant in Master DB
     g.use_master_db = True
-    master_engine = db.get_master_engine()
-    
-    with master_engine.connect() as conn:
-        # Check tenant_lookups mapping
-        row = conn.execute(
-            text("SELECT tenant_id FROM tenant_lookups WHERE email = :email LIMIT 1"),
-            {"email": email}
-        ).first()
-        
-        tenant_id = row[0] if row else None
 
-        # Fallback: check users table in master DB if legacy setup
-        if not tenant_id:
-            user_master = User.query.filter_by(email=email, is_deleted=False).first()
-            if user_master:
-                tenant_id = user_master.tenant_id
+    # Check if SuperAdmin in Master DB
+    master_user = MasterUser.query.filter_by(email=email, is_deleted=False).first()
+    if master_user and master_user.role == "SuperAdmin":
+        if not master_user.check_password(password):
+            return error_response("INVALID_CREDENTIALS", "Invalid email or password.", 401)
+        if master_user.status != "active":
+            return error_response("USER_SUSPENDED", "This user account is inactive.", 403)
 
-        if not tenant_id:
-            return error_response(
-                error_code="INVALID_CREDENTIALS",
-                message="Invalid email or password.",
-                status_code=401
-            )
+        additional_claims = {
+            "parlour_id": None,
+            "tenant_db_uri": None,
+            "branch_id": None,
+            "role": "SuperAdmin"
+        }
+        access_token = create_access_token(identity=str(master_user.id), additional_claims=additional_claims, expires_delta=timedelta(days=30))
+        refresh_token = create_refresh_token(identity=str(master_user.id), additional_claims=additional_claims, expires_delta=timedelta(days=90))
 
-        tenant = Tenant.query.filter_by(id=tenant_id, is_deleted=False).first()
-        if not tenant or tenant.status != "active":
-            return error_response(
-                error_code="TENANT_SUSPENDED",
-                message="Your beauty parlour tenant account is inactive or suspended.",
-                status_code=403
-            )
+        return success_response({
+            "token": access_token,
+            "refresh_token": refresh_token,
+            "expires_in": 2592000,
+            "user": {
+                "id": master_user.id,
+                "first_name": "Super",
+                "last_name": "Admin",
+                "email": master_user.email,
+                "role": "SuperAdmin",
+                "tenant_id": None,
+                "branch_id": None,
+                "parlour_name": "Super Admin System"
+            }
+        })
 
-        tenant_db_uri = tenant.db_connection_uri
+    # Check tenant_lookups mapping in Master DB
+    lookup = TenantLookup.query.filter_by(email=email).first()
+    if not lookup:
+        return error_response(
+            error_code="INVALID_CREDENTIALS",
+            message="Invalid email or password.",
+            status_code=401
+        )
+
+    tenant = Tenant.query.filter_by(id=lookup.tenant_id, is_deleted=False).first()
+    if not tenant or tenant.status != "active":
+        return error_response(
+            error_code="TENANT_SUSPENDED",
+            message="Your beauty parlour tenant account is inactive or suspended.",
+            status_code=403
+        )
+
+    tenant_db_uri = lookup.db_connection_uri or tenant.db_connection_uri
 
     # 2. Switch context to Tenant DB and verify credentials
     db.session.remove()
@@ -93,7 +112,7 @@ def login():
 
     # Issue tokens with tenant_db_uri claim
     additional_claims = {
-        "parlour_id": user.tenant_id or tenant_id,
+        "parlour_id": user.tenant_id or tenant.id,
         "tenant_db_uri": tenant_db_uri,
         "branch_id": user.branch_id,
         "role": user.role
@@ -237,9 +256,9 @@ def register():
         with sys_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as sys_conn:
             sys_conn.execute(text(f"CREATE DATABASE IF NOT EXISTS `{db_name}` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"))
 
-        # 4. Build schema tables in target tenant database
+        # 4. Build schema tables in target tenant database using tenant_metadata ONLY
         tenant_engine = create_engine(tenant_db_uri)
-        db.metadata.create_all(bind=tenant_engine)
+        tenant_metadata.create_all(bind=tenant_engine)
 
         # 5. Record Tenant & Lookup in Master DB
         g.use_master_db = True
@@ -255,13 +274,13 @@ def register():
         db.session.add(tenant)
         db.session.flush()
 
-        with master_engine.connect() as conn:
-            conn.execute(
-                text("INSERT INTO tenant_lookups (email, tenant_id) VALUES (:email, :t_id)"),
-                {"email": email, "t_id": tenant.id}
-            )
-            conn.commit()
-
+        lookup = TenantLookup(
+            email=email,
+            tenant_id=tenant.id,
+            db_name=db_name,
+            db_connection_uri=tenant_db_uri
+        )
+        db.session.add(lookup)
         db.session.commit()
         new_tenant_id = tenant.id
 

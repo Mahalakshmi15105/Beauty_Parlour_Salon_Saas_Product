@@ -1,8 +1,9 @@
-from app.database import db
+from app.database import db, tenant_metadata
 from app.models.mixins import TimestampMixin, SoftDeleteMixin
 
 class MembershipPlan(db.Model, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "membership_plans"
+    metadata = tenant_metadata
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, nullable=False, index=True)
@@ -26,6 +27,7 @@ class MembershipPlan(db.Model, TimestampMixin, SoftDeleteMixin):
 
 class MembershipPlanService(db.Model, TimestampMixin):
     __tablename__ = "membership_plan_services"
+    metadata = tenant_metadata
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, nullable=False, index=True)
@@ -44,6 +46,7 @@ class MembershipPlanService(db.Model, TimestampMixin):
 
 class CustomerMembership(db.Model, TimestampMixin):
     __tablename__ = "customer_memberships"
+    metadata = tenant_metadata
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, nullable=False, index=True)
@@ -65,6 +68,7 @@ class CustomerMembership(db.Model, TimestampMixin):
 
 class MembershipBenefit(db.Model, TimestampMixin):
     __tablename__ = "membership_benefits"
+    metadata = tenant_metadata
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, nullable=False, index=True)

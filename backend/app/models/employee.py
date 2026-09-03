@@ -1,9 +1,10 @@
-from app.database import db
+from app.database import db, tenant_metadata
 from app.models.mixins import TimestampMixin, SoftDeleteMixin
 from datetime import date
 
 class Employee(db.Model, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "employees"
+    metadata = tenant_metadata
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, nullable=False, index=True)

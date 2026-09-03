@@ -1,15 +1,19 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
-import { useModalFocusTrap, useFormKeyboardNavigation } from "../utils/keyboardNavigation";
+import { useToast } from "../context/ToastContext";
+import { useModalFocusTrap, useFormKeyboardNavigation, focusAndOpenSelect } from "../utils/keyboardNavigation";
 import { User, X, ChevronDown, Check, Printer, FileSpreadsheet, FileText } from "lucide-react";
 import { exportToCSV, printDataList, exportToPDF } from "../utils/exportUtils";
 
 function CustomerMemberships() {
+  const { showSuccess, showError } = useToast();
   const { formatCurrency, currencySymbol, t } = useLanguageCurrency();
   const assignModalRef = useRef(null);
   const assignFormRef = useRef(null);
   const upgradeModalRef = useRef(null);
+  const customerSelectInputRef = useRef(null);
+  const planSelectRef = useRef(null);
 
   const [plans, setPlans] = useState([]);
   const [services, setServices] = useState([]);
@@ -135,7 +139,7 @@ function CustomerMemberships() {
   const fetchCustomerMemberships = (cust) => {
     setSelectedCustomer(cust);
     setLoading(true);
-    API.get(`/customers/${cust.id}/memberships`)
+    API.get(`/memberships/customer/${cust.id}`)
       .then((res) => {
         setMemberships(res.data || []);
         setLoading(false);
@@ -173,11 +177,12 @@ function CustomerMemberships() {
   const handleAssignSubmit = (e) => {
     e.preventDefault();
     if (!assignForm.customer_id) {
-      alert("Please select a customer first.");
+      setShowComboboxDropdown(true);
+      if (customerSelectInputRef.current) customerSelectInputRef.current.focus();
       return;
     }
     if (!assignForm.plan_id) {
-      alert("Please select a membership plan.");
+      if (planSelectRef.current) focusAndOpenSelect(planSelectRef.current);
       return;
     }
 
@@ -194,47 +199,40 @@ function CustomerMemberships() {
         });
         fetchAllMemberships();
         fetchCustomers();
+        showSuccess("Membership assigned successfully.");
         if (selectedCustomer && selectedCustomer.id === parseInt(assignForm.customer_id)) {
           fetchCustomerMemberships(selectedCustomer);
-        } else {
-          alert("Membership assigned successfully.");
         }
       })
       .catch((err) => {
         setSubmitting(false);
         const errMsg = err.response?.data?.message || err.message || "Failed to assign membership.";
-        alert(errMsg);
+        showError(errMsg);
       });
   };
 
   const handleRenew = (cmId) => {
-    if (window.confirm("Are you sure you want to renew this membership? Renewal extends expiry date and resets benefit balances.")) {
-      API.post(`/memberships/${cmId}/renew`)
-        .then(() => {
-          fetchAllMemberships();
-          if (selectedCustomer) {
-            fetchCustomerMemberships(selectedCustomer);
-          } else {
-            alert("Membership renewed successfully.");
-          }
-        })
-        .catch((err) => alert(err.response?.data?.message || err.message || "Failed to renew."));
-    }
+    API.post(`/memberships/${cmId}/renew`)
+      .then(() => {
+        fetchAllMemberships();
+        showSuccess("Membership renewed successfully.");
+        if (selectedCustomer) {
+          fetchCustomerMemberships(selectedCustomer);
+        }
+      })
+      .catch((err) => showError(err.response?.data?.message || err.message || "Failed to renew."));
   };
 
   const handleCancel = (cmId) => {
-    if (window.confirm("Are you sure you want to cancel this customer membership?")) {
-      API.post(`/memberships/${cmId}/cancel`)
-        .then(() => {
-          fetchAllMemberships();
-          if (selectedCustomer) {
-            fetchCustomerMemberships(selectedCustomer);
-          } else {
-            alert("Membership cancelled successfully.");
-          }
-        })
-        .catch((err) => alert(err.response?.data?.message || err.message || "Failed to cancel."));
-    }
+    API.post(`/memberships/${cmId}/cancel`)
+      .then(() => {
+        fetchAllMemberships();
+        showSuccess("Membership cancelled successfully.");
+        if (selectedCustomer) {
+          fetchCustomerMemberships(selectedCustomer);
+        }
+      })
+      .catch((err) => showError(err.response?.data?.message || err.message || "Failed to cancel."));
   };
 
   const openUpgradeModal = (cmId) => {
@@ -253,13 +251,12 @@ function CustomerMemberships() {
       .then(() => {
         setShowUpgradeModal(false);
         fetchAllMemberships();
+        showSuccess("Membership upgraded successfully.");
         if (selectedCustomer) {
           fetchCustomerMemberships(selectedCustomer);
-        } else {
-          alert("Membership upgraded successfully.");
         }
       })
-      .catch((err) => alert(err.response?.data?.message || err.message || "Failed to upgrade."));
+      .catch((err) => showError(err.response?.data?.message || err.message || "Failed to upgrade."));
   };
 
   return (

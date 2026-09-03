@@ -1,8 +1,9 @@
-from app.database import db
+from app.database import db, tenant_metadata
 from app.models.mixins import TimestampMixin, SoftDeleteMixin
 
 class Customer(db.Model, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "customers"
+    metadata = tenant_metadata
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, nullable=False, index=True)
@@ -27,6 +28,7 @@ class Customer(db.Model, TimestampMixin, SoftDeleteMixin):
 
 class Reminder(db.Model, TimestampMixin):
     __tablename__ = "reminders"
+    metadata = tenant_metadata
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, nullable=False, index=True)
@@ -45,6 +47,7 @@ class Reminder(db.Model, TimestampMixin):
 
 class CustomerFeedback(db.Model, TimestampMixin):
     __tablename__ = "customer_feedback"
+    metadata = tenant_metadata
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, nullable=False, index=True)

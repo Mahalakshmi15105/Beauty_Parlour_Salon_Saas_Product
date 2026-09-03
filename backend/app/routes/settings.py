@@ -134,11 +134,12 @@ def update_settings():
 
     data = request.get_json() or {}
     
-    # Always operate on main_setting for general settings
-    setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id, branch_id=None).first()
-    if not setting:
-        setting = TenantSetting(tenant_id=g.parlour_id, branch_id=None)
-        db.session.add(setting)
+    # Always operate on all tenant settings rows for this tenant
+    settings_list = TenantSetting.query.filter_by(tenant_id=g.parlour_id).all()
+    if not settings_list:
+        s_init = TenantSetting(tenant_id=g.parlour_id, branch_id=None)
+        db.session.add(s_init)
+        settings_list = [s_init]
 
     branch = None
     if g.role == "BranchAdmin" and g.branch_id:
@@ -156,25 +157,59 @@ def update_settings():
     mkt = data.get("marketing_settings", {})
 
     try:
-        # Update Business Profile
-        # Only ParlourAdmin can update tenant name
-        if g.role == "ParlourAdmin" and tenant and biz.get("name"):
-            tenant.name = biz["name"].strip()
+        # Update Business Profile across tenant setting rows
+        for setting in settings_list:
+            if g.role == "ParlourAdmin" and tenant and biz.get("name"):
+                tenant.name = biz["name"].strip()
 
-        if "logo_url" in biz and g.role == "ParlourAdmin":
-            setting.logo_url = biz.get("logo_url")
+            if "logo_url" in biz and g.role == "ParlourAdmin":
+                setting.logo_url = biz.get("logo_url")
 
-        if g.role == "ParlourAdmin":
-            setting.owner_name = biz.get("owner_name")
-            setting.alternate_phone = biz.get("phone") or biz.get("alternate_phone")
-            setting.gst_number = biz.get("gst_number")
-            setting.address = biz.get("address")
-            setting.city = biz.get("city")
-            setting.state = biz.get("state")
-            setting.country = biz.get("country")
-            setting.postal_code = biz.get("postal_code")
-            setting.website = biz.get("website")
-            setting.description = biz.get("description")
+            if g.role == "ParlourAdmin":
+                setting.owner_name = biz.get("owner_name")
+                setting.alternate_phone = biz.get("phone") or biz.get("alternate_phone")
+                setting.gst_number = biz.get("gst_number")
+                setting.address = biz.get("address")
+                setting.city = biz.get("city")
+                setting.state = biz.get("state")
+                setting.country = biz.get("country")
+                setting.postal_code = biz.get("postal_code")
+                setting.website = biz.get("website")
+                setting.description = biz.get("description")
+
+            # Update Invoice & Tax Settings
+            if inv:
+                if "tax_rate" in inv and inv["tax_rate"] is not None:
+                    try:
+                        setting.tax_rate = Decimal(str(inv["tax_rate"]))
+                    except Exception:
+                        pass
+                if "tax_name" in inv and inv["tax_name"]:
+                    setting.tax_name = str(inv["tax_name"]).strip()
+                if "invoice_prefix" in inv and inv["invoice_prefix"]:
+                    setting.invoice_prefix = str(inv["invoice_prefix"]).strip()
+                if "receipt_header" in inv and inv["receipt_header"]:
+                    setting.receipt_header = str(inv["receipt_header"]).strip()
+                if "receipt_footer" in inv and inv["receipt_footer"]:
+                    setting.receipt_footer = str(inv["receipt_footer"]).strip()
+                if "terms_and_conditions" in inv and inv["terms_and_conditions"]:
+                    setting.terms_and_conditions = str(inv["terms_and_conditions"]).strip()
+
+        # Update Regional Settings
+        if reg:
+            c_code = reg.get("currency_code") or reg.get("currency")
+            if c_code:
+                setting.currency = str(c_code).strip()
+                if hasattr(setting, "currency_code"):
+                    setting.currency_code = str(c_code).strip()
+            if reg.get("currency_symbol"):
+                setting.currency_symbol = str(reg.get("currency_symbol")).strip()
+            if reg.get("language") and hasattr(setting, "language"):
+                setting.language = str(reg.get("language")).strip()
+            if reg.get("date_format") and hasattr(setting, "date_format"):
+                setting.date_format = str(reg.get("date_format")).strip()
+            if reg.get("timezone") and hasattr(setting, "timezone"):
+                setting.timezone = str(reg.get("timezone")).strip()
 
         # Update Receipt Settings
         if rec:

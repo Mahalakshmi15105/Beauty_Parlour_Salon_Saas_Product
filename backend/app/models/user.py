@@ -1,9 +1,10 @@
-from app.database import db
+from app.database import db, tenant_metadata
 from app.models.mixins import TimestampMixin, SoftDeleteMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 
 class User(db.Model, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "users"
+    metadata = tenant_metadata
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, nullable=True, index=True)
@@ -28,6 +29,7 @@ class User(db.Model, TimestampMixin, SoftDeleteMixin):
 
 class TenantSetting(db.Model, TimestampMixin):
     __tablename__ = "tenant_settings"
+    metadata = tenant_metadata
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, nullable=False, index=True)

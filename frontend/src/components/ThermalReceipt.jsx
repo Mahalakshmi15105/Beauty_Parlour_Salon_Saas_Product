@@ -1,3 +1,4 @@
+import { useToast } from "../context/ToastContext";
 import React from "react";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { getFullImageUrl } from "../utils/imageUrl";
@@ -6,6 +7,7 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
 export async function downloadThermalReceiptPDF(elementOrRef, invoiceNumber = "INV-0001", paperSize = "80mm") {
+  const { showSuccess, showError } = useToast();
   let targetEl = null;
   if (elementOrRef && elementOrRef.current) {
     targetEl = elementOrRef.current;
@@ -20,7 +22,7 @@ export async function downloadThermalReceiptPDF(elementOrRef, invoiceNumber = "I
   }
 
   if (!targetEl) {
-    alert("Thermal receipt content is not available for PDF export.");
+    showError("Thermal receipt content is not available for PDF export.");
     return;
   }
 
@@ -62,7 +64,7 @@ export async function downloadThermalReceiptPDF(elementOrRef, invoiceNumber = "I
     pdf.save(`Invoice_${cleanInvNumber}.pdf`);
   } catch (err) {
     console.error("PDF Export Error:", err);
-    alert("Failed to download PDF receipt.");
+    showError("Failed to download PDF receipt.");
   }
 }
 
@@ -81,7 +83,7 @@ export function printThermalReceiptElement(elementOrRef, paperSize = "80mm") {
   }
 
   if (!targetEl || !targetEl.innerHTML || targetEl.innerHTML.trim() === "") {
-    alert("Thermal Receipt content is empty or not rendered. Please try again.");
+    showError("Thermal Receipt content is empty or not rendered. Please try again.");
     return;
   }
 
@@ -234,7 +236,7 @@ export function printThermalReceiptElement(elementOrRef, paperSize = "80mm") {
           const bodyHtml = printWin.document.body ? printWin.document.body.innerHTML : "";
           if (!bodyHtml || bodyHtml.length === 0) {
             console.error("CRITICAL ERROR: printWindow document body is EMPTY (0 length)! Aborting print.");
-            alert("Print window failed to load receipt content.");
+            showError("Print window failed to load receipt content.");
             return;
           }
 
@@ -442,7 +444,7 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
       {/* SEPARATOR 1 */}
       <div className="border-b border-dashed border-slate-300 my-1.5" />
 
-      {/* 2. INVOICE METADATA (Bill No -> Client -> Date) */}
+      {/* 2. INVOICE METADATA (Bill No -> Client -> Date -> Loyalty Visit Status) */}
       <div className="text-xs space-y-0.5 text-black">
         <div className="flex justify-between font-bold">
           <span>Bill No:</span>
@@ -456,6 +458,12 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
           <span>Date:</span>
           <span>{formattedDate}</span>
         </div>
+        {invoice.membership_name && (
+          <div className="flex justify-between font-bold text-black border-t border-dotted border-slate-300 pt-1 mt-1">
+            <span>Loyalty Status:</span>
+            <span className="font-extrabold text-right">{invoice.membership_name}</span>
+          </div>
+        )}
       </div>
 
       {/* SEPARATOR 2 */}
@@ -479,6 +487,7 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
                   </div>
                   <div className="space-y-1.5">
                     {serviceItems.map((item, idx) => {
+                      const isFreeReward = item.is_free_reward || item.is_free_visit_reward || (item.discount > 0 && item.line_total === 0);
                       const itemName = (item.item_name || item.name || item.service_name || `Service #${idx + 1}`).toUpperCase();
                       const staffName = item.staff_name || item.employee_name || (item.employee_names ? item.employee_names.join(", ") : "");
                       const rate = item.unit_price || item.rate || (item.price || 0);
@@ -488,8 +497,17 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
                       return (
                         <div key={idx} className="space-y-0.5 text-black">
                           <div className="flex justify-between items-start font-bold">
-                            <span className="w-2/3 break-words leading-tight">{itemName}</span>
-                            <span className="w-1/3 text-right font-extrabold">{formatCurrency(amount)}</span>
+                            <span className="w-2/3 break-words leading-tight">
+                              {itemName}
+                              {isFreeReward && (
+                                <span className="block text-[10px] text-black font-extrabold italic">
+                                  🎁 Membership Reward Claimed: FREE
+                                </span>
+                              )}
+                            </span>
+                            <span className="w-1/3 text-right font-extrabold">
+                              {isFreeReward ? "FREE" : formatCurrency(amount)}
+                            </span>
                           </div>
                           {(showQty || showRate || staffName) && (
                             <div className="text-[11px] text-black space-x-2">
@@ -498,7 +516,7 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
                               {staffName && <span className="italic">Staff: {staffName}</span>}
                             </div>
                           )}
-                          {item.discount > 0 && (
+                          {item.discount > 0 && !isFreeReward && (
                             <div className="text-[11px] text-black">
                               Disc: -{formatCurrency(item.discount)}
                             </div>

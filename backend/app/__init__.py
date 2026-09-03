@@ -65,12 +65,8 @@ def create_app(config_class=Config):
         # a clear error until the DB becomes available.
         # ------------------------------------------------------------------
         try:
-            # Create tables if they do not exist (safe operation, will not overwrite/delete data)
-            db.create_all()
-
-            # Ensure all new/missing columns exist across existing database tables
-            from app.utils.db_migrations import run_auto_migrations
-            run_auto_migrations()
+            # Create Master DB tables (tenants, subscription_plans, tenant_lookups, users)
+            db.create_all_master()
 
             # AUTO-SEED: if the database is empty, seed default data
             from app.models.global_models import Tenant

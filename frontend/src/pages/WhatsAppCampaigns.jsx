@@ -23,10 +23,12 @@ import {
   MessageSquare,
 } from "lucide-react";
 import API from "../services/api";
+import { useToast } from "../context/ToastContext";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { useModalFocusTrap } from "../utils/keyboardNavigation";
 
 export default function WhatsAppCampaigns() {
+  const { showSuccess, showError } = useToast();
   const { t } = useLanguageCurrency();
   const detailModalRef = useRef(null);
   const [activeTab, setActiveTab] = useState("create"); // create, progress, history
@@ -116,7 +118,7 @@ export default function WhatsAppCampaigns() {
         setUploadingImage(false);
       })
       .catch((err) => {
-        alert(err.response?.data?.message || "Failed to upload image.");
+        showError(err.response?.data?.message || "Failed to upload image.");
         setUploadingImage(false);
       });
   };
@@ -124,15 +126,15 @@ export default function WhatsAppCampaigns() {
   // Launch Campaign Dispatch
   const handleLaunchCampaign = () => {
     if (!title.trim()) {
-      alert("Please enter a campaign title.");
+      showError("Please enter a campaign title.");
       return;
     }
     if (!offerMessage.trim()) {
-      alert("Please enter the campaign offer message.");
+      showError("Please enter the campaign offer message.");
       return;
     }
     if (templateType === "IMAGE_WITH_CAPTION" && !imageUrl) {
-      alert("Please upload an image for the Image + Caption campaign template.");
+      showError("Please upload an image for the Image + Caption campaign template.");
       return;
     }
 
@@ -160,7 +162,7 @@ export default function WhatsAppCampaigns() {
       })
       .catch((err) => {
         setLoading(false);
-        alert(err.response?.data?.message || "Failed to launch campaign dispatch.");
+        showError(err.response?.data?.message || "Failed to launch campaign dispatch.");
       });
   };
 
@@ -192,7 +194,7 @@ export default function WhatsAppCampaigns() {
         setSelectedHistoryCampaign(res.data || {});
         setShowDetailModal(true);
       })
-      .catch((err) => alert(err.response?.data?.message || "Failed to load details."));
+      .catch((err) => showError(err.response?.data?.message || "Failed to load details."));
   };
 
   // Modal focus trap for the campaign detail modal.
