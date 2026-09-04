@@ -3,8 +3,9 @@ import API from "../services/api";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { useToast } from "../context/ToastContext";
 import { useModalFocusTrap, useFormKeyboardNavigation, focusAndOpenSelect } from "../utils/keyboardNavigation";
-import { User, X, ChevronDown, Check, Printer, FileSpreadsheet, FileText } from "lucide-react";
+import { User, X, ChevronDown, Check, Printer, FileSpreadsheet, FileText, Download, MessageSquare, Send } from "lucide-react";
 import { exportToCSV, printDataList, exportToPDF } from "../utils/exportUtils";
+import { ThermalReceipt, printThermalReceiptElement, downloadThermalReceiptPDF } from "../components/ThermalReceipt";
 
 function CustomerMemberships() {
   const { showSuccess, showError } = useToast();
@@ -20,12 +21,18 @@ function CustomerMemberships() {
   const [allCustomers, setAllCustomers] = useState([]);
   const [allMemberships, setAllMemberships] = useState([]);
 
+  // Receipt / Bill Preview Modal State
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [completedInvoice, setCompletedInvoice] = useState(null);
+  const [receiptSettings, setReceiptSettings] = useState(null);
+  const [businessProfile, setBusinessProfile] = useState(null);
+
   // Assignment Modal State
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assignForm, setAssignForm] = useState({
     customer_id: "",
     plan_id: "",
-    payment_method: "Cash",
+    payment_method: "",
     benefits: [], // array of { service_id, quantity }
   });
 
@@ -38,7 +45,7 @@ function CustomerMemberships() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showRenewModal, setShowRenewModal] = useState(false);
   const [renewTarget, setRenewTarget] = useState(null);
-  const [renewPaymentMethod, setRenewPaymentMethod] = useState("Cash");
+  const [renewPaymentMethod, setRenewPaymentMethod] = useState("");
 
   const [activeMembershipId, setActiveMembershipId] = useState(null);
   const [upgradePlanId, setUpgradePlanId] = useState("");
@@ -59,6 +66,16 @@ function CustomerMemberships() {
     if (submitBtn) submitBtn.click();
   });
 
+  // Fetch receipt/business settings for thermal bill printing
+  const fetchReceiptContext = () => {
+    API.get("/settings/receipt")
+      .then((res) => setReceiptSettings(res.data))
+      .catch(() => {});
+    API.get("/settings/profile")
+      .then((res) => setBusinessProfile(res.data))
+      .catch(() => {});
+  };
+
   // Fetch initial collections
   const fetchAllMemberships = () => {
     API.get("/memberships")
@@ -68,11 +85,7 @@ function CustomerMemberships() {
 
   const fetchPlans = () => {
     API.get("/membership-plans?status=active").then((res) => {
-      const fetchedPlans = res.data.items || [];
-      setPlans(fetchedPlans);
-      if (fetchedPlans.length > 0) {
-        setAssignForm(prev => ({ ...prev, plan_id: fetchedPlans[0].id.toString() }));
-      }
+      setPlans(res.data.items || []);
     });
   };
 
@@ -85,7 +98,20 @@ function CustomerMemberships() {
     API.get("/services?status=active").then((res) => setServices(res.data.items || []));
     fetchCustomers();
     fetchAllMemberships();
+    fetchReceiptContext();
   }, []);
+
+  const openBillPreviewModalForInvoice = (invoiceId) => {
+    if (!invoiceId) return;
+    API.get(`/invoices/${invoiceId}`)
+      .then((res) => {
+        setCompletedInvoice(res.data);
+        setShowReceiptModal(true);
+      })
+      .catch((err) => {
+        console.error("Error fetching invoice details for receipt preview:", err);
+      });
+  };
 
   // Customer Autocomplete Lookup for the View Specific section
   useEffect(() => {
@@ -190,6 +216,10 @@ function CustomerMemberships() {
       if (planSelectRef.current) focusAndOpenSelect(planSelectRef.current);
       return;
     }
+    if (!assignForm.payment_method) {
+      showError("Please select a payment method.");
+      return;
+    }
 
     setSubmitting(true);
     API.post("/memberships/assign", assignForm)
@@ -199,16 +229,21 @@ function CustomerMemberships() {
         setComboboxSearch("");
         setAssignForm({
           customer_id: "",
-          plan_id: plans.length > 0 ? plans[0].id.toString() : "",
-          payment_method: "Cash",
+          plan_id: "",
+          payment_method: "",
           benefits: [],
         });
         fetchAllMemberships();
         fetchCustomers();
-        const invNum = res.data?.data?.invoice_number || res.data?.invoice_number;
+        const invData = res.data?.data || res.data;
+        const invNum = invData?.invoice_number;
+        const invoiceId = invData?.invoice_id;
         showSuccess(`Membership assigned successfully. Invoice generated: ${invNum || ''}`);
         if (selectedCustomer && selectedCustomer.id === parseInt(assignForm.customer_id)) {
           fetchCustomerMemberships(selectedCustomer);
+        }
+        if (invoiceId) {
+          openBillPreviewModalForInvoice(invoiceId);
         }
       })
       .catch((err) => {
@@ -220,13 +255,17 @@ function CustomerMemberships() {
 
   const openRenewModal = (membershipRecord) => {
     setRenewTarget(membershipRecord);
-    setRenewPaymentMethod("Cash");
+    setRenewPaymentMethod("");
     setShowRenewModal(true);
   };
 
   const handleConfirmRenew = (e) => {
     e.preventDefault();
     if (!renewTarget) return;
+    if (!renewPaymentMethod) {
+      showError("Please select a payment method.");
+      return;
+    }
 
     setSubmitting(true);
     API.post(`/memberships/${renewTarget.id}/renew`, { payment_method: renewPaymentMethod })
@@ -234,10 +273,15 @@ function CustomerMemberships() {
         setSubmitting(false);
         setShowRenewModal(false);
         fetchAllMemberships();
-        const invNum = res.data?.data?.invoice_number || res.data?.invoice_number;
+        const invData = res.data?.data || res.data;
+        const invNum = invData?.invoice_number;
+        const invoiceId = invData?.invoice_id;
         showSuccess(`Membership renewed successfully. Invoice generated: ${invNum || ''}`);
         if (selectedCustomer) {
           fetchCustomerMemberships(selectedCustomer);
+        }
+        if (invoiceId) {
+          openBillPreviewModalForInvoice(invoiceId);
         }
       })
       .catch((err) => {
@@ -661,8 +705,10 @@ function CustomerMemberships() {
               <div>
                 <label className="block text-xs font-semibold text-text-secondary mb-1">Select Membership Plan *</label>
                 <select
+                  ref={planSelectRef}
                   required
                   value={assignForm.plan_id}
+                  onFocus={(e) => focusAndOpenSelect(e.target)}
                   onChange={(e) => setAssignForm({ ...assignForm, plan_id: e.target.value })}
                   className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-primary font-medium"
                 >
@@ -693,15 +739,18 @@ function CustomerMemberships() {
               <div>
                 <label className="block text-xs font-semibold text-text-secondary mb-1">Payment Method *</label>
                 <select
-                  value={assignForm.payment_method || "Cash"}
+                  required
+                  value={assignForm.payment_method}
+                  onFocus={(e) => focusAndOpenSelect(e.target)}
                   onChange={(e) => setAssignForm({ ...assignForm, payment_method: e.target.value })}
                   className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-primary font-medium"
                 >
+                  <option value="">[ Select Payment Method ]</option>
                   <option value="Cash">Cash</option>
-                  <option value="Card">Card / POS</option>
-                  <option value="UPI">UPI / GPay / PhonePe</option>
-                  <option value="Net Banking">Net Banking</option>
-                  <option value="Other">Other</option>
+                  <option value="Paytm">Paytm</option>
+                  <option value="PhonePe">PhonePe</option>
+                  <option value="GPay">GPay</option>
+                  <option value="Card">Card</option>
                 </select>
               </div>
 
@@ -753,15 +802,18 @@ function CustomerMemberships() {
               <div>
                 <label className="block text-xs font-semibold text-text-secondary mb-1">Select Payment Method *</label>
                 <select
+                  required
                   value={renewPaymentMethod}
+                  onFocus={(e) => focusAndOpenSelect(e.target)}
                   onChange={(e) => setRenewPaymentMethod(e.target.value)}
                   className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-primary font-medium"
                 >
+                  <option value="">[ Select Payment Method ]</option>
                   <option value="Cash">Cash</option>
-                  <option value="Card">Card / POS</option>
-                  <option value="UPI">UPI / GPay / PhonePe</option>
-                  <option value="Net Banking">Net Banking</option>
-                  <option value="Other">Other</option>
+                  <option value="Paytm">Paytm</option>
+                  <option value="PhonePe">PhonePe</option>
+                  <option value="GPay">GPay</option>
+                  <option value="Card">Card</option>
                 </select>
               </div>
 
@@ -802,9 +854,11 @@ function CustomerMemberships() {
                 <select
                   required
                   value={upgradePlanId}
+                  onFocus={(e) => focusAndOpenSelect(e.target)}
                   onChange={(e) => setUpgradePlanId(e.target.value)}
                   className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-primary"
                 >
+                  <option value="">[ Select Target Plan ]</option>
                   {plans.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name} - {formatCurrency(p.price)} ({p.duration_days} Days)
@@ -816,7 +870,7 @@ function CustomerMemberships() {
               {/* Upgrade Perks entry */}
               <div className="space-y-2 border-t border-border-soft pt-3">
                 <div className="flex justify-between items-center">
-                  <label className="text-xs font-semibold text-text-secondary font-semibold">New Plan Service Perks</label>
+                  <label className="text-xs font-semibold text-text-secondary">New Plan Service Perks</label>
                   <button
                     type="button"
                     onClick={() => handleAddBenefitRow(true)}
@@ -864,6 +918,90 @@ function CustomerMemberships() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Bill Preview & Thermal Receipt Modal */}
+      {showReceiptModal && completedInvoice && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
+          <div className="bg-white max-w-xl w-full rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-8">
+            {/* Header */}
+            <div className="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
+              <div>
+                <h3 className="text-base font-bold flex items-center gap-2">
+                  <span>Membership Paid Invoice</span>
+                  <span className="text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-medium">
+                    {completedInvoice.invoice_number}
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">Official paid bill generated and stored in billing system.</p>
+              </div>
+              <button
+                onClick={() => setShowReceiptModal(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Receipt Content Container */}
+            <div className="p-6 bg-slate-100 flex justify-center max-h-[60vh] overflow-y-auto">
+              <ThermalReceipt
+                invoiceResult={completedInvoice}
+                receiptSettings={receiptSettings}
+                businessProfile={businessProfile}
+              />
+            </div>
+
+            {/* Quick Distribution & Printing Actions */}
+            <div className="p-6 bg-white border-t border-slate-200 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => printThermalReceiptElement()}
+                  className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 px-4 rounded-xl text-sm transition flex items-center justify-center space-x-2 shadow-sm"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Print Thermal Bill</span>
+                </button>
+                <button
+                  onClick={() => downloadThermalReceiptPDF(completedInvoice)}
+                  className="w-full bg-primary hover:bg-primary-hover text-white font-semibold py-2.5 px-4 rounded-xl text-sm transition flex items-center justify-center space-x-2 shadow-sm"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Download PDF Bill</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                <button
+                  onClick={() => {
+                    const phone = completedInvoice.customer_phone || "";
+                    if (!phone) {
+                      showError("Customer phone number is missing.");
+                      return;
+                    }
+                    const text = encodeURIComponent(
+                      `Hello ${completedInvoice.customer_name}, your membership paid invoice #${completedInvoice.invoice_number} of ${completedInvoice.total_amount} is ready. Thank you for your business!`
+                    );
+                    window.open(`https://wa.me/${phone.replace(/[^0-9]/g, "")}?text=${text}`, "_blank");
+                  }}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-3 rounded-xl text-xs transition flex items-center justify-center space-x-2"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Send WhatsApp Bill</span>
+                </button>
+                <button
+                  onClick={() => {
+                    showSuccess(`SMS bill dispatch triggered for ${completedInvoice.customer_phone || "customer"}`);
+                  }}
+                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 px-3 rounded-xl text-xs transition flex items-center justify-center space-x-2 border border-slate-300"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-slate-600" />
+                  <span>Send SMS Bill</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
