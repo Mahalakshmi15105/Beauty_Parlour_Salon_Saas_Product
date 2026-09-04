@@ -325,9 +325,13 @@ def delete_plan(plan_id):
 @memberships_bp.route("/memberships/assign", methods=["POST"])
 @require_role(["ParlourAdmin", "BranchAdmin"])
 def assign_membership():
+    from app.models.billing import Invoice, InvoiceLineItem, InvoicePayment
+    from app.models.user import TenantSetting
+
     data = request.get_json() or {}
     customer_id = data.get("customer_id")
     plan_id = data.get("plan_id")
+    payment_method = data.get("payment_method", "Cash").strip() if data.get("payment_method") else "Cash"
     benefits_data = data.get("benefits", [])  # list of {service_id, quantity}
 
     if not customer_id or not plan_id:
@@ -360,8 +364,68 @@ def assign_membership():
 
     expiry_date = datetime.now() + timedelta(days=days)
 
+    # Calculate Invoice Prices & Tax
+    target_branch_id = g.branch_id if hasattr(g, "branch_id") and g.branch_id else None
+    if not target_branch_id and customer.branch_id:
+        target_branch_id = customer.branch_id
+
+    plan_price = Decimal(str(getattr(plan, 'price', 0.00) or 0.00))
+    
+    settings = TenantSetting.query.filter_by(tenant_id=g.parlour_id, branch_id=target_branch_id).first()
+    if not settings:
+        settings = TenantSetting.query.filter_by(tenant_id=g.parlour_id, branch_id=None).first()
+    
+    tax_rate = Decimal(str(settings.tax_rate)) if settings and settings.tax_rate else Decimal("0.00")
+    calculated_tax = round(plan_price * (tax_rate / Decimal("100.00")), 2) if tax_rate > 0 else Decimal("0.00")
+    grand_total = plan_price + calculated_tax
+
     try:
-        # Create linkage
+        # 1. Generate Invoice Number & Invoice Record
+        count_filter = [Invoice.tenant_id == g.parlour_id]
+        if target_branch_id:
+            count_filter.append(Invoice.branch_id == target_branch_id)
+        count = db.session.query(Invoice).filter(*count_filter).count()
+        invoice_number = f"INV-{g.parlour_id}-{count + 1:06d}"
+
+        invoice = Invoice(
+            tenant_id=g.parlour_id,
+            branch_id=target_branch_id,
+            invoice_number=invoice_number,
+            customer_id=customer_id,
+            subtotal=plan_price,
+            discount=Decimal("0.00"),
+            tax=calculated_tax,
+            total=grand_total,
+            status="Paid",
+            membership_name=plan.name,
+            membership_discount=Decimal("0.00")
+        )
+        db.session.add(invoice)
+        db.session.flush()
+
+        # Save Line Item
+        line_item = InvoiceLineItem(
+            tenant_id=g.parlour_id,
+            branch_id=target_branch_id,
+            invoice_id=invoice.id,
+            quantity=1,
+            unit_price=plan_price,
+            discount_amount=Decimal("0.00"),
+            tax_amount=calculated_tax,
+            line_total=grand_total
+        )
+        db.session.add(line_item)
+
+        # Save Payment
+        payment = InvoicePayment(
+            tenant_id=g.parlour_id,
+            invoice_id=invoice.id,
+            method=payment_method,
+            amount=grand_total
+        )
+        db.session.add(payment)
+
+        # 2. Create Membership linkage
         cm = CustomerMembership(
             tenant_id=g.parlour_id,
             customer_id=customer_id,
@@ -379,7 +443,6 @@ def assign_membership():
             if not svc_id or qty <= 0:
                 continue
             
-            # Verify service
             svc = Service.query.filter_by(id=svc_id, tenant_id=g.parlour_id).first()
             if not svc:
                 raise ValueError(f"Service ID {svc_id} is invalid.")
@@ -403,12 +466,23 @@ def assign_membership():
             status_code=400 if isinstance(e, ValueError) else 500
         )
 
-    return success_response({"membership_id": cm.id, "expires_at": cm.expires_at.isoformat()}, 201)
+    return success_response({
+        "membership_id": cm.id, 
+        "expires_at": cm.expires_at.isoformat(),
+        "invoice_number": invoice.invoice_number,
+        "total_amount": float(grand_total)
+    }, 201)
 
 
 @memberships_bp.route("/memberships/<int:cm_id>/renew", methods=["POST"])
 @require_role(["ParlourAdmin", "BranchAdmin"])
 def renew_membership(cm_id):
+    from app.models.billing import Invoice, InvoiceLineItem, InvoicePayment
+    from app.models.user import TenantSetting
+
+    data = request.get_json() or {}
+    payment_method = data.get("payment_method", "Cash").strip() if data.get("payment_method") else "Cash"
+
     cm = CustomerMembership.query.filter_by(id=cm_id, tenant_id=g.parlour_id).first()
     if not cm:
         return error_response(
@@ -421,16 +495,78 @@ def renew_membership(cm_id):
     if not plan:
         raise ValueError("Membership Plan associated is invalid.")
 
-    # Extend expiration & increment renewal count
-    base_date = max(datetime.now(), cm.expires_at)
-    cm.expires_at = base_date + timedelta(days=plan.duration_days)
-    cm.status = "active"
-    cm.renew_count = (getattr(cm, 'renew_count', 0) or 0) + 1
+    customer = Customer.query.filter_by(id=cm.customer_id, tenant_id=g.parlour_id).first()
 
-    # Reset benefits
+    target_branch_id = g.branch_id if hasattr(g, "branch_id") and g.branch_id else None
+    if not target_branch_id and customer and customer.branch_id:
+        target_branch_id = customer.branch_id
+
+    plan_price = Decimal(str(getattr(plan, 'price', 0.00) or 0.00))
+    
+    settings = TenantSetting.query.filter_by(tenant_id=g.parlour_id, branch_id=target_branch_id).first()
+    if not settings:
+        settings = TenantSetting.query.filter_by(tenant_id=g.parlour_id, branch_id=None).first()
+
+    tax_rate = Decimal(str(settings.tax_rate)) if settings and settings.tax_rate else Decimal("0.00")
+    calculated_tax = round(plan_price * (tax_rate / Decimal("100.00")), 2) if tax_rate > 0 else Decimal("0.00")
+    grand_total = plan_price + calculated_tax
+
     try:
+        # Create Renewal Invoice
+        count_filter = [Invoice.tenant_id == g.parlour_id]
+        if target_branch_id:
+            count_filter.append(Invoice.branch_id == target_branch_id)
+        count = db.session.query(Invoice).filter(*count_filter).count()
+        invoice_number = f"INV-{g.parlour_id}-{count + 1:06d}"
+
+        invoice = Invoice(
+            tenant_id=g.parlour_id,
+            branch_id=target_branch_id,
+            invoice_number=invoice_number,
+            customer_id=cm.customer_id,
+            subtotal=plan_price,
+            discount=Decimal("0.00"),
+            tax=calculated_tax,
+            total=grand_total,
+            status="Paid",
+            membership_name=f"{plan.name} (Renewal)",
+            membership_discount=Decimal("0.00")
+        )
+        db.session.add(invoice)
+        db.session.flush()
+
+        # Save Line Item
+        line_item = InvoiceLineItem(
+            tenant_id=g.parlour_id,
+            branch_id=target_branch_id,
+            invoice_id=invoice.id,
+            quantity=1,
+            unit_price=plan_price,
+            discount_amount=Decimal("0.00"),
+            tax_amount=calculated_tax,
+            line_total=grand_total
+        )
+        db.session.add(line_item)
+
+        # Save Payment
+        payment = InvoicePayment(
+            tenant_id=g.parlour_id,
+            invoice_id=invoice.id,
+            method=payment_method,
+            amount=grand_total
+        )
+        db.session.add(payment)
+
+        # Extend expiration & increment renewal count
+        base_date = max(datetime.now(), cm.expires_at)
+        cm.expires_at = base_date + timedelta(days=plan.duration_days)
+        cm.status = "active"
+        cm.renew_count = (getattr(cm, 'renew_count', 0) or 0) + 1
+
+        # Reset benefits
         for b in cm.benefits:
             b.remaining_quantity = b.total_quantity
+            
         db.session.commit()
     except Exception as e:
         db.session.rollback()
@@ -441,7 +577,12 @@ def renew_membership(cm_id):
             status_code=500
         )
 
-    return success_response({"message": "Membership renewed successfully.", "new_expiry": cm.expires_at.isoformat()})
+    return success_response({
+        "message": "Membership renewed successfully.", 
+        "new_expiry": cm.expires_at.isoformat(),
+        "invoice_number": invoice.invoice_number,
+        "total_amount": float(grand_total)
+    })
 
 
 @memberships_bp.route("/memberships/<int:cm_id>/upgrade", methods=["POST"])
@@ -580,6 +721,7 @@ def get_all_memberships():
             "customer_phone": cm.customer.phone if cm.customer else "No Phone",
             "plan_id": cm.membership_plan_id,
             "plan_name": cm.plan.name if cm.plan else "Default Membership",
+            "price": float(cm.plan.price) if cm.plan and cm.plan.price else 0.0,
             "expires_at": cm.expires_at.isoformat(),
             "status": cm.status,
             "renew_count": getattr(cm, "renew_count", 0) or 0,

@@ -25,6 +25,7 @@ function CustomerMemberships() {
   const [assignForm, setAssignForm] = useState({
     customer_id: "",
     plan_id: "",
+    payment_method: "Cash",
     benefits: [], // array of { service_id, quantity }
   });
 
@@ -35,6 +36,10 @@ function CustomerMemberships() {
 
   // Action Modals (Renew / Upgrade)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showRenewModal, setShowRenewModal] = useState(false);
+  const [renewTarget, setRenewTarget] = useState(null);
+  const [renewPaymentMethod, setRenewPaymentMethod] = useState("Cash");
+
   const [activeMembershipId, setActiveMembershipId] = useState(null);
   const [upgradePlanId, setUpgradePlanId] = useState("");
   const [upgradeBenefits, setUpgradeBenefits] = useState([]);
@@ -188,18 +193,20 @@ function CustomerMemberships() {
 
     setSubmitting(true);
     API.post("/memberships/assign", assignForm)
-      .then(() => {
+      .then((res) => {
         setSubmitting(false);
         setShowAssignModal(false);
         setComboboxSearch("");
         setAssignForm({
           customer_id: "",
           plan_id: plans.length > 0 ? plans[0].id.toString() : "",
+          payment_method: "Cash",
           benefits: [],
         });
         fetchAllMemberships();
         fetchCustomers();
-        showSuccess("Membership assigned successfully.");
+        const invNum = res.data?.data?.invoice_number || res.data?.invoice_number;
+        showSuccess(`Membership assigned successfully. Invoice generated: ${invNum || ''}`);
         if (selectedCustomer && selectedCustomer.id === parseInt(assignForm.customer_id)) {
           fetchCustomerMemberships(selectedCustomer);
         }
@@ -211,16 +218,32 @@ function CustomerMemberships() {
       });
   };
 
-  const handleRenew = (cmId) => {
-    API.post(`/memberships/${cmId}/renew`)
-      .then(() => {
+  const openRenewModal = (membershipRecord) => {
+    setRenewTarget(membershipRecord);
+    setRenewPaymentMethod("Cash");
+    setShowRenewModal(true);
+  };
+
+  const handleConfirmRenew = (e) => {
+    e.preventDefault();
+    if (!renewTarget) return;
+
+    setSubmitting(true);
+    API.post(`/memberships/${renewTarget.id}/renew`, { payment_method: renewPaymentMethod })
+      .then((res) => {
+        setSubmitting(false);
+        setShowRenewModal(false);
         fetchAllMemberships();
-        showSuccess("Membership renewed successfully.");
+        const invNum = res.data?.data?.invoice_number || res.data?.invoice_number;
+        showSuccess(`Membership renewed successfully. Invoice generated: ${invNum || ''}`);
         if (selectedCustomer) {
           fetchCustomerMemberships(selectedCustomer);
         }
       })
-      .catch((err) => showError(err.response?.data?.message || err.message || "Failed to renew."));
+      .catch((err) => {
+        setSubmitting(false);
+        showError(err.response?.data?.message || err.message || "Failed to renew membership.");
+      });
   };
 
   const handleCancel = (cmId) => {
@@ -518,7 +541,7 @@ function CustomerMemberships() {
                       {m.status === "active" && (
                         <>
                           <button
-                            onClick={() => handleRenew(m.id)}
+                            onClick={() => openRenewModal(m)}
                             className="text-text-primary hover:underline font-semibold"
                           >
                             Renew ({m.renew_count || 0})
@@ -641,7 +664,7 @@ function CustomerMemberships() {
                   required
                   value={assignForm.plan_id}
                   onChange={(e) => setAssignForm({ ...assignForm, plan_id: e.target.value })}
-                  className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-primary"
+                  className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-primary font-medium"
                 >
                   <option value="">[ Select Membership Plan ]</option>
                   {plans.map((p) => (
@@ -649,6 +672,36 @@ function CustomerMemberships() {
                       {p.name} - {formatCurrency(p.price)} ({p.duration_days} Days)
                     </option>
                   ))}
+                </select>
+              </div>
+
+              {assignForm.plan_id && (() => {
+                const selectedPlan = plans.find(p => p.id.toString() === assignForm.plan_id.toString());
+                return selectedPlan ? (
+                  <div className="bg-primary-light/50 border border-primary/20 p-3.5 rounded-lg space-y-1">
+                    <div className="flex justify-between items-center text-xs font-semibold text-text-primary">
+                      <span>Plan Price to Charge:</span>
+                      <span className="text-sm font-bold text-primary">{formatCurrency(selectedPlan.price)}</span>
+                    </div>
+                    <div className="text-[11px] text-text-secondary">
+                      Valid for {selectedPlan.duration_days} days. An official paid invoice will be generated upon confirmation.
+                    </div>
+                  </div>
+                ) : null;
+              })()}
+
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary mb-1">Payment Method *</label>
+                <select
+                  value={assignForm.payment_method || "Cash"}
+                  onChange={(e) => setAssignForm({ ...assignForm, payment_method: e.target.value })}
+                  className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-primary font-medium"
+                >
+                  <option value="Cash">Cash</option>
+                  <option value="Card">Card / POS</option>
+                  <option value="UPI">UPI / GPay / PhonePe</option>
+                  <option value="Net Banking">Net Banking</option>
+                  <option value="Other">Other</option>
                 </select>
               </div>
 
@@ -665,7 +718,67 @@ function CustomerMemberships() {
                   disabled={submitting}
                   className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-md text-xs font-semibold disabled:opacity-50"
                 >
-                  {submitting ? "Assigning..." : "Assign Plan"}
+                  {submitting ? "Processing..." : "Pay & Assign Membership"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Renew Membership Modal */}
+      {showRenewModal && renewTarget && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-surface max-w-md w-full rounded-lg shadow-lg border border-border-soft overflow-hidden">
+            <div className="px-6 py-4 border-b border-border-soft flex justify-between items-center">
+              <h3 className="text-md font-semibold text-text-primary">Renew Membership & Issue Invoice</h3>
+              <button onClick={() => setShowRenewModal(false)} className="text-text-secondary hover:text-text-primary p-1">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleConfirmRenew} className="p-6 space-y-4">
+              <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-lg space-y-1">
+                <div className="text-xs font-semibold text-text-primary">
+                  Customer: <span className="font-bold">{renewTarget.customer_name}</span>
+                </div>
+                <div className="text-xs text-text-secondary">
+                  Plan: <span className="font-semibold text-text-primary">{renewTarget.plan_name}</span>
+                </div>
+                <div className="text-xs text-text-secondary flex justify-between pt-1 border-t border-slate-200 mt-2">
+                  <span>Renewal Price:</span>
+                  <span className="font-bold text-primary text-sm">{formatCurrency(renewTarget.price || 0)}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary mb-1">Select Payment Method *</label>
+                <select
+                  value={renewPaymentMethod}
+                  onChange={(e) => setRenewPaymentMethod(e.target.value)}
+                  className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-primary font-medium"
+                >
+                  <option value="Cash">Cash</option>
+                  <option value="Card">Card / POS</option>
+                  <option value="UPI">UPI / GPay / PhonePe</option>
+                  <option value="Net Banking">Net Banking</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div className="pt-4 border-t border-border-soft flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowRenewModal(false)}
+                  className="px-4 py-2 border border-border-soft rounded-md text-xs font-semibold text-text-secondary hover:bg-background"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-md text-xs font-semibold disabled:opacity-50"
+                >
+                  {submitting ? "Processing..." : "Confirm Pay & Renew"}
                 </button>
               </div>
             </form>
