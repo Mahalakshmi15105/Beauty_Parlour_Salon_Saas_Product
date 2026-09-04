@@ -172,6 +172,22 @@ def get_customer_records():
         )
     ).filter(Customer.tenant_id == g.parlour_id)
 
+    # Enforce Customer branch isolation
+    if hasattr(g, "branch_id") and g.branch_id:
+        query = query.filter(Customer.branch_id == g.branch_id)
+    else:
+        b_param = request.args.get("branch_id")
+        if b_param == "all":
+            pass
+        elif b_param and b_param not in ("main", "null", "0", "None"):
+            try:
+                bid = int(b_param)
+                query = query.filter(Customer.branch_id == bid)
+            except (ValueError, TypeError):
+                query = query.filter(Customer.branch_id.is_(None))
+        else:
+            query = query.filter(Customer.branch_id.is_(None))
+
     if search_q:
         search_filter = f"%{search_q}%"
         query = query.filter(

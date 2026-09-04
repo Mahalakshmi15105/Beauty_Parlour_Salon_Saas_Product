@@ -30,10 +30,12 @@ def get_settings():
             main_setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id, branch_id=None).first()
 
     branch = None
+    branch_setting = None
     if g.role == "BranchAdmin" and g.branch_id:
         branch = Branch.query.filter_by(id=g.branch_id, tenant_id=g.parlour_id).first()
+        branch_setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id, branch_id=g.branch_id).first()
 
-    setting = main_setting
+    setting = branch_setting if branch_setting else main_setting
     g.use_master_db = True
     tenant = Tenant.query.get(g.parlour_id)
     g.use_master_db = False
@@ -134,12 +136,14 @@ def update_settings():
 
     data = request.get_json() or {}
     
-    # Always operate on all tenant settings rows for this tenant
-    settings_list = TenantSetting.query.filter_by(tenant_id=g.parlour_id).all()
-    if not settings_list:
-        s_init = TenantSetting(tenant_id=g.parlour_id, branch_id=None)
-        db.session.add(s_init)
-        settings_list = [s_init]
+    # Target specific branch setting row or main parlour setting row
+    target_branch_id = g.branch_id if (g.role == "BranchAdmin" and g.branch_id) else None
+    target_setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id, branch_id=target_branch_id).first()
+    if not target_setting:
+        target_setting = TenantSetting(tenant_id=g.parlour_id, branch_id=target_branch_id)
+        db.session.add(target_setting)
+    
+    settings_list = [target_setting]
 
     branch = None
     if g.role == "BranchAdmin" and g.branch_id:

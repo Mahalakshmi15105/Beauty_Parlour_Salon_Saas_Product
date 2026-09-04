@@ -186,6 +186,7 @@ def require_role(roles):
                 branch_exists = cache.get(b_cache_key)
                 if branch_exists is None:
                     try:
+                        g.use_master_db = False
                         from app.models.branch import Branch
                         b_obj = Branch.query.filter_by(id=branch_id, tenant_id=parlour_id).first()
                         branch_exists = bool(b_obj)

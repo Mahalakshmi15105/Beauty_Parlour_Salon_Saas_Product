@@ -541,7 +541,25 @@ def cancel_membership(cm_id):
 @memberships_bp.route("/memberships", methods=["GET"])
 @require_role(["ParlourAdmin", "BranchAdmin"])
 def get_all_memberships():
-    query = CustomerMembership.query.filter_by(tenant_id=g.parlour_id).order_by(CustomerMembership.id.desc())
+    from app.models.customer import Customer
+    query = CustomerMembership.query.join(Customer).filter(CustomerMembership.tenant_id == g.parlour_id)
+    
+    if hasattr(g, "branch_id") and g.branch_id:
+        query = query.filter(Customer.branch_id == g.branch_id)
+    else:
+        b_param = request.args.get("branch_id")
+        if b_param == "all":
+            pass
+        elif b_param and b_param not in ("main", "null", "0", "None"):
+            try:
+                bid = int(b_param)
+                query = query.filter(Customer.branch_id == bid)
+            except (ValueError, TypeError):
+                query = query.filter(Customer.branch_id.is_(None))
+        else:
+            query = query.filter(Customer.branch_id.is_(None))
+
+    query = query.order_by(CustomerMembership.id.desc())
     
     results = []
     for cm in query.all():
