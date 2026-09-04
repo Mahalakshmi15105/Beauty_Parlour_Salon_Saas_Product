@@ -64,7 +64,7 @@ function PublicBookingPage({ tenantId = 1, tenantIdentifier, isBranch = false, o
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
-  const [customerGender, setCustomerGender] = useState("Female");
+  const [customerGender, setCustomerGender] = useState("");
   const [notes, setNotes] = useState("");
   const [lookingUpPhone, setLookingUpPhone] = useState(false);
   const [phoneFound, setPhoneFound] = useState(false);
@@ -867,9 +867,15 @@ function PublicBookingPage({ tenantId = 1, tenantIdentifier, isBranch = false, o
                       <label className="block text-sm font-bold text-slate-700 mb-1">Gender</label>
                       <select
                         value={customerGender}
+                        onFocus={(e) => {
+                          try {
+                            if (e.target.showPicker) e.target.showPicker();
+                          } catch (err) {}
+                        }}
                         onChange={(e) => setCustomerGender(e.target.value)}
                         className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm text-slate-800 font-medium focus:outline-none focus:border-pink-500 transition"
                       >
+                        <option value="">Select Gender</option>
                         <option value="Female">Female</option>
                         <option value="Male">Male</option>
                         <option value="Other">Other</option>

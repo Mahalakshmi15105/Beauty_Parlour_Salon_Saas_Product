@@ -276,36 +276,7 @@ export default function VisitMembershipSettings() {
               />
             </div>
 
-            {/* Qualifying Services Checkboxes */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-slate-700">
-                Select Which Services Count as a "Qualifying Visit":
-              </label>
-              <p className="text-[11px] text-slate-500">
-                Check all services that increment the customer's visit counter when purchased. (If none selected, all services count).
-              </p>
-              <div className="max-h-48 overflow-y-auto border border-border-soft bg-white rounded-xl p-3 grid grid-cols-2 gap-2">
-                {services.map((svc) => {
-                  const isChecked = qualifyingServiceIds.includes(svc.id);
-                  return (
-                    <label
-                      key={svc.id}
-                      className={`flex items-center space-x-2 text-xs p-2 rounded-lg cursor-pointer transition ${
-                        isChecked ? "bg-primary/10 font-bold text-slate-900" : "hover:bg-slate-50 text-slate-700"
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => handleToggleQualifyingService(svc.id)}
-                        className="rounded text-primary focus:ring-primary"
-                      />
-                      <span>{svc.name} ({formatCurrency(svc.price)})</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
+
 
             {/* Free Reward Services Checkboxes */}
             <div className="space-y-2">

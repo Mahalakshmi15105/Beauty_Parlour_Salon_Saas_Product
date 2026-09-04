@@ -288,7 +288,7 @@ export function printThermalReceiptElement(elementOrRef, paperSize = "80mm") {
   }
 }
 
-export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, businessProfile = {} }, ref) => {
+export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, businessProfile = {}, hideLoyaltyStatus = false, hideLineItems = false }, ref) => {
   const { formatCurrency } = useLanguageCurrency();
 
   const paperSize = settings.paper_size || "80mm";
@@ -458,7 +458,7 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
           <span>Date:</span>
           <span>{formattedDate}</span>
         </div>
-        {invoice.membership_name && (
+        {!hideLoyaltyStatus && invoice.membership_name && (
           <div className="flex justify-between font-bold text-black border-t border-dotted border-slate-300 pt-1 mt-1">
             <span>Loyalty Status:</span>
             <span className="font-extrabold text-right">{invoice.membership_name}</span>
@@ -466,111 +466,113 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
         )}
       </div>
 
-      {/* SEPARATOR 2 */}
-      <div className="border-b border-dashed border-slate-300 my-1.5" />
+      {/* SEPARATOR 2 (only show if line items section is visible) */}
+      {!hideLineItems && <div className="border-b border-dashed border-slate-300 my-1.5" />}
 
       {/* 3. ITEM TABLE HEADER */}
-      <div className="text-xs">
-        {(() => {
-          const lineItems = invoice.line_items || invoice.items || [];
-          const serviceItems = lineItems.filter(item => item.type === "service" || item.service_id);
-          const productItems = lineItems.filter(item => item.type === "product" || item.product_id);
+      {!hideLineItems && (
+        <div className="text-xs">
+          {(() => {
+            const lineItems = invoice.line_items || invoice.items || [];
+            const serviceItems = lineItems.filter(item => item.type === "service" || item.service_id);
+            const productItems = lineItems.filter(item => item.type === "product" || item.product_id);
 
-          return (
-            <div className="space-y-3">
-              {/* SERVICES SECTION */}
-              {serviceItems.length > 0 && (
-                <div>
-                  <div className="font-bold uppercase border-b border-dashed border-slate-300 pb-0.5 mb-1 text-black flex justify-between">
-                    <span className="w-2/3">SERVICES</span>
-                    <span className="w-1/3 text-right">AMT</span>
-                  </div>
-                  <div className="space-y-1.5">
-                    {serviceItems.map((item, idx) => {
-                      const isFreeReward = item.is_free_reward || item.is_free_visit_reward || (item.discount > 0 && item.line_total === 0);
-                      const itemName = (item.item_name || item.name || item.service_name || `Service #${idx + 1}`).toUpperCase();
-                      const staffName = item.staff_name || item.employee_name || (item.employee_names ? item.employee_names.join(", ") : "");
-                      const rate = item.unit_price || item.rate || (item.price || 0);
-                      const qty = item.quantity || item.qty || 1;
-                      const amount = item.line_total || item.total || (rate * qty);
+            return (
+              <div className="space-y-3">
+                {/* SERVICES SECTION */}
+                {serviceItems.length > 0 && (
+                  <div>
+                    <div className="font-bold uppercase border-b border-dashed border-slate-300 pb-0.5 mb-1 text-black flex justify-between">
+                      <span className="w-2/3">SERVICES</span>
+                      <span className="w-1/3 text-right">AMT</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {serviceItems.map((item, idx) => {
+                        const isFreeReward = item.is_free_reward || item.is_free_visit_reward || (item.discount > 0 && item.line_total === 0);
+                        const itemName = (item.item_name || item.name || item.service_name || `Service #${idx + 1}`).toUpperCase();
+                        const staffName = item.staff_name || item.employee_name || (item.employee_names ? item.employee_names.join(", ") : "");
+                        const rate = item.unit_price || item.rate || (item.price || 0);
+                        const qty = item.quantity || item.qty || 1;
+                        const amount = item.line_total || item.total || (rate * qty);
 
-                      return (
-                        <div key={idx} className="space-y-0.5 text-black">
-                          <div className="flex justify-between items-start font-bold">
-                            <span className="w-2/3 break-words leading-tight">
-                              {itemName}
-                              {isFreeReward && (
-                                <span className="block text-[10px] text-black font-extrabold italic">
-                                  🎁 Membership Reward Claimed: FREE
-                                </span>
-                              )}
-                            </span>
-                            <span className="w-1/3 text-right font-extrabold">
-                              {isFreeReward ? "FREE" : formatCurrency(amount)}
-                            </span>
+                        return (
+                          <div key={idx} className="space-y-0.5 text-black">
+                            <div className="flex justify-between items-start font-bold">
+                              <span className="w-2/3 break-words leading-tight">
+                                {itemName}
+                                {isFreeReward && (
+                                  <span className="block text-[10px] text-black font-extrabold italic">
+                                    🎁 Membership Reward Claimed: FREE
+                                  </span>
+                                )}
+                              </span>
+                              <span className="w-1/3 text-right font-extrabold">
+                                {isFreeReward ? "FREE" : formatCurrency(amount)}
+                              </span>
+                            </div>
+                            {(showQty || showRate || staffName) && (
+                              <div className="text-[11px] text-black space-x-2">
+                                {showQty && <span>Qty: {qty}</span>}
+                                {showRate && <span>Rate: {formatCurrency(rate)}</span>}
+                                {staffName && <span className="italic">Staff: {staffName}</span>}
+                              </div>
+                            )}
+                            {item.discount > 0 && !isFreeReward && (
+                              <div className="text-[11px] text-black">
+                                Disc: -{formatCurrency(item.discount)}
+                              </div>
+                            )}
                           </div>
-                          {(showQty || showRate || staffName) && (
-                            <div className="text-[11px] text-black space-x-2">
-                              {showQty && <span>Qty: {qty}</span>}
-                              {showRate && <span>Rate: {formatCurrency(rate)}</span>}
-                              {staffName && <span className="italic">Staff: {staffName}</span>}
-                            </div>
-                          )}
-                          {item.discount > 0 && !isFreeReward && (
-                            <div className="text-[11px] text-black">
-                              Disc: -{formatCurrency(item.discount)}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* PRODUCTS SECTION */}
-              {productItems.length > 0 && (
-                <div>
-                  <div className="font-bold uppercase border-b border-dashed border-slate-300 pb-0.5 mb-1 text-black flex justify-between">
-                    <span className="w-2/3 text-left">PRODUCTS</span>
-                    <span className="w-1/3 text-right">AMT</span>
-                  </div>
-                  <div className="space-y-1.5">
-                    {productItems.map((item, idx) => {
-                      const itemName = (item.item_name || item.name || item.product_name || `Product #${idx + 1}`).toUpperCase();
-                      const qty = item.quantity || item.qty || 1;
-                      const rate = item.unit_price || item.rate || (item.price || 0);
-                      const mrp = item.mrp || item.unit_price || item.rate || (item.price || 0);
-                      const amount = item.line_total || item.total || (rate * qty);
+                {/* PRODUCTS SECTION */}
+                {productItems.length > 0 && (
+                  <div>
+                    <div className="font-bold uppercase border-b border-dashed border-slate-300 pb-0.5 mb-1 text-black flex justify-between">
+                      <span className="w-2/3 text-left">PRODUCTS</span>
+                      <span className="w-1/3 text-right">AMT</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {productItems.map((item, idx) => {
+                        const itemName = (item.item_name || item.name || item.product_name || `Product #${idx + 1}`).toUpperCase();
+                        const qty = item.quantity || item.qty || 1;
+                        const rate = item.unit_price || item.rate || (item.price || 0);
+                        const mrp = item.mrp || item.unit_price || item.rate || (item.price || 0);
+                        const amount = item.line_total || item.total || (rate * qty);
 
-                      return (
-                        <div key={idx} className="space-y-0.5 text-black">
-                          <div className="flex justify-between items-start">
-                            <span className="w-2/3 break-words leading-tight font-bold">{itemName}</span>
-                            <span className="w-1/3 text-right font-extrabold">{formatCurrency(amount)}</span>
+                        return (
+                          <div key={idx} className="space-y-0.5 text-black">
+                            <div className="flex justify-between items-start">
+                              <span className="w-2/3 break-words leading-tight font-bold">{itemName}</span>
+                              <span className="w-1/3 text-right font-extrabold">{formatCurrency(amount)}</span>
+                            </div>
+                            {(showQty || showRate || showMrp) && (
+                              <div className="text-[11px] text-black space-x-2">
+                                {showQty && <span>Qty: {qty}</span>}
+                                {showRate && <span>Rate: {formatCurrency(rate)}</span>}
+                                {showMrp && <span>MRP: {formatCurrency(mrp)}</span>}
+                              </div>
+                            )}
+                            {item.discount > 0 && (
+                              <div className="text-[11px] text-black text-right">
+                                Disc: -{formatCurrency(item.discount)}
+                              </div>
+                            )}
                           </div>
-                          {(showQty || showRate || showMrp) && (
-                            <div className="text-[11px] text-black space-x-2">
-                              {showQty && <span>Qty: {qty}</span>}
-                              {showRate && <span>Rate: {formatCurrency(rate)}</span>}
-                              {showMrp && <span>MRP: {formatCurrency(mrp)}</span>}
-                            </div>
-                          )}
-                          {item.discount > 0 && (
-                            <div className="text-[11px] text-black text-right">
-                              Disc: -{formatCurrency(item.discount)}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          );
-        })()}
-      </div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* SEPARATOR 3 */}
       <div className="border-b border-dashed border-slate-300 my-1.5" />

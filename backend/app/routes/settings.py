@@ -163,9 +163,6 @@ def update_settings():
     try:
         # Update Business Profile across tenant setting rows
         for setting in settings_list:
-            if g.role == "ParlourAdmin" and tenant and biz.get("name"):
-                tenant.name = biz["name"].strip()
-
             if "logo_url" in biz and g.role == "ParlourAdmin":
                 setting.logo_url = biz.get("logo_url")
 
@@ -272,6 +269,19 @@ def update_settings():
                     setting.accent_color = thm["accent_color"].strip()
 
         db.session.commit()
+
+        # Update Tenant Name in master DB separately
+        if g.role == "ParlourAdmin" and biz.get("name"):
+            try:
+                g.use_master_db = True
+                t_master = Tenant.query.get(g.parlour_id)
+                if t_master:
+                    t_master.name = biz["name"].strip()
+                    db.session.commit()
+            except Exception as t_err:
+                logger.error(f"Failed to update tenant master name: {t_err}")
+            finally:
+                g.use_master_db = False
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to update tenant settings: {str(e)}")

@@ -71,13 +71,13 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
   const { t } = useLanguageCurrency();
   const sidebarRef = useRef(null);
 
-  // Desktop Collapsed State from localStorage
+  // Desktop Collapsed State from localStorage (defaults to true / collapsed on sign in)
   const [isCollapsed, setIsCollapsed] = useState(() => {
     try {
       const saved = localStorage.getItem("sidebar_collapsed");
-      return saved !== null ? JSON.parse(saved) : false;
+      return saved !== null ? JSON.parse(saved) : true;
     } catch (e) {
-      return false;
+      return true;
     }
   });
 
@@ -304,15 +304,6 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
               </div>
             </div>
           )}
-
-          {/* Toggle Expand/Collapse Button */}
-          <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="hidden md:flex p-1.5 rounded-xl hover:bg-background text-text-secondary hover:text-text-primary border border-border-soft transition shrink-0 ml-1"
-            title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-          >
-            {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-          </button>
         </div>
 
         {/* Navigation Items */}

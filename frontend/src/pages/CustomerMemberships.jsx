@@ -70,12 +70,19 @@ function CustomerMemberships() {
 
   // Fetch receipt/business settings for thermal bill printing
   const fetchReceiptContext = () => {
-    API.get("/settings/receipt")
-      .then((res) => setReceiptSettings(res.data))
-      .catch(() => {});
-    API.get("/settings/profile")
-      .then((res) => setBusinessProfile(res.data))
-      .catch(() => {});
+    API.get("/settings")
+      .then((res) => {
+        const data = res.data?.data || res.data;
+        if (data) {
+          if (data.receipt_settings) {
+            setReceiptSettings(data.receipt_settings);
+          }
+          if (data.business_profile) {
+            setBusinessProfile(data.business_profile);
+          }
+        }
+      })
+      .catch((err) => console.error("Failed to load receipt context in CustomerMemberships:", err));
   };
 
   // Fetch initial collections
@@ -569,6 +576,7 @@ function CustomerMemberships() {
                 <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Customer</th>
                 <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Mobile</th>
                 <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Membership Plan</th>
+                <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Invoice #</th>
                 <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Status</th>
                 <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Expiry Date</th>
                 <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Actions</th>
@@ -585,7 +593,7 @@ function CustomerMemberships() {
                 if (filteredMemberships.length === 0) {
                   return (
                     <tr>
-                      <td colSpan="6" className="px-6 py-8 text-center text-xs text-text-secondary">
+                      <td colSpan="7" className="px-6 py-8 text-center text-xs text-text-secondary">
                         No assigned memberships found for status "{statusFilter}".
                       </td>
                     </tr>
@@ -602,6 +610,15 @@ function CustomerMemberships() {
                     </td>
                     <td className="px-6 py-4 text-xs text-text-secondary font-semibold">
                       {m.plan_name}
+                    </td>
+                    <td className="px-6 py-4 text-xs">
+                      {m.invoice_number ? (
+                        <span className="font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded text-[11px]">
+                          {m.invoice_number}
+                        </span>
+                      ) : (
+                        <span className="text-text-secondary text-[11px]">—</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-xs">
                       <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${
@@ -628,6 +645,14 @@ function CustomerMemberships() {
                       >
                         View
                       </button>
+                      {m.invoice_id && (
+                        <button
+                          onClick={() => openBillPreviewModalForInvoice(m.invoice_id)}
+                          className="text-emerald-700 hover:underline font-semibold"
+                        >
+                          View Bill
+                        </button>
+                      )}
                       {m.status === "active" && (
                         <>
                           <button
@@ -1062,13 +1087,15 @@ function CustomerMemberships() {
             {/* Receipt Content Container */}
             <div className="p-6 bg-slate-100 flex justify-center max-h-[60vh] overflow-y-auto">
               <ThermalReceipt
-                invoiceResult={completedInvoice}
-                receiptSettings={receiptSettings}
-                businessProfile={businessProfile}
+                invoice={completedInvoice}
+                settings={receiptSettings || {}}
+                businessProfile={businessProfile || {}}
+                hideLoyaltyStatus={true}
+                hideLineItems={true}
               />
             </div>
 
-            {/* Quick Distribution & Printing Actions */}
+            {/* Quick Distribution, Printing & Save Actions */}
             <div className="p-6 bg-white border-t border-slate-200 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <button
@@ -1113,6 +1140,20 @@ function CustomerMemberships() {
                 >
                   <MessageSquare className="w-3.5 h-3.5 text-slate-600" />
                   <span>Send SMS Bill</span>
+                </button>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100">
+                <button
+                  onClick={() => {
+                    setShowReceiptModal(false);
+                    fetchAllMemberships();
+                    showSuccess("Membership bill transaction saved & completed into history!");
+                  }}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl text-sm transition shadow-md flex items-center justify-center space-x-2"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Save & Complete</span>
                 </button>
               </div>
             </div>

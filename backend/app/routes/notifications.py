@@ -81,11 +81,18 @@ def check_and_generate_expiry_notifications(target_tenant_id=None):
             # Load details for notification payload
             customer = db.session.get(Customer, m.customer_id)
             plan = db.session.get(MembershipPlan, m.membership_plan_id)
-            tenant = db.session.get(Tenant, m.tenant_id)
-
             cust_name = f"{customer.first_name} {customer.last_name or ''}".strip() if customer else "Customer"
             plan_name = plan.name if plan else "Membership Plan"
-            salon_name = tenant.name if tenant else "Salon"
+            salon_name = "Salon"
+            try:
+                from app.models.global_models import master_engine
+                from sqlalchemy.orm import Session
+                with Session(master_engine) as m_session:
+                    tenant = m_session.get(Tenant, m.tenant_id)
+                    if tenant:
+                        salon_name = tenant.name
+            except Exception:
+                pass
 
             if stage == "expired":
                 message = f"Customer {cust_name}'s {plan_name} membership has expired on {exp_date.strftime('%d %b %Y')}."
@@ -164,8 +171,16 @@ def check_and_generate_inactive_customer_notifications(target_tenant_id=None):
             return 0
 
         created_count = 0
-        tenant = db.session.get(Tenant, target_tenant_id)
-        salon_name = tenant.name if tenant else "Salon"
+        salon_name = "Salon"
+        try:
+            from app.models.global_models import master_engine
+            from sqlalchemy.orm import Session
+            with Session(master_engine) as m_session:
+                tenant = m_session.get(Tenant, target_tenant_id)
+                if tenant:
+                    salon_name = tenant.name
+        except Exception:
+            pass
 
         for c, latest_created_at in inactive_records:
             last_date = latest_created_at.date() if isinstance(latest_created_at, datetime) else latest_created_at

@@ -52,6 +52,7 @@ class TenantSetting(db.Model, TimestampMixin):
     invoice_prefix = db.Column(db.String(20), nullable=False, default="INV")
     tax_name = db.Column(db.String(50), nullable=False, default="GST")
     tax_rate = db.Column(db.Numeric(5, 2), nullable=False, default=18.00)
+    enable_membership_tax = db.Column(db.Boolean, nullable=False, default=False)
     receipt_header = db.Column(db.Text, nullable=True)
     receipt_footer = db.Column(db.Text, nullable=True)
     terms_and_conditions = db.Column(db.Text, nullable=True)

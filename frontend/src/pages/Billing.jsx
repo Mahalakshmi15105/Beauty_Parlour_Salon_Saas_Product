@@ -990,6 +990,7 @@ function Billing() {
   const getMembershipDiscountForService = (serviceObj, activeMem) => {
     if (!useMembership || !activeMem || activeMem.isDayRestricted) return 0;
     const planId = activeMem.membership_plan_id || activeMem.plan_id;
+    const targetServiceId = parseInt(serviceObj.id || serviceObj.item_id);
 
     // 1. Check if serviceObj has specific mapped membership discounts
     const discounts = serviceObj?.membership_discounts || [];
@@ -1006,19 +1007,33 @@ function Billing() {
       }
     }
 
-    // 2. Check activeMem plan-level service_discount_percentage (e.g. 10%, 20%, 50%)
+    // 2. Check if activeMem has service-level discounts array (e.g. from customer history)
+    if (activeMem.plan_services && Array.isArray(activeMem.plan_services)) {
+      const match = activeMem.plan_services.find((ps) => parseInt(ps.service_id) === targetServiceId);
+      if (match) {
+        if (match.discount_percentage && parseFloat(match.discount_percentage) > 0) {
+          return parseFloat(match.discount_percentage);
+        }
+        if (match.discount_amount && parseFloat(match.discount_amount) > 0 && (serviceObj.price || serviceObj.rate)) {
+          const price = parseFloat(serviceObj.price || serviceObj.rate || 1);
+          return (parseFloat(match.discount_amount) / price) * 100;
+        }
+      }
+    }
+
+    // 3. Check activeMem plan-level service_discount_percentage (e.g. 10%, 20%, 50%)
     if (activeMem.service_discount_percentage !== undefined && activeMem.service_discount_percentage !== null) {
       const planPercent = parseFloat(activeMem.service_discount_percentage);
       if (planPercent > 0) {
         const eligibleList = activeMem.eligible_services || activeMem.plan?.eligible_services || [];
-        const isEligible = !eligibleList.length || eligibleList.includes(serviceObj.id) || eligibleList.includes(String(serviceObj.id));
+        const isEligible = !eligibleList.length || eligibleList.includes(targetServiceId) || eligibleList.includes(String(targetServiceId));
         if (isEligible) {
           return planPercent;
         }
       }
     }
 
-    // 3. Fallback check on activeMem.discount_percentage
+    // 4. Fallback check on activeMem.discount_percentage
     if (activeMem.discount_percentage && parseFloat(activeMem.discount_percentage) > 0) {
       return parseFloat(activeMem.discount_percentage);
     }
@@ -1040,10 +1055,10 @@ function Billing() {
       prevCart.map((item) => {
         let calcDiscount = 0;
         if (item.type === "service") {
-          const svcObj = services.find((s) => s.id === item.item_id || s.id === item.id);
+          const svcObj = services.find((s) => s.id === parseInt(item.item_id || item.id));
           calcDiscount = svcObj ? getMembershipDiscountForService(svcObj, activeMembership) : (useMembership && activeMembership ? parseFloat(activeMembership.service_discount_percentage || 0) : 0);
         } else if (item.type === "product") {
-          const prodObj = products.find((p) => p.id === item.item_id || p.id === item.id);
+          const prodObj = products.find((p) => p.id === parseInt(item.item_id || item.id));
           calcDiscount = prodObj ? getMembershipDiscountForProduct(prodObj, activeMembership) : (useMembership && activeMembership ? parseFloat(activeMembership.product_discount_percentage || 0) : 0);
         }
         return {

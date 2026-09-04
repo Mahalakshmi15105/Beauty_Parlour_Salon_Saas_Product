@@ -36,17 +36,22 @@ function Notifications({ setActiveTab, setCustomerMembershipsCustomerFilter, set
     const unreadOnly = activeFilterTab === "unread" ? "true" : "false";
     const type = activeFilterTab !== "all" && activeFilterTab !== "unread" ? activeFilterTab : "all";
 
-    API.get(`/notifications?unread_only=${unreadOnly}&type=${type}&limit=50`)
-      .then((res) => {
-        const data = res.data.data || res.data;
-        setNotifications(data.items || []);
-        setUnreadCount(data.unread_count || 0);
-        setTotalCount(data.total_count || 0);
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError(err.response?.data?.message || err.message || "Failed to load notifications.");
-        setLoading(false);
+    // Auto-trigger scan first to make sure expiries & inactive customer alerts are generated
+    API.post("/notifications/check-expiries")
+      .catch(() => {})
+      .finally(() => {
+        API.get(`/notifications?unread_only=${unreadOnly}&type=${type}&limit=50`)
+          .then((res) => {
+            const data = res.data.data || res.data;
+            setNotifications(data.items || []);
+            setUnreadCount(data.unread_count || 0);
+            setTotalCount(data.total_count || 0);
+            setLoading(false);
+          })
+          .catch((err) => {
+            setError(err.response?.data?.message || err.message || "Failed to load notifications.");
+            setLoading(false);
+          });
       });
   };
 

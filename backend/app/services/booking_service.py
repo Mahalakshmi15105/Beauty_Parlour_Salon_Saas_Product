@@ -208,7 +208,14 @@ class BookingService:
         Enforces tenant and branch boundaries for appointments, customers, and employees.
         """
         try:
-            tenant = Tenant.query.filter_by(id=tenant_id, is_deleted=False).first()
+            from flask import g
+            was_master = getattr(g, "use_master_db", False)
+            try:
+                g.use_master_db = True
+                tenant = Tenant.query.filter_by(id=tenant_id, is_deleted=False).first()
+            finally:
+                g.use_master_db = was_master
+
             if not tenant or tenant.status != "active":
                 return False, {"error_code": "INVALID_TENANT", "message": "The associated beauty parlour account is inactive or not found."}, 400
 

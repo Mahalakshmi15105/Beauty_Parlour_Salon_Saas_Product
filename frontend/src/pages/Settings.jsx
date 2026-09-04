@@ -367,13 +367,15 @@ function Settings() {
             Manage business profile, thermal receipt templates, tax rules, themes, regional settings, and system configurations
           </p>
         </div>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="bg-primary hover:bg-primary-hover text-white px-5 py-2 rounded-lg text-sm font-semibold transition flex items-center space-x-2 shadow-sm disabled:opacity-50"
-        >
-          {saving ? <span>Saving Changes...</span> : <span>{t("save_settings")}</span>}
-        </button>
+        {activeTab !== "membership" && (
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="bg-primary hover:bg-primary-hover text-white px-5 py-2 rounded-lg text-sm font-semibold transition flex items-center space-x-2 shadow-sm disabled:opacity-50"
+          >
+            {saving ? <span>Saving Changes...</span> : <span>{t("save_settings")}</span>}
+          </button>
+        )}
       </div>
 
       {error && (
@@ -1269,6 +1271,25 @@ function Settings() {
                     className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
                   />
                 </div>
+              </div>
+
+              {/* Membership Tax Enable Checkbox */}
+              <div className="p-4 bg-background/50 border border-border-soft rounded-xl flex items-center justify-between">
+                <div>
+                  <label className="text-xs font-bold text-slate-800 block">Apply Tax / GST on Membership Purchases</label>
+                  <p className="text-[11px] text-text-secondary">When checked, GST tax rate will be added to Membership plan purchases. Uncheck to make membership bills tax-free.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={Boolean(settingsData.invoice_settings.enable_membership_tax)}
+                  onChange={(e) =>
+                    setSettingsData({
+                      ...settingsData,
+                      invoice_settings: { ...settingsData.invoice_settings, enable_membership_tax: e.target.checked },
+                    })
+                  }
+                  className="w-5 h-5 text-primary rounded border-border-soft focus:ring-primary"
+                />
               </div>
 
               <div>

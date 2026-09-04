@@ -379,7 +379,9 @@ def get_invoices():
     cursor = request.args.get("cursor")
     sort = request.args.get("sort", "-created_at")
 
-    query = get_branch_query(Invoice)
+    query = get_branch_query(Invoice).filter(
+        (Invoice.membership_name.is_(None)) | (Invoice.membership_name == "")
+    )
 
     sort_field = "id"
     sort_desc = False

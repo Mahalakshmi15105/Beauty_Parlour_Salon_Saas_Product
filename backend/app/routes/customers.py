@@ -552,6 +552,15 @@ def get_customer_history(customer_id):
                 "remaining_quantity": b.remaining_quantity
             })
 
+        plan_services = []
+        if m.plan and m.plan.eligible_services:
+            for es in m.plan.eligible_services:
+                plan_services.append({
+                    "service_id": es.service_id,
+                    "discount_percentage": float(es.discount_percentage or 0.0),
+                    "discount_amount": float(es.discount_amount or 0.0)
+                })
+
         memberships_data.append({
             "id": m.id,
             "membership_plan_id": m.membership_plan_id,
@@ -561,8 +570,10 @@ def get_customer_history(customer_id):
             "expiry_date": m.expires_at.strftime("%Y-%m-%d") if m.expires_at else "N/A",
             "status": m.status,
             "service_discount_percentage": float(m.plan.service_discount_percentage) if m.plan else 0.0,
+            "product_discount_percentage": float(m.plan.product_discount_percentage) if m.plan else 0.0,
             "day_restrictions": json.loads(m.plan.day_restrictions) if (m.plan and m.plan.day_restrictions) else [],
             "eligible_services": [es.service_id for es in m.plan.eligible_services] if m.plan else [],
+            "plan_services": plan_services,
             "benefits": benefits
         })
 

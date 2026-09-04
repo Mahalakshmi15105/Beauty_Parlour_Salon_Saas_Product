@@ -375,7 +375,8 @@ def assign_membership():
     if not settings:
         settings = TenantSetting.query.filter_by(tenant_id=g.parlour_id, branch_id=None).first()
     
-    tax_rate = Decimal(str(settings.tax_rate)) if settings and settings.tax_rate else Decimal("0.00")
+    enable_tax = bool(getattr(settings, "enable_membership_tax", False))
+    tax_rate = Decimal(str(settings.tax_rate)) if (settings and settings.tax_rate and enable_tax) else Decimal("0.00")
     calculated_tax = round(plan_price * (tax_rate / Decimal("100.00")), 2) if tax_rate > 0 else Decimal("0.00")
     grand_total = plan_price + calculated_tax
 
@@ -468,6 +469,7 @@ def assign_membership():
 
     return success_response({
         "membership_id": cm.id, 
+        "invoice_id": invoice.id,
         "expires_at": cm.expires_at.isoformat(),
         "invoice_number": invoice.invoice_number,
         "total_amount": float(grand_total)
@@ -580,6 +582,7 @@ def renew_membership(cm_id):
     return success_response({
         "message": "Membership renewed successfully.", 
         "new_expiry": cm.expires_at.isoformat(),
+        "invoice_id": invoice.id,
         "invoice_number": invoice.invoice_number,
         "total_amount": float(grand_total)
     })
@@ -714,6 +717,13 @@ def get_all_memberships():
                 "remaining_quantity": b.remaining_quantity
             })
             
+        from app.models.billing import Invoice
+        inv = Invoice.query.filter_by(
+            customer_id=cm.customer_id, 
+            tenant_id=g.parlour_id, 
+            membership_name=cm.plan.name if cm.plan else None
+        ).order_by(Invoice.id.desc()).first()
+
         results.append({
             "id": cm.id,
             "customer_id": cm.customer_id,
@@ -725,6 +735,10 @@ def get_all_memberships():
             "expires_at": cm.expires_at.isoformat(),
             "status": cm.status,
             "renew_count": getattr(cm, "renew_count", 0) or 0,
+            "invoice_id": inv.id if inv else None,
+            "invoice_number": inv.invoice_number if inv else None,
+            "invoice_total": float(inv.total) if inv else float(cm.plan.price) if cm.plan and cm.plan.price else 0.0,
+            "invoice_date": inv.created_at.isoformat() if inv else cm.created_at.isoformat(),
             "benefits": benefits
         })
     return success_response(results)
