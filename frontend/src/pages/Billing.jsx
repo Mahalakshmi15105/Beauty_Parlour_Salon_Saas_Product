@@ -1078,6 +1078,12 @@ function Billing() {
 
     const initialDiscount = getMembershipDiscountForService(serviceObj, activeMembership);
 
+    if (useMembership && activeMembership && initialDiscount === 0) {
+      const custName = customerSearchQuery && customerSearchQuery !== "Walk-in Customer" ? customerSearchQuery.split("(")[0].trim() : "Customer";
+      const planName = activeMembership.plan_name || activeMembership.name || "Membership";
+      showError(`"${serviceObj.name}" is not included in ${custName}'s ${planName} plan.`);
+    }
+
     setCart((prevCart) => {
       const existingIndex = prevCart.findIndex(
         (item) => item.type === "service" && item.item_id === serviceObj.id
@@ -2003,7 +2009,7 @@ function Billing() {
                     ];
 
                     return (
-                      <div className="absolute left-0 right-0 top-full mt-1 bg-surface border border-border-soft rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto text-xs">
+                      <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-pink-200 rounded-2xl shadow-2xl z-[100] max-h-64 overflow-y-auto text-xs p-2 space-y-1">
                         {options.map((opt, idx) => {
                           const isHighlighted = idx === customerHighlightedIndex;
 
@@ -2018,15 +2024,15 @@ function Billing() {
                                   setIsCustomerDropdownOpen(false);
                                   setTimeout(() => advanceAndOpenSelect(customerSelectRef.current, categorySelectRef), 50);
                                 }}
-                                className={`w-full text-left px-4 py-2.5 flex items-center justify-between border-b border-border-soft font-bold ${
-                                  isHighlighted ? "bg-pink-100 text-primary border-l-4 border-primary" : "hover:bg-primary-light/50 text-primary"
+                                className={`w-full text-left px-4 py-3 flex items-center justify-between rounded-xl font-extrabold transition ${
+                                  isHighlighted ? "bg-pink-100 text-pink-900 border border-pink-300 shadow-xs" : "bg-pink-50 text-pink-800 border border-pink-100 hover:bg-pink-100"
                                 }`}
                               >
-                                <span className="flex items-center space-x-1.5">
-                                  <User className="w-3.5 h-3.5 text-primary" />
-                                  <span>Walk-in Customer</span>
+                                <span className="flex items-center space-x-2">
+                                  <User className="w-4 h-4 text-pink-600" />
+                                  <span className="text-slate-900 font-black">Walk-In Customer</span>
                                 </span>
-                                <span className="text-[10px] bg-primary-light text-primary px-2 py-0.5 rounded-full font-bold">Default</span>
+                                <span className="text-[10px] bg-white text-pink-700 border border-pink-200 px-2.5 py-0.5 rounded-full font-bold">Default</span>
                               </button>
                             );
                           }
@@ -2043,17 +2049,17 @@ function Billing() {
                                   setIsCustomerDropdownOpen(false);
                                   setTimeout(() => advanceAndOpenSelect(customerSelectRef.current, categorySelectRef), 50);
                                 }}
-                                className={`w-full text-left px-4 py-2 flex items-center justify-between border-b border-border-soft/40 ${
-                                  isHighlighted ? "bg-pink-100 text-slate-900 border-l-4 border-primary" : "hover:bg-background"
+                                className={`w-full text-left px-4 py-2.5 flex items-center justify-between rounded-xl transition border ${
+                                  isHighlighted ? "bg-pink-50 border-pink-300 text-slate-900 font-bold shadow-xs" : "bg-white border-slate-100 hover:bg-slate-50 text-slate-800"
                                 }`}
                               >
                                 <div>
-                                  <span className="font-semibold text-slate-900">{c.first_name} {c.last_name || ""}</span>
-                                  <span className="text-slate-500 text-[11px] block">{c.phone || "No Mobile"}</span>
+                                  <span className="font-black text-slate-900 block text-xs">{c.first_name} {c.last_name || ""}</span>
+                                  <span className="text-slate-700 font-bold text-[11px] block mt-0.5">{c.phone || "No Mobile"}</span>
                                 </div>
                                 {selectedCustomerId === String(c.id) && (
-                                  <span className="text-primary font-bold flex items-center space-x-1">
-                                    <Check className="w-3.5 h-3.5" />
+                                  <span className="text-pink-700 font-bold text-[11px] flex items-center space-x-1 bg-pink-50 px-2 py-0.5 rounded-full border border-pink-200">
+                                    <Check className="w-3.5 h-3.5 text-pink-600" />
                                     <span>Selected</span>
                                   </span>
                                 )}
@@ -2067,11 +2073,11 @@ function Billing() {
                                 key="add_new"
                                 type="button"
                                 onClick={() => openQuickAddCustomer(customerSearchQuery !== "Walk-in Customer" ? customerSearchQuery : "")}
-                                className={`w-full text-left px-4 py-2.5 text-primary font-extrabold flex items-center space-x-2 ${
-                                  isHighlighted ? "bg-pink-100 border-l-4 border-primary" : "bg-primary/5 hover:bg-primary/10"
+                                className={`w-full text-left px-4 py-3 text-pink-800 font-extrabold flex items-center space-x-2 rounded-xl transition border border-pink-200 ${
+                                  isHighlighted ? "bg-pink-100 shadow-xs" : "bg-pink-50 hover:bg-pink-100"
                                 }`}
                               >
-                                <Plus className="w-3.5 h-3.5" />
+                                <Plus className="w-4 h-4 text-pink-600" />
                                 <span>
                                   Add New Customer {customerSearchQuery && customerSearchQuery !== "Walk-in Customer" ? `"${customerSearchQuery}"` : ""}
                                 </span>

@@ -10,79 +10,41 @@ const getTenantKey = (key) => {
 
 export const THEMES = {
   light: {
-    name: 'Sunlight',
+    name: 'Glowe Sunlight',
     icon: 'sun',
     colors: {
-      background: '#FAFAFC',
-      surface: '#FFFFFF',
-      sidebar: '#FFFFFF',
-      navbar: '#FFFFFF',
-      card: '#FFFFFF',
-      border: '#ECECEC',
+      background: '#FFF7F2',
+      surface: 'rgba(255, 255, 255, 0.85)',
+      sidebar: 'rgba(255, 240, 235, 0.75)',
+      navbar: 'rgba(255, 255, 255, 0.85)',
+      card: 'rgba(255, 255, 255, 0.9)',
+      border: 'rgba(255, 220, 215, 0.6)',
       inputBg: '#FFFFFF',
-      inputBorder: '#ECECEC',
-      hoverBg: '#F4F4F6',
-      accent: '#FDF2F8',
-      primary: '#EC4899',
-      primaryHover: '#DB2777',
-      primaryLight: '#FDF2F8',
-      primaryBorderSoft: 'rgba(236, 72, 153, 0.18)',
-      textPrimary: '#0F172A',
-      textSecondary: '#64748B',
-      borderSoft: '#ECECEC',
+      inputBorder: '#FFD8E1',
+      hoverBg: '#FFF0F3',
+      accent: '#FF758F',
+      primary: '#FF758F',
+      primaryHover: '#FF4D6D',
+      primaryLight: '#FFF0F3',
+      primaryBorderSoft: 'rgba(255, 117, 143, 0.2)',
+      textPrimary: '#4A2E35',
+      textSecondary: '#8C6A75',
+      borderSoft: 'rgba(255, 117, 143, 0.15)',
       goldAccent: '#D4AF37',
-      goldLight: '#FEF3C7',
+      goldLight: '#FFF8E7',
       success: '#10B981',
       warning: '#F59E0B',
       danger: '#F43F5E',
     },
     chartColors: {
-      primary: '#EC4899',
-      secondary: '#F472B6',
+      primary: '#FF758F',
+      secondary: '#FF9EAA',
       tertiary: '#10B981',
       quaternary: '#F59E0B',
-      quinary: '#64748B',
+      quinary: '#8C6A75',
       background: '#FFFFFF',
-      grid: '#ECECEC',
-      text: '#0F172A',
-    }
-  },
-  dark: {
-    name: 'Starlight',
-    icon: 'moon',
-    colors: {
-      background: '#0F172A',
-      surface: '#1E293B',
-      sidebar: '#1E293B',
-      navbar: '#1E293B',
-      card: '#1E293B',
-      border: '#334155',
-      inputBg: '#0F172A',
-      inputBorder: '#334155',
-      hoverBg: '#334155',
-      accent: '#1E1B4B',
-      primary: '#EC4899',
-      primaryHover: '#DB2777',
-      primaryLight: 'rgba(236, 72, 153, 0.15)',
-      primaryBorderSoft: 'rgba(236, 72, 153, 0.3)',
-      textPrimary: '#F8FAFC',
-      textSecondary: '#94A3B8',
-      borderSoft: '#334155',
-      goldAccent: '#F59E0B',
-      goldLight: 'rgba(245, 158, 11, 0.15)',
-      success: '#10B981',
-      warning: '#F59E0B',
-      danger: '#F43F5E',
-    },
-    chartColors: {
-      primary: '#EC4899',
-      secondary: '#F472B6',
-      tertiary: '#38BDF8',
-      quaternary: '#F59E0B',
-      quinary: '#10B981',
-      background: '#1E293B',
-      grid: '#334155',
-      text: '#F8FAFC',
+      grid: '#FFEBEF',
+      text: '#4A2E35',
     }
   }
 };
@@ -90,7 +52,7 @@ export const THEMES = {
 export const DEFAULT_THEME = 'light';
 
 export function getTheme(themeId) {
-  return THEMES[themeId] || THEMES[DEFAULT_THEME];
+  return THEMES['light'];
 }
 
 export function applyTheme(themeId, accentColorOverride = null) {

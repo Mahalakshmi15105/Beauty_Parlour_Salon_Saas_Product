@@ -1,41 +1,91 @@
 @import "tailwindcss";
 
 :root {
-  --color-primary: #EC4899;
-  --color-primary-hover: #DB2777;
-  --color-primary-light: #FDF2F8;
-  --color-primary-border-soft: rgba(236, 72, 153, 0.18);
+  --color-primary: #FF758F;
+  --color-primary-hover: #FF4D6D;
+  --color-primary-light: #FFF0F3;
+  --color-primary-border-soft: rgba(255, 117, 143, 0.2);
 
   --color-gold-accent: #D4AF37;
-  --color-gold-light: #FEF3C7;
+  --color-gold-light: #FFF8E7;
 
   --color-success: #10B981;
   --color-warning: #F59E0B;
   --color-danger: #F43F5E;
   
-  --color-background: #FDFBFD;
+  --color-background: #FFF7F2;
   --color-surface: #FFFFFF;
-  --color-sidebar: #FFFFFF;
-  --color-navbar: #FFFFFF;
-  --color-card: #FFFFFF;
-  --color-border: #E2E8F0;
+  --color-sidebar: rgba(255, 240, 235, 0.75);
+  --color-navbar: rgba(255, 255, 255, 0.85);
+  --color-card: rgba(255, 255, 255, 0.9);
+  --color-border: rgba(255, 220, 215, 0.6);
   --color-input-bg: #FFFFFF;
-  --color-input-border: #E2E8F0;
-  --color-hover-bg: #F1F5F9;
-  --color-accent: #8B5CF6;
+  --color-input-border: #FFD8E1;
+  --color-hover-bg: #FFF0F3;
+  --color-accent: #FF758F;
   
-  --color-text-primary: #0F172A;
-  --color-text-secondary: #64748B;
-  --color-border-soft: rgba(0, 0, 0, 0.1);
+  --color-text-primary: #4A2E35;
+  --color-text-secondary: #8C6A75;
+  --color-border-soft: rgba(255, 117, 143, 0.15);
 }
 
-/* Dynamic CSS Variable Driven Design System Utilities */
-.bg-primary { background-color: var(--color-primary) !important; }
+/* Glowe Theme Utility Classes & Glassmorphism Aesthetics */
+.glowe-bg-gradient {
+  background: linear-gradient(135deg, #FFF0F5 0%, #FFF6EC 50%, #E8F4FE 100%) !important;
+}
+
+.glowe-sidebar-gradient {
+  background: linear-gradient(180deg, #FFEBEF 0%, #FFF3E6 60%, #FFEBF0 100%) !important;
+}
+
+.glowe-glass-card {
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(16px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.8) !important;
+  box-shadow: 0 10px 30px -5px rgba(255, 182, 193, 0.25), 0 4px 12px -2px rgba(220, 150, 160, 0.12) !important;
+  border-radius: 1.5rem !important;
+}
+
+.glowe-pink-gradient {
+  background: linear-gradient(135deg, #FF9EAA 0%, #FF6B8B 100%) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 8px 20px -4px rgba(255, 107, 139, 0.45) !important;
+}
+
+.glowe-pill-active {
+  background: linear-gradient(135deg, #FF9EAA 0%, #FF6B8B 100%) !important;
+  color: #FFFFFF !important;
+  border-radius: 9999px !important;
+  box-shadow: 0 6px 16px -3px rgba(255, 107, 139, 0.4) !important;
+}
+
+.glowe-glow-shadow {
+  box-shadow: 0 10px 28px -6px rgba(255, 182, 193, 0.35), 0 2px 10px -2px rgba(240, 160, 175, 0.15) !important;
+}
+
+/* Dynamic CSS Variable Driven Design System Utilities with Glass Button Aesthetics */
+.bg-primary { 
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%) !important; 
+  box-shadow: 0 6px 18px -4px rgba(255, 117, 143, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important;
+  border-radius: 9999px !important;
+  transition: all 0.2s ease-in-out !important;
+}
+.bg-primary:hover {
+  transform: translateY(-1px) scale(1.01) !important;
+  box-shadow: 0 8px 22px -3px rgba(255, 117, 143, 0.55), inset 0 1px 1px rgba(255, 255, 255, 0.4) !important;
+}
+
 .text-primary { color: var(--color-primary) !important; }
 .border-primary { border-color: var(--color-primary) !important; }
 
-.bg-primary-hover:hover, .hover\:bg-primary-hover:hover { background-color: var(--color-primary-hover) !important; }
-.bg-primary-light { background-color: var(--color-primary-light) !important; }
+.bg-primary-hover:hover, .hover\:bg-primary-hover:hover { 
+  background: linear-gradient(135deg, var(--color-primary-hover) 0%, var(--color-primary) 100%) !important; 
+}
+.bg-primary-light { 
+  background-color: var(--color-primary-light) !important; 
+  border: 1px solid var(--color-primary-border-soft) !important;
+}
 .hover\:bg-primary-light:hover { background-color: var(--color-primary-light) !important; }
 .border-border-soft { border-color: var(--color-primary-border-soft) !important; }
 
@@ -51,12 +101,14 @@
   }
 
   body {
-    background-color: var(--color-background);
+    background: linear-gradient(135deg, #FFF0F5 0%, #FFF6EC 50%, #E8F4FE 100%);
+    background-attachment: fixed;
     color: var(--color-text-primary);
-    font-family: "Inter", system-ui, -apple-system, sans-serif;
+    font-family: "Outfit", "Inter", system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     margin: 0;
     padding: 0;
+    min-height: 100vh;
   }
 
   /* Global Keyboard Focus-Visible & Active Focus Ring Indicator */
@@ -66,8 +118,64 @@
   button:focus-visible,
   [tabindex="0"]:focus-visible {
     outline: none !important;
-    border-color: #EC4899 !important;
-    box-shadow: 0 0 0 3.5px rgba(236, 72, 153, 0.25), 0 2px 8px -2px rgba(236, 72, 153, 0.18) !important;
+    border-color: #FF758F !important;
+    box-shadow: 0 0 0 3.5px rgba(255, 117, 143, 0.25), 0 2px 8px -2px rgba(255, 117, 143, 0.18) !important;
     transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out !important;
+  }
+
+  /* Select Dropdown Open State Visibility & Curved Option Popup Styling */
+  select {
+    border-radius: 0.75rem !important;
+    color: #4A2E35 !important;
+    background-color: #FFFFFF !important;
+  }
+
+  select option {
+    background-color: #FFFFFF !important;
+    color: #1E293B !important;
+    font-weight: 600 !important;
+    padding: 10px 14px !important;
+    border-radius: 0.5rem !important;
+  }
+
+  select option:hover,
+  select option:focus,
+  select option:checked {
+    background: linear-gradient(135deg, #FF758F 0%, #FF4D6D 100%) !important;
+    color: #FFFFFF !important;
+  }
+
+  /* Global Modal & Popover Solid Background & High-Contrast Text Enforcement */
+  .fixed.inset-0 > div,
+  div[role="dialog"],
+  .modal-content,
+  .bg-surface.rounded-2xl,
+  .bg-surface.rounded-3xl,
+  .bg-surface.rounded-xl,
+  .bg-surface.rounded-lg {
+    background-color: #FFFFFF !important;
+    opacity: 1 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 10px 25px -5px rgba(255, 117, 143, 0.2) !important;
+  }
+
+  /* Modal Input & Text Labels Contrast */
+  .fixed.inset-0 input,
+  .fixed.inset-0 select,
+  .fixed.inset-0 textarea,
+  div[role="dialog"] input,
+  div[role="dialog"] select,
+  div[role="dialog"] textarea {
+    background-color: #FFF7F9 !important;
+    border-color: #FFD8E1 !important;
+    color: #1E293B !important;
+    font-weight: 600 !important;
+  }
+
+  .fixed.inset-0 label,
+  div[role="dialog"] label {
+    color: #334155 !important;
+    font-weight: 700 !important;
   }
 }

@@ -230,7 +230,7 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
       {/* SIDEBAR COMPONENT (DESKTOP + MOBILE DRAWER) */}
       <aside
         ref={sidebarRef}
-        className={`bg-surface border-r border-border-soft flex flex-col z-50 transition-all duration-300 ease-in-out ${
+        className={`bg-surface border-r border-border-soft flex flex-col z-50 transition-all duration-300 ease-in-out glowe-sidebar-gradient glowe-glow-shadow ${
           // Desktop behavior
           `hidden md:flex ${isCollapsed ? "w-20" : "w-64"}`
         }`}
@@ -289,15 +289,15 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
                 </span>
                 {user?.role === "BranchAdmin" ? (
                   <>
-                    <span className="text-[11px] font-bold text-slate-600 block truncate mt-0.5">
+                    <span className="text-[11px] font-extrabold text-slate-800 block truncate mt-0.5">
                       {user?.parlour_name || "Main Parlour"}
                     </span>
-                    <span className="text-[10px] font-semibold text-pink-600 block truncate mt-0.5">
+                    <span className="text-[10px] font-bold text-pink-600 block truncate mt-0.5">
                       Powered By SmartGoNext
                     </span>
                   </>
                 ) : (
-                  <span className="text-[11px] font-semibold text-slate-500 block mt-0.5 whitespace-nowrap">
+                  <span className="text-[11px] font-bold text-slate-700 block mt-0.5 whitespace-nowrap">
                     Powered By SmartGoNext
                   </span>
                 )}
@@ -317,10 +317,10 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
                   onClick={() => setActiveTab(item.id)}
                   className={`w-full flex items-center ${
                     isCollapsed ? "justify-center px-2 py-3" : "space-x-3 px-3.5 py-2.5"
-                  } rounded-xl text-xs font-semibold transition-all ${
+                  } rounded-full text-xs font-bold transition-all ${
                     isActive
-                      ? "bg-primary text-white shadow-md"
-                      : "text-text-secondary hover:bg-primary-light hover:text-primary"
+                      ? "glowe-pill-active text-white shadow-md scale-[1.02]"
+                      : "text-slate-800 hover:bg-primary-light hover:text-primary"
                   }`}
                 >
                   <span>{getMenuIcon(item.id)}</span>
@@ -342,10 +342,10 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
         <div className="p-3 border-t border-border-soft shrink-0">
           {!isCollapsed && user && (
             <div className="px-3.5 py-2 mb-2 text-left border-b border-border-soft/40 pb-2.5">
-              <p className="text-xs font-bold text-slate-800 truncate">
+              <p className="text-xs font-black text-slate-900 truncate">
                 {user.owner_name || user.email || "Admin"}
               </p>
-              <p className="text-[10px] text-slate-500 font-semibold truncate">
+              <p className="text-[10px] text-slate-700 font-bold truncate">
                 {user.role === "BranchAdmin" 
                   ? `Branch Admin: ${branchData?.name || user.branch_name || "Branch"}`
                   : user.role === "ParlourAdmin" 
@@ -492,9 +492,6 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
           </div>
 
           <div className="flex items-center space-x-3">
-            {/* THEME SELECTOR */}
-            <ThemeSelector />
-
             {/* BRANCH ADMIN INDICATOR */}
             {user?.role === "BranchAdmin" && (
               <div className="flex items-center space-x-1.5 bg-slate-900 text-white px-3 py-1.5 rounded-xl border border-pink-500/30 shadow-sm">

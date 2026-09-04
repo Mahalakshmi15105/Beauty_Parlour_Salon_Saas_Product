@@ -111,27 +111,27 @@ function Dashboard() {
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-4 gap-6">
-        <div className="bg-surface border border-border-soft p-6 rounded-lg shadow-sm flex flex-col justify-between">
-          <p className="text-xs font-semibold text-text-secondary uppercase">Today's Revenue</p>
-          <p className="text-2xl font-bold text-text-primary mt-2">{formatCurrency(summary?.revenue?.today)}</p>
+        <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow flex flex-col justify-between">
+          <p className="text-xs font-bold text-pink-600 uppercase tracking-wider">Today's Revenue</p>
+          <p className="text-2xl font-black text-text-primary mt-2">{formatCurrency(summary?.revenue?.today)}</p>
           <p className="text-[10px] text-success font-medium mt-2">▲ {summary?.invoices?.today} Bills Processed</p>
         </div>
 
-        <div className="bg-surface border border-border-soft p-6 rounded-lg shadow-sm flex flex-col justify-between">
-          <p className="text-xs font-semibold text-text-secondary uppercase">Weekly Revenue</p>
-          <p className="text-2xl font-bold text-text-primary mt-2">{formatCurrency(summary?.revenue?.weekly)}</p>
+        <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow flex flex-col justify-between">
+          <p className="text-xs font-bold text-text-secondary uppercase tracking-wider">Weekly Revenue</p>
+          <p className="text-2xl font-black text-text-primary mt-2">{formatCurrency(summary?.revenue?.weekly)}</p>
           <p className="text-[10px] text-text-secondary mt-2">Last 7 Days Rolling</p>
         </div>
 
-        <div className="bg-surface border border-border-soft p-6 rounded-lg shadow-sm flex flex-col justify-between">
-          <p className="text-xs font-semibold text-text-secondary uppercase">Monthly Revenue</p>
-          <p className="text-2xl font-bold text-text-primary mt-2">{formatCurrency(summary?.revenue?.monthly)}</p>
+        <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow flex flex-col justify-between">
+          <p className="text-xs font-bold text-text-secondary uppercase tracking-wider">Monthly Revenue</p>
+          <p className="text-2xl font-black text-text-primary mt-2">{formatCurrency(summary?.revenue?.monthly)}</p>
           <p className="text-[10px] text-text-secondary mt-2">{summary?.invoices?.this_month} Bills This Month</p>
         </div>
 
-        <div className="bg-surface border border-border-soft p-6 rounded-lg shadow-sm flex flex-col justify-between">
-          <p className="text-xs font-semibold text-text-secondary uppercase">{t("active_customers")}</p>
-          <p className="text-2xl font-bold text-text-primary mt-2">{summary?.memberships?.active}</p>
+        <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow flex flex-col justify-between">
+          <p className="text-xs font-bold text-amber-600 uppercase tracking-wider">{t("active_customers")}</p>
+          <p className="text-2xl font-black text-text-primary mt-2">{summary?.memberships?.active}</p>
           <p className="text-[10px] text-warning font-medium mt-2">{summary?.memberships?.expiring_soon} Expiring Soon</p>
         </div>
       </div>
@@ -139,8 +139,8 @@ function Dashboard() {
       {/* Charts Row 1: Daily Revenue Trend & Top Services */}
       <div className="grid grid-cols-12 gap-8">
         {/* Daily Revenue Area Chart */}
-        <div className="col-span-8 bg-surface border border-border-soft p-6 rounded-lg shadow-sm space-y-4">
-          <h3 className="text-sm font-semibold text-text-primary">{t("revenue_chart")}</h3>
+        <div className="col-span-8 glowe-glass-card p-6 rounded-2xl glowe-glow-shadow space-y-4">
+          <h3 className="text-sm font-bold text-text-primary">{t("revenue_chart")}</h3>
           <div className="h-64">
             {charts?.daily_trend?.length === 0 ? (
               <div className="h-full flex items-center justify-center text-xs text-text-secondary">No billing activity recorded in this period.</div>
@@ -149,15 +149,15 @@ function Dashboard() {
                 <AreaChart data={charts?.daily_trend}>
                   <defs>
                     <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#7C3AED" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#7C3AED" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#FF758F" stopOpacity={0.45} />
+                      <stop offset="95%" stopColor="#FF758F" stopOpacity={0.02} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#FFE4E8" />
                   <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip formatter={(value) => [formatCurrency(value), "Revenue"]} />
-                  <Area type="monotone" dataKey="revenue" stroke="#7C3AED" fillOpacity={1} fill="url(#colorRev)" />
+                  <Area type="monotone" dataKey="revenue" stroke="#FF758F" strokeWidth={2.5} fillOpacity={1} fill="url(#colorRev)" />
                 </AreaChart>
               </ResponsiveContainer>
             )}

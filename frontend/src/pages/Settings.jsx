@@ -1386,46 +1386,36 @@ function Settings() {
           {/* System Accent Color Picker Tab */}
           {activeTab === "accent" && (
             <div className="space-y-6">
-              <h3 className="text-sm font-semibold text-text-primary border-b border-border-soft pb-3">🎨 Accent Color Picker</h3>
+              <h3 className="text-sm font-bold text-text-primary border-b border-border-soft pb-3">🎨 Accent Color Picker</h3>
               <p className="text-xs text-text-secondary">
-                Pick your preferred accent theme color for your website (default Rose Pink #EC4899 or choose a custom color).
+                Pick your preferred accent theme color for your website (default Glowe Pink #FF758F or choose a custom color).
               </p>
 
               {/* Default Color Badge */}
               <div className="inline-flex items-center">
-                <span className="px-2 py-1 bg-gray-100 rounded-md text-[10px] font-mono text-gray-600">
-                  #EC4899
+                <span className="px-2.5 py-1 bg-pink-50 border border-pink-200 rounded-full text-[11px] font-mono font-bold text-pink-600">
+                  Default Glowe Pink #FF758F
                 </span>
               </div>
 
               {/* Color Options - Horizontal Pill Layout */}
               <div className="flex flex-wrap items-center gap-3">
                 {[
-                  { color: '#EC4899', name: 'Default Pink' },
-                  { color: '#EF4444', name: 'Red Vibrant' },
-                  { color: '#DC2626', name: 'Crimson Red' },
+                  { color: '#FF758F', name: 'Glowe Pink (Default)' },
+                  { color: '#FF4D6D', name: 'Blush Coral' },
                   { color: '#F43F5E', name: 'Rose' },
-                  { color: '#10B981', name: 'Emerald Green' },
-                  { color: '#3B82F6', name: 'Royal Blue' },
-                  { color: '#A855F7', name: 'Purple Neon' },
                 ].map((preset) => (
                   <button
                     key={preset.color}
                     type="button"
                     onClick={() => handleAccentColorChange(preset.color)}
-                    className="flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold text-white transition-all duration-200"
+                    className="flex items-center gap-2 rounded-full px-4 py-2.5 text-xs font-bold text-white transition-all duration-200 shadow-md hover:scale-105"
                     style={{
-                      backgroundColor: preset.color,
-                      boxShadow: accentColor === preset.color ? `0 0 0 2px ${preset.color}, 0 0 0 4px white` : 'none',
+                      background: `linear-gradient(135deg, ${preset.color} 0%, ${preset.color}DD 100%)`,
+                      boxShadow: accentColor === preset.color ? `0 0 0 3px ${preset.color}55, 0 6px 16px ${preset.color}66` : `0 4px 10px ${preset.color}33`,
                     }}
                   >
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{
-                        backgroundColor: preset.color,
-                        boxShadow: 'inset 0 1px 2px rgba(255, 255, 255, 0.3)',
-                      }}
-                    />
+                    <span className="w-2.5 h-2.5 rounded-full bg-white shadow-xs"></span>
                     <span>{preset.name}</span>
                   </button>
                 ))}
