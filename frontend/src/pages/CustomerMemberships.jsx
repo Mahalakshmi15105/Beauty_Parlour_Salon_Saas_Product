@@ -15,6 +15,7 @@ function CustomerMemberships() {
   const upgradeModalRef = useRef(null);
   const customerSelectInputRef = useRef(null);
   const planSelectRef = useRef(null);
+  const paymentSelectRef = useRef(null);
 
   const [plans, setPlans] = useState([]);
   const [services, setServices] = useState([]);
@@ -36,9 +37,10 @@ function CustomerMemberships() {
     benefits: [], // array of { service_id, quantity }
   });
 
-  // Combobox customer dropdown inside modal
+  // Combobox customer dropdown inside modal & Keyboard navigation index
   const [comboboxSearch, setComboboxSearch] = useState("");
   const [showComboboxDropdown, setShowComboboxDropdown] = useState(false);
+  const [comboboxHighlightedIndex, setComboboxHighlightedIndex] = useState(0);
   const comboboxRef = useRef(null);
 
   // Action Modals (Renew / Upgrade)
@@ -326,6 +328,9 @@ function CustomerMemberships() {
       .catch((err) => showError(err.response?.data?.message || err.message || "Failed to upgrade."));
   };
 
+  // Datatable Filter State
+  const [statusFilter, setStatusFilter] = useState("all"); // "all", "active", "cancelled"
+
   return (
     <div className="space-y-6">
       {/* Title Bar */}
@@ -338,7 +343,8 @@ function CustomerMemberships() {
           onClick={() => {
             setAssignForm({
               customer_id: selectedCustomer ? selectedCustomer.id.toString() : "",
-              plan_id: plans.length > 0 ? plans[0].id.toString() : "",
+              plan_id: "",
+              payment_method: "",
               benefits: [],
             });
             if (selectedCustomer) {
@@ -418,7 +424,8 @@ function CustomerMemberships() {
                 onClick={() => {
                   setAssignForm({
                     customer_id: selectedCustomer.id.toString(),
-                    plan_id: plans.length > 0 ? plans[0].id.toString() : "",
+                    plan_id: "",
+                    payment_method: "",
                     benefits: [],
                   });
                   setComboboxSearch(`${selectedCustomer.first_name} ${selectedCustomer.last_name || ""} (${selectedCustomer.phone || "No Phone"})`);
@@ -496,8 +503,37 @@ function CustomerMemberships() {
 
       {/* Datatable Listing of All Customer Memberships */}
       <div className="bg-surface border border-border-soft rounded-lg overflow-hidden shadow-sm">
-        <div className="px-6 py-4 border-b border-border-soft bg-slate-50/50 flex justify-between items-center">
-          <h3 className="text-sm font-semibold text-text-primary">All Assigned Customer Memberships</h3>
+        <div className="px-6 py-4 border-b border-border-soft bg-slate-50/50 flex flex-wrap justify-between items-center gap-4">
+          <div className="flex items-center space-x-3">
+            <h3 className="text-sm font-semibold text-text-primary">All Assigned Customer Memberships</h3>
+            {/* Status Filter Tabs */}
+            <div className="flex bg-slate-200/60 p-0.5 rounded-lg text-xs font-semibold">
+              <button
+                onClick={() => setStatusFilter("all")}
+                className={`px-3 py-1 rounded-md transition ${
+                  statusFilter === "all" ? "bg-white text-slate-900 shadow-sm font-bold" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                All Status
+              </button>
+              <button
+                onClick={() => setStatusFilter("active")}
+                className={`px-3 py-1 rounded-md transition ${
+                  statusFilter === "active" ? "bg-emerald-600 text-white shadow-sm font-bold" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Active Only
+              </button>
+              <button
+                onClick={() => setStatusFilter("cancelled")}
+                className={`px-3 py-1 rounded-md transition ${
+                  statusFilter === "cancelled" ? "bg-rose-600 text-white shadow-sm font-bold" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Cancelled / Inactive
+              </button>
+            </div>
+          </div>
           
           <div className="flex space-x-2">
             <button
@@ -539,14 +575,24 @@ function CustomerMemberships() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border-soft">
-              {allMemberships.length === 0 ? (
-                <tr>
-                  <td colSpan="6" className="px-6 py-8 text-center text-xs text-text-secondary">
-                    No assigned memberships found.
-                  </td>
-                </tr>
-              ) : (
-                allMemberships.map((m) => (
+              {(() => {
+                const filteredMemberships = allMemberships.filter((m) => {
+                  if (statusFilter === "active") return m.status === "active";
+                  if (statusFilter === "cancelled") return m.status !== "active";
+                  return true;
+                });
+
+                if (filteredMemberships.length === 0) {
+                  return (
+                    <tr>
+                      <td colSpan="6" className="px-6 py-8 text-center text-xs text-text-secondary">
+                        No assigned memberships found for status "{statusFilter}".
+                      </td>
+                    </tr>
+                  );
+                }
+
+                return filteredMemberships.map((m) => (
                   <tr key={m.id} className="hover:bg-background/50 transition">
                     <td className="px-6 py-4 text-xs font-bold text-text-primary">
                       {m.customer_name}
@@ -600,8 +646,8 @@ function CustomerMemberships() {
                       )}
                     </td>
                   </tr>
-                ))
-              )}
+                ));
+              })()}
             </tbody>
           </table>
         </div>
@@ -623,16 +669,60 @@ function CustomerMemberships() {
                 <label className="block text-xs font-semibold text-text-secondary mb-1">Customer *</label>
                 <div className="relative">
                   <input
+                    ref={customerSelectInputRef}
                     type="text"
                     required
                     placeholder="Search customer by Name or Mobile..."
                     value={comboboxSearch}
-                    onFocus={() => setShowComboboxDropdown(true)}
+                    onFocus={() => {
+                      setShowComboboxDropdown(true);
+                      setComboboxHighlightedIndex(0);
+                    }}
                     onChange={(e) => {
                       setComboboxSearch(e.target.value);
                       setShowComboboxDropdown(true);
+                      setComboboxHighlightedIndex(0);
                       if (assignForm.customer_id) {
                         setAssignForm({ ...assignForm, customer_id: "" });
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      const filtered = allCustomers.filter((c) => {
+                        const term = comboboxSearch.toLowerCase();
+                        return (
+                          !term ||
+                          `${c.first_name} ${c.last_name || ""} ${c.phone || ""}`
+                            .toLowerCase()
+                            .includes(term)
+                        );
+                      });
+
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        if (!showComboboxDropdown) {
+                          setShowComboboxDropdown(true);
+                        }
+                        if (filtered.length > 0) {
+                          setComboboxHighlightedIndex((prev) => (prev + 1) % filtered.length);
+                        }
+                      } else if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        if (filtered.length > 0) {
+                          setComboboxHighlightedIndex((prev) => (prev - 1 + filtered.length) % filtered.length);
+                        }
+                      } else if (e.key === "Enter" || e.key === "ArrowRight") {
+                        if (showComboboxDropdown && filtered.length > 0) {
+                          e.preventDefault();
+                          const chosen = filtered[comboboxHighlightedIndex] || filtered[0];
+                          if (chosen) {
+                            setAssignForm({ ...assignForm, customer_id: chosen.id.toString() });
+                            setComboboxSearch(`${chosen.first_name} ${chosen.last_name || ""} (${chosen.phone || "No Phone"})`);
+                            setShowComboboxDropdown(false);
+                            setTimeout(() => {
+                              if (planSelectRef.current) focusAndOpenSelect(planSelectRef.current);
+                            }, 50);
+                          }
+                        }
                       }
                     }}
                     className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-primary"
@@ -667,8 +757,9 @@ function CustomerMemberships() {
                             .includes(term)
                         );
                       })
-                      .map((c) => {
+                      .map((c, idx) => {
                         const isSelected = assignForm.customer_id === c.id.toString();
+                        const isHighlighted = idx === comboboxHighlightedIndex;
                         return (
                           <button
                             key={c.id}
@@ -677,9 +768,12 @@ function CustomerMemberships() {
                               setAssignForm({ ...assignForm, customer_id: c.id.toString() });
                               setComboboxSearch(`${c.first_name} ${c.last_name || ""} (${c.phone || "No Phone"})`);
                               setShowComboboxDropdown(false);
+                              setTimeout(() => {
+                                if (planSelectRef.current) focusAndOpenSelect(planSelectRef.current);
+                              }, 50);
                             }}
                             className={`w-full text-left px-3 py-2 text-xs hover:bg-background transition flex justify-between items-center ${
-                              isSelected ? "bg-primary-light text-primary font-semibold" : ""
+                              isHighlighted ? "bg-primary-light text-primary font-bold" : isSelected ? "bg-primary-light/50 text-primary font-semibold" : ""
                             }`}
                           >
                             <span>{c.first_name} {c.last_name || ""} ({c.phone || "No Phone"})</span>
@@ -709,7 +803,19 @@ function CustomerMemberships() {
                   required
                   value={assignForm.plan_id}
                   onFocus={(e) => focusAndOpenSelect(e.target)}
-                  onChange={(e) => setAssignForm({ ...assignForm, plan_id: e.target.value })}
+                  onChange={(e) => {
+                    setAssignForm({ ...assignForm, plan_id: e.target.value });
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === "ArrowRight") {
+                      if (assignForm.plan_id) {
+                        e.preventDefault();
+                        setTimeout(() => {
+                          if (paymentSelectRef.current) focusAndOpenSelect(paymentSelectRef.current);
+                        }, 50);
+                      }
+                    }
+                  }}
                   className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-primary font-medium"
                 >
                   <option value="">[ Select Membership Plan ]</option>
@@ -739,10 +845,18 @@ function CustomerMemberships() {
               <div>
                 <label className="block text-xs font-semibold text-text-secondary mb-1">Payment Method *</label>
                 <select
+                  ref={paymentSelectRef}
                   required
                   value={assignForm.payment_method}
                   onFocus={(e) => focusAndOpenSelect(e.target)}
                   onChange={(e) => setAssignForm({ ...assignForm, payment_method: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowRight") {
+                      e.preventDefault();
+                      const submitBtn = assignModalRef.current?.querySelector('button[type="submit"]');
+                      if (submitBtn) submitBtn.focus();
+                    }
+                  }}
                   className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-primary font-medium"
                 >
                   <option value="">[ Select Payment Method ]</option>
