@@ -4,7 +4,7 @@ import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { useToast } from "../context/ToastContext";
 import { useModalFocusTrap, useFormKeyboardNavigation, focusAndOpenSelect } from "../utils/keyboardNavigation";
 import { User, X, ChevronDown, Check, Printer, FileSpreadsheet, FileText, Download, MessageSquare, Send } from "lucide-react";
-import { exportToCSV, printDataList, exportToPDF } from "../utils/exportUtils";
+import { exportToCSV, printDataList, exportToPDF, exportToExcel } from "../utils/exportUtils";
 import { ThermalReceipt, printThermalReceiptElement, downloadThermalReceiptPDF } from "../components/ThermalReceipt";
 
 function CustomerMemberships() {
@@ -142,37 +142,51 @@ function CustomerMemberships() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const getFilteredMemberships = () => {
+    return allMemberships.filter((m) => {
+      if (statusFilter === "active") return m.status === "active";
+      if (statusFilter === "cancelled") return m.status !== "active";
+      return true;
+    });
+  };
+
   const handlePrint = () => {
+    const data = getFilteredMemberships();
     const columns = [
-      { header: "Customer Name", accessor: "customer_name" },
+      { header: "Customer Name", accessor: (row) => `${row.customer_first_name || row.customer_name || ""} ${row.customer_last_name || ""}`.trim() },
       { header: "Mobile", accessor: "customer_phone" },
       { header: "Membership Plan", accessor: "plan_name" },
+      { header: "Invoice #", accessor: "invoice_number" },
       { header: "Status", accessor: "status" },
-      { header: "Expiry Date", accessor: (row) => new Date(row.expires_at).toLocaleDateString() }
+      { header: "Expiry Date", accessor: (row) => row.expires_at ? new Date(row.expires_at).toLocaleDateString() : "-" }
     ];
-    printDataList("Customer Subscriptions & Packages List", allMemberships, columns);
+    printDataList("Customer Subscriptions & Packages List", data, columns);
   };
 
   const handleExportExcel = () => {
+    const data = getFilteredMemberships();
     const columns = [
-      { header: "Customer Name", accessor: "customer_name" },
+      { header: "Customer Name", accessor: (row) => `${row.customer_first_name || row.customer_name || ""} ${row.customer_last_name || ""}`.trim() },
       { header: "Mobile", accessor: "customer_phone" },
       { header: "Membership Plan", accessor: "plan_name" },
+      { header: "Invoice #", accessor: "invoice_number" },
       { header: "Status", accessor: "status" },
-      { header: "Expiry Date", accessor: (row) => new Date(row.expires_at).toLocaleDateString() }
+      { header: "Expiry Date", accessor: (row) => row.expires_at ? new Date(row.expires_at).toLocaleDateString() : "-" }
     ];
-    exportToCSV(allMemberships, columns, "customer_memberships_list");
+    exportToExcel("Customer Subscriptions & Packages List", data, columns, "customer_memberships_list");
   };
 
   const handleExportPDF = () => {
+    const data = getFilteredMemberships();
     const columns = [
-      { header: "Customer Name", accessor: "customer_name", width: 45 },
-      { header: "Mobile", accessor: "customer_phone", width: 35 },
-      { header: "Membership Plan", accessor: "plan_name", width: 45 },
-      { header: "Status", accessor: "status", width: 25 },
-      { header: "Expiry Date", accessor: (row) => new Date(row.expires_at).toLocaleDateString(), width: 30 }
+      { header: "Customer Name", accessor: (row) => `${row.customer_first_name || row.customer_name || ""} ${row.customer_last_name || ""}`.trim(), width: 40 },
+      { header: "Mobile", accessor: "customer_phone", width: 25 },
+      { header: "Membership Plan", accessor: "plan_name", width: 35 },
+      { header: "Invoice #", accessor: "invoice_number", width: 30 },
+      { header: "Status", accessor: "status", width: 20 },
+      { header: "Expiry Date", accessor: (row) => row.expires_at ? new Date(row.expires_at).toLocaleDateString() : "-", width: 25 }
     ];
-    exportToPDF("Customer Subscriptions & Packages List", allMemberships, columns, "customer_memberships_list");
+    exportToPDF("Customer Subscriptions & Packages List", data, columns, "customer_memberships_list");
   };
 
   // Load customer's active memberships

@@ -4,7 +4,7 @@ import { useToast } from "../context/ToastContext";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { useModalFocusTrap, useFormKeyboardNavigation } from "../utils/keyboardNavigation";
 import { X, Printer, FileSpreadsheet, FileText } from "lucide-react";
-import { exportToCSV, printDataList, exportToPDF } from "../utils/exportUtils";
+import { exportToCSV, printDataList, exportToPDF, exportToExcel } from "../utils/exportUtils";
 
 function MembershipPlans() {
   const { showSuccess, showError } = useToast();
@@ -117,7 +117,7 @@ function MembershipPlans() {
       { header: "Validity", accessor: (row) => `${row.duration_days} Days` },
       { header: "Status", accessor: "status" }
     ];
-    exportToCSV(plans, columns, "membership_plans_list");
+    exportToExcel("Membership Plans Directory", plans, columns, "membership_plans_list");
   };
 
   const handleExportPDF = () => {

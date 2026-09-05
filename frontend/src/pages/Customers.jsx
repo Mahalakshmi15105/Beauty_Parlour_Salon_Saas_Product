@@ -94,6 +94,8 @@ function Customers() {
   }, [search, gender, activeSubTab, churnThreshold]);
 
   const handlePrint = () => {
+    const exportData = activeSubTab === "dormant" ? dormantCustomers : customers;
+    const title = activeSubTab === "dormant" ? "Dormant Clients List" : "Customers List";
     const columns = [
       { header: "Name", accessor: (row) => `${row.first_name || ""} ${row.last_name || ""}`.trim() },
       { header: "Phone", accessor: "phone" },
@@ -101,10 +103,13 @@ function Customers() {
       { header: "Gender", accessor: "gender" },
       { header: "DOB", accessor: "date_of_birth" }
     ];
-    printDataList("Customers List", customers, columns);
+    printDataList(title, exportData, columns);
   };
 
   const handleExportCSV = () => {
+    const exportData = activeSubTab === "dormant" ? dormantCustomers : customers;
+    const title = activeSubTab === "dormant" ? "Dormant Clients List" : "Customers List";
+    const filename = activeSubTab === "dormant" ? "dormant_clients_list" : "customers_list";
     const columns = [
       { header: "First Name", accessor: "first_name" },
       { header: "Last Name", accessor: "last_name" },
@@ -114,10 +119,13 @@ function Customers() {
       { header: "DOB", accessor: "date_of_birth" },
       { header: "Address", accessor: "address" }
     ];
-    exportToCSV("Customers List", customers, columns, "customers_list");
+    exportToCSV(exportData, columns, filename);
   };
 
   const handleExportExcel = () => {
+    const exportData = activeSubTab === "dormant" ? dormantCustomers : customers;
+    const title = activeSubTab === "dormant" ? "Dormant Clients List" : "Customers List";
+    const filename = activeSubTab === "dormant" ? "dormant_clients_list" : "customers_list";
     const columns = [
       { header: "First Name", accessor: "first_name" },
       { header: "Last Name", accessor: "last_name" },
@@ -127,10 +135,13 @@ function Customers() {
       { header: "DOB", accessor: "date_of_birth" },
       { header: "Address", accessor: "address" }
     ];
-    exportToExcel("Customers List", customers, columns, "customers_list");
+    exportToExcel(title, exportData, columns, filename);
   };
 
   const handleExportPDF = () => {
+    const exportData = activeSubTab === "dormant" ? dormantCustomers : customers;
+    const title = activeSubTab === "dormant" ? "Dormant Clients List" : "Customers List";
+    const filename = activeSubTab === "dormant" ? "dormant_clients_list" : "customers_list";
     const columns = [
       { header: "Name", accessor: (row) => `${row.first_name || ""} ${row.last_name || ""}`.trim(), width: 35 },
       { header: "Phone", accessor: "phone", width: 25 },
@@ -138,7 +149,7 @@ function Customers() {
       { header: "Gender", accessor: "gender", width: 20 },
       { header: "DOB", accessor: "date_of_birth", width: 25 }
     ];
-    exportToPDF("Customers List", customers, columns, "customers_list");
+    exportToPDF(title, exportData, columns, filename);
   };
 
   const handleNextPage = () => {

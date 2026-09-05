@@ -1,13 +1,13 @@
 import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
 
-export function exportToCSV(data, columns, filename) {
+export function exportToCSV(data = [], columns = [], filename = "export") {
+  const safeData = Array.isArray(data) ? data : [];
   const headers = columns.map(c => c.header);
-  const rows = data.map(row => 
+  const rows = safeData.map(row => 
     columns.map(c => {
       const val = typeof c.accessor === 'function' ? c.accessor(row) : row[c.accessor];
-      // escape double quotes and wrap in quotes
-      return `"${String(val || '').replace(/"/g, '""')}"`;
+      return `"${String(val ?? '').replace(/"/g, '""')}"`;
     }).join(',')
   );
   const csvContent = [headers.join(','), ...rows].join('\n');
@@ -21,57 +21,68 @@ export function exportToCSV(data, columns, filename) {
   document.body.removeChild(link);
 }
 
-export function exportToExcel(title, data, columns, filename, parlourName = "SmartGoNext Beauty SaaS") {
-  // Create workbook
+export function exportToExcel(title, data = [], columns = [], filename = "export", parlourName = "SmartGoNext Beauty SaaS") {
+  const safeData = Array.isArray(data) ? data : [];
   const wb = XLSX.utils.book_new();
   
-  // Create header row with styling
+  // Header rows
   const headerData = [
     [parlourName],
     [title],
     [`Generated on ${new Date().toLocaleString()}`],
-    [], // Empty row
+    [], // Empty spacing row
     columns.map(c => c.header)
   ];
   
-  // Create data rows
-  const rowData = data.map(row => 
+  // Data rows
+  const rowData = safeData.map(row => 
     columns.map(c => {
       const val = typeof c.accessor === 'function' ? c.accessor(row) : row[c.accessor];
-      return val || '';
+      return val ?? '';
     })
   );
   
-  // Combine header and data
   const allData = [...headerData, ...rowData];
-  
-  // Create worksheet
   const ws = XLSX.utils.aoa_to_sheet(allData);
   
-  // Set column widths
-  const colWidths = columns.map(c => ({ wch: c.width || 20 }));
+  // Calculate dynamic column widths (auto-fit content)
+  const colWidths = columns.map(c => {
+    let maxLen = c.header ? String(c.header).length : 10;
+    safeData.forEach(row => {
+      const val = typeof c.accessor === 'function' ? c.accessor(row) : row[c.accessor];
+      const str = String(val ?? '');
+      if (str.length > maxLen) maxLen = str.length;
+    });
+    return { wch: Math.min(Math.max(maxLen + 4, 12), 50) };
+  });
   ws['!cols'] = colWidths;
   
-  // Add worksheet to workbook
-  XLSX.utils.book_append_sheet(wb, ws, "Report");
+  // Merge report title rows across all columns
+  const numCols = Math.max(columns.length, 1);
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: numCols - 1 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: numCols - 1 } },
+    { s: { r: 2, c: 0 }, e: { r: 2, c: numCols - 1 } }
+  ];
   
-  // Save file
+  XLSX.utils.book_append_sheet(wb, ws, "Report");
   XLSX.writeFile(wb, `${filename}.xlsx`);
 }
 
-export function printDataList(title, data, columns, parlourName = "SmartGoNext Beauty SaaS") {
+export function printDataList(title, data = [], columns = [], parlourName = "SmartGoNext Beauty SaaS") {
+  const safeData = Array.isArray(data) ? data : [];
   const printWin = window.open('', '_blank');
   
   const headersHtml = columns.map(c => 
-    `<th style="border: 2px solid #333; padding: 12px; text-align: left; background-color: #f8f9fa; font-weight: bold; font-size: 12px;">${c.header}</th>`
+    `<th>${c.header}</th>`
   ).join('');
   
-  const rowsHtml = data.map(row => 
+  const rowsHtml = safeData.length > 0 ? safeData.map(row => 
     `<tr>${columns.map(c => {
       const val = typeof c.accessor === 'function' ? c.accessor(row) : row[c.accessor];
-      return `<td style="border: 1px solid #ddd; padding: 10px; font-size: 11px;">${val || '—'}</td>`;
+      return `<td>${val ?? '—'}</td>`;
     }).join('')}</tr>`
-  ).join('');
+  ).join('') : `<tr><td colspan="${columns.length}" style="text-align:center; padding: 20px;">No records available.</td></tr>`;
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -81,57 +92,79 @@ export function printDataList(title, data, columns, parlourName = "SmartGoNext B
         <style>
           @page {
             size: A4;
-            margin: 20mm;
+            margin: 10mm;
           }
           body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
             margin: 0; 
-            padding: 20px;
+            padding: 16px;
             background: white;
+            color: #0f172a;
+          }
+          .page-border {
+            border: 2px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 24px;
+            box-sizing: border-box;
+            min-height: 94vh;
           }
           .report-header {
             text-align: center;
-            margin-bottom: 30px;
-            border-bottom: 3px solid #EC4899;
-            padding-bottom: 20px;
+            margin-bottom: 20px;
+            border-bottom: 3px solid #ff758f;
+            padding-bottom: 12px;
+          }
+          .parlour-name {
+            font-size: 24px;
+            font-weight: 800;
+            color: #0f172a;
+            margin: 0;
+            letter-spacing: -0.5px;
           }
           .report-title {
-            font-size: 24px;
-            font-weight: bold;
-            color: #1e293b;
-            margin: 0 0 10px 0;
-          }
-          .report-subtitle {
-            font-size: 14px;
-            color: #64748b;
-            margin: 0;
+            font-size: 16px;
+            font-weight: 700;
+            color: #ff758f;
+            margin: 6px 0 0 0;
           }
           .report-meta {
             text-align: right;
-            font-size: 12px;
+            font-size: 11px;
+            font-weight: 600;
             color: #64748b;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
           }
           table { 
             width: 100%; 
             border-collapse: collapse; 
-            margin-top: 20px;
+            margin-top: 8px;
             page-break-inside: auto;
           }
           thead {
             display: table-header-group;
           }
-          thead tr {
-            page-break-inside: avoid;
-          }
           th {
-            page-break-inside: avoid;
+            border: 1px solid #cbd5e1;
+            padding: 10px 12px;
+            text-align: left;
+            background-color: #f8fafc;
+            font-weight: 700;
+            font-size: 11px;
+            color: #334155;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
           }
           tr {
             page-break-inside: avoid;
           }
           td {
-            page-break-inside: avoid;
+            border: 1px solid #e2e8f0;
+            padding: 9px 12px;
+            font-size: 11px;
+            color: #334155;
+          }
+          tr:nth-child(even) td {
+            background-color: #f8fafc;
           }
           @media print {
             body { margin: 0; padding: 0; }
@@ -140,15 +173,17 @@ export function printDataList(title, data, columns, parlourName = "SmartGoNext B
         </style>
       </head>
       <body>
-        <div class="report-header">
-          <h1 class="report-title">${parlourName}</h1>
-          <p class="report-subtitle">${title}</p>
+        <div class="page-border">
+          <div class="report-header">
+            <h1 class="parlour-name">${parlourName}</h1>
+            <div class="report-title">${title}</div>
+          </div>
+          <div class="report-meta">Generated on ${new Date().toLocaleString()}</div>
+          <table>
+            <thead><tr>${headersHtml}</tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
         </div>
-        <div class="report-meta">Generated on ${new Date().toLocaleString()}</div>
-        <table>
-          <thead><tr>${headersHtml}</tr></thead>
-          <tbody>${rowsHtml}</tbody>
-        </table>
         <script>
           window.onload = function() {
             window.print();
@@ -163,119 +198,123 @@ export function printDataList(title, data, columns, parlourName = "SmartGoNext B
   printWin.document.close();
 }
 
-export function exportToPDF(title, data, columns, filename, parlourName = "SmartGoNext Beauty SaaS") {
+export function exportToPDF(title, data = [], columns = [], filename = "export", parlourName = "SmartGoNext Beauty SaaS") {
+  const safeData = Array.isArray(data) ? data : [];
   const doc = new jsPDF();
   const pageWidth = 210; // A4 width in mm
   const pageHeight = 297; // A4 height in mm
-  const margin = 15;
+  const margin = 12;
   const contentWidth = pageWidth - (2 * margin);
   
-  let currentPage = 1;
-  let totalPages = 1;
+  const rowsPerPage = 24;
+  const totalPages = Math.max(Math.ceil(safeData.length / rowsPerPage), 1);
   
-  // Calculate total pages needed
-  const rowsPerPage = 25; // Approximate rows per page
-  totalPages = Math.ceil(data.length / rowsPerPage);
-  
-  // Generate PDF pages
   for (let page = 0; page < totalPages; page++) {
     if (page > 0) {
       doc.addPage();
     }
     
-    const startY = margin;
-    let y = startY;
+    let y = margin + 8;
     
-    // Page border
-    doc.setDrawColor(200, 200, 200);
+    // Clean Page Frame / Border
+    doc.setDrawColor(203, 213, 225); // Slate 300
+    doc.setLineWidth(0.6);
     doc.rect(margin, margin, contentWidth, pageHeight - (2 * margin));
     
-    // Header section
+    // Header section: Business Name
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.setTextColor(30, 30, 30);
+    doc.setFontSize(16);
+    doc.setTextColor(15, 23, 42); // Slate 900
     doc.text(parlourName, pageWidth / 2, y, { align: "center" });
-    y += 10;
+    y += 7;
     
-    doc.setFontSize(14);
-    doc.setTextColor(236, 72, 153); // Brand color
+    // Report Title
+    doc.setFontSize(12);
+    doc.setTextColor(236, 72, 153); // Pink accent
     doc.text(title, pageWidth / 2, y, { align: "center" });
-    y += 8;
+    y += 6;
     
+    // Timestamp
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
     doc.text(`Generated on ${new Date().toLocaleString()}`, pageWidth / 2, y, { align: "center" });
-    y += 10;
-    
-    // Horizontal line
-    doc.setDrawColor(236, 72, 153);
-    doc.setLineWidth(0.5);
-    doc.line(margin, y, pageWidth - margin, y);
     y += 8;
     
-    // Table header
+    // Horizontal divider
+    doc.setDrawColor(236, 72, 153);
+    doc.setLineWidth(0.8);
+    doc.line(margin + 5, y, pageWidth - margin - 5, y);
+    y += 6;
+    
+    // Table header box
     doc.setFillColor(248, 250, 252);
-    doc.rect(margin, y, contentWidth, 10, 'F');
-    doc.setDrawColor(200, 200, 200);
-    doc.rect(margin, y, contentWidth, 10);
+    doc.rect(margin + 4, y, contentWidth - 8, 9, 'F');
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.4);
+    doc.rect(margin + 4, y, contentWidth - 8, 9);
     
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(30, 30, 30);
+    doc.setFontSize(8);
+    doc.setTextColor(30, 41, 59);
     
-    let x = margin + 5;
+    // Compute total width sum of custom widths
+    const totalCustomWidth = columns.reduce((acc, c) => acc + (c.width || 30), 0);
+    const scaleFactor = (contentWidth - 8) / (totalCustomWidth || 1);
+    
+    let x = margin + 6;
     columns.forEach(c => {
-      const colWidth = (c.width || 30) * (contentWidth / 180);
-      doc.text(c.header, x, y + 7);
+      const colWidth = (c.width || 30) * scaleFactor;
+      doc.text(String(c.header || ''), x, y + 6);
       x += colWidth;
     });
     
-    y += 15;
+    y += 13;
     
     // Table rows for this page
     const startIndex = page * rowsPerPage;
-    const endIndex = Math.min(startIndex + rowsPerPage, data.length);
+    const endIndex = Math.min(startIndex + rowsPerPage, safeData.length);
     
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
-    doc.setTextColor(60, 60, 60);
+    doc.setTextColor(51, 65, 85);
     
-    for (let i = startIndex; i < endIndex; i++) {
-      const row = data[i];
-      let xRow = margin + 5;
-      
-      columns.forEach(c => {
-        const colWidth = (c.width || 30) * (contentWidth / 180);
-        const val = typeof c.accessor === 'function' ? c.accessor(row) : row[c.accessor];
-        const valStr = String(val || '—');
+    if (safeData.length === 0) {
+      doc.text("No records available.", pageWidth / 2, y, { align: "center" });
+    } else {
+      for (let i = startIndex; i < endIndex; i++) {
+        const row = safeData[i];
+        let xRow = margin + 6;
         
-        // Truncate if too long
-        if (valStr.length > 25) {
-          const truncated = valStr.substring(0, 22) + '...';
+        columns.forEach(c => {
+          const colWidth = (c.width || 30) * scaleFactor;
+          const val = typeof c.accessor === 'function' ? c.accessor(row) : row[c.accessor];
+          const valStr = String(val ?? '—');
+          
+          // Truncate long text cleanly
+          const maxChars = Math.floor(colWidth / 2.2);
+          const truncated = valStr.length > maxChars ? valStr.substring(0, Math.max(maxChars - 3, 1)) + '...' : valStr;
           doc.text(truncated, xRow, y);
-        } else {
-          doc.text(valStr, xRow, y);
-        }
+          
+          xRow += colWidth;
+        });
         
-        xRow += colWidth;
-      });
-      
-      y += 7;
-      
-      // Row separator line
-      doc.setDrawColor(240, 240, 240);
-      doc.setLineWidth(0.1);
-      doc.line(margin, y, pageWidth - margin, y);
-      y += 1;
+        y += 4;
+        // Row separator line
+        doc.setDrawColor(226, 232, 240);
+        doc.setLineWidth(0.2);
+        doc.line(margin + 4, y, pageWidth - margin - 4, y);
+        y += 4;
+      }
     }
     
-    // Page number
+    // Page footer
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
-    doc.setTextColor(150, 150, 150);
-    doc.text(`Page ${page + 1} of ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: "center" });
+    doc.setTextColor(148, 163, 184);
+    doc.text(`Page ${page + 1} of ${totalPages}`, pageWidth / 2, pageHeight - margin - 3, { align: "center" });
   }
 
   doc.save(`${filename}.pdf`);
 }
+

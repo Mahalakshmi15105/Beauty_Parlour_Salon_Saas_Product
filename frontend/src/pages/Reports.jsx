@@ -3,7 +3,7 @@ import API from "../services/api";
 import { useToast } from "../context/ToastContext";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { useTheme } from "../context/ThemeContext";
-import { exportToCSV, printDataList, exportToPDF } from "../utils/exportUtils";
+import { exportToCSV, printDataList, exportToPDF, exportToExcel } from "../utils/exportUtils";
 import { 
   Printer, 
   FileSpreadsheet, 
@@ -163,9 +163,9 @@ function Reports() {
   };
 
   const handleExportExcel = () => {
-    const { columns, data, filename } = getExportConfig();
+    const { columns, data, title, filename } = getExportConfig();
     if (data.length === 0) return showError("No data available to export.");
-    exportToCSV(data, columns, filename);
+    exportToExcel(title, data, columns, filename);
   };
 
   const handleExportPDF = () => {

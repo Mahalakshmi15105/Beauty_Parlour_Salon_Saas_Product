@@ -4,7 +4,7 @@ import { useToast } from "../context/ToastContext";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { useModalFocusTrap, useFormKeyboardNavigation } from "../utils/keyboardNavigation";
 import { AlertTriangle, X, Printer, FileSpreadsheet, FileText, Boxes, Users, ClipboardList, Plus, Trash2, Edit, CheckCircle, Upload } from "lucide-react";
-import { exportToCSV, printDataList, exportToPDF } from "../utils/exportUtils";
+import { exportToCSV, printDataList, exportToPDF, exportToExcel } from "../utils/exportUtils";
 import BulkUploadModal from "../components/BulkUploadModal";
 
 function Products() {
@@ -359,7 +359,7 @@ function Products() {
       { header: "Threshold", accessor: "low_stock_threshold" },
       { header: "Status", accessor: "status" }
     ];
-    exportToCSV(products, columns, activeTab === "reorders" ? "reorders_report" : "products_catalog");
+    exportToExcel(activeTab === "reorders" ? "Low Stock & Reorders Report" : "Products & Inventory Catalog", products, columns, activeTab === "reorders" ? "reorders_report" : "products_catalog");
   };
 
   const handleExportPDF = () => {
@@ -401,7 +401,7 @@ function Products() {
       { header: "Total Cost", accessor: (row) => `${currencySymbol}${parseFloat(row.total_price || 0).toFixed(2)}` },
       { header: "Status", accessor: "status" }
     ];
-    exportToCSV(reorderLogs, columns, "restock_history");
+    exportToExcel("Restock Procurement History Log", reorderLogs, columns, "restock_history");
   };
 
   // Export handlers for Suppliers Directory
@@ -426,7 +426,7 @@ function Products() {
       { header: "Office Address", accessor: "address" },
       { header: "Status", accessor: "status" }
     ];
-    exportToCSV(suppliers, columns, "suppliers_directory");
+    exportToExcel("Suppliers Directory", suppliers, columns, "suppliers_directory");
   };
 
   const handleExportPDFSuppliers = () => {

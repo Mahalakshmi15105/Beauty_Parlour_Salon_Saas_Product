@@ -3,7 +3,7 @@ import API from "../services/api";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { useModalFocusTrap, useFormKeyboardNavigation } from "../utils/keyboardNavigation";
 import { X, Printer, FileSpreadsheet, FileText, Upload } from "lucide-react";
-import { exportToCSV, printDataList, exportToPDF } from "../utils/exportUtils";
+import { exportToCSV, printDataList, exportToPDF, exportToExcel } from "../utils/exportUtils";
 import BulkUploadModal from "../components/BulkUploadModal";
 import { useToast } from "../context/ToastContext";
 
@@ -154,7 +154,7 @@ function Services() {
       { header: "Price", accessor: (row) => `${currencySymbol}${parseFloat(row.price || 0).toFixed(2)}` },
       { header: "Status", accessor: "status" }
     ];
-    exportToCSV(services, columns, "services_list");
+    exportToExcel("Services & Treatments Catalog", services, columns, "services_list");
   };
 
   const handleExportPDF = () => {
