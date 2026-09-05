@@ -563,8 +563,8 @@ function Services() {
 
       {/* Service Modal (Glowing First Field, Duration & Description removed, Auto-Calculated Multi-Membership Discounts) */}
       {showServiceModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div ref={serviceModalRef} className="bg-surface max-w-xl w-full rounded-2xl shadow-xl border border-border-soft overflow-hidden">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div ref={serviceModalRef} className="glowe-glass-card max-w-xl w-full rounded-3xl shadow-2xl border border-white/70 overflow-hidden">
             <div className="px-6 py-4 border-b border-border-soft flex justify-between items-center">
               <h3 className="text-md font-bold text-text-primary">
                 {editId ? "Edit Service" : "Add New Service"}
@@ -732,9 +732,9 @@ function Services() {
 
       {/* Category Management Modal (Glowing First Field, Edit Option beside Delete, Lucide X Close Icon) */}
       {showCategoryModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div ref={categoryModalRef} className="bg-surface max-w-md w-full rounded-2xl shadow-xl border border-border-soft overflow-hidden">
-            <div className="px-6 py-4 border-b border-border-soft flex justify-between items-center">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div ref={categoryModalRef} className="glowe-glass-card max-w-md w-full rounded-3xl shadow-2xl border border-white/70 overflow-hidden">
+            <div className="px-6 py-4 border-b border-pink-100/60 flex justify-between items-center bg-white/50 backdrop-blur-md">
               <h3 className="text-md font-bold text-text-primary">Manage Service Categories</h3>
               <button onClick={() => setShowCategoryModal(false)} className="text-text-secondary hover:text-text-primary p-1">
                 <X className="w-5 h-5" />

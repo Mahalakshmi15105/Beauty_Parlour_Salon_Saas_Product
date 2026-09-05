@@ -176,8 +176,8 @@ function App() {
   // 3. LOGIN PAGE VIEW
   if (currentView === "login" || (!token && currentView === "app")) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-pink-50 via-white to-pink-50 flex flex-col items-center justify-center p-6 font-sans">
-        <div className="max-w-md w-full bg-white border border-pink-100 rounded-3xl shadow-xl p-8 space-y-6">
+      <div className="min-h-screen glowe-bg-gradient flex flex-col items-center justify-center p-6 font-sans">
+        <div className="max-w-md w-full glowe-glass-card p-8 rounded-3xl glowe-glow-shadow space-y-6">
           <div className="text-center space-y-2">
             <button
               onClick={() => setCurrentView("landing")}
@@ -185,9 +185,11 @@ function App() {
             >
               Back to Home
             </button>
-            <div className="inline-flex h-14 w-14 bg-gradient-to-tr from-pink-600 to-rose-400 text-white items-center justify-center rounded-2xl font-bold text-lg mb-2 shadow-lg shadow-pink-500/30">
-              <Sparkles className="w-7 h-7 text-white" />
-            </div>
+            <img
+              src="/smartgonext-logo.png"
+              alt="SmartGoNext Logo"
+              className="w-14 h-14 object-contain rounded-2xl mx-auto mb-2 shadow-lg shadow-slate-900/10"
+            />
             <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Sign in to your account</h1>
             <p className="text-xs text-slate-500 font-medium">Enter your credentials to access your parlour dashboard.</p>
           </div>
@@ -218,7 +220,7 @@ function App() {
                   }
                 }}
                 placeholder="admin@smartgonext.com"
-                className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm text-slate-800 focus:outline-none focus:border-pink-500 focus:bg-white transition font-medium"
+                className="w-full bg-white/80 border border-pink-100 px-4 py-3 rounded-xl text-sm text-slate-800 focus:outline-none focus:border-pink-500 focus:bg-white transition font-medium"
               />
             </div>
 
@@ -242,7 +244,7 @@ function App() {
                     }
                   }}
                   placeholder="••••••••"
-                  className="w-full bg-slate-50 border border-slate-200 px-4 py-3 pr-10 rounded-xl text-sm text-slate-800 focus:outline-none focus:border-pink-500 focus:bg-white transition font-medium"
+                  className="w-full bg-white/80 border border-pink-100 px-4 py-3 pr-10 rounded-xl text-sm text-slate-800 focus:outline-none focus:border-pink-500 focus:bg-white transition font-medium"
                 />
                 <button
                   type="button"
@@ -259,13 +261,13 @@ function App() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-pink-600 to-rose-500 hover:from-pink-700 hover:to-rose-600 text-white py-3.5 rounded-xl text-xs font-extrabold shadow-lg shadow-pink-500/25 transition disabled:opacity-50"
+              className="w-full glowe-pink-gradient text-white py-3.5 rounded-full text-xs font-extrabold shadow-lg transition disabled:opacity-50"
             >
               {loading ? "Signing in..." : "Sign in to Admin Portal"}
             </button>
           </form>
 
-          <div className="text-center pt-2 border-t border-slate-100">
+          <div className="text-center pt-2 border-t border-pink-100/60">
             <p className="text-xs text-slate-500 font-medium">
               Don't have a salon account?{" "}
               <button onClick={() => setCurrentView("register")} className="text-pink-600 font-bold hover:underline">

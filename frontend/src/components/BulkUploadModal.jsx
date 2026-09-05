@@ -152,45 +152,45 @@ function BulkUploadModal({ module, onClose, onSuccess }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
+      <div className="glowe-glass-card rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-white/70">
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-900">
+        <div className="sticky top-0 bg-white/80 backdrop-blur-xl border-b border-pink-100/60 px-6 py-4 flex items-center justify-between z-10">
+          <h2 className="text-xl font-bold text-slate-900">
             Bulk Upload {moduleNames[module]}
           </h2>
           <button
             onClick={handleClose}
-            className="p-2 hover:bg-gray-100 rounded-full transition"
+            className="p-2 hover:bg-pink-50 text-slate-500 hover:text-pink-600 rounded-full transition"
           >
-            <X className="w-5 h-5 text-gray-500" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
         <div className="p-6">
           {error && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-700">{error}</p>
+            <div className="mb-4 p-4 bg-rose-50/90 border border-rose-200 rounded-2xl flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-rose-500 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-rose-700 font-semibold">{error}</p>
             </div>
           )}
 
           {step === 1 && (
-            <div className="py-6 space-y-6">
-              <div className="bg-pink-50/60 border border-pink-100 rounded-2xl p-6 text-center">
-                <div className="w-12 h-12 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-3">
+            <div className="py-4 space-y-6">
+              <div className="glowe-glass-card border border-pink-100 rounded-2xl p-6 text-center shadow-xs">
+                <div className="w-12 h-12 bg-pink-100/80 rounded-full flex items-center justify-center mx-auto mb-3 shadow-xs">
                   <Download className="w-6 h-6 text-pink-600" />
                 </div>
-                <h3 className="text-base font-bold text-gray-900 mb-1">
+                <h3 className="text-base font-bold text-slate-900 mb-1">
                   Need an Excel Template?
                 </h3>
-                <p className="text-xs text-gray-600 mb-4 max-w-md mx-auto">
+                <p className="text-xs text-slate-600 mb-4 max-w-md mx-auto font-medium">
                   Download the template file pre-formatted with clean column titles and validation guidelines.
                 </p>
                 <button
                   onClick={handleDownloadTemplate}
-                  className="px-5 py-2.5 bg-white border border-pink-300 text-pink-700 rounded-xl font-bold text-xs hover:bg-pink-100/50 transition flex items-center gap-2 mx-auto shadow-xs"
+                  className="px-5 py-2.5 bg-white/90 border border-pink-300 text-pink-700 rounded-full font-bold text-xs hover:bg-pink-50 transition flex items-center gap-2 mx-auto shadow-xs hover:shadow-pink-500/20"
                 >
                   <Download className="w-4 h-4" />
                   Download Template
@@ -198,24 +198,24 @@ function BulkUploadModal({ module, onClose, onSuccess }) {
               </div>
 
               <div className="relative flex py-1 items-center">
-                <div className="flex-grow border-t border-gray-200"></div>
-                <span className="flex-shrink mx-4 text-xs font-extrabold text-gray-400 uppercase tracking-wider">OR</span>
-                <div className="flex-grow border-t border-gray-200"></div>
+                <div className="flex-grow border-t border-pink-200/60"></div>
+                <span className="flex-shrink mx-4 text-xs font-extrabold text-slate-400 uppercase tracking-wider">OR</span>
+                <div className="flex-grow border-t border-pink-200/60"></div>
               </div>
 
-              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 text-center">
-                <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Upload className="w-6 h-6 text-gray-700" />
+              <div className="glowe-glass-card border border-pink-100 rounded-2xl p-6 text-center shadow-xs">
+                <div className="w-12 h-12 bg-pink-100/80 rounded-full flex items-center justify-center mx-auto mb-3 shadow-xs">
+                  <Upload className="w-6 h-6 text-pink-600" />
                 </div>
-                <h3 className="text-base font-bold text-gray-900 mb-1">
+                <h3 className="text-base font-bold text-slate-900 mb-1">
                   Already Have a Filled Template?
                 </h3>
-                <p className="text-xs text-gray-600 mb-4 max-w-md mx-auto">
+                <p className="text-xs text-slate-600 mb-4 max-w-md mx-auto font-medium">
                   If you have already downloaded and filled your Excel file, proceed directly to upload.
                 </p>
                 <button
                   onClick={() => setStep(2)}
-                  className="px-6 py-2.5 bg-pink-600 text-white rounded-xl font-bold text-xs hover:bg-pink-700 transition flex items-center gap-2 mx-auto shadow-sm"
+                  className="px-6 py-2.5 glowe-pink-gradient text-white rounded-full font-extrabold text-xs transition flex items-center gap-2 mx-auto shadow-md shadow-pink-500/30"
                 >
                   <Upload className="w-4 h-4" />
                   Upload Excel File
@@ -227,17 +227,17 @@ function BulkUploadModal({ module, onClose, onSuccess }) {
           {step === 2 && (
             <div>
               <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                <h3 className="text-lg font-bold text-slate-900 mb-1">
                   Upload Excel File
                 </h3>
-                <p className="text-gray-600 text-sm">
+                <p className="text-slate-600 text-xs font-medium">
                   Upload the filled template file. Only .xlsx and .xls files are accepted.
                 </p>
               </div>
 
               <div
-                className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
-                  selectedFile ? 'border-pink-500 bg-pink-50' : 'border-gray-300 hover:border-pink-400'
+                className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all ${
+                  selectedFile ? 'border-pink-500 bg-pink-50/60' : 'border-pink-200 hover:border-pink-400 bg-white/50 backdrop-blur-xs'
                 }`}
                 onDragOver={handleDragOver}
                 onDragEnter={handleDragEnter}
@@ -254,13 +254,13 @@ function BulkUploadModal({ module, onClose, onSuccess }) {
                 
                 {!selectedFile ? (
                   <>
-                    <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-600 mb-4">
+                    <Upload className="w-12 h-12 text-pink-400 mx-auto mb-3" />
+                    <p className="text-slate-700 text-xs font-medium mb-4">
                       Drag & drop your Excel file here, or click to browse
                     </p>
                     <button
                       onClick={() => fileInputRef.current?.click()}
-                      className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
+                      className="px-4 py-2 bg-white border border-pink-200 text-pink-600 font-bold text-xs rounded-full hover:bg-pink-50 transition shadow-xs"
                     >
                       Select File
                     </button>
@@ -269,16 +269,16 @@ function BulkUploadModal({ module, onClose, onSuccess }) {
                   <div className="flex items-center justify-center gap-3">
                     <FileText className="w-8 h-8 text-pink-600" />
                     <div className="text-left">
-                      <p className="font-medium text-gray-900">{selectedFile.name}</p>
-                      <p className="text-sm text-gray-500">
+                      <p className="font-bold text-slate-900 text-xs">{selectedFile.name}</p>
+                      <p className="text-[11px] text-slate-500 font-medium">
                         {(selectedFile.size / 1024).toFixed(2)} KB
                       </p>
                     </div>
                     <button
                       onClick={() => setSelectedFile(null)}
-                      className="p-2 hover:bg-gray-200 rounded-full transition"
+                      className="p-2 hover:bg-pink-100 rounded-full transition text-slate-500 hover:text-pink-600"
                     >
-                      <X className="w-4 h-4 text-gray-500" />
+                      <X className="w-4 h-4" />
                     </button>
                   </div>
                 )}
@@ -287,14 +287,14 @@ function BulkUploadModal({ module, onClose, onSuccess }) {
               <div className="flex gap-3 mt-6">
                 <button
                   onClick={handleClose}
-                  className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                  className="flex-1 px-4 py-3 border border-pink-200 text-slate-700 font-bold text-xs rounded-full hover:bg-pink-50 transition"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleUpload}
                   disabled={!selectedFile || uploading}
-                  className="flex-1 px-4 py-3 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-3 glowe-pink-gradient text-white font-extrabold text-xs rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md shadow-pink-500/30"
                 >
                   {uploading ? (
                     <>

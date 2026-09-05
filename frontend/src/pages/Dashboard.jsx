@@ -111,25 +111,25 @@ function Dashboard() {
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-4 gap-6">
-        <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow flex flex-col justify-between">
+        <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow flex flex-col justify-between" style={{ boxShadow: "0 8px 24px rgba(255, 117, 143, 0.2)" }}>
           <p className="text-xs font-bold text-pink-600 uppercase tracking-wider">Today's Revenue</p>
           <p className="text-2xl font-black text-text-primary mt-2">{formatCurrency(summary?.revenue?.today)}</p>
           <p className="text-[10px] text-success font-medium mt-2">▲ {summary?.invoices?.today} Bills Processed</p>
         </div>
 
-        <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow flex flex-col justify-between">
-          <p className="text-xs font-bold text-text-secondary uppercase tracking-wider">Weekly Revenue</p>
+        <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow flex flex-col justify-between" style={{ boxShadow: "0 8px 24px rgba(99, 102, 241, 0.15)" }}>
+          <p className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Weekly Revenue</p>
           <p className="text-2xl font-black text-text-primary mt-2">{formatCurrency(summary?.revenue?.weekly)}</p>
           <p className="text-[10px] text-text-secondary mt-2">Last 7 Days Rolling</p>
         </div>
 
-        <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow flex flex-col justify-between">
-          <p className="text-xs font-bold text-text-secondary uppercase tracking-wider">Monthly Revenue</p>
+        <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow flex flex-col justify-between" style={{ boxShadow: "0 8px 24px rgba(16, 185, 129, 0.15)" }}>
+          <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Monthly Revenue</p>
           <p className="text-2xl font-black text-text-primary mt-2">{formatCurrency(summary?.revenue?.monthly)}</p>
           <p className="text-[10px] text-text-secondary mt-2">{summary?.invoices?.this_month} Bills This Month</p>
         </div>
 
-        <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow flex flex-col justify-between">
+        <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow flex flex-col justify-between" style={{ boxShadow: "0 8px 24px rgba(245, 158, 11, 0.15)" }}>
           <p className="text-xs font-bold text-amber-600 uppercase tracking-wider">{t("active_customers")}</p>
           <p className="text-2xl font-black text-text-primary mt-2">{summary?.memberships?.active}</p>
           <p className="text-[10px] text-warning font-medium mt-2">{summary?.memberships?.expiring_soon} Expiring Soon</p>
@@ -165,8 +165,8 @@ function Dashboard() {
         </div>
 
         {/* Top Services Bar Chart */}
-        <div className="col-span-4 bg-surface border border-border-soft p-6 rounded-lg shadow-sm space-y-4">
-          <h3 className="text-sm font-semibold text-text-primary">Top Treatments by Sales</h3>
+        <div className="col-span-4 glowe-glass-card p-6 rounded-2xl glowe-glow-shadow space-y-4">
+          <h3 className="text-sm font-bold text-text-primary">Top Treatments by Sales</h3>
           <div className="h-64">
             {charts?.top_services?.length === 0 ? (
               <div className="h-full flex items-center justify-center text-xs text-text-secondary">No treatment data.</div>
@@ -188,8 +188,8 @@ function Dashboard() {
       {/* Activity Feeds */}
       <div className="grid grid-cols-2 gap-8">
         {/* Latest Checkout Invoices */}
-        <div className="bg-surface border border-border-soft p-6 rounded-lg shadow-sm space-y-4">
-          <h3 className="text-sm font-semibold text-text-primary">{t("pos_billing")}</h3>
+        <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow space-y-4">
+          <h3 className="text-sm font-bold text-text-primary">{t("pos_billing")}</h3>
           {activities?.recent_invoices?.length === 0 ? (
             <p className="text-xs text-text-secondary">No recent transactions.</p>
           ) : (
@@ -213,7 +213,7 @@ function Dashboard() {
         </div>
 
         {/* Latest Registered Customers */}
-        <div className="bg-surface border border-border-soft p-6 rounded-lg shadow-sm space-y-4">
+        <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow space-y-4">
           <h3 className="text-sm font-semibold text-text-primary">{t("recent_activities")}</h3>
           {activities?.recent_customers?.length === 0 ? (
             <p className="text-xs text-text-secondary">No new registrations.</p>

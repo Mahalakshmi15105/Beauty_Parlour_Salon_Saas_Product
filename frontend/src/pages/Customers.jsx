@@ -523,11 +523,11 @@ function Customers() {
 
       {/* Add/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div ref={modalRef} className="bg-surface max-w-lg w-full rounded-lg shadow-lg border border-border-soft overflow-hidden">
-            <div className="px-6 py-4 border-b border-border-soft flex justify-between items-center">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div ref={modalRef} className="glowe-glass-card max-w-lg w-full rounded-3xl shadow-2xl border border-white/70 overflow-hidden">
+            <div className="px-6 py-4 border-b border-pink-100/60 flex justify-between items-center bg-white/50 backdrop-blur-md">
               <div className="flex items-center space-x-2">
-                <h3 className="text-md font-semibold text-text-primary">
+                <h3 className="text-md font-bold text-slate-900">
                   {editId ? "Edit Customer" : "Add New Customer"}
                 </h3>
                 {editId && (() => {

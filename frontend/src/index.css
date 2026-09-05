@@ -31,66 +31,77 @@
 
 /* Glowe Theme Utility Classes & Glassmorphism Aesthetics */
 .glowe-bg-gradient {
-  background: linear-gradient(135deg, #FFF0F5 0%, #FFF6EC 50%, #E8F4FE 100%) !important;
+  background: linear-gradient(135deg, #FFF0F5 0%, #FFF5EB 50%, #E6F0FA 100%) !important;
+  background-attachment: fixed !important;
 }
 
 .glowe-sidebar-gradient {
-  background: linear-gradient(180deg, #FFEBEF 0%, #FFF3E6 60%, #FFEBF0 100%) !important;
+  background: rgba(255, 255, 255, 0.65) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 8px 24px rgba(255, 117, 143, 0.12) !important;
 }
 
 .glowe-glass-card {
-  background: rgba(255, 255, 255, 0.85) !important;
-  backdrop-filter: blur(16px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.8) !important;
-  box-shadow: 0 10px 30px -5px rgba(255, 182, 193, 0.25), 0 4px 12px -2px rgba(220, 150, 160, 0.12) !important;
+  background: rgba(255, 255, 255, 0.6) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 8px 24px rgba(255, 117, 143, 0.15) !important;
   border-radius: 1.5rem !important;
 }
 
 .glowe-pink-gradient {
-  background: linear-gradient(135deg, #FF9EAA 0%, #FF6B8B 100%) !important;
+  background: linear-gradient(90deg, #FF7EB3 0%, #FF4D94 100%) !important;
   color: #FFFFFF !important;
-  box-shadow: 0 8px 20px -4px rgba(255, 107, 139, 0.45) !important;
+  box-shadow: 0 6px 18px rgba(255, 77, 148, 0.45) !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.glowe-pink-gradient:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 8px 24px rgba(255, 77, 148, 0.6) !important;
 }
 
 .glowe-pill-active {
-  background: linear-gradient(135deg, #FF9EAA 0%, #FF6B8B 100%) !important;
+  background: linear-gradient(90deg, #FF7EB3 0%, #FF4D94 100%) !important;
   color: #FFFFFF !important;
   border-radius: 9999px !important;
-  box-shadow: 0 6px 16px -3px rgba(255, 107, 139, 0.4) !important;
+  box-shadow: 0 6px 18px rgba(255, 77, 148, 0.45) !important;
 }
 
 .glowe-glow-shadow {
-  box-shadow: 0 10px 28px -6px rgba(255, 182, 193, 0.35), 0 2px 10px -2px rgba(240, 160, 175, 0.15) !important;
+  box-shadow: 0 8px 24px rgba(255, 117, 143, 0.15) !important;
 }
 
 /* Dynamic CSS Variable Driven Design System Utilities with Glass Button Aesthetics */
 .bg-primary { 
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%) !important; 
-  box-shadow: 0 6px 18px -4px rgba(255, 117, 143, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important;
+  background: linear-gradient(90deg, #FF7EB3 0%, #FF4D94 100%) !important; 
+  box-shadow: 0 6px 18px rgba(255, 77, 148, 0.45) !important;
   border-radius: 9999px !important;
-  transition: all 0.2s ease-in-out !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
 }
 .bg-primary:hover {
-  transform: translateY(-1px) scale(1.01) !important;
-  box-shadow: 0 8px 22px -3px rgba(255, 117, 143, 0.55), inset 0 1px 1px rgba(255, 255, 255, 0.4) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 8px 24px rgba(255, 77, 148, 0.6) !important;
 }
 
 .text-primary { color: var(--color-primary) !important; }
 .border-primary { border-color: var(--color-primary) !important; }
 
 .bg-primary-hover:hover, .hover\:bg-primary-hover:hover { 
-  background: linear-gradient(135deg, var(--color-primary-hover) 0%, var(--color-primary) 100%) !important; 
+  background: linear-gradient(90deg, #FF4D94 0%, #FF7EB3 100%) !important; 
 }
 .bg-primary-light { 
-  background-color: var(--color-primary-light) !important; 
+  background-color: rgba(255, 240, 243, 0.8) !important; 
   border: 1px solid var(--color-primary-border-soft) !important;
 }
-.hover\:bg-primary-light:hover { background-color: var(--color-primary-light) !important; }
+.hover\:bg-primary-light:hover { background-color: rgba(255, 240, 243, 1) !important; }
 .border-border-soft { border-color: var(--color-primary-border-soft) !important; }
 
-.bg-background { background-color: var(--color-background) !important; }
-.bg-surface { background-color: var(--color-surface) !important; }
+.bg-background { background: linear-gradient(135deg, #FFF0F5 0%, #FFF5EB 50%, #E6F0FA 100%) !important; background-attachment: fixed !important; }
+.bg-surface { background: rgba(255, 255, 255, 0.6) !important; backdrop-filter: blur(20px) saturate(180%) !important; -webkit-backdrop-filter: blur(20px) saturate(180%) !important; }
 
 .text-text-primary { color: var(--color-text-primary) !important; }
 .text-text-secondary { color: var(--color-text-secondary) !important; }
@@ -139,31 +150,6 @@
   }
 
   select option:hover,
-  select option:focus,
-  select option:checked {
-    background: linear-gradient(135deg, #FF758F 0%, #FF4D6D 100%) !important;
-    color: #FFFFFF !important;
-  }
-
-  /* Global Modal & Popover Solid Background & High-Contrast Text Enforcement */
-  .fixed.inset-0 > div,
-  div[role="dialog"],
-  .modal-content,
-  .bg-surface.rounded-2xl,
-  .bg-surface.rounded-3xl,
-  .bg-surface.rounded-xl,
-  .bg-surface.rounded-lg {
-    background-color: #FFFFFF !important;
-    opacity: 1 !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 10px 25px -5px rgba(255, 117, 143, 0.2) !important;
-  }
-
-  /* Modal Input & Text Labels Contrast */
-  .fixed.inset-0 input,
-  .fixed.inset-0 select,
-  .fixed.inset-0 textarea,
   div[role="dialog"] input,
   div[role="dialog"] select,
   div[role="dialog"] textarea {
@@ -178,4 +164,104 @@
     color: #334155 !important;
     font-weight: 700 !important;
   }
+}
+
+/* Keyframe Animations for Landing Page Glowe Theme */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes floatSoft {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 4px 14px rgba(255, 117, 143, 0.25);
+    border-color: rgba(255, 117, 143, 0.4);
+  }
+  50% {
+    box-shadow: 0 8px 22px rgba(255, 117, 143, 0.45);
+    border-color: rgba(255, 77, 148, 0.7);
+  }
+}
+
+@keyframes textShimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Landing Page Specific Animation Utility Classes */
+.animate-fade-in-up {
+  animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-reveal-badge {
+  animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+}
+
+.animate-reveal-h1-main {
+  animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.25s both;
+}
+
+.animate-reveal-h1-sub {
+  animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both;
+}
+
+.animate-reveal-desc {
+  animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.55s both;
+}
+
+.animate-shimmer-text {
+  background: linear-gradient(90deg, #FF4D94 0%, #FF7EB3 25%, #E11D48 50%, #FF7EB3 75%, #FF4D94 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: textShimmer 5s ease infinite;
+}
+
+.animate-float-soft {
+  animation: floatSoft 4s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2.5s ease-in-out infinite;
+}
+
+/* Secondary Login Glass Outline Button Styling */
+.glowe-login-btn {
+  background: rgba(255, 255, 255, 0.8) !important;
+  border: 2px solid #FF758F !important;
+  color: #FF4D94 !important;
+  box-shadow: 0 4px 12px rgba(255, 117, 143, 0.15) !important;
+  transition: all 0.3s ease !important;
+  animation: pulseGlow 3s ease-in-out infinite;
+}
+
+.glowe-login-btn:hover {
+  background: linear-gradient(90deg, #FF7EB3 0%, #FF4D94 100%) !important;
+  border-color: transparent !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 8px 24px rgba(255, 77, 148, 0.5) !important;
+  transform: translateY(-1px) !important;
 }
