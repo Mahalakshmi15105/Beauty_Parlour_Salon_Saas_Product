@@ -192,6 +192,11 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
     return () => document.removeEventListener("mousedown", handleClickOutsideNotif);
   }, []);
 
+  // Close Notification Dropdown on activeTab change
+  useEffect(() => {
+    setNotifDropdownOpen(false);
+  }, [activeTab]);
+
   // Close Mobile Drawer on Escape key
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -475,7 +480,7 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
       {/* MAIN WORKSPACE CANVAS */}
       <main className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* HEADER BAR WITH HAMBURGER BUTTON */}
-        <header className="h-16 bg-surface border-b border-border-soft px-4 md:px-8 flex items-center justify-between shrink-0">
+        <header className="relative z-50 h-16 bg-surface border-b border-border-soft px-4 md:px-8 flex items-center justify-between shrink-0">
           <div className="flex items-center space-x-3">
             {/* Hamburger (☰) Toggle Button */}
             <button
@@ -503,7 +508,7 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
             )}
 
             {/* NOTIFICATION BELL & DROPDOWN */}
-            <div ref={notifDropdownRef} className="relative">
+            <div ref={notifDropdownRef} className="relative z-50">
               <button
                 onClick={() => setNotifDropdownOpen((prev) => !prev)}
                 className="p-2 rounded-xl text-slate-600 hover:bg-background border border-border-soft transition shadow-2xs relative flex items-center justify-center"
@@ -519,8 +524,8 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
 
               {/* Dropdown Menu */}
               {notifDropdownOpen && (
-                <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-surface border border-border-soft rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col text-xs font-sans">
-                  <div className="p-3.5 border-b border-border-soft flex justify-between items-center bg-background">
+                <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-2xl shadow-2xl z-[9999] overflow-hidden flex flex-col text-xs font-sans">
+                  <div className="p-3.5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                     <div className="flex items-center space-x-2 font-extrabold text-slate-900">
                       <Bell className="w-4 h-4 text-primary" />
                       <span>Notifications ({unreadNotifCount} unread)</span>
