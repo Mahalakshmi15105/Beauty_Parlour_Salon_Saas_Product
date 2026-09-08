@@ -36,7 +36,7 @@ def get_whatsapp_settings():
     meta_app_id = settings_dict.get("meta_app_id") or current_app.config.get("META_APP_ID") or os.getenv("META_APP_ID", "")
     config_id = settings_dict.get("meta_config_id") or current_app.config.get("META_CONFIG_ID") or os.getenv("META_CONFIG_ID", "")
     graph_version = settings_dict.get("meta_graph_api_version") or current_app.config.get("META_GRAPH_API_VERSION") or os.getenv("META_GRAPH_API_VERSION", "v21.0")
-    redirect_uri = settings_dict.get("meta_redirect_uri") or current_app.config.get("META_REDIRECT_URI") or os.getenv("META_REDIRECT_URI", "")
+    redirect_uri = settings_dict.get("meta_redirect_uri") or current_app.config.get("META_REDIRECT_URI") or os.getenv("META_REDIRECT_URI", "https://www.smartgonext.com/settings")
 
     if not setting:
         return success_response({

@@ -761,7 +761,7 @@ def get_platform_settings():
     meta_app_id = settings_dict.get("meta_app_id") or os.getenv("META_APP_ID", "")
     meta_app_secret = settings_dict.get("meta_app_secret") or os.getenv("META_APP_SECRET", "")
     meta_config_id = settings_dict.get("meta_config_id") or os.getenv("META_CONFIG_ID", "")
-    meta_redirect_uri = settings_dict.get("meta_redirect_uri") or os.getenv("META_REDIRECT_URI", "")
+    meta_redirect_uri = settings_dict.get("meta_redirect_uri") or os.getenv("META_REDIRECT_URI", "https://www.smartgonext.com/settings")
     meta_graph_api_version = settings_dict.get("meta_graph_api_version") or os.getenv("META_GRAPH_API_VERSION", "v21.0")
 
     return success_response({
