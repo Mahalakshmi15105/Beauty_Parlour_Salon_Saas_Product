@@ -199,7 +199,7 @@ export default function WhatsAppIntegration() {
       const height = 650;
       const left = window.screen.width / 2 - width / 2;
       const top = window.screen.height / 2 - height / 2;
-      const redirectUri = encodeURIComponent("https://www.smartgonext.com/");
+      const redirectUri = encodeURIComponent(settings.meta_redirect_uri || "https://www.smartgonext.com/settings");
       const version = settings.meta_graph_api_version || "v21.0";
       
       const oauthUrl = settings.meta_config_id
