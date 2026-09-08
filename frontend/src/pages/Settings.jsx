@@ -148,6 +148,9 @@ function Settings() {
     marketing_settings: {
       churn_days_threshold: 45,
     },
+    billing_settings: {
+      billing_mode: "normal",
+    },
   });
 
   const handleLogoSelected = (file) => {
@@ -247,6 +250,10 @@ function Settings() {
           marketing_settings: {
             ...prev.marketing_settings,
             ...(rawData.marketing_settings || {}),
+          },
+          billing_settings: {
+            ...prev.billing_settings,
+            ...(rawData.billing_settings || {}),
           },
         }));
 
@@ -399,6 +406,7 @@ function Settings() {
           {(() => {
             const tabs = [
               { id: "business", label: "Parlour Profile", icon: Building2 },
+              { id: "billing_mode", label: "Billing Type & Mode", icon: Sliders },
               { id: "membership", label: "Membership System", icon: Award },
               { id: "whatsapp", label: "WhatsApp Integration", icon: MessageSquare },
               { id: "receipt", label: "Receipt & Thermal Printing", icon: Printer },
@@ -436,6 +444,73 @@ function Settings() {
 
         {/* Settings Form Panel */}
         <div ref={formRef} className="col-span-9 bg-surface border border-border-soft p-8 rounded-lg space-y-6">
+          {/* Billing Type & Mode Tab */}
+          {activeTab === "billing_mode" && (
+            <div className="space-y-6">
+              <div className="border-b border-border-soft pb-3">
+                <h3 className="text-sm font-semibold text-text-primary">Billing Interface & Mode Selection</h3>
+                <p className="text-[11px] text-text-secondary">Choose the default billing interface for your parlour billing staff. This setting is saved per tenant & branch.</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  {
+                    id: "normal",
+                    title: "Normal Billing",
+                    badge: "Standard Dropdown",
+                    desc: "Classic dropdown selection workflow with full customer details, service rows, and quick keyboard navigation.",
+                  },
+                  {
+                    id: "touch",
+                    title: "Touch Billing",
+                    badge: "Tap & Split-Screen",
+                    desc: "Modern tap-first split screen with category grid cards, visual image thumbnails, and fast order building.",
+                  },
+                ].map((mode) => {
+                  const isSelected = (settingsData.billing_settings?.billing_mode || "normal") === mode.id;
+                  return (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => {
+                        localStorage.setItem("billing_mode", mode.id);
+                        setSettingsData({
+                          ...settingsData,
+                          billing_settings: {
+                            ...settingsData.billing_settings,
+                            billing_mode: mode.id,
+                          },
+                        });
+                      }}
+                      className={`p-5 rounded-2xl border text-left transition flex flex-col justify-between space-y-4 ${
+                        isSelected
+                          ? "border-primary bg-primary/10 ring-2 ring-primary/20 shadow-md"
+                          : "border-border-soft bg-background/50 hover:border-slate-300"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <span className="text-xs font-bold text-primary uppercase tracking-wider bg-primary/10 px-2.5 py-1 rounded-full border border-primary/20">
+                          {mode.badge}
+                        </span>
+                        <div
+                          className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                            isSelected ? "border-primary bg-primary text-white" : "border-slate-300"
+                          }`}
+                        >
+                          {isSelected && <Check className="w-3.5 h-3.5" />}
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="text-base font-extrabold text-slate-900">{mode.title}</h4>
+                        <p className="text-xs text-text-secondary mt-1 leading-relaxed">{mode.desc}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Membership System Tab */}
           {activeTab === "membership" && (
             <VisitMembershipSettings />

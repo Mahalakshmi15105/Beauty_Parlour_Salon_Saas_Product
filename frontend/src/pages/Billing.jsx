@@ -3,6 +3,7 @@ import API from "../services/api";
 import { useToast } from "../context/ToastContext";
 import { ThermalReceipt, printThermalReceiptElement, downloadThermalReceiptPDF } from "../components/ThermalReceipt";
 import { getFullImageUrl } from "../utils/imageUrl";
+import TouchModeBilling from "../components/TouchModeBilling";
 import {
   User,
   Scissors,
@@ -41,6 +42,8 @@ import {
   ChevronDown,
   Award,
   Gift,
+  LayoutGrid,
+  ListFilter
 } from "lucide-react";
 
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
@@ -58,6 +61,9 @@ function Billing() {
   const { showSuccess, showError } = useToast();
   const { formatCurrency, currencySymbol, t } = useLanguageCurrency();
   const [activeSubTab, setActiveSubTab] = useState("checkout");
+  const [isTouchMode, setIsTouchMode] = useState(() => {
+    return localStorage.getItem("billing_mode") === "touch";
+  });
 
   // Element Refs for POS Keyboard Workflow
   const customerSelectRef = useRef(null);
@@ -77,6 +83,7 @@ function Billing() {
   // Master Datasets
   const [categories, setCategories] = useState([]);
   const [services, setServices] = useState([]);
+  const [allServices, setAllServices] = useState([]);
   const [products, setProducts] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -835,7 +842,7 @@ function Billing() {
       });
   };
 
-  // Initial Load: Fetch Categories, Employees, Customers, Products, Settings, Membership Plans
+  // Initial Load: Fetch Categories, Employees, Customers, Products, All Services, Settings, Membership Plans
   useEffect(() => {
     setLoading(true);
     Promise.all([
@@ -843,20 +850,30 @@ function Billing() {
       API.get("/employees?limit=100"),
       API.get("/customers?limit=10000"),
       API.get("/products?limit=10000"),
+      API.get("/services?limit=10000"),
       API.get("/settings"),
       API.get("/membership-plans?status=active&limit=100"),
     ])
-      .then(([catRes, empRes, custRes, prodRes, setRes, plansRes]) => {
+      .then(([catRes, empRes, custRes, prodRes, allSvcRes, setRes, plansRes]) => {
         const catList = catRes.data || [];
         setCategories(catList);
         setEmployees(empRes.data.items || []);
         setCustomers(custRes.data.items || []);
         setProducts(prodRes.data.items || prodRes.data || []);
+        setAllServices(allSvcRes.data.items || []);
         setMembershipPlans(plansRes.data.items || []);
 
         const settingsData = setRes?.data || setRes;
         const invSet = settingsData?.invoice_settings || {};
         const regSet = settingsData?.regional_settings || {};
+        const bilSet = settingsData?.billing_settings || {};
+
+        if (bilSet.billing_mode) {
+          localStorage.setItem("billing_mode", bilSet.billing_mode);
+          setIsTouchMode(bilSet.billing_mode === "touch");
+        } else {
+          setIsTouchMode(false);
+        }
 
         if (invSet.tax_rate !== undefined && invSet.tax_rate !== null) {
           setTaxRate(parseFloat(invSet.tax_rate));
@@ -932,24 +949,11 @@ function Billing() {
     }
   }, [activeSubTab]);
 
-  const handleCustomerChange = (customerIdStr) => {
-    setSelectedCustomerId(customerIdStr);
-    setActiveMembership(null);
-    setVisitMembershipStatus(null);
-
-    if (!customerIdStr) {
-      setSelectedGender("");
+  const fetchCustomerMemberships = (customerIdStr) => {
+    if (!customerIdStr || customerIdStr === "walkin") {
+      setActiveMembership(null);
+      setVisitMembershipStatus(null);
       return;
-    }
-    if (customerIdStr === "walkin") {
-      setSelectedGender("Walk-in");
-      return;
-    }
-    const cust = customers.find((c) => c.id === parseInt(customerIdStr));
-    if (cust && cust.gender) {
-      setSelectedGender(cust.gender);
-    } else {
-      setSelectedGender("Unspecified");
     }
 
     // Fetch Type A % discount active membership
@@ -984,6 +988,28 @@ function Billing() {
         }
       })
       .catch((err) => console.error("Failed to load visit membership status:", err));
+  };
+
+  useEffect(() => {
+    fetchCustomerMemberships(selectedCustomerId);
+  }, [selectedCustomerId, activeBranchId]);
+
+  const handleCustomerChange = (customerIdStr) => {
+    setSelectedCustomerId(customerIdStr);
+    if (!customerIdStr) {
+      setSelectedGender("");
+      return;
+    }
+    if (customerIdStr === "walkin") {
+      setSelectedGender("Walk-in");
+      return;
+    }
+    const cust = customers.find((c) => c.id === parseInt(customerIdStr));
+    if (cust && cust.gender) {
+      setSelectedGender(cust.gender);
+    } else {
+      setSelectedGender("Unspecified");
+    }
   };
 
   // Helper to determine discount percentage for a service given active customer membership
@@ -1055,7 +1081,8 @@ function Billing() {
       prevCart.map((item) => {
         let calcDiscount = 0;
         if (item.type === "service") {
-          const svcObj = services.find((s) => s.id === parseInt(item.item_id || item.id));
+          const serviceList = allServices.length > 0 ? allServices : services;
+          const svcObj = serviceList.find((s) => s.id === parseInt(item.item_id || item.id));
           calcDiscount = svcObj ? getMembershipDiscountForService(svcObj, activeMembership) : (useMembership && activeMembership ? parseFloat(activeMembership.service_discount_percentage || 0) : 0);
         } else if (item.type === "product") {
           const prodObj = products.find((p) => p.id === parseInt(item.item_id || item.id));
@@ -1067,13 +1094,14 @@ function Billing() {
         };
       })
     );
-  }, [useMembership, activeMembership, services, products]);
+  }, [useMembership, activeMembership, services, allServices, products]);
 
   const handleAddServiceToCart = (serviceIdToUse) => {
     const targetId = serviceIdToUse || selectedServiceId;
     if (!targetId) return;
 
-    const serviceObj = services.find((s) => s.id === parseInt(targetId));
+    const serviceList = allServices.length > 0 ? allServices : services;
+    const serviceObj = serviceList.find((s) => s.id === parseInt(targetId));
     if (!serviceObj) return;
 
     const initialDiscount = getMembershipDiscountForService(serviceObj, activeMembership);
@@ -1376,6 +1404,11 @@ function Billing() {
     ? (parseFloat(invoiceTaxAmount) || 0)
     : defaultTaxAmountFromSettings;
   const netPayable = netTotal + totalTaxAmount;
+
+  // Touch Mode alias bindings
+  const subtotal = grossTotal;
+  const totalDiscountAmount = totalDiscount;
+  const grandTotal = netPayable;
 
   const handleTogglePaymentMethod = (methodId) => {
     if (selectedPaymentMethods.includes(methodId)) {
@@ -1877,9 +1910,56 @@ function Billing() {
 
       {/* MODE 1: CHECKOUT SCREEN */}
       {activeSubTab === "checkout" && (
+        isTouchMode ? (
+          <TouchModeBilling
+            categories={categories}
+            services={allServices}
+            products={products}
+            cart={cart}
+            setCart={setCart}
+            selectedCustomerId={selectedCustomerId}
+            setSelectedCustomerId={setSelectedCustomerId}
+            customerSearchQuery={customerSearchQuery}
+            setCustomerSearchQuery={setCustomerSearchQuery}
+            isCustomerDropdownOpen={isCustomerDropdownOpen}
+            setIsCustomerDropdownOpen={setIsCustomerDropdownOpen}
+            customerHighlightedIndex={customerHighlightedIndex}
+            setCustomerHighlightedIndex={setCustomerHighlightedIndex}
+            customers={customers}
+            selectedGender={selectedGender}
+            setSelectedGender={setSelectedGender}
+            activeMembership={activeMembership}
+            visitMembershipStatus={visitMembershipStatus}
+            useMembership={useMembership}
+            setUseMembership={setUseMembership}
+            handleAddServiceToCart={handleAddServiceToCart}
+            handleAddProductToCart={handleAddProductToCart}
+            handleRemoveCartItem={handleRemoveItem}
+            handleQuantityChange={handleUpdateQty}
+            handleDiscountChange={handleUpdateDiscountPercent}
+            handleEmployeeToggle={handleSelectEmployee}
+            employees={employees}
+            taxRate={taxRate}
+            invoiceTaxAmount={invoiceTaxAmount}
+            setInvoiceTaxAmount={setInvoiceTaxAmount}
+            isTaxAmountOverridden={isTaxAmountOverridden}
+            setIsTaxAmountOverridden={setIsTaxAmountOverridden}
+            subtotal={subtotal}
+            totalDiscountAmount={totalDiscountAmount}
+            totalTaxAmount={totalTaxAmount}
+            grandTotal={grandTotal}
+            handleOpenPaymentModal={handleProceedToPayment}
+            openQuickAddCustomer={openQuickAddCustomer}
+            openQuickEditCustomer={openQuickEditCustomer}
+            openCustomerHistory={openCustomerHistory}
+            customerComboboxRef={customerComboboxRef}
+            currencySymbol={currencySymbol}
+            formatCurrency={formatCurrency}
+          />
+        ) : (
         <div className="space-y-3">
           {/* Step 1 & 2: Customer & Gender Selection */}
-          <div className="bg-surface border border-border-soft p-4 rounded-2xl shadow-xs space-y-3">
+          <div className="relative z-40 bg-surface border border-border-soft p-4 rounded-2xl shadow-xs space-y-3">
             <div className="flex items-center space-x-2 text-xs font-extrabold text-primary uppercase tracking-wider">
               <User className="w-4 h-4 text-primary" />
               <span>Step 1 & 2: Customer & Gender Selection</span>
@@ -2009,7 +2089,7 @@ function Billing() {
                     ];
 
                     return (
-                      <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-pink-200 rounded-2xl shadow-2xl z-[100] max-h-64 overflow-y-auto text-xs p-2 space-y-1">
+                      <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-pink-200 rounded-2xl shadow-2xl z-[9999] max-h-64 overflow-y-auto text-xs p-2 space-y-1">
                         {options.map((opt, idx) => {
                           const isHighlighted = idx === customerHighlightedIndex;
 
@@ -2272,7 +2352,7 @@ function Billing() {
           </div>
 
           {/* Step 3 & 4: Category & Service Selection */}
-          <div className="bg-surface border border-border-soft p-4 rounded-2xl shadow-xs space-y-3">
+          <div className="relative z-30 bg-surface border border-border-soft p-4 rounded-2xl shadow-xs space-y-3">
             <div className="flex items-center space-x-2 text-xs font-extrabold text-primary uppercase tracking-wider">
               <Scissors className="w-4 h-4 text-primary" />
               <span>Step 3 & 4: Category & Service Selection</span>
@@ -2711,6 +2791,7 @@ function Billing() {
             </div>
           </div>
         </div>
+        )
       )}
 
       {/* MODE 2: BILLING HISTORY TAB */}

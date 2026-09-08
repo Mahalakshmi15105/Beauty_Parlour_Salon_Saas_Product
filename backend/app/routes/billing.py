@@ -8,7 +8,7 @@ from app.models.membership import MembershipBenefit, CustomerMembership
 from app.models.user import TenantSetting
 from app.utils.responses import success_response, error_response
 from app.utils.auth import require_role, get_tenant_query, get_branch_query
-from app.utils.query import paginate_query
+from app.utils.query import paginate_query, generate_unique_invoice_number
 from decimal import Decimal
 import logging
 
@@ -232,12 +232,7 @@ def checkout():
             invoice_status = "Paid"
 
         # 5. Generate unique sequential invoice number
-        count_filter = [Invoice.tenant_id == g.parlour_id]
-        if target_branch_id:
-            count_filter.append(Invoice.branch_id == target_branch_id)
-
-        count = db.session.query(Invoice).filter(*count_filter).count()
-        invoice_number = f"INV-{g.parlour_id}-{count + 1:06d}"
+        invoice_number = generate_unique_invoice_number(g.parlour_id, target_branch_id)
 
         # 6. Save Invoice Header
         invoice = Invoice(
@@ -379,9 +374,7 @@ def get_invoices():
     cursor = request.args.get("cursor")
     sort = request.args.get("sort", "-created_at")
 
-    query = get_branch_query(Invoice).filter(
-        (Invoice.membership_name.is_(None)) | (Invoice.membership_name == "")
-    )
+    query = get_branch_query(Invoice)
 
     sort_field = "id"
     sort_desc = False

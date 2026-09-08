@@ -131,11 +131,11 @@ class CampaignService:
         template_params = campaign_data.get("template_params") or []
 
         valid_until = None
-        if valid_until_str:
+        if valid_until_str and str(valid_until_str).strip() and str(valid_until_str).strip() != "dd-mm-yyyy":
             try:
-                valid_until = datetime.strptime(valid_until_str, "%Y-%m-%d").date()
-            except ValueError:
-                pass
+                valid_until = datetime.strptime(str(valid_until_str).strip(), "%Y-%m-%d").date()
+            except Exception:
+                valid_until = None
 
         # Calculate audience
         preview = CampaignService.preview_campaign_audience(tenant_id, audience_type, custom_ids, branch_id)

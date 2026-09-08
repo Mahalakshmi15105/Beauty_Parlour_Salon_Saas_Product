@@ -13,15 +13,30 @@ logger = logging.getLogger(__name__)
 whatsapp_bp = Blueprint("whatsapp", __name__)
 
 
+from app.models.global_models import PlatformSetting
+
 @whatsapp_bp.route("/whatsapp/settings", methods=["GET"])
 @require_role(["ParlourAdmin", "BranchAdmin"])
 def get_whatsapp_settings():
     """Returns Meta WhatsApp Business account connection details for the logged-in parlour tenant."""
     setting = get_tenant_query(WhatsAppSetting).filter_by(tenant_id=g.parlour_id).first()
-    meta_app_id = current_app.config.get("META_APP_ID") or os.getenv("META_APP_ID", "")
-    config_id = current_app.config.get("META_CONFIG_ID") or os.getenv("META_CONFIG_ID", "")
-    graph_version = current_app.config.get("META_GRAPH_API_VERSION") or os.getenv("META_GRAPH_API_VERSION", "v21.0")
-    redirect_uri = current_app.config.get("META_REDIRECT_URI") or os.getenv("META_REDIRECT_URI", "")
+
+    # Load dynamic platform Meta App credentials from master DB
+    settings_dict = {}
+    try:
+        # Create a quick query context for master DB
+        engine = db.get_master_engine()
+        with engine.connect() as conn:
+            from sqlalchemy import text
+            rows = conn.execute(text("SELECT setting_key, setting_value FROM platform_settings")).mappings().all()
+            settings_dict = {r["setting_key"]: r["setting_value"] for r in rows}
+    except Exception as e:
+        logger.warning(f"Notice querying platform_settings for Meta config: {e}")
+
+    meta_app_id = settings_dict.get("meta_app_id") or current_app.config.get("META_APP_ID") or os.getenv("META_APP_ID", "")
+    config_id = settings_dict.get("meta_config_id") or current_app.config.get("META_CONFIG_ID") or os.getenv("META_CONFIG_ID", "")
+    graph_version = settings_dict.get("meta_graph_api_version") or current_app.config.get("META_GRAPH_API_VERSION") or os.getenv("META_GRAPH_API_VERSION", "v21.0")
+    redirect_uri = settings_dict.get("meta_redirect_uri") or current_app.config.get("META_REDIRECT_URI") or os.getenv("META_REDIRECT_URI", "")
 
     if not setting:
         return success_response({
@@ -43,6 +58,7 @@ def get_whatsapp_settings():
     res_dict["meta_config_id"] = config_id
     res_dict["meta_graph_api_version"] = graph_version
     res_dict["meta_redirect_uri"] = redirect_uri
+
     return success_response(res_dict)
 
 
@@ -118,10 +134,10 @@ def connect_meta_oauth():
                     meta_info = {}
 
             meta_info = {
-                "waba_id": meta_info.get("waba_id") or env_waba_id or "109283746591023",
-                "phone_number_id": meta_info.get("phone_number_id") or env_phone_id or "982304918237465",
-                "phone_number": meta_info.get("phone_number") or "+91 97511 09239",
-                "business_name": meta_info.get("business_name") or "Salon Official WhatsApp"
+                "waba_id": meta_info.get("waba_id") or env_waba_id or "1079650281386210",
+                "phone_number_id": meta_info.get("phone_number_id") or env_phone_id or "1218366684696559",
+                "phone_number": meta_info.get("phone_number") or "+91 8903499503",
+                "business_name": meta_info.get("business_name") or "Beauty Parlour"
             }
 
         # 2. Save or Update WhatsAppSetting for current tenant
@@ -244,9 +260,16 @@ def whatsapp_webhook():
         token = request.args.get("hub.verify_token")
         challenge = request.args.get("hub.challenge")
 
+        expected_token = current_app.config.get("WHATSAPP_WEBHOOK_VERIFY_TOKEN") or os.getenv("WHATSAPP_WEBHOOK_VERIFY_TOKEN", "smartgonext_verify_token_2026")
+
         if mode == "subscribe" and challenge:
-            return challenge, 200
-        return "Webhook Verification Endpoint", 200
+            if token == expected_token or not token:
+                from flask import Response
+                return Response(challenge, status=200, mimetype="text/plain")
+            else:
+                return "Verification token mismatch", 403
+        from flask import Response
+        return Response("Webhook Verification Endpoint", status=200, mimetype="text/plain")
 
     # POST Webhook status updates from Meta
     payload = request.get_json() or {}

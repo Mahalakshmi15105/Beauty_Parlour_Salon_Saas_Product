@@ -125,6 +125,9 @@ def get_settings():
         },
         "marketing_settings": {
             "churn_days_threshold": int(_get("churn_days_threshold", 45) or 45)
+        },
+        "billing_settings": {
+            "billing_mode": _get("billing_mode", "normal") or "normal"
         }
     })
 
@@ -267,6 +270,12 @@ def update_settings():
                     setting.secondary_color = thm["secondary_color"].strip()
                 if thm.get("accent_color"):
                     setting.accent_color = thm["accent_color"].strip()
+
+        # Update Billing Settings
+        bil = data.get("billing_settings", {})
+        if bil:
+            if "billing_mode" in bil and bil["billing_mode"]:
+                target_setting.billing_mode = str(bil["billing_mode"]).strip().lower()
 
         db.session.commit()
 

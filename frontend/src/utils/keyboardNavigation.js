@@ -8,12 +8,26 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
   document.addEventListener(
     "focusin",
     (e) => {
-      if (e.target && e.target.tagName === "SELECT") {
-        if (typeof e.target.showPicker === "function") {
-          try {
-            e.target.showPicker();
-          } catch (err) {
-            // ignore if already open or restricted by browser
+      if (e.target) {
+        if (e.target.tagName === "SELECT") {
+          if (typeof e.target.showPicker === "function") {
+            try {
+              e.target.showPicker();
+            } catch (err) {
+              // ignore if already open or restricted by browser
+            }
+          }
+        } else if (e.target.getAttribute("data-image-upload-trigger") === "true") {
+          const targetInputId = e.target.getAttribute("data-target-input");
+          if (targetInputId) {
+            const inputEl = document.getElementById(targetInputId);
+            if (inputEl) {
+              try {
+                inputEl.click();
+              } catch (err) {
+                // ignore
+              }
+            }
           }
         }
       }
@@ -21,6 +35,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
     true
   );
 }
+
 export function isElementNavigable(el) {
   if (!el || typeof el.getBoundingClientRect !== "function") return false;
   if (el.disabled || el.readOnly) return false;
@@ -64,9 +79,9 @@ export function validateCurrentInput(el) {
 
 /**
  * Custom React Hook: Form Keyboard Navigation Engine
- * Automatically moves focus to the next editable control on Enter key press.
- * Validates current field before moving, skips disabled/read-only fields,
- * and preserves browser native shortcuts (Ctrl+C, Ctrl+V, etc.).
+ * Automatically moves focus to the next editable control on Enter key or Right Arrow press.
+ * Validates current field before moving, auto-opens selects, auto-triggers image file upload,
+ * and executes onSubmit when advancing past the last form field.
  */
 export function useFormKeyboardNavigation(containerRef, onSubmit) {
   useEffect(() => {
@@ -77,13 +92,28 @@ export function useFormKeyboardNavigation(containerRef, onSubmit) {
       // Preserve native system/browser key combinations (Ctrl, Alt, Meta)
       if (e.ctrlKey || e.altKey || e.metaKey) return;
 
-      // Handle Enter key for form input advancement
-      if (e.key === "Enter") {
-        const activeEl = document.activeElement;
+      const activeEl = document.activeElement;
+      if (!activeEl) return;
 
+      // Handle Enter and ArrowRight key for form input advancement
+      if (e.key === "Enter" || e.key === "ArrowRight") {
         // Allow multiline text entering inside textareas
-        if (activeEl && activeEl.tagName === "TEXTAREA" && !e.ctrlKey) {
+        if (activeEl.tagName === "TEXTAREA" && e.key === "Enter" && !e.ctrlKey) {
           return;
+        }
+
+        // For ArrowRight, only advance if caret is at the end of input text or on non-text element
+        if (e.key === "ArrowRight") {
+          if (activeEl.tagName === "INPUT") {
+            const t = activeEl.type;
+            if (t === "text" || t === "search" || !t) {
+              const isAtEnd = activeEl.selectionStart === undefined || activeEl.selectionStart === activeEl.value.length;
+              if (!isAtEnd) return;
+            }
+          } else if (activeEl.tagName === "SELECT") {
+            // Allow native select option navigation
+            return;
+          }
         }
 
         // Validate active input field before advancing
@@ -94,16 +124,34 @@ export function useFormKeyboardNavigation(containerRef, onSubmit) {
           }
         }
 
-        // Query all focusable elements inside container
+        // Query all navigable focusable elements inside container
         const focusables = Array.from(
           container.querySelectorAll(
             'input:not([type="hidden"]), select, textarea, button, [tabindex="0"]'
           )
-        ).filter(isElementNavigable);
+        ).filter((el) => {
+          if (!isElementNavigable(el)) return false;
+          if (el.getAttribute("data-skip-nav") === "true") return false;
+          if (el.getAttribute("type") === "button" && el.classList.contains("cancel-btn")) return false;
+          return true;
+        });
 
         if (focusables.length === 0) return;
 
         const currentIndex = focusables.indexOf(activeEl);
+
+        // If active element is an image upload trigger and Enter is pressed, trigger file picker
+        if (activeEl.getAttribute("data-image-upload-trigger") === "true" && e.key === "Enter") {
+          const targetInputId = activeEl.getAttribute("data-target-input");
+          if (targetInputId) {
+            const inputEl = document.getElementById(targetInputId);
+            if (inputEl) {
+              e.preventDefault();
+              try { inputEl.click(); } catch (err) {}
+              return;
+            }
+          }
+        }
 
         if (currentIndex !== -1 && currentIndex < focusables.length - 1) {
           e.preventDefault();
@@ -121,6 +169,38 @@ export function useFormKeyboardNavigation(containerRef, onSubmit) {
             e.preventDefault();
             onSubmit(e);
           }
+        }
+      } else if (e.key === "ArrowLeft") {
+        if (activeEl.tagName === "INPUT") {
+          const t = activeEl.type;
+          if (t === "text" || t === "search" || !t) {
+            const isAtStart = activeEl.selectionStart === 0;
+            if (!isAtStart) return;
+          }
+        } else if (activeEl.tagName === "SELECT") {
+          return;
+        }
+
+        const focusables = Array.from(
+          container.querySelectorAll(
+            'input:not([type="hidden"]), select, textarea, button, [tabindex="0"]'
+          )
+        ).filter((el) => {
+          if (!isElementNavigable(el)) return false;
+          if (el.getAttribute("data-skip-nav") === "true") return false;
+          return true;
+        });
+
+        const currentIndex = focusables.indexOf(activeEl);
+        if (currentIndex > 0) {
+          e.preventDefault();
+          const prevEl = focusables[currentIndex - 1];
+          try {
+            prevEl.focus();
+            if (typeof prevEl.select === "function" && prevEl.tagName === "INPUT") {
+              prevEl.select();
+            }
+          } catch (err) {}
         }
       }
     };

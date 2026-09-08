@@ -39,16 +39,19 @@ def ensure_tenant_categories(tenant_id):
     if not tenant_id:
         return
     try:
-        # Fast exit check: If tenant already has categories, skip checks
-        existing_cat = ServiceCategory.query.filter_by(tenant_id=tenant_id, is_deleted=False).first()
-        if existing_cat:
-            return
-
         g.use_master_db = True
         tenant = Tenant.query.get(tenant_id)
         g.use_master_db = False
         if not tenant:
             return
+        
+        g.tenant_db_uri = tenant.db_connection_uri
+
+        # Fast exit check: If tenant already has categories, skip checks
+        existing_cat = ServiceCategory.query.filter_by(tenant_id=tenant_id, is_deleted=False).first()
+        if existing_cat:
+            return
+
         added = False
         for cat_name in PREDEFINED_CATEGORIES:
             cat = ServiceCategory.query.filter_by(tenant_id=tenant_id, name=cat_name, is_deleted=False).first()
@@ -256,15 +259,27 @@ def get_services():
 
     data = []
     for s in services:
-        discounts = [
-            {
-                "plan_id": mps.membership_plan_id,
-                "plan_name": mps.plan.name if mps.plan else f"Plan #{mps.membership_plan_id}",
-                "percentage": float(mps.discount_percentage or 0.0),
-                "amount": float(mps.discount_amount or 0.0)
-            }
-            for mps in MembershipPlanService.query.filter_by(service_id=s.id).all()
-        ]
+        try:
+            cat_name = s.category.name if s.category else None
+        except Exception:
+            cat_name = None
+
+        discounts = []
+        try:
+            for mps in MembershipPlanService.query.filter_by(service_id=s.id).all():
+                try:
+                    p_name = mps.plan.name if mps.plan else f"Plan #{mps.membership_plan_id}"
+                except Exception:
+                    p_name = f"Plan #{mps.membership_plan_id}"
+                discounts.append({
+                    "plan_id": mps.membership_plan_id,
+                    "plan_name": p_name,
+                    "percentage": float(mps.discount_percentage or 0.0),
+                    "amount": float(mps.discount_amount or 0.0)
+                })
+        except Exception as e:
+            logger.error(f"Error loading discounts for service {s.id}: {str(e)}")
+
         data.append({
             "id": s.id,
             "name": s.name,
@@ -273,9 +288,10 @@ def get_services():
             "status": s.status,
             "description": s.description,
             "category_id": s.category_id,
-            "category_name": s.category.name if s.category else None,
+            "category_name": cat_name,
+            "image_url": s.image_url,
             "membership_discounts": discounts,
-            "created_at": s.created_at.isoformat()
+            "created_at": s.created_at.isoformat() if s.created_at else None
         })
 
     return success_response({
@@ -312,6 +328,7 @@ def get_service(service_id):
         "description": service.description,
         "category_id": service.category_id,
         "category_name": service.category.name if service.category else None,
+        "image_url": service.image_url,
         "membership_discounts": discounts,
         "created_at": service.created_at.isoformat()
     })
@@ -375,6 +392,7 @@ def create_service():
             price=price_val,
             duration_minutes=dur_val,
             description=data.get("description"),
+            image_url=data.get("image_url"),
             status=data.get("status", "active")
         )
         db.session.add(service)
@@ -401,10 +419,11 @@ def create_service():
         db.session.commit()
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Error creating service: {str(e)}")
+        import traceback
+        logger.error(f"Error creating service: {str(e)}\n{traceback.format_exc()}")
         return error_response(
             error_code="DATABASE_ERROR",
-            message="Failed to create service record.",
+            message=f"Failed to create service record: {str(e)}",
             status_code=500
         )
 
@@ -475,6 +494,8 @@ def update_service(service_id):
         service.price = price_val
         service.duration_minutes = dur_val
         service.description = data.get("description")
+        if "image_url" in data:
+            service.image_url = data.get("image_url")
         service.status = data.get("status", "active")
 
         # Update membership discounts mapping

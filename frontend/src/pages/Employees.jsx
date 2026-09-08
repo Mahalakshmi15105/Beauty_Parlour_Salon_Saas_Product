@@ -185,7 +185,13 @@ function Employees() {
       return;
     }
 
-    const action = editId ? API.put(`/employees/${editId}`, formData) : API.post("/employees", formData);
+    const payload = {
+      ...formData,
+      salary: formData.salary !== "" && formData.salary !== null ? parseFloat(formData.salary) : 0,
+      commission_percentage: formData.commission_percentage !== "" && formData.commission_percentage !== null ? parseFloat(formData.commission_percentage) : 0,
+    };
+
+    const action = editId ? API.put(`/employees/${editId}`, payload) : API.post("/employees", payload);
 
     action
       .then(() => {

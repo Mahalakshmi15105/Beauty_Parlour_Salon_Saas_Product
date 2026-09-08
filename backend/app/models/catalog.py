@@ -30,6 +30,7 @@ class Service(db.Model, TimestampMixin, SoftDeleteMixin):
     duration_minutes = db.Column(db.Integer, nullable=False, default=30)
     status = db.Column(db.String(50), nullable=False, default="active")  # active, inactive
     description = db.Column(db.Text, nullable=True)
+    image_url = db.Column(db.Text, nullable=True)
 
     # Relationships
     category = db.relationship("ServiceCategory", back_populates="services")
@@ -56,6 +57,7 @@ class Product(db.Model, TimestampMixin, SoftDeleteMixin):
     stock_quantity = db.Column(db.Integer, nullable=False, default=0)
     low_stock_threshold = db.Column(db.Integer, nullable=False, default=5)
     status = db.Column(db.String(50), nullable=False, default="active")  # active, inactive
+    image_url = db.Column(db.Text, nullable=True)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

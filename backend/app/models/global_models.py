@@ -82,3 +82,19 @@ class MasterUser(db.Model, TimestampMixin, SoftDeleteMixin):
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+
+class PlatformSetting(db.Model, TimestampMixin):
+    """
+    Global platform configuration stored in parlour_master DB.
+    """
+    __tablename__ = "platform_settings"
+    metadata = master_metadata
+
+    id = db.Column(db.Integer, primary_key=True)
+    setting_key = db.Column(db.String(100), nullable=False, unique=True, index=True)
+    setting_value = db.Column(db.Text, nullable=True)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+

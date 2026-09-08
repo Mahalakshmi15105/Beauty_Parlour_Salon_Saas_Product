@@ -1,7 +1,8 @@
 from flask import Blueprint, request, g, current_app
 from sqlalchemy import func, create_engine, text
 from app.database import db
-from app.models.global_models import Tenant, SubscriptionPlan, TenantLookup, MasterUser
+from app.models.global_models import Tenant, SubscriptionPlan, TenantLookup, MasterUser, PlatformSetting
+from app.models.whatsapp import WhatsAppSetting
 from app.db_bootstrap import ensure_database_exists
 from app.models.user import User, TenantSetting
 from app.models.customer import Customer
@@ -746,35 +747,97 @@ def get_platform_analytics():
 @super_admin_bp.route("/super-admin/settings", methods=["GET"])
 @require_role(["SuperAdmin"])
 def get_platform_settings():
-    """Get platform-level settings"""
-    # For now, return basic platform info. This can be extended with a PlatformSettings model.
+    """Get platform-level settings including WhatsApp Meta Gateway credentials"""
+    import os
+    g.use_master_db = True
+    
+    try:
+        settings_rows = PlatformSetting.query.all()
+        settings_dict = {s.setting_key: s.setting_value for s in settings_rows}
+    except Exception as e:
+        logger.warning(f"Notice fetching PlatformSetting: {e}")
+        settings_dict = {}
+
+    meta_app_id = settings_dict.get("meta_app_id") or os.getenv("META_APP_ID", "")
+    meta_app_secret = settings_dict.get("meta_app_secret") or os.getenv("META_APP_SECRET", "")
+    meta_config_id = settings_dict.get("meta_config_id") or os.getenv("META_CONFIG_ID", "")
+    meta_redirect_uri = settings_dict.get("meta_redirect_uri") or os.getenv("META_REDIRECT_URI", "")
+    meta_graph_api_version = settings_dict.get("meta_graph_api_version") or os.getenv("META_GRAPH_API_VERSION", "v21.0")
+
     return success_response({
-        "platform_name": "SmartGoNext Beauty SaaS",
-        "platform_version": "1.0.0",
-        "default_subscription_plan_id": 1,  # Can be made configurable
-        "contact_email": "support@smartgonext.com",
-        "support_phone": "+91-XXXXXXXXXX"
+        "platform_name": settings_dict.get("platform_name", "SmartGoNext Beauty SaaS"),
+        "platform_version": settings_dict.get("platform_version", "1.0.0"),
+        "contact_email": settings_dict.get("contact_email", "support@smartgonext.com"),
+        "support_phone": settings_dict.get("support_phone", "+91-XXXXXXXXXX"),
+        "meta_app_id": meta_app_id,
+        "meta_app_secret": meta_app_secret,
+        "meta_config_id": meta_config_id,
+        "meta_redirect_uri": meta_redirect_uri,
+        "meta_graph_api_version": meta_graph_api_version
     })
 
 
 @super_admin_bp.route("/super-admin/settings", methods=["PUT"])
 @require_role(["SuperAdmin"])
 def update_platform_settings():
-    """Update platform-level settings"""
+    """Update platform-level settings including WhatsApp Meta Gateway credentials"""
+    g.use_master_db = True
     data = request.get_json() or {}
-    
-    # For now, this is a placeholder. In future, can be extended with a PlatformSettings model.
-    # Store settings in a dedicated platform_settings table or use environment variables.
-    
-    log = AuditLog(
-        tenant_id=None,
-        user_id=g.user_id,
-        action="PLATFORM_SETTINGS_UPDATED",
-        resource_name="PlatformSettings",
-        resource_id=None,
-        details=f"Updated platform settings: {str(data)}"
-    )
-    db.session.add(log)
+
+    keys_to_update = [
+        "platform_name", "contact_email", "support_phone",
+        "meta_app_id", "meta_app_secret", "meta_config_id",
+        "meta_redirect_uri", "meta_graph_api_version"
+    ]
+
+    for key in keys_to_update:
+        if key in data:
+            setting_obj = PlatformSetting.query.filter_by(setting_key=key).first()
+            if not setting_obj:
+                setting_obj = PlatformSetting(setting_key=key, setting_value=str(data[key]))
+                db.session.add(setting_obj)
+            else:
+                setting_obj.setting_value = str(data[key])
+
     db.session.commit()
-    
+
     return success_response({"message": "Platform settings updated successfully."})
+
+
+@super_admin_bp.route("/super-admin/whatsapp-status", methods=["GET"])
+@require_role(["SuperAdmin"])
+def get_tenants_whatsapp_status():
+    """Get WhatsApp Business Account connection status across all tenants"""
+    g.use_master_db = True
+    tenants = Tenant.query.all()
+    statuses = []
+
+    for t in tenants:
+        t_uri = t.db_connection_uri or f"mysql+pymysql://root:root@localhost:3306/{t.db_name}?charset=utf8mb4"
+        w_status = {
+            "tenant_id": t.id,
+            "tenant_name": t.name,
+            "status": "DISCONNECTED",
+            "business_name": "",
+            "phone_number": "",
+            "meta_waba_id": "",
+            "connected_at": None
+        }
+        try:
+            g.use_master_db = False
+            g.tenant_db_uri = t_uri
+            setting = WhatsAppSetting.query.filter_by(tenant_id=t.id).first()
+            if setting and setting.status == "CONNECTED":
+                w_status["status"] = "CONNECTED"
+                w_status["business_name"] = setting.business_name or ""
+                w_status["phone_number"] = setting.phone_number or ""
+                w_status["meta_waba_id"] = setting.meta_waba_id or ""
+                w_status["connected_at"] = setting.connected_at.isoformat() if setting.connected_at else None
+        except Exception as e:
+            logger.warning(f"Failed to check WhatsApp status for tenant {t.id}: {e}")
+
+        statuses.append(w_status)
+
+    g.use_master_db = True
+    return success_response({"items": statuses})
+

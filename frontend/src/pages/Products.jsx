@@ -21,6 +21,7 @@ function Products() {
 
   // Products State
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
@@ -29,6 +30,16 @@ function Products() {
   const [cursorHistory, setCursorHistory] = useState([]);
   const [nextCursor, setNextCursor] = useState(null);
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
+
+  // Category Modal State
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [categoryName, setCategoryName] = useState("");
+  const [editingCatId, setEditingCatId] = useState(null);
+  const [editingCatName, setEditingCatName] = useState("");
+  const categoryModalRef = useRef(null);
+  const categoryFormRef = useRef(null);
+  const categorySelectRef = useRef(null);
+  const categoryNameInputRef = useRef(null);
 
   // Reorder Transaction History State
   const [reorderLogs, setReorderLogs] = useState([]);
@@ -49,6 +60,7 @@ function Products() {
     stock_quantity: "",
     low_stock_threshold: "5",
     status: "active",
+    image_url: "",
   });
 
   // Reorder Modal State
@@ -136,11 +148,68 @@ function Products() {
       });
   };
 
+  useModalFocusTrap(showCategoryModal, categoryModalRef, () => setShowCategoryModal(false));
+  useFormKeyboardNavigation(categoryFormRef, () => {
+    const submitBtn = categoryModalRef.current?.querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.click();
+  });
+
+  const fetchCategories = () => {
+    API.get("/service-categories")
+      .then((res) => setCategories(res.data || []))
+      .catch((err) => console.error("Error loading categories", err));
+  };
+
+  const handleCategorySubmit = (e) => {
+    e.preventDefault();
+    if (!categoryName.trim()) {
+      if (categoryNameInputRef.current) categoryNameInputRef.current.focus();
+      return;
+    }
+
+    API.post("/service-categories", { name: categoryName })
+      .then(() => {
+        setCategoryName("");
+        setShowCategoryModal(false);
+        showSuccess("Product category created!");
+        fetchCategories();
+      })
+      .catch((err) => {
+        showError(err.response?.data?.message || err.message || "Operation failed.");
+      });
+  };
+
+  const handleEditCategorySubmit = (catId) => {
+    if (!editingCatName.trim()) return;
+    API.put(`/service-categories/${catId}`, { name: editingCatName.trim() })
+      .then(() => {
+        setEditingCatId(null);
+        setEditingCatName("");
+        showSuccess("Category name updated!");
+        fetchCategories();
+      })
+      .catch((err) => {
+        showError(err.response?.data?.message || err.message || "Failed to update category name.");
+      });
+  };
+
+  const handleDeleteCategory = (id) => {
+    API.delete(`/service-categories/${id}`)
+      .then(() => {
+        showSuccess("Category deleted.");
+        fetchCategories();
+      })
+      .catch((err) => {
+        showError(err.response?.data?.message || err.message || "Failed to delete category.");
+      });
+  };
+
   useEffect(() => {
     fetchProducts();
   }, [search, category, showLowStockOnly, activeTab]);
 
   useEffect(() => {
+    fetchCategories();
     fetchSuppliers();
     fetchReorderLogs();
   }, []);
@@ -156,11 +225,10 @@ function Products() {
 
   const handlePrevPage = () => {
     if (cursorHistory.length > 0) {
-      const prev = cursorHistory[cursorHistory.length - 1];
-      const newHistory = cursorHistory.slice(0, -1);
-      setCursorHistory(newHistory);
-      setCursor(prev);
-      fetchProducts(prev);
+      const prevCursor = cursorHistory[cursorHistory.length - 1];
+      setCursorHistory(cursorHistory.slice(0, -1));
+      setCursor(prevCursor);
+      fetchProducts(prevCursor);
     }
   };
 
@@ -178,6 +246,7 @@ function Products() {
       stock_quantity: "",
       low_stock_threshold: "5",
       status: "active",
+      image_url: "",
     });
     setShowModal(true);
   };
@@ -195,6 +264,7 @@ function Products() {
       stock_quantity: p.stock_quantity || "",
       low_stock_threshold: p.low_stock_threshold || "5",
       status: p.status || "active",
+      image_url: p.image_url || "",
     });
     setShowModal(true);
   };
@@ -472,6 +542,13 @@ function Products() {
           ) : (
             <>
               <button
+                onClick={() => setShowCategoryModal(true)}
+                className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2"
+              >
+                <ClipboardList className="w-4 h-4" />
+                Manage Categories
+              </button>
+              <button
                 onClick={() => setShowBulkUpload(true)}
                 className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2"
               >
@@ -628,8 +705,8 @@ function Products() {
               className="bg-background border border-border-soft px-4 py-2 rounded-lg text-sm text-text-secondary focus:outline-none"
             >
               <option value="">All Categories</option>
-              {categoriesList.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
+              {categories.map((cat) => (
+                <option key={cat.id || cat.name} value={cat.name}>{cat.name}</option>
               ))}
             </select>
             
@@ -710,7 +787,7 @@ function Products() {
                   <thead>
                     <tr className="bg-primary-light border-b border-border-soft">
                       <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Product Details</th>
-                      <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">SKU / Barcode</th>
+                      <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Barcode</th>
                       <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Purchase Price</th>
                       <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase text-center">MRP</th>
                       <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase text-center">Selling Price</th>
@@ -724,14 +801,22 @@ function Products() {
                       return (
                         <tr key={p.id} className={`hover:bg-background/50 transition ${isLowStock ? "bg-rose-50/20" : ""}`}>
                           <td className="px-6 py-4 text-sm font-medium text-text-primary">
-                            <div>
-                              <p className="font-semibold">{p.name}</p>
-                              <p className="text-xs text-text-secondary mt-0.5">{p.category || "Uncategorized"}</p>
+                            <div className="flex items-center space-x-3">
+                              {p.image_url ? (
+                                <img src={p.image_url} alt={p.name} className="w-9 h-9 rounded-lg object-cover border border-border-soft flex-shrink-0" />
+                              ) : (
+                                <div className="w-9 h-9 rounded-lg bg-pink-50 text-pink-500 flex items-center justify-center font-bold text-xs flex-shrink-0 border border-pink-100">
+                                  {p.name ? p.name.charAt(0).toUpperCase() : "P"}
+                                </div>
+                              )}
+                              <div>
+                                <p className="font-semibold">{p.name}</p>
+                                <p className="text-xs text-text-secondary mt-0.5">{p.category || "Uncategorized"}</p>
+                              </div>
                             </div>
                           </td>
                           <td className="px-6 py-4 text-xs text-text-secondary">
-                            <p>SKU: {p.sku || "—"}</p>
-                            <p className="mt-0.5">Barcode: {p.barcode || "—"}</p>
+                            <p>Barcode: {p.barcode || "—"}</p>
                           </td>
                           <td className="px-6 py-4 text-sm text-text-secondary">
                             {formatCurrency(p.cost_price)}
@@ -867,6 +952,102 @@ function Products() {
         </>
       )}
 
+      {/* Category Management Modal */}
+      {showCategoryModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div ref={categoryModalRef} className="glowe-glass-card max-w-md w-full rounded-3xl shadow-2xl border border-white/70 overflow-hidden">
+            <div className="px-6 py-4 border-b border-pink-100/60 flex justify-between items-center bg-white/50 backdrop-blur-md">
+              <h3 className="text-md font-bold text-text-primary">Manage Product Categories</h3>
+              <button onClick={() => setShowCategoryModal(false)} className="text-text-secondary hover:text-text-primary p-1">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-6">
+              <form ref={categoryFormRef} onSubmit={handleCategorySubmit} className="flex space-x-3">
+                <input
+                  ref={categoryNameInputRef}
+                  type="text"
+                  required
+                  autoFocus
+                  placeholder="New Category name..."
+                  value={categoryName}
+                  onChange={(e) => setCategoryName(e.target.value)}
+                  className="flex-1 bg-background border border-primary ring-2 ring-pink-500/20 shadow-md shadow-pink-500/20 px-3.5 py-2 rounded-xl text-sm font-semibold focus:outline-none focus:border-primary"
+                />
+                <button
+                  type="submit"
+                  className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-xl text-sm font-bold transition shadow-xs"
+                >
+                  Add
+                </button>
+              </form>
+
+              <div className="border-t border-border-soft pt-4 space-y-2 max-h-60 overflow-y-auto">
+                <h4 className="text-xs font-bold text-text-secondary uppercase mb-2">Existing Categories</h4>
+                {categories.length === 0 ? (
+                  <p className="text-xs text-text-secondary">No categories created yet.</p>
+                ) : (
+                  categories.map((c) => (
+                    <div key={c.id} className="flex items-center justify-between py-2 border-b border-border-soft/50 last:border-0">
+                      {editingCatId === c.id ? (
+                        <div className="flex items-center space-x-2 flex-1 mr-2">
+                          <input
+                            type="text"
+                            value={editingCatName}
+                            onChange={(e) => setEditingCatName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleEditCategorySubmit(c.id);
+                              else if (e.key === "Escape") setEditingCatId(null);
+                            }}
+                            className="flex-1 bg-background border border-primary px-2 py-1 rounded-lg text-xs font-semibold text-slate-900 focus:outline-none"
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleEditCategorySubmit(c.id)}
+                            className="text-xs font-bold text-emerald-600 hover:underline"
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingCatId(null)}
+                            className="text-xs text-slate-400 hover:underline"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="text-sm font-medium text-text-primary">{c.name}</span>
+                          <div className="flex items-center space-x-3">
+                            <button
+                              onClick={() => {
+                                setEditingCatId(c.id);
+                                setEditingCatName(c.name);
+                              }}
+                              className="text-xs font-semibold text-primary hover:underline"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCategory(c.id)}
+                              className="text-xs text-danger hover:underline"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Product Add/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
@@ -893,26 +1074,26 @@ function Products() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Category</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Shampoos"
+                  <select
+                    ref={categorySelectRef}
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    onFocus={(e) => {
+                      if (typeof e.target.showPicker === "function") {
+                        try { e.target.showPicker(); } catch (err) {}
+                      }
+                    }}
                     className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
-                  />
+                  >
+                    <option value="">Select Category</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id || cat.name} value={cat.name}>{cat.name}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">SKU Code</label>
-                  <input
-                    type="text"
-                    value={formData.sku}
-                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
-                  />
-                </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Barcode</label>
                   <input
@@ -927,6 +1108,11 @@ function Products() {
                   <select
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    onFocus={(e) => {
+                      if (typeof e.target.showPicker === "function") {
+                        try { e.target.showPicker(); } catch (err) {}
+                      }
+                    }}
                     className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
                   >
                     <option value="active">Active</option>
@@ -994,11 +1180,60 @@ function Products() {
                 </div>
               </div>
 
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary mb-1">Product Image (Optional)</label>
+                <div className="flex items-center space-x-3 bg-background border border-border-soft p-2.5 rounded-lg">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    id="product-image-upload"
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setFormData((prev) => ({ ...prev, image_url: reader.result }));
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    tabIndex="0"
+                    data-image-upload-trigger="true"
+                    data-target-input="product-image-upload"
+                    onClick={() => document.getElementById("product-image-upload")?.click()}
+                    className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 rounded-md text-xs font-semibold cursor-pointer transition flex items-center space-x-1.5 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Choose Image</span>
+                  </button>
+                  {formData.image_url ? (
+                    <div className="flex items-center space-x-2">
+                      <img src={formData.image_url} alt="Preview" className="w-9 h-9 rounded-md object-cover border border-border-soft" />
+                      <button
+                        type="button"
+                        data-skip-nav="true"
+                        onClick={() => setFormData((prev) => ({ ...prev, image_url: "" }))}
+                        className="text-xs text-rose-500 hover:underline font-semibold"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-text-secondary">No image chosen</span>
+                  )}
+                </div>
+              </div>
+
               <div className="pt-4 border-t border-border-soft flex justify-end space-x-3">
                 <button
                   type="button"
+                  data-skip-nav="true"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border border-border-soft rounded-lg text-sm text-text-secondary hover:bg-background"
+                  className="cancel-btn px-4 py-2 border border-border-soft rounded-lg text-sm text-text-secondary hover:bg-background"
                 >
                   Cancel
                 </button>
@@ -1134,7 +1369,6 @@ function Products() {
             <div className="p-6 space-y-4">
               <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg text-xs space-y-1">
                 <p className="font-bold text-amber-900">Product: {reorderProduct.name}</p>
-                <p className="text-amber-800">SKU Code: {reorderProduct.sku || "N/A"}</p>
                 <p className="text-amber-800">Current Stock: <span className="font-bold text-rose-600">{reorderProduct.stock_quantity}</span> (Threshold: {reorderProduct.low_stock_threshold})</p>
               </div>
 
@@ -1179,7 +1413,7 @@ function Products() {
                 <textarea
                   readOnly
                   rows={6}
-                  value={`Hello Supplier,\n\nWe need to place a restock order for the following item:\n- Product: ${reorderProduct.name}\n- SKU: ${reorderProduct.sku || "N/A"}\n- Current Stock: ${reorderProduct.stock_quantity}\n- Order Quantity: ${reorderQty} units\n\nPlease confirm availability and billing details.\n\nBest regards,\nSalon Official`}
+                  value={`Hello Supplier,\n\nWe need to place a restock order for the following item:\n- Product: ${reorderProduct.name}\n- Current Stock: ${reorderProduct.stock_quantity}\n- Order Quantity: ${reorderQty} units\n\nPlease confirm availability and billing details.\n\nBest regards,\nSalon Official`}
                   className="w-full bg-background/50 border border-border-soft p-3 rounded-lg text-xs font-mono text-slate-700 focus:outline-none"
                 />
               </div>
@@ -1201,7 +1435,7 @@ function Products() {
                   <button
                     type="button"
                     onClick={() => {
-                      const text = `Hello Supplier,\n\nWe need to place a restock order for the following item:\n- Product: ${reorderProduct.name}\n- SKU: ${reorderProduct.sku || "N/A"}\n- Current Stock: ${reorderProduct.stock_quantity}\n- Order Quantity: ${reorderQty} units\n\nPlease confirm availability and billing details.\n\nBest regards,\nSalon Official`;
+                      const text = `Hello Supplier,\n\nWe need to place a restock order for the following item:\n- Product: ${reorderProduct.name}\n- Current Stock: ${reorderProduct.stock_quantity}\n- Order Quantity: ${reorderQty} units\n\nPlease confirm availability and billing details.\n\nBest regards,\nSalon Official`;
                       navigator.clipboard.writeText(text);
                       setCopiedMessage(true);
                       setTimeout(() => setCopiedMessage(false), 3000);
@@ -1213,7 +1447,7 @@ function Products() {
                   <button
                     type="button"
                     onClick={() => {
-                      const text = `Hello Supplier,\n\nWe need to place a restock order for the following item:\n- Product: ${reorderProduct.name}\n- SKU: ${reorderProduct.sku || "N/A"}\n- Current Stock: ${reorderProduct.stock_quantity}\n- Order Quantity: ${reorderQty} units\n\nPlease confirm availability and billing details.\n\nBest regards,\nSalon Official`;
+                      const text = `Hello Supplier,\n\nWe need to place a restock order for the following item:\n- Product: ${reorderProduct.name}\n- Current Stock: ${reorderProduct.stock_quantity}\n- Order Quantity: ${reorderQty} units\n\nPlease confirm availability and billing details.\n\nBest regards,\nSalon Official`;
                       const cleanPhone = supplierPhone.replace(/[^0-9]/g, "");
                       const targetPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
                       window.open(`https://wa.me/${targetPhone || ""}?text=${encodeURIComponent(text)}`, "_blank");

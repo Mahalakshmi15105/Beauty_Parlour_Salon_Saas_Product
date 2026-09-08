@@ -40,3 +40,42 @@ def paginate_query(query, model, limit_val=20, cursor=None, sort_field="id", sor
         next_cursor = None
 
     return items, next_cursor
+
+
+def generate_unique_invoice_number(tenant_id, branch_id=None):
+    """
+    Generates a unique, collision-proof sequential invoice number.
+    Format: INV-{tenant_id}-{sequential_number:06d}
+    Guarantees uniqueness against DB unique constraint (invoices.ix_invoices_invoice_number).
+    """
+    from app.models.billing import Invoice
+    from app.database import db
+
+    prefix = f"INV-{tenant_id}-"
+
+    # Query for the latest invoice row for this tenant to find the current highest integer sequence
+    last_invoice = (
+        db.session.query(Invoice.invoice_number)
+        .filter(Invoice.tenant_id == tenant_id)
+        .filter(Invoice.invoice_number.like(f"{prefix}%"))
+        .order_by(Invoice.id.desc())
+        .first()
+    )
+
+    next_seq = 1
+    if last_invoice and last_invoice.invoice_number:
+        try:
+            parts = last_invoice.invoice_number.split("-")
+            if len(parts) >= 3 and parts[-1].isdigit():
+                next_seq = int(parts[-1]) + 1
+        except Exception:
+            pass
+
+    # Safety loop: ensure candidate number does not exist anywhere in invoices table
+    while True:
+        candidate = f"{prefix}{next_seq:06d}"
+        exists = db.session.query(Invoice.id).filter(Invoice.invoice_number == candidate).first()
+        if not exists:
+            return candidate
+        next_seq += 1
+

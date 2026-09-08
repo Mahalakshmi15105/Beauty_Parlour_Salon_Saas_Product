@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
 import { useToast } from "../context/ToastContext";
-import { X, Eye, Pencil, Trash2, BarChart3, Users, Building2, CreditCard, Settings, TrendingUp } from "lucide-react";
+import { X, Eye, Pencil, Trash2, BarChart3, Users, Building2, CreditCard, Settings, TrendingUp, MessageSquare, Key, CheckCircle, XCircle } from "lucide-react";
 import { useModalFocusTrap, useFormKeyboardNavigation } from "../utils/keyboardNavigation";
 
 function SuperAdmin() {
@@ -21,6 +21,17 @@ function SuperAdmin() {
   const [auditLogs, setAuditLogs] = useState([]);
   const [selectedTenant, setSelectedTenant] = useState(null);
   const [tenantDetails, setTenantDetails] = useState(null);
+
+  // WhatsApp Gateway State
+  const [whatsappStatuses, setWhatsappStatuses] = useState([]);
+  const [whatsappForm, setWhatsappForm] = useState({
+    meta_app_id: "",
+    meta_app_secret: "",
+    meta_config_id: "",
+    meta_redirect_uri: "",
+    meta_graph_api_version: "v21.0"
+  });
+  const [savingWhatsappSettings, setSavingWhatsappSettings] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -68,8 +79,9 @@ function SuperAdmin() {
       API.get("/super-admin/settings"),
       API.get("/super-admin/system-health"),
       API.get("/super-admin/audit-logs"),
+      API.get("/super-admin/whatsapp-status").catch(() => ({ data: { items: [] } })),
     ])
-      .then(([dashRes, tenRes, branchRes, planRes, userRes, analyticsRes, settingsRes, healthRes, auditRes]) => {
+      .then(([dashRes, tenRes, branchRes, planRes, userRes, analyticsRes, settingsRes, healthRes, auditRes, waStatusRes]) => {
         setDashboard(dashRes.data);
         setTenants(tenRes.data.items);
         setBranches(branchRes.data.items);
@@ -79,6 +91,18 @@ function SuperAdmin() {
         setPlatformSettings(settingsRes.data);
         setSystemHealth(healthRes.data);
         setAuditLogs(auditRes.data);
+        setWhatsappStatuses(waStatusRes.data?.items || []);
+
+        if (settingsRes.data) {
+          setWhatsappForm({
+            meta_app_id: settingsRes.data.meta_app_id || "",
+            meta_app_secret: settingsRes.data.meta_app_secret || "",
+            meta_config_id: settingsRes.data.meta_config_id || "",
+            meta_redirect_uri: settingsRes.data.meta_redirect_uri || "",
+            meta_graph_api_version: settingsRes.data.meta_graph_api_version || "v21.0"
+          });
+        }
+
         if (planRes.data.length > 0 && !provisionForm.plan_id) {
           setProvisionForm((prev) => ({ ...prev, plan_id: planRes.data[0].id }));
         }
@@ -93,6 +117,21 @@ function SuperAdmin() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const handleSaveWhatsappSettings = (e) => {
+    if (e) e.preventDefault();
+    setSavingWhatsappSettings(true);
+    API.put("/super-admin/settings", whatsappForm)
+      .then(() => {
+        showSuccess("WhatsApp Gateway & Meta App configuration saved successfully!");
+        setSavingWhatsappSettings(false);
+        fetchData();
+      })
+      .catch((err) => {
+        setSavingWhatsappSettings(false);
+        showError(err.message || "Failed to save Meta App settings.");
+      });
+  };
 
   const handleProvisionSubmit = (e) => {
     e.preventDefault();
@@ -209,6 +248,7 @@ function SuperAdmin() {
           { id: "users", label: "Platform Users", icon: Users },
           { id: "analytics", label: "Platform Analytics", icon: TrendingUp },
           { id: "health", label: "System Health", icon: Settings },
+          { id: "whatsapp", label: "WhatsApp Gateway", icon: MessageSquare },
           { id: "audit", label: "Audit Logs", icon: Settings },
         ].map((tab) => (
           <button
@@ -668,6 +708,163 @@ function SuperAdmin() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* WhatsApp Gateway Tab */}
+      {activeTab === "whatsapp" && (
+        <div className="space-y-6">
+          {/* Card 1: Platform Meta App Gateway Configuration */}
+          <div className="bg-surface border border-border-soft p-6 rounded-lg shadow-sm space-y-4">
+            <div className="flex justify-between items-start border-b border-border-soft pb-4">
+              <div>
+                <h3 className="text-base font-extrabold text-text-primary flex items-center space-x-2">
+                  <Key className="w-5 h-5 text-primary" />
+                  <span>Meta WhatsApp Gateway & App Credentials</span>
+                </h3>
+                <p className="text-xs text-text-secondary mt-1">
+                  Manage the platform-wide Meta Developer App ID & Configuration used by all salon parlours for Embedded Signup.
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveWhatsappSettings} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-text-secondary mb-1">
+                    Meta App ID <span className="text-danger">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 123456789012345"
+                    value={whatsappForm.meta_app_id}
+                    onChange={(e) => setWhatsappForm({ ...whatsappForm, meta_app_id: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-xs font-mono focus:outline-none focus:border-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-text-secondary mb-1">
+                    Meta App Secret
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="••••••••••••••••••••••••"
+                    value={whatsappForm.meta_app_secret}
+                    onChange={(e) => setWhatsappForm({ ...whatsappForm, meta_app_secret: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-xs font-mono focus:outline-none focus:border-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-text-secondary mb-1">
+                    Embedded Signup Config ID
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 9876543210"
+                    value={whatsappForm.meta_config_id}
+                    onChange={(e) => setWhatsappForm({ ...whatsappForm, meta_config_id: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-xs font-mono focus:outline-none focus:border-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-text-secondary mb-1">
+                    OAuth Redirect URI
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="https://yourdomain.com/settings"
+                    value={whatsappForm.meta_redirect_uri}
+                    onChange={(e) => setWhatsappForm({ ...whatsappForm, meta_redirect_uri: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-xs font-mono focus:outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={savingWhatsappSettings}
+                  className="bg-primary hover:bg-primary-hover text-white px-5 py-2.5 rounded-lg text-xs font-bold transition shadow-sm disabled:opacity-50"
+                >
+                  {savingWhatsappSettings ? "Saving Gateway Credentials..." : "Save Gateway Configuration"}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Card 2: Salon Tenant Connection Status Monitor */}
+          <div className="bg-surface border border-border-soft p-6 rounded-lg shadow-sm space-y-4">
+            <div>
+              <h3 className="text-base font-extrabold text-text-primary flex items-center space-x-2">
+                <MessageSquare className="w-5 h-5 text-primary" />
+                <span>Multi-Tenant WhatsApp Connection Monitor</span>
+              </h3>
+              <p className="text-xs text-text-secondary mt-1">
+                Real-time status of connected WhatsApp Business Accounts (WABA) across all registered parlours.
+              </p>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-primary-light border-b border-border-soft text-text-primary">
+                    <th className="px-4 py-3 font-bold uppercase">Salon Tenant</th>
+                    <th className="px-4 py-3 font-bold uppercase">Status</th>
+                    <th className="px-4 py-3 font-bold uppercase">WABA Business Name</th>
+                    <th className="px-4 py-3 font-bold uppercase">WhatsApp Phone #</th>
+                    <th className="px-4 py-3 font-bold uppercase">WABA ID</th>
+                    <th className="px-4 py-3 font-bold uppercase">Connected Date</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-soft">
+                  {whatsappStatuses.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-6 text-center text-text-secondary">
+                        No salon tenants found.
+                      </td>
+                    </tr>
+                  ) : (
+                    whatsappStatuses.map((st) => (
+                      <tr key={st.tenant_id} className="hover:bg-background/60 transition">
+                        <td className="px-4 py-3 font-bold text-text-primary">
+                          #{st.tenant_id} - {st.tenant_name}
+                        </td>
+                        <td className="px-4 py-3">
+                          {st.status === "CONNECTED" ? (
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                              <CheckCircle className="w-3 h-3" />
+                              <span>CONNECTED</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">
+                              <XCircle className="w-3 h-3 text-slate-400" />
+                              <span>DISCONNECTED</span>
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 font-medium text-slate-700">
+                          {st.business_name || "—"}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-slate-600">
+                          {st.phone_number || "—"}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-slate-500 text-[11px]">
+                          {st.meta_waba_id || "—"}
+                        </td>
+                        <td className="px-4 py-3 text-slate-500">
+                          {st.connected_at ? new Date(st.connected_at).toLocaleString() : "—"}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 

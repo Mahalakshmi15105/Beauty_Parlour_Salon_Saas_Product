@@ -68,7 +68,8 @@ def get_products():
             "stock_quantity": p.stock_quantity,
             "low_stock_threshold": p.low_stock_threshold,
             "status": p.status,
-            "created_at": p.created_at.isoformat()
+            "image_url": p.image_url,
+            "created_at": p.created_at.isoformat() if p.created_at else None
         } for p in products
     ]
 
@@ -100,7 +101,8 @@ def get_product(product_id):
         "stock_quantity": product.stock_quantity,
         "low_stock_threshold": product.low_stock_threshold,
         "status": product.status,
-        "created_at": product.created_at.isoformat()
+        "image_url": product.image_url,
+        "created_at": product.created_at.isoformat() if product.created_at else None
     })
 
 
@@ -174,7 +176,8 @@ def create_product():
             mrp=mrp_val,
             stock_quantity=stock_val,
             low_stock_threshold=thresh_val,
-            status=data.get("status", "active")
+            status=data.get("status", "active"),
+            image_url=data.get("image_url")
         )
         db.session.add(product)
         db.session.commit()
@@ -192,7 +195,8 @@ def create_product():
         "name": product.name,
         "sku": product.sku,
         "selling_price": float(product.selling_price),
-        "mrp": float(product.mrp)
+        "mrp": float(product.mrp),
+        "image_url": product.image_url
     }, 201)
 
 
@@ -269,6 +273,8 @@ def update_product(product_id):
         product.stock_quantity = stock_val
         product.low_stock_threshold = thresh_val
         product.status = data.get("status", "active")
+        if "image_url" in data:
+            product.image_url = data.get("image_url")
         db.session.commit()
     except Exception as e:
         db.session.rollback()

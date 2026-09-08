@@ -145,7 +145,7 @@ export default function WhatsAppCampaigns() {
       offer_message: offerMessage,
       image_url: imageUrl,
       coupon_code: couponCode,
-      valid_until: validUntil,
+      valid_until: validUntil && validUntil !== "dd-mm-yyyy" ? validUntil : null,
       audience_type: audienceType,
     };
     if (campaignTemplateName.trim()) {
@@ -162,7 +162,7 @@ export default function WhatsAppCampaigns() {
       })
       .catch((err) => {
         setLoading(false);
-        showError(err.response?.data?.message || "Failed to launch campaign dispatch.");
+        showError(err.response?.data?.message || err.response?.data?.detail || "Failed to launch campaign dispatch.");
       });
   };
 

@@ -112,23 +112,99 @@ export default function WhatsAppIntegration() {
     fetchSettings();
   }, []);
 
-  const handleConnectWithMeta = (forceDirect = false) => {
+  // Load Meta Facebook JavaScript SDK dynamically
+  useEffect(() => {
+    if (!settings.meta_app_id) return;
+    
+    // Load SDK script if not already present
+    if (!document.getElementById("facebook-jssdk")) {
+      window.fbAsyncInit = function () {
+        window.FB.init({
+          appId: settings.meta_app_id,
+          cookie: true,
+          xfbml: true,
+          version: settings.meta_graph_api_version || "v21.0"
+        });
+      };
+
+      (function (d, s, id) {
+        var js, fjs = d.getElementsByTagName(s)[0];
+        if (d.getElementById(id)) return;
+        js = d.createElement(s);
+        js.id = id;
+        js.src = "https://connect.facebook.net/en_US/sdk.js";
+        fjs.parentNode.insertBefore(js, fjs);
+      }(document, "script", "facebook-jssdk"));
+    } else if (window.FB) {
+      window.FB.init({
+        appId: settings.meta_app_id,
+        cookie: true,
+        xfbml: true,
+        version: settings.meta_graph_api_version || "v21.0"
+      });
+    }
+
+    // Listen to window postMessage events from Meta Embedded Signup SDK / popups
+    const handleMetaMessage = (event) => {
+      if (!event.origin.includes("facebook.com") && !event.origin.includes("facebook.net")) return;
+      try {
+        const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+        if (data && (data.type === "WA_EMBEDDED_SIGNUP" || data.event === "facebook.signup")) {
+          const code = data.code || data.data?.code || "facebook_connect";
+          triggerConnectApi(code);
+        }
+      } catch (e) {}
+    };
+
+    window.addEventListener("message", handleMetaMessage);
+    return () => window.removeEventListener("message", handleMetaMessage);
+  }, [settings.meta_app_id]);
+
+  const handleConnectWithMeta = () => {
     setNotice({ type: "", message: "" });
     setConnecting(true);
 
     const appId = settings.meta_app_id;
+    
+    // 1. Try Meta Facebook JS SDK FB.login first if loaded
+    if (window.FB && appId) {
+      const loginOptions = {
+        scope: "whatsapp_business_management,whatsapp_business_messaging",
+        response_type: "code",
+        override_default_response_type: true,
+        extras: {
+          setup: {
+            // Include config_id for Meta Embedded Signup if present
+            ...(settings.meta_config_id ? { config_id: settings.meta_config_id } : {})
+          }
+        }
+      };
 
-    if (appId && !forceDirect) {
+      window.FB.login((response) => {
+        if (response.authResponse && response.authResponse.code) {
+          triggerConnectApi(response.authResponse.code);
+        } else if (response.authResponse && response.authResponse.accessToken) {
+          triggerConnectApi(response.authResponse.accessToken);
+        } else {
+          // User closed or completed via Embedded Signup session
+          triggerConnectApi("facebook_connect");
+        }
+      }, loginOptions);
+      return;
+    }
+
+    // 2. Fallback to Meta Popup OAuth flow
+    if (appId) {
       const width = 600;
       const height = 650;
       const left = window.screen.width / 2 - width / 2;
       const top = window.screen.height / 2 - height / 2;
-      // Use the Meta-registered redirect URI from backend config so OAuth matches exactly what's approved in Meta App Dashboard
-      const redirectUri = encodeURIComponent(settings.meta_redirect_uri || (window.location.origin + "/whatsapp-integration"));
+      const redirectUri = encodeURIComponent("https://www.smartgonext.com/");
       const version = settings.meta_graph_api_version || "v21.0";
-      const configId = settings.meta_config_id ? `&config_id=${settings.meta_config_id}` : "";
-
-      const oauthUrl = `https://www.facebook.com/${version}/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=whatsapp_business_management,whatsapp_business_messaging${configId}&response_type=code&state=whatsapp_signup`;
+      
+      const oauthUrl = settings.meta_config_id
+        ? `https://www.facebook.com/${version}/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&config_id=${settings.meta_config_id}&response_type=code&state=whatsapp_signup`
+        : `https://www.facebook.com/${version}/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=whatsapp_business_management,whatsapp_business_messaging&response_type=code&state=whatsapp_signup`;
 
       const popup = window.open(
         oauthUrl,
@@ -136,31 +212,13 @@ export default function WhatsAppIntegration() {
         `width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes`
       );
 
-      if (!popup) {
-        // Fallback directly to OAuth connect API
-        triggerConnectApi("facebook_connect");
-        return;
-      }
-
       const checkPopup = setInterval(() => {
         try {
           if (!popup || popup.closed) {
             clearInterval(checkPopup);
-            // If popup closed without redirect, perform backend connection
             triggerConnectApi("facebook_connect");
-            return;
           }
-
-          if (popup.location.origin === window.location.origin) {
-            const urlParams = new URLSearchParams(popup.location.search);
-            const code = urlParams.get("code") || "facebook_connect";
-            clearInterval(checkPopup);
-            popup.close();
-            triggerConnectApi(code);
-          }
-        } catch (e) {
-          // Cross-origin check while popup is on facebook.com
-        }
+        } catch (e) {}
       }, 500);
     } else {
       triggerConnectApi("facebook_connect");

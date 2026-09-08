@@ -111,6 +111,9 @@ class TenantSetting(db.Model, TimestampMixin):
     # Marketing / Client Churn Settings
     churn_days_threshold = db.Column(db.Integer, nullable=False, default=45)
 
+    # Billing Settings
+    billing_mode = db.Column(db.String(20), nullable=False, default="normal")  # normal, touch
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 

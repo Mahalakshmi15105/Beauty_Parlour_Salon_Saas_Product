@@ -27,16 +27,15 @@ class WhatsAppService:
         if not app_id or not app_secret:
             raise ValueError("META_APP_ID or META_APP_SECRET environment variables are missing.")
 
-        target_redirect = redirect_uri or configured_redirect
+        target_redirect = redirect_uri or configured_redirect or "https://www.smartgonext.com/"
 
         url = f"{get_meta_graph_base()}/oauth/access_token"
         params = {
             "client_id": app_id,
             "client_secret": app_secret,
             "code": code,
+            "redirect_uri": target_redirect
         }
-        if target_redirect:
-            params["redirect_uri"] = target_redirect
 
         try:
             res = requests.get(url, params=params, timeout=15)
@@ -125,7 +124,7 @@ class WhatsAppService:
 
         # Multi-Tenant Phone ID Priority: prefer tenant's phone_id if valid; fallback to system env
         phone_id = ""
-        if tenant_phone_id and tenant_phone_id not in ["982304918237465", "109283746591023"] and len(tenant_phone_id) > 5:
+        if tenant_phone_id and len(tenant_phone_id) > 5 and not tenant_phone_id.startswith("SIMULATED"):
             phone_id = tenant_phone_id
         elif env_phone_id:
             phone_id = env_phone_id
@@ -142,9 +141,7 @@ class WhatsAppService:
         """Determines if credentials are simulated/demo/non-functional."""
         if not token or not phone_id:
             return True
-        if token.startswith("SIMULATED") or "demo" in token.lower() or token == "facebook_connect":
-            return True
-        if phone_id in ["982304918237465", "109283746591023"]:
+        if token.startswith("SIMULATED") or "demo" in token.lower():
             return True
         return False
 

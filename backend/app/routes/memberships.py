@@ -7,7 +7,7 @@ from app.models.catalog import Service
 from app.models.customer import Customer
 from app.utils.responses import success_response, error_response
 from app.utils.auth import require_role, get_tenant_query, get_branch_query
-from app.utils.query import paginate_query
+from app.utils.query import paginate_query, generate_unique_invoice_number
 from datetime import datetime, timedelta
 from decimal import Decimal
 import logging
@@ -382,11 +382,7 @@ def assign_membership():
 
     try:
         # 1. Generate Invoice Number & Invoice Record
-        count_filter = [Invoice.tenant_id == g.parlour_id]
-        if target_branch_id:
-            count_filter.append(Invoice.branch_id == target_branch_id)
-        count = db.session.query(Invoice).filter(*count_filter).count()
-        invoice_number = f"INV-{g.parlour_id}-{count + 1:06d}"
+        invoice_number = generate_unique_invoice_number(g.parlour_id, target_branch_id)
 
         invoice = Invoice(
             tenant_id=g.parlour_id,
@@ -515,11 +511,7 @@ def renew_membership(cm_id):
 
     try:
         # Create Renewal Invoice
-        count_filter = [Invoice.tenant_id == g.parlour_id]
-        if target_branch_id:
-            count_filter.append(Invoice.branch_id == target_branch_id)
-        count = db.session.query(Invoice).filter(*count_filter).count()
-        invoice_number = f"INV-{g.parlour_id}-{count + 1:06d}"
+        invoice_number = generate_unique_invoice_number(g.parlour_id, target_branch_id)
 
         invoice = Invoice(
             tenant_id=g.parlour_id,

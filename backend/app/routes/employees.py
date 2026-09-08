@@ -102,8 +102,8 @@ def create_employee():
     data = request.get_json() or {}
     first_name = data.get("first_name", "").strip()
     phone = data.get("phone", "").strip()
-    salary = data.get("salary", 0.00)
-    commission = data.get("commission_percentage", 0.00)
+    salary = data.get("salary")
+    commission = data.get("commission_percentage")
 
     if not first_name or not phone:
         return error_response(
@@ -114,14 +114,30 @@ def create_employee():
 
     # Validate numbers
     try:
-        salary_val = float(salary)
-        comm_val = float(commission)
-        if salary_val < 0 or comm_val < 0 or comm_val > 100:
-            raise ValueError()
-    except ValueError:
+        salary_val = float(salary) if salary not in ("", None) else 0.0
+    except (ValueError, TypeError):
         return error_response(
             error_code="VALIDATION_FAILED",
-            message="Salary must be >= 0 and commission must be between 0 and 100.",
+            message="Salary must be a valid number >= 0.",
+            status_code=400
+        )
+
+    try:
+        comm_val = float(commission) if commission not in ("", None) else 0.0
+    except (ValueError, TypeError):
+        comm_val = 0.0
+
+    if salary_val < 0:
+        return error_response(
+            error_code="VALIDATION_FAILED",
+            message="Salary must be >= 0.",
+            status_code=400
+        )
+
+    if comm_val < 0 or comm_val > 100:
+        return error_response(
+            error_code="VALIDATION_FAILED",
+            message="Commission must be between 0 and 100.",
             status_code=400
         )
 
@@ -212,8 +228,8 @@ def update_employee(employee_id):
     data = request.get_json() or {}
     first_name = data.get("first_name", "").strip()
     phone = data.get("phone", "").strip()
-    salary = data.get("salary", 0.00)
-    commission = data.get("commission_percentage", 0.00)
+    salary = data.get("salary")
+    commission = data.get("commission_percentage")
 
     if not first_name or not phone:
         return error_response(
@@ -223,14 +239,30 @@ def update_employee(employee_id):
         )
 
     try:
-        salary_val = float(salary)
-        comm_val = float(commission)
-        if salary_val < 0 or comm_val < 0 or comm_val > 100:
-            raise ValueError()
-    except ValueError:
+        salary_val = float(salary) if salary not in ("", None) else 0.0
+    except (ValueError, TypeError):
         return error_response(
             error_code="VALIDATION_FAILED",
-            message="Salary must be >= 0 and commission must be between 0 and 100.",
+            message="Salary must be a valid number >= 0.",
+            status_code=400
+        )
+
+    try:
+        comm_val = float(commission) if commission not in ("", None) else 0.0
+    except (ValueError, TypeError):
+        comm_val = 0.0
+
+    if salary_val < 0:
+        return error_response(
+            error_code="VALIDATION_FAILED",
+            message="Salary must be >= 0.",
+            status_code=400
+        )
+
+    if comm_val < 0 or comm_val > 100:
+        return error_response(
+            error_code="VALIDATION_FAILED",
+            message="Commission must be between 0 and 100.",
             status_code=400
         )
 

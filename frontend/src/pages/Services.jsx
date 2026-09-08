@@ -265,6 +265,7 @@ function Services() {
       name: "",
       category_id: "",
       price: "",
+      image_url: "",
       status: "active",
     });
     setMembershipDiscounts([{ plan_id: "", percentage: "", amount: "" }]);
@@ -277,6 +278,7 @@ function Services() {
       name: s.name || "",
       category_id: s.category_id || "",
       price: s.price || "",
+      image_url: s.image_url || "",
       status: s.status || "active",
     });
     const existingDiscounts = s.membership_discounts || s.discounts || [];
@@ -618,6 +620,54 @@ function Services() {
                 </div>
 
                 <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Service Image (Optional)</label>
+                  <div className="flex items-center space-x-3 bg-background border border-border-soft p-2.5 rounded-lg">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      id="service-image-upload"
+                      onChange={(e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setServiceForm((prev) => ({ ...prev, image_url: reader.result }));
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      tabIndex="0"
+                      data-image-upload-trigger="true"
+                      data-target-input="service-image-upload"
+                      onClick={() => document.getElementById("service-image-upload")?.click()}
+                      className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 rounded-md text-xs font-semibold cursor-pointer transition flex items-center space-x-1.5 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Choose Image</span>
+                    </button>
+                    {serviceForm.image_url ? (
+                      <div className="flex items-center space-x-2">
+                        <img src={serviceForm.image_url} alt="Preview" className="w-9 h-9 rounded-md object-cover border border-border-soft" />
+                        <button
+                          type="button"
+                          data-skip-nav="true"
+                          onClick={() => setServiceForm((prev) => ({ ...prev, image_url: "" }))}
+                          className="text-xs text-rose-500 hover:underline font-semibold"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-text-secondary">No image chosen</span>
+                    )}
+                  </div>
+                </div>
+
+                <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Status</label>
                   <select
                     value={serviceForm.status}
@@ -638,6 +688,7 @@ function Services() {
                   </span>
                   <button
                     type="button"
+                    data-skip-nav="true"
                     onClick={handleAddDiscountRow}
                     className="text-xs font-bold text-primary hover:underline flex items-center space-x-1"
                   >
@@ -698,6 +749,7 @@ function Services() {
                       <div className="col-span-1 flex justify-center pt-3">
                         <button
                           type="button"
+                          data-skip-nav="true"
                           onClick={() => handleRemoveDiscountRow(idx)}
                           className="text-slate-400 hover:text-danger p-1 rounded-md transition"
                           title="Remove Membership Plan"
@@ -713,8 +765,9 @@ function Services() {
               <div className="pt-4 border-t border-border-soft flex justify-end space-x-3">
                 <button
                   type="button"
+                  data-skip-nav="true"
                   onClick={() => setShowServiceModal(false)}
-                  className="px-4 py-2 border border-border-soft rounded-lg text-sm text-text-secondary hover:bg-background"
+                  className="cancel-btn px-4 py-2 border border-border-soft rounded-lg text-sm text-text-secondary hover:bg-background"
                 >
                   Cancel
                 </button>
