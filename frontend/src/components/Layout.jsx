@@ -297,12 +297,12 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
                     <span className="text-[11px] font-extrabold text-slate-800 block truncate mt-0.5">
                       {user?.parlour_name || "Main Parlour"}
                     </span>
-                    <span className="text-[10px] font-bold text-pink-600 block truncate mt-0.5">
+                    <span className="text-[10px] font-bold text-slate-500 block truncate mt-0.5">
                       Powered By SmartGoNext
                     </span>
                   </>
                 ) : (
-                  <span className="text-[11px] font-bold text-slate-700 block mt-0.5 whitespace-nowrap">
+                  <span className="text-[11px] font-bold text-slate-500 block mt-0.5 whitespace-nowrap">
                     Powered By SmartGoNext
                   </span>
                 )}

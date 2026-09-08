@@ -448,6 +448,8 @@ export default function TouchModeBilling({
 
                     {/* Employee Selection Dropdown */}
                     <select
+                      data-row={idx}
+                      data-field="employee"
                       value={item.employee_ids && item.employee_ids.length > 0 ? item.employee_ids[0] : ""}
                       onChange={(e) => handleEmployeeToggle(idx, e.target.value)}
                       className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[11px] font-semibold text-slate-700 focus:outline-none focus:border-pink-500 max-w-[150px]"

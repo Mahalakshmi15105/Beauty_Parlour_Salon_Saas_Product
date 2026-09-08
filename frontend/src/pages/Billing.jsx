@@ -1485,6 +1485,7 @@ function Billing() {
 
   const handleProceedToPayment = () => {
     if (!selectedCustomerId) {
+      showError("Please select a customer first before proceeding to payment.");
       if (customerSelectRef.current) {
         customerSelectRef.current.focus();
         setIsCustomerDropdownOpen(true);
@@ -1493,6 +1494,7 @@ function Billing() {
       return;
     }
     if (cart.length === 0) {
+      showError("Your cart is empty. Please add services or products first.");
       if (!selectedCategoryId) {
         if (categorySelectRef.current) {
           categorySelectRef.current.focus();
@@ -1510,8 +1512,11 @@ function Billing() {
       (item) => item.type === "service" && (!item.employee_ids || item.employee_ids.length === 0)
     );
     if (missingEmpIdx !== -1) {
+      const missingService = cart[missingEmpIdx];
+      showError(`Please select an employee/staff member for '${missingService.name || 'Service'}'.`);
       const empSelect = document.querySelector(`[data-row="${missingEmpIdx}"][data-field="employee"]`);
       if (empSelect) {
+        empSelect.scrollIntoView({ behavior: 'smooth', block: 'center' });
         empSelect.focus();
         openNativeSelectDropdown(empSelect);
       }

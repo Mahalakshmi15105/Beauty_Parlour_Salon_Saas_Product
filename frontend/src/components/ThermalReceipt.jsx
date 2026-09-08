@@ -646,20 +646,14 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
       {/* 6. THANK YOU & FOOTER */}
       <div className="text-center space-y-1 text-xs text-black pt-1">
         <p className="font-bold">Thank you for visiting. Please visit again.</p>
-        <p className="font-bold text-sm uppercase">{businessProfile.name || "BEAUTY PARLOUR"}</p>
+        <p className="text-[10px] text-slate-400 font-semibold pt-1">Powered By SmartGoNext</p>
       </div>
 
-      {/* 8. NOTES & CONTACT PHONE */}
+      {/* 8. NOTES */}
       {invoice.notes && (
         <div className="text-xs text-black space-y-0.5 pt-0.5">
           <span className="font-bold block">Notes:</span>
           <p className="italic">{invoice.notes}</p>
-        </div>
-      )}
-
-      {showPhone && businessProfile.phone && (
-        <div className="pt-1.5 text-center text-xs font-bold text-black">
-          For appointments, Please call on {businessProfile.phone}
         </div>
       )}
     </div>
