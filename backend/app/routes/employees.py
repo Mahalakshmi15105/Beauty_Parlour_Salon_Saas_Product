@@ -52,16 +52,16 @@ def get_employees():
     data = [
         {
             "id": emp.id,
-            "first_name": emp.first_name,
-            "last_name": emp.last_name,
-            "phone": emp.phone,
-            "specialization": emp.specialization,
-            "role": emp.role,
-            "salary": float(emp.salary),
-            "commission_percentage": float(emp.commission_percentage),
-            "joining_date": emp.joining_date.isoformat(),
-            "status": emp.status,
-            "created_at": emp.created_at.isoformat()
+            "first_name": emp.first_name or "",
+            "last_name": emp.last_name or "",
+            "phone": emp.phone or "",
+            "specialization": emp.specialization or "",
+            "role": emp.role or "",
+            "salary": float(emp.salary or 0.0),
+            "commission_percentage": float(emp.commission_percentage or 0.0),
+            "joining_date": emp.joining_date.isoformat() if emp.joining_date else None,
+            "status": emp.status or "active",
+            "created_at": emp.created_at.isoformat() if emp.created_at else ""
         } for emp in employees
     ]
 
@@ -83,16 +83,16 @@ def get_employee(employee_id):
         )
     return success_response({
         "id": employee.id,
-        "first_name": employee.first_name,
-        "last_name": employee.last_name,
-        "phone": employee.phone,
-        "specialization": employee.specialization,
-        "role": employee.role,
-        "salary": float(employee.salary),
-        "commission_percentage": float(employee.commission_percentage),
-        "joining_date": employee.joining_date.isoformat(),
-        "status": employee.status,
-        "created_at": employee.created_at.isoformat()
+        "first_name": employee.first_name or "",
+        "last_name": employee.last_name or "",
+        "phone": employee.phone or "",
+        "specialization": employee.specialization or "",
+        "role": employee.role or "",
+        "salary": float(employee.salary or 0.0),
+        "commission_percentage": float(employee.commission_percentage or 0.0),
+        "joining_date": employee.joining_date.isoformat() if employee.joining_date else None,
+        "status": employee.status or "active",
+        "created_at": employee.created_at.isoformat() if employee.created_at else ""
     })
 
 

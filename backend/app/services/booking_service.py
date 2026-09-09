@@ -208,15 +208,18 @@ class BookingService:
         Enforces tenant and branch boundaries for appointments, customers, and employees.
         """
         try:
-            from flask import g
-            was_master = getattr(g, "use_master_db", False)
+            # Verify tenant is active in master DB
+            tenant_active = False
             try:
-                g.use_master_db = True
-                tenant = Tenant.query.filter_by(id=tenant_id, is_deleted=False).first()
-            finally:
-                g.use_master_db = was_master
+                with db.get_master_engine().connect() as conn:
+                    from sqlalchemy import text
+                    res = conn.execute(text("SELECT status FROM tenants WHERE id = :id AND is_deleted = 0"), {"id": tenant_id}).fetchone()
+                    if res and res[0] == "active":
+                        tenant_active = True
+            except Exception as t_err:
+                logger.warning(f"Failed to check tenant status: {t_err}")
 
-            if not tenant or tenant.status != "active":
+            if not tenant_active:
                 return False, {"error_code": "INVALID_TENANT", "message": "The associated beauty parlour account is inactive or not found."}, 400
 
             # Validate target_branch_id if supplied

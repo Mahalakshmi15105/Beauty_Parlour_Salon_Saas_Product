@@ -2,6 +2,7 @@ import json
 import logging
 import re
 from flask import Blueprint, request
+from app.database import db
 from app.models.global_models import Tenant
 from app.models.catalog import Service
 from app.models.employee import Employee
@@ -47,6 +48,7 @@ def resolve_tenant(identifier):
 
     if tenant:
         g.use_master_db = False
+        db.session.remove()
         g.tenant_db_uri = tenant.db_connection_uri
         g.parlour_id = tenant.id
 
@@ -134,7 +136,7 @@ def get_public_booking_config(tenant_identifier):
             "city": settings.city or "",
             "state": settings.state or "",
             "postal_code": settings.postal_code or "",
-            "currency_symbol": settings.currency_symbol or "₹",
+            "currency_symbol": "₹" if not settings.currency_symbol or str(settings.currency_symbol).strip() in ["?", "\\u20b9", ""] else settings.currency_symbol,
             "booking_enabled": bool(getattr(settings, "booking_enabled", True)),
             "booking_type": getattr(settings, "booking_type", "Token"),
             "allow_staff_selection": bool(getattr(settings, "allow_staff_selection", False)),

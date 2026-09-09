@@ -24,10 +24,14 @@ class DynamicMultiTenantSession(BaseSession):
                 pass
         return self._db.get_engine(bind=bind_key)
 
+from sqlalchemy.pool import NullPool
+
 class MySQLMultiTenantSQLAlchemy(SQLAlchemy):
     """
     SQLAlchemy extension wrapper that dynamically routes session binds
     to either the Master MySQL DB or the active Tenant MySQL DB per request.
+    Uses NullPool to ensure connections are closed immediately after requests,
+    preventing connection limit exhaustion (MySQL 1203) under cPanel / WSGI.
     """
     def __init__(self, *args, **kwargs):
         kwargs["session_options"] = kwargs.get("session_options", {})
@@ -42,39 +46,36 @@ class MySQLMultiTenantSQLAlchemy(SQLAlchemy):
     def get_master_engine(self):
         master_uri = current_app.config.get("MASTER_DATABASE_URI", "mysql+pymysql://root:root@localhost:3306/parlour_master?charset=utf8mb4")
         if "master" not in self._engine_cache:
-            logger.info("Connecting to MySQL Master DB...")
+            logger.info("Connecting to MySQL Master DB with NullPool...")
             engine = create_engine(
                 master_uri,
+                poolclass=NullPool,
                 pool_pre_ping=True,
-                pool_recycle=1800,
-                pool_size=10,
-                max_overflow=20
+                connect_args={"charset": "utf8mb4"}
             )
             self._engine_cache["master"] = engine
-            try:
-                master_metadata.create_all(bind=engine)
-            except Exception as e:
-                logger.warning(f"Notice auto-creating master tables: {e}")
         return self._engine_cache["master"]
 
     def get_tenant_engine(self, db_uri):
         if not db_uri:
             return self.get_master_engine()
         
+        try:
+            from app.db_bootstrap import sanitize_tenant_uri
+            master_uri = current_app.config.get("MASTER_DATABASE_URI") or current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
+            db_uri = sanitize_tenant_uri(db_uri, master_uri)
+        except Exception:
+            pass
+
         if db_uri not in self._engine_cache:
-            logger.info(f"Initializing MySQL connection pool for tenant: {db_uri}")
+            logger.info(f"Connecting to MySQL tenant DB with NullPool: {db_uri}")
             engine = create_engine(
                 db_uri,
+                poolclass=NullPool,
                 pool_pre_ping=True,
-                pool_recycle=1800,
-                pool_size=5,
-                max_overflow=10
+                connect_args={"charset": "utf8mb4"}
             )
             self._engine_cache[db_uri] = engine
-            try:
-                tenant_metadata.create_all(bind=engine)
-            except Exception as e:
-                logger.warning(f"Notice auto-creating tenant tables for {db_uri}: {e}")
         return self._engine_cache[db_uri]
 
     def get_engine(self, app=None, bind=None):

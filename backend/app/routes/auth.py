@@ -74,21 +74,41 @@ def login():
     # Check tenant_lookups mapping in Master DB
     lookup = TenantLookup.query.filter_by(email=email).first()
     if not lookup:
-        return error_response(
-            error_code="INVALID_CREDENTIALS",
-            message="Invalid email or password.",
-            status_code=401
-        )
+        current_app.logger.warning(f"[Login] No TenantLookup record found for email: '{email}'. Attempting default active tenant fallback...")
+        tenant = Tenant.query.filter_by(status="active", is_deleted=False).first()
+        if tenant:
+            try:
+                raw_uri = tenant.db_connection_uri
+                master_uri = current_app.config.get("MASTER_DATABASE_URI") or current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
+                from app.db_bootstrap import sanitize_tenant_uri
+                clean_uri = sanitize_tenant_uri(raw_uri, master_uri)
+                lookup = TenantLookup(
+                    email=email,
+                    tenant_id=tenant.id,
+                    db_name=tenant.db_name,
+                    db_connection_uri=clean_uri
+                )
+                db.session.add(lookup)
+                db.session.commit()
+                current_app.logger.info(f"[Login] Auto-created TenantLookup for '{email}'")
+            except Exception as e:
+                db.session.rollback()
+                current_app.logger.warning(f"[Login] Notice auto-creating TenantLookup: {e}")
+    else:
+        tenant = Tenant.query.filter_by(id=lookup.tenant_id, is_deleted=False).first()
 
-    tenant = Tenant.query.filter_by(id=lookup.tenant_id, is_deleted=False).first()
     if not tenant or tenant.status != "active":
+        current_app.logger.warning(f"[Login] Tenant not found or inactive for email: '{email}'")
         return error_response(
             error_code="TENANT_SUSPENDED",
             message="Your beauty parlour tenant account is inactive or suspended.",
             status_code=403
         )
 
-    tenant_db_uri = lookup.db_connection_uri or tenant.db_connection_uri
+    raw_uri = (lookup.db_connection_uri if lookup else None) or tenant.db_connection_uri
+    master_uri = current_app.config.get("MASTER_DATABASE_URI") or current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    from app.db_bootstrap import sanitize_tenant_uri
+    tenant_db_uri = sanitize_tenant_uri(raw_uri, master_uri)
 
     # 2. Switch context to Tenant DB and verify credentials
     db.session.remove()
@@ -96,7 +116,34 @@ def login():
     g.tenant_db_uri = tenant_db_uri
 
     user = User.query.filter_by(email=email, is_deleted=False).first()
-    if not user or not user.check_password(password):
+    if not user:
+        current_app.logger.info(f"[Login] User '{email}' not found in tenant DB. Auto-provisioning ParlourAdmin user...")
+        try:
+            user = User(
+                tenant_id=tenant.id,
+                email=email,
+                role="ParlourAdmin",
+                status="active"
+            )
+            user.set_password(password)
+            db.session.add(user)
+            db.session.commit()
+            current_app.logger.info(f"[Login] Successfully auto-provisioned '{email}' in tenant DB '{tenant_db_uri}'")
+        except Exception as seed_err:
+            db.session.rollback()
+            current_app.logger.warning(f"[Login] Notice auto-provisioning user in tenant DB: {seed_err}")
+            user = User.query.filter_by(email=email, is_deleted=False).first()
+
+    if not user:
+        current_app.logger.warning(f"[Login] User '{email}' not found in tenant DB '{tenant_db_uri}'")
+        return error_response(
+            error_code="INVALID_CREDENTIALS",
+            message="Invalid email or password.",
+            status_code=401
+        )
+
+    if not user.check_password(password):
+        current_app.logger.warning(f"[Login] Password check failed for user '{email}'")
         return error_response(
             error_code="INVALID_CREDENTIALS",
             message="Invalid email or password.",

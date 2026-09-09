@@ -39,13 +39,6 @@ def ensure_tenant_categories(tenant_id):
     if not tenant_id:
         return
     try:
-        g.use_master_db = True
-        tenant = Tenant.query.get(tenant_id)
-        g.use_master_db = False
-        if not tenant:
-            return
-        
-        g.tenant_db_uri = tenant.db_connection_uri
 
         # Fast exit check: If tenant already has categories, skip checks
         existing_cat = ServiceCategory.query.filter_by(tenant_id=tenant_id, is_deleted=False).first()
@@ -282,14 +275,14 @@ def get_services():
 
         data.append({
             "id": s.id,
-            "name": s.name,
-            "price": float(s.price),
-            "duration_minutes": s.duration_minutes,
-            "status": s.status,
-            "description": s.description,
+            "name": s.name or "",
+            "price": float(s.price or 0.0),
+            "duration_minutes": s.duration_minutes or 0,
+            "status": s.status or "active",
+            "description": s.description or "",
             "category_id": s.category_id,
             "category_name": cat_name,
-            "image_url": s.image_url,
+            "image_url": s.image_url or "",
             "membership_discounts": discounts,
             "created_at": s.created_at.isoformat() if s.created_at else None
         })
@@ -321,16 +314,16 @@ def get_service(service_id):
     ]
     return success_response({
         "id": service.id,
-        "name": service.name,
-        "price": float(service.price),
-        "duration_minutes": service.duration_minutes,
-        "status": service.status,
-        "description": service.description,
+        "name": service.name or "",
+        "price": float(service.price or 0.0),
+        "duration_minutes": service.duration_minutes or 0,
+        "status": service.status or "active",
+        "description": service.description or "",
         "category_id": service.category_id,
         "category_name": service.category.name if service.category else None,
-        "image_url": service.image_url,
+        "image_url": service.image_url or "",
         "membership_discounts": discounts,
-        "created_at": service.created_at.isoformat()
+        "created_at": service.created_at.isoformat() if service.created_at else None
     })
 
 

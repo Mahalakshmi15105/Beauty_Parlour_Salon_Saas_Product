@@ -3,6 +3,7 @@ export const getFullImageUrl = (url) => {
   if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
     return url;
   }
-  const backendBase = "http://localhost:5000";
+  const apiBase = import.meta.env.VITE_API_URL || "https://salon-backend.smartgonext.com/api/v1";
+  const backendBase = apiBase.replace(/\/api\/v1\/?$/, "");
   return `${backendBase}${url.startsWith("/") ? "" : "/"}${url}`;
 };

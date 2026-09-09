@@ -50,10 +50,25 @@ def seed_database():
             db.session.add(super_admin)
             db.session.commit()
             print("Super Admin user created in Master DB.")
+        else:
+            super_admin.status = "active"
+            super_admin.set_password("SuperAdmin123!")
+            db.session.commit()
+            print("Super Admin user password synced in Master DB.")
 
         # 3. Create Default Beauty Parlour Tenant in Master DB
         tenant = Tenant.query.filter_by(name="SmartGoNext Beauty Salon").first()
-        base_uri = app.config.get("MYSQL_BASE_URI", "mysql+pymysql://root:root@localhost:3306/")
+        import re
+        base_uri = app.config.get("MYSQL_BASE_URI")
+        if not base_uri or "root:root" in base_uri:
+            master_uri = app.config.get("MASTER_DATABASE_URI", "")
+            m_b = re.match(r"^(mysql\+[a-z0-9]+://[^/]+/).*", master_uri)
+            if m_b:
+                base_uri = m_b.group(1)
+            else:
+                base_uri = "mysql+pymysql://smartgo1_salon_user:Arish%40123@localhost:3306/"
+
+        cpanel_user = app.config.get("CPANEL_USERNAME", "")
         
         if not tenant:
             tenant = Tenant(
@@ -66,11 +81,40 @@ def seed_database():
             
             tenant_id = tenant.id
             slug_clean = tenant.slug.replace('-', '_')
-            db_name = f"tenant_{slug_clean}_{tenant_id}"
+            if cpanel_user and not slug_clean.startswith(f"{cpanel_user}_"):
+                db_name = f"{cpanel_user}_tenant_{slug_clean}_{tenant_id}"
+            else:
+                db_name = f"tenant_{slug_clean}_{tenant_id}"
             tenant_db_uri = f"{base_uri}{db_name}?charset=utf8mb4"
             tenant.db_name = db_name
             tenant.db_connection_uri = tenant_db_uri
+            db.session.commit()
+            print("SmartGoNext Beauty Salon Tenant created in Master DB.")
+        else:
+            tenant_id = tenant.id
+            slug_clean = tenant.slug.replace('-', '_')
+            if cpanel_user and not slug_clean.startswith(f"{cpanel_user}_"):
+                default_dbname = f"{cpanel_user}_tenant_{slug_clean}_{tenant_id}"
+            else:
+                default_dbname = f"tenant_{slug_clean}_{tenant_id}"
+            
+            raw_dbname = tenant.db_name or default_dbname
+            if cpanel_user and not raw_dbname.startswith(f"{cpanel_user}_"):
+                db_name = f"{cpanel_user}_{raw_dbname}"
+            else:
+                db_name = raw_dbname
+                
+            tenant_db_uri = f"{base_uri}{db_name}?charset=utf8mb4"
+            from app.db_bootstrap import sanitize_tenant_uri
+            tenant_db_uri = sanitize_tenant_uri(tenant_db_uri, app.config.get("MASTER_DATABASE_URI", ""))
+            
+            tenant.db_name = db_name
+            tenant.db_connection_uri = tenant_db_uri
+            db.session.commit()
 
+        # Ensure TenantLookup exists in Master DB for admin@smartgonext.com
+        lookup = TenantLookup.query.filter_by(email="admin@smartgonext.com").first()
+        if not lookup:
             lookup = TenantLookup(
                 email="admin@smartgonext.com",
                 tenant_id=tenant_id,
@@ -79,14 +123,22 @@ def seed_database():
             )
             db.session.add(lookup)
             db.session.commit()
-            print("SmartGoNext Beauty Salon Tenant & Lookup created in Master DB.")
+            print("TenantLookup created for admin@smartgonext.com.")
         else:
-            tenant_id = tenant.id
-            slug_clean = tenant.slug.replace('-', '_')
-            db_name = tenant.db_name or f"tenant_{slug_clean}_{tenant_id}"
-            tenant_db_uri = tenant.db_connection_uri or f"{base_uri}{db_name}?charset=utf8mb4"
+            lookup.db_name = db_name
+            lookup.db_connection_uri = tenant_db_uri
+            db.session.commit()
 
-        # 4. Provision Tenant DB & Schema
+        # 4. Provision Tenant DB (via cPanel UAPI) & Schema
+        try:
+            from app.services.cpanel_service import cpanel_service
+            if cpanel_service.is_configured():
+                m_user = re.search(r"//([^:@]+)", base_uri)
+                db_user = m_user.group(1) if m_user else None
+                cpanel_service.create_database(db_name, db_user)
+        except Exception as cp_err:
+            print(f"Notice running cPanel API in seed: {cp_err}")
+
         ensure_database_exists(tenant_db_uri)
         tenant_engine = create_engine(tenant_db_uri)
         tenant_metadata.create_all(bind=tenant_engine)
@@ -109,6 +161,11 @@ def seed_database():
             db.session.add(parlour_admin)
             db.session.commit()
             print("Parlour Admin user created in Tenant DB.")
+        else:
+            parlour_admin.status = "active"
+            parlour_admin.set_password("ParlourAdmin123!")
+            db.session.commit()
+            print("Parlour Admin user password synced in Tenant DB.")
 
         # 7. Create Default Settings in Tenant DB
         settings = TenantSetting.query.filter_by(tenant_id=tenant_id).first()

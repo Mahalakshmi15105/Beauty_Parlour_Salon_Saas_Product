@@ -23,6 +23,8 @@ import os
 import sys
 import logging
 
+os.environ["IN_PASSENGER"] = "true"
+
 # Ensure the backend directory is on the Python path
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 if BACKEND_DIR not in sys.path:

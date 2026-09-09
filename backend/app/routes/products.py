@@ -59,16 +59,16 @@ def get_products():
         {
             "id": p.id,
             "name": p.name,
-            "category": p.category,
-            "sku": p.sku,
-            "barcode": p.barcode,
-            "cost_price": float(p.cost_price),
-            "selling_price": float(p.selling_price),
-            "mrp": float(p.mrp),
-            "stock_quantity": p.stock_quantity,
-            "low_stock_threshold": p.low_stock_threshold,
-            "status": p.status,
-            "image_url": p.image_url,
+            "category": p.category or "",
+            "sku": p.sku or "",
+            "barcode": p.barcode or "",
+            "cost_price": float(p.cost_price or 0.0),
+            "selling_price": float(p.selling_price or 0.0),
+            "mrp": float(p.mrp or 0.0),
+            "stock_quantity": p.stock_quantity or 0,
+            "low_stock_threshold": p.low_stock_threshold or 0,
+            "status": p.status or "active",
+            "image_url": p.image_url or "",
             "created_at": p.created_at.isoformat() if p.created_at else None
         } for p in products
     ]
@@ -92,16 +92,16 @@ def get_product(product_id):
     return success_response({
         "id": product.id,
         "name": product.name,
-        "category": product.category,
-        "sku": product.sku,
-        "barcode": product.barcode,
-        "cost_price": float(product.cost_price),
-        "selling_price": float(product.selling_price),
-        "mrp": float(product.mrp),
-        "stock_quantity": product.stock_quantity,
-        "low_stock_threshold": product.low_stock_threshold,
-        "status": product.status,
-        "image_url": product.image_url,
+        "category": product.category or "",
+        "sku": product.sku or "",
+        "barcode": product.barcode or "",
+        "cost_price": float(product.cost_price or 0.0),
+        "selling_price": float(product.selling_price or 0.0),
+        "mrp": float(product.mrp or 0.0),
+        "stock_quantity": product.stock_quantity or 0,
+        "low_stock_threshold": product.low_stock_threshold or 0,
+        "status": product.status or "active",
+        "image_url": product.image_url or "",
         "created_at": product.created_at.isoformat() if product.created_at else None
     })
 

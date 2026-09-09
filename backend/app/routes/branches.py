@@ -53,20 +53,20 @@ def create_branch():
         )
 
     # Check branch limit
-    g.use_master_db = True
-    tenant = Tenant.query.get(g.parlour_id)
-    plan = tenant.subscription_plan if tenant else None
-    g.use_master_db = False
-
-    if not tenant:
-        return error_response(
-            error_code="TENANT_NOT_FOUND",
-            message="Tenant not found.",
-            status_code=404
-        )
-
-    # Get branch limit from subscription plan
-    max_branches = plan.max_branches if plan else 3
+    max_branches = 3
+    try:
+        with db.get_master_engine().connect() as conn:
+            from sqlalchemy import text
+            res = conn.execute(text("""
+                SELECT sp.max_branches 
+                FROM tenants t 
+                LEFT JOIN subscription_plans sp ON t.subscription_plan_id = sp.id 
+                WHERE t.id = :id
+            """), {"id": g.parlour_id}).fetchone()
+            if res and res[0] is not None:
+                max_branches = res[0]
+    except Exception as err:
+        logger.warning(f"Failed to fetch max_branches: {err}")
     current_branch_count = Branch.query.filter_by(tenant_id=g.parlour_id, is_deleted=False).count()
 
     if current_branch_count >= max_branches:
@@ -141,16 +141,23 @@ def create_branch():
             logger.info("BranchAdmin added to session")
 
             # Insert TenantLookup mapping into Master DB for auth login routing
-            from app.models.global_models import TenantLookup
-            g.use_master_db = True
-            lookup = TenantLookup(
-                tenant_id=g.parlour_id,
-                email=admin_email,
-                db_name=tenant.db_name,
-                db_connection_uri=tenant.db_connection_uri
-            )
-            db.session.add(lookup)
-            g.use_master_db = False
+            try:
+                from sqlalchemy import text
+                with db.get_master_engine().begin() as m_conn:
+                    t_row = m_conn.execute(text("SELECT db_name, db_connection_uri FROM tenants WHERE id = :id"), {"id": g.parlour_id}).fetchone()
+                    if t_row:
+                        m_conn.execute(text("""
+                            INSERT INTO tenant_lookup (tenant_id, email, db_name, db_connection_uri) 
+                            VALUES (:tenant_id, :email, :db_name, :db_connection_uri)
+                            ON DUPLICATE KEY UPDATE db_name = :db_name, db_connection_uri = :db_connection_uri
+                        """), {
+                            "tenant_id": g.parlour_id,
+                            "email": admin_email,
+                            "db_name": t_row[0],
+                            "db_connection_uri": t_row[1]
+                        })
+            except Exception as l_err:
+                logger.error(f"Failed to insert TenantLookup for branch admin: {l_err}")
 
         logger.info("Committing transaction...")
         db.session.commit()
@@ -296,19 +303,20 @@ def delete_branch(branch_id):
 @require_role(["ParlourAdmin"])
 def check_branch_limit():
     """Check if tenant can create more branches"""
-    g.use_master_db = True
-    tenant = Tenant.query.get(g.parlour_id)
-    plan = tenant.subscription_plan if tenant else None
-    g.use_master_db = False
-
-    if not tenant:
-        return error_response(
-            error_code="TENANT_NOT_FOUND",
-            message="Tenant not found.",
-            status_code=404
-        )
-
-    max_branches = plan.max_branches if plan else 3
+    max_branches = 3
+    try:
+        with db.get_master_engine().connect() as conn:
+            from sqlalchemy import text
+            res = conn.execute(text("""
+                SELECT sp.max_branches 
+                FROM tenants t 
+                LEFT JOIN subscription_plans sp ON t.subscription_plan_id = sp.id 
+                WHERE t.id = :id
+            """), {"id": g.parlour_id}).fetchone()
+            if res and res[0] is not None:
+                max_branches = res[0]
+    except Exception as err:
+        logger.warning(f"Failed to fetch max_branches: {err}")
     current_branch_count = Branch.query.filter_by(tenant_id=g.parlour_id, is_deleted=False).count()
     can_create = current_branch_count < max_branches
 

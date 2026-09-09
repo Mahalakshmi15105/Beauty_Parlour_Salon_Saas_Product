@@ -1,7 +1,11 @@
+import logging
 from functools import wraps
 from flask import g
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 from app.utils.responses import error_response
+from app.database import db
+
+logger = logging.getLogger(__name__)
 
 def get_tenant_query(model):
     """
@@ -139,16 +143,22 @@ def require_role(roles):
 
             # Resolve tenant database URI if not embedded directly in JWT
             if parlour_id and not tenant_db_uri:
-                g.use_master_db = True
-                from app.models.global_models import Tenant
-                tenant_record = Tenant.query.filter_by(id=parlour_id, is_deleted=False).first()
-                if not tenant_record or tenant_record.status != "active":
-                    return error_response(
-                        error_code="INVALID_TENANT",
-                        message="The associated parlour tenant does not exist, is deleted, or is suspended.",
-                        status_code=400
-                    )
-                tenant_db_uri = tenant_record.db_connection_uri
+                try:
+                    with db.get_master_engine().connect() as conn:
+                        from sqlalchemy import text
+                        row = conn.execute(
+                            text("SELECT db_connection_uri, status, is_deleted FROM tenants WHERE id = :id"),
+                            {"id": parlour_id}
+                        ).fetchone()
+                        if not row or row[1] != "active" or row[2]:
+                            return error_response(
+                                error_code="INVALID_TENANT",
+                                message="The associated parlour tenant does not exist, is deleted, or is suspended.",
+                                status_code=400
+                            )
+                        tenant_db_uri = row[0]
+                except Exception as e:
+                    logger.error(f"Failed to fetch tenant DB URI in auth: {e}")
 
             # Bind contexts to thread-local g
             g.user_id = user_id
@@ -156,21 +166,21 @@ def require_role(roles):
             g.tenant_db_uri = tenant_db_uri
             g.branch_id = branch_id
             g.role = role
+            g.use_master_db = False
+
             if parlour_id:
                 from app.services.cache import cache
                 t_cache_key = f"tenant_valid:{parlour_id}"
                 tenant_exists = cache.get(t_cache_key)
                 if tenant_exists is None:
                     try:
-                        from app.models.global_models import Tenant
-                        g.use_master_db = True
-                        t_obj = Tenant.query.filter_by(id=parlour_id).first()
-                        g.use_master_db = False
-                        tenant_exists = bool(t_obj)
-                        cache.set(t_cache_key, tenant_exists, timeout=1800)
+                        with db.get_master_engine().connect() as conn:
+                            from sqlalchemy import text
+                            row = conn.execute(text("SELECT id FROM tenants WHERE id = :id"), {"id": parlour_id}).fetchone()
+                            tenant_exists = bool(row)
+                            cache.set(t_cache_key, tenant_exists, timeout=1800)
                     except Exception as e:
-                        import logging
-                        logging.getLogger(__name__).warning(f"Tenant verification fallback triggered: {e}")
+                        logger.warning(f"Tenant verification fallback triggered: {e}")
                         tenant_exists = True
 
                 if not tenant_exists:
@@ -186,14 +196,20 @@ def require_role(roles):
                 branch_exists = cache.get(b_cache_key)
                 if branch_exists is None:
                     try:
-                        g.use_master_db = False
-                        from app.models.branch import Branch
-                        b_obj = Branch.query.filter_by(id=branch_id, tenant_id=parlour_id).first()
-                        branch_exists = bool(b_obj)
+                        if tenant_db_uri:
+                            tenant_engine = db.get_tenant_engine(tenant_db_uri)
+                            with tenant_engine.connect() as conn:
+                                from sqlalchemy import text
+                                row = conn.execute(
+                                    text("SELECT id FROM branches WHERE id = :bid AND tenant_id = :tid"),
+                                    {"bid": branch_id, "tid": parlour_id}
+                                ).fetchone()
+                                branch_exists = bool(row)
+                        else:
+                            branch_exists = True
                         cache.set(b_cache_key, branch_exists, timeout=1800)
                     except Exception as e:
-                        import logging
-                        logging.getLogger(__name__).warning(f"Branch verification fallback triggered: {e}")
+                        logger.warning(f"Branch verification fallback triggered: {e}")
                         branch_exists = True
 
                 if not branch_exists:
@@ -203,7 +219,7 @@ def require_role(roles):
                         status_code=400
                     )
 
-            g.use_master_db = False
+            db.session.remove()
             return fn(*args, **kwargs)
         return wrapper
     return decorator

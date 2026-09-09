@@ -15,6 +15,16 @@ import logging
 logger = logging.getLogger(__name__)
 memberships_bp = Blueprint("memberships", __name__)
 
+def safe_json_parse(val):
+    if not val:
+        return []
+    if isinstance(val, (list, dict)):
+        return val
+    try:
+        return json.loads(val)
+    except Exception:
+        return []
+
 # --- MEMBERSHIP PLANS CRUD ---
 
 @memberships_bp.route("/membership-plans", methods=["GET"])
@@ -57,15 +67,15 @@ def get_plans():
     data = [
         {
             "id": p.id,
-            "name": p.name,
-            "description": p.description,
-            "price": float(p.price),
-            "duration_days": p.duration_days,
-            "service_discount_percentage": float(p.service_discount_percentage),
-            "status": p.status,
-            "day_restrictions": json.loads(p.day_restrictions) if p.day_restrictions else [],
-            "eligible_services": [es.service_id for es in p.eligible_services],
-            "created_at": p.created_at.isoformat()
+            "name": p.name or "",
+            "description": p.description or "",
+            "price": float(p.price or 0.0),
+            "duration_days": p.duration_days or 0,
+            "service_discount_percentage": float(p.service_discount_percentage or 0.0),
+            "status": p.status or "active",
+            "day_restrictions": safe_json_parse(p.day_restrictions),
+            "eligible_services": [es.service_id for es in p.eligible_services] if p.eligible_services else [],
+            "created_at": p.created_at.isoformat() if p.created_at else ""
         } for p in plans
     ]
 
@@ -87,14 +97,14 @@ def get_plan(plan_id):
         )
     return success_response({
         "id": plan.id,
-        "name": plan.name,
-        "description": plan.description,
-        "price": float(plan.price),
-        "duration_days": plan.duration_days,
-        "service_discount_percentage": float(plan.service_discount_percentage),
-        "status": plan.status,
-        "day_restrictions": json.loads(plan.day_restrictions) if plan.day_restrictions else [],
-        "eligible_services": [es.service_id for es in plan.eligible_services]
+        "name": plan.name or "",
+        "description": plan.description or "",
+        "price": float(plan.price or 0.0),
+        "duration_days": plan.duration_days or 0,
+        "service_discount_percentage": float(plan.service_discount_percentage or 0.0),
+        "status": plan.status or "active",
+        "day_restrictions": safe_json_parse(plan.day_restrictions),
+        "eligible_services": [es.service_id for es in plan.eligible_services] if plan.eligible_services else []
     })
 
 
@@ -106,16 +116,6 @@ def create_plan():
         return error_response(
             error_code="TENANT_CONTEXT_MISSING",
             message="Parlour tenant context is missing. Please login again.",
-            status_code=400
-        )
-    # Verify tenant exists
-    g.use_master_db = True
-    tenant = Tenant.query.filter_by(id=g.parlour_id, is_deleted=False).first()
-    g.use_master_db = False
-    if not tenant:
-        return error_response(
-            error_code="TENANT_NOT_FOUND",
-            message="The selected parlour tenant does not exist.",
             status_code=400
         )
     data = request.get_json() or {}
@@ -211,16 +211,6 @@ def update_plan(plan_id):
         return error_response(
             error_code="TENANT_CONTEXT_MISSING",
             message="Parlour tenant context is missing. Please login again.",
-            status_code=400
-        )
-    # Verify tenant exists
-    g.use_master_db = True
-    tenant = Tenant.query.filter_by(id=g.parlour_id, is_deleted=False).first()
-    g.use_master_db = False
-    if not tenant:
-        return error_response(
-            error_code="TENANT_NOT_FOUND",
-            message="The selected parlour tenant does not exist.",
             status_code=400
         )
     data = request.get_json() or {}

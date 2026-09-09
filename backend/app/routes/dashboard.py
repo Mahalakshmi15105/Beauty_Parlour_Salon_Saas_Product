@@ -198,10 +198,10 @@ def get_activities():
         {
             "id": inv.id,
             "invoice_number": inv.invoice_number,
-            "customer_name": f"{inv.customer.first_name} {inv.customer.last_name or ''}".strip(),
-            "total": float(inv.total),
+            "customer_name": (f"{inv.customer.first_name} {inv.customer.last_name or ''}".strip()) if inv.customer else (getattr(inv, "customer_name", None) or "Walk-in Customer"),
+            "total": float(inv.total or 0.0),
             "status": inv.status,
-            "created_at": inv.created_at.isoformat()
+            "created_at": inv.created_at.isoformat() if inv.created_at else ""
         } for inv in recent_invoices
     ]
 
@@ -209,8 +209,8 @@ def get_activities():
         {
             "id": c.id,
             "name": f"{c.first_name} {c.last_name or ''}".strip(),
-            "phone": c.phone,
-            "created_at": c.created_at.isoformat()
+            "phone": c.phone or "",
+            "created_at": c.created_at.isoformat() if c.created_at else ""
         } for c in recent_customers
     ]
 

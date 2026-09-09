@@ -109,18 +109,27 @@ def bulk_upload_customers():
                 valid_customers.append(row_data)
         
         # Check subscription plan customer limit
-        from app.models.global_models import Tenant
-        g.use_master_db = True
-        tenant = Tenant.query.get(g.parlour_id)
-        plan = tenant.subscription_plan if tenant else None
-        g.use_master_db = False
-        if plan:
+        max_cust = None
+        try:
+            with db.get_master_engine().connect() as conn:
+                from sqlalchemy import text
+                res = conn.execute(text("""
+                    SELECT sp.max_customers FROM tenants t 
+                    LEFT JOIN subscription_plans sp ON t.subscription_plan_id = sp.id 
+                    WHERE t.id = :id
+                """), {"id": g.parlour_id}).fetchone()
+                if res and res[0] is not None:
+                    max_cust = res[0]
+        except Exception as err:
+            logger.warning(f"Failed to fetch customer limit: {err}")
+
+        if max_cust is not None:
             current_count = get_tenant_query(Customer).count()
-            if current_count + len(valid_customers) > plan.max_customers:
-                remaining = max(0, plan.max_customers - current_count)
+            if current_count + len(valid_customers) > max_cust:
+                remaining = max(0, max_cust - current_count)
                 return error_response(
                     error_code="PLAN_LIMIT_EXCEEDED",
-                    message=f"Subscription plan customer limit ({plan.max_customers}) reached. Current: {current_count}, Uploading: {len(valid_customers)}. Remaining capacity: {remaining}.",
+                    message=f"Subscription plan customer limit ({max_cust}) reached. Current: {current_count}, Uploading: {len(valid_customers)}. Remaining capacity: {remaining}.",
                     status_code=400
                 )
 
@@ -246,18 +255,27 @@ def bulk_upload_employees():
                 valid_employees.append(row_data)
         
         # Check subscription plan employee limit
-        from app.models.global_models import Tenant
-        g.use_master_db = True
-        tenant = Tenant.query.get(g.parlour_id)
-        plan = tenant.subscription_plan if tenant else None
-        g.use_master_db = False
-        if plan:
+        max_emp = None
+        try:
+            with db.get_master_engine().connect() as conn:
+                from sqlalchemy import text
+                res = conn.execute(text("""
+                    SELECT sp.max_employees FROM tenants t 
+                    LEFT JOIN subscription_plans sp ON t.subscription_plan_id = sp.id 
+                    WHERE t.id = :id
+                """), {"id": g.parlour_id}).fetchone()
+                if res and res[0] is not None:
+                    max_emp = res[0]
+        except Exception as err:
+            logger.warning(f"Failed to fetch employee limit: {err}")
+
+        if max_emp is not None:
             current_count = get_tenant_query(Employee).count()
-            if current_count + len(valid_employees) > plan.max_employees:
-                remaining = max(0, plan.max_employees - current_count)
+            if current_count + len(valid_employees) > max_emp:
+                remaining = max(0, max_emp - current_count)
                 return error_response(
                     error_code="PLAN_LIMIT_EXCEEDED",
-                    message=f"Subscription plan employee limit ({plan.max_employees}) reached. Current: {current_count}, Uploading: {len(valid_employees)}. Remaining capacity: {remaining}.",
+                    message=f"Subscription plan employee limit ({max_emp}) reached. Current: {current_count}, Uploading: {len(valid_employees)}. Remaining capacity: {remaining}.",
                     status_code=400
                 )
 
@@ -385,18 +403,27 @@ def bulk_upload_services():
                 valid_services.append(row_data)
         
         # Check subscription plan service limit
-        from app.models.global_models import Tenant
-        g.use_master_db = True
-        tenant = Tenant.query.get(g.parlour_id)
-        plan = tenant.subscription_plan if tenant else None
-        g.use_master_db = False
-        if plan:
+        max_svc = None
+        try:
+            with db.get_master_engine().connect() as conn:
+                from sqlalchemy import text
+                res = conn.execute(text("""
+                    SELECT sp.max_services FROM tenants t 
+                    LEFT JOIN subscription_plans sp ON t.subscription_plan_id = sp.id 
+                    WHERE t.id = :id
+                """), {"id": g.parlour_id}).fetchone()
+                if res and res[0] is not None:
+                    max_svc = res[0]
+        except Exception as err:
+            logger.warning(f"Failed to fetch service limit: {err}")
+
+        if max_svc is not None:
             current_count = get_tenant_query(Service).count()
-            if current_count + len(valid_services) > plan.max_services:
-                remaining = max(0, plan.max_services - current_count)
+            if current_count + len(valid_services) > max_svc:
+                remaining = max(0, max_svc - current_count)
                 return error_response(
                     error_code="PLAN_LIMIT_EXCEEDED",
-                    message=f"Subscription plan service limit ({plan.max_services}) reached. Current: {current_count}, Uploading: {len(valid_services)}. Remaining capacity: {remaining}.",
+                    message=f"Subscription plan service limit ({max_svc}) reached. Current: {current_count}, Uploading: {len(valid_services)}. Remaining capacity: {remaining}.",
                     status_code=400
                 )
 

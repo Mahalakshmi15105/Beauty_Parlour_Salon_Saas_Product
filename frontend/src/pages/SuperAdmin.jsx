@@ -45,6 +45,18 @@ function SuperAdmin() {
     plan_id: "",
   });
 
+  // Edit Tenant Credentials Modal
+  const [showEditTenantModal, setShowEditTenantModal] = useState(false);
+  const [editingTenant, setEditingTenant] = useState(null);
+  const [editTenantForm, setEditTenantForm] = useState({
+    name: "",
+    admin_email: "",
+    new_password: "",
+    status: "active",
+    plan_id: ""
+  });
+  const [updatingTenant, setUpdatingTenant] = useState(false);
+
   // Plan Management Modal
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [planForm, setPlanForm] = useState({
@@ -58,9 +70,10 @@ function SuperAdmin() {
   });
   const [editingPlan, setEditingPlan] = useState(null);
 
-  useModalFocusTrap(showProvisionModal || showPlanModal, modalRef, () => {
+  useModalFocusTrap(showProvisionModal || showPlanModal || showEditTenantModal, modalRef, () => {
     setShowProvisionModal(false);
     setShowPlanModal(false);
+    setShowEditTenantModal(false);
   });
   useFormKeyboardNavigation(formRef, () => {
     const submitBtn = modalRef.current?.querySelector('button[type="submit"]');
@@ -69,7 +82,8 @@ function SuperAdmin() {
 
   const fetchData = () => {
     setLoading(true);
-    Promise.all([
+    setError(null);
+    Promise.allSettled([
       API.get("/super-admin/dashboard"),
       API.get("/super-admin/tenants?limit=50"),
       API.get("/super-admin/branches?limit=50"),
@@ -82,34 +96,39 @@ function SuperAdmin() {
       API.get("/super-admin/whatsapp-status").catch(() => ({ data: { items: [] } })),
     ])
       .then(([dashRes, tenRes, branchRes, planRes, userRes, analyticsRes, settingsRes, healthRes, auditRes, waStatusRes]) => {
-        setDashboard(dashRes.data);
-        setTenants(tenRes.data.items);
-        setBranches(branchRes.data.items);
-        setPlans(planRes.data);
-        setUsers(userRes.data.items);
-        setAnalytics(analyticsRes.data);
-        setPlatformSettings(settingsRes.data);
-        setSystemHealth(healthRes.data);
-        setAuditLogs(auditRes.data);
-        setWhatsappStatuses(waStatusRes.data?.items || []);
-
-        if (settingsRes.data) {
-          setWhatsappForm({
-            meta_app_id: settingsRes.data.meta_app_id || "",
-            meta_app_secret: settingsRes.data.meta_app_secret || "",
-            meta_config_id: settingsRes.data.meta_config_id || "",
-            meta_redirect_uri: settingsRes.data.meta_redirect_uri || "",
-            meta_graph_api_version: settingsRes.data.meta_graph_api_version || "v21.0"
-          });
+        if (dashRes?.status === "fulfilled") setDashboard(dashRes.value.data);
+        if (tenRes?.status === "fulfilled") setTenants(tenRes.value.data?.items || []);
+        if (branchRes?.status === "fulfilled") setBranches(branchRes.value.data?.items || []);
+        if (planRes?.status === "fulfilled") {
+          const plansList = planRes.value.data || [];
+          setPlans(plansList);
+          if (plansList.length > 0 && !provisionForm.plan_id) {
+            setProvisionForm((prev) => ({ ...prev, plan_id: plansList[0].id }));
+          }
         }
-
-        if (planRes.data.length > 0 && !provisionForm.plan_id) {
-          setProvisionForm((prev) => ({ ...prev, plan_id: planRes.data[0].id }));
+        if (userRes?.status === "fulfilled") setUsers(userRes.value.data?.items || []);
+        if (analyticsRes?.status === "fulfilled") setAnalytics(analyticsRes.value.data);
+        if (settingsRes?.status === "fulfilled") {
+          setPlatformSettings(settingsRes.value.data);
+          if (settingsRes.value.data) {
+            setWhatsappForm({
+              meta_app_id: settingsRes.value.data.meta_app_id || "",
+              meta_app_secret: settingsRes.value.data.meta_app_secret || "",
+              meta_config_id: settingsRes.value.data.meta_config_id || "",
+              meta_redirect_uri: settingsRes.value.data.meta_redirect_uri || "",
+              meta_graph_api_version: settingsRes.value.data.meta_graph_api_version || "v21.0"
+            });
+          }
         }
+        if (healthRes?.status === "fulfilled") setSystemHealth(healthRes.value.data);
+        if (auditRes?.status === "fulfilled") setAuditLogs(auditRes.value.data || []);
+        if (waStatusRes?.status === "fulfilled") setWhatsappStatuses(waStatusRes.value.data?.items || []);
+        
         setLoading(false);
       })
       .catch((err) => {
-        setError(err.message || "Failed to load Super Admin portal dataset.");
+        const errMsg = typeof err === "string" ? err : (err?.message || "Failed to load Super Admin data.");
+        setError(errMsg);
         setLoading(false);
       });
   };
@@ -142,6 +161,39 @@ function SuperAdmin() {
         fetchData();
       })
       .catch((err) => showError(err.message || "Provisioning failed."));
+  };
+
+  const handleOpenEditTenant = (t) => {
+    setEditingTenant(t);
+    setEditTenantForm({
+      name: t.name || "",
+      admin_email: t.admin_email || "",
+      new_password: "",
+      status: t.status || "active",
+      plan_id: t.subscription_plan_id || plans[0]?.id || ""
+    });
+    setShowEditTenantModal(true);
+  };
+
+  const handleEditTenantSubmit = (e) => {
+    e.preventDefault();
+    if (!editingTenant) return;
+    setUpdatingTenant(true);
+    API.put(`/super-admin/tenants/${editingTenant.id}`, editTenantForm)
+      .then(() => {
+        showSuccess("Tenant credentials & details updated successfully!");
+        setShowEditTenantModal(false);
+        setEditingTenant(null);
+        setUpdatingTenant(false);
+        fetchData();
+        if (activeTab === "tenant-details" && selectedTenant === editingTenant.id) {
+          handleViewTenantDetails(editingTenant.id);
+        }
+      })
+      .catch((err) => {
+        setUpdatingTenant(false);
+        showError(err.message || "Failed to update tenant details.");
+      });
   };
 
   const handleStatusToggle = (tenantId, currentStatus) => {
@@ -219,7 +271,7 @@ function SuperAdmin() {
   }
 
   if (error) {
-    return <div className="p-8 text-center text-danger text-sm font-medium">{error}</div>;
+    return <div className="p-8 text-center text-rose-600 text-sm font-semibold">{typeof error === "string" ? error : (error?.message || "An unexpected error occurred.")}</div>;
   }
 
   return (
@@ -339,12 +391,20 @@ function SuperAdmin() {
                       {t.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 flex space-x-2">
+                  <td className="px-6 py-4 flex items-center space-x-3">
                     <button
                       onClick={() => handleViewTenantDetails(t.id)}
+                      title="View Details"
                       className="text-primary hover:underline"
                     >
                       <Eye className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleOpenEditTenant(t)}
+                      title="Edit Shop Details & Reset Password"
+                      className="text-slate-600 hover:text-primary transition"
+                    >
+                      <Pencil className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleStatusToggle(t.id, t.status)}
@@ -374,7 +434,16 @@ function SuperAdmin() {
           
           <div className="grid grid-cols-2 gap-6">
             <div className="bg-surface border border-border-soft p-6 rounded-lg shadow-sm space-y-4">
-              <h3 className="text-sm font-semibold text-text-primary border-b border-border-soft pb-2">Parlour Information</h3>
+              <div className="flex justify-between items-center border-b border-border-soft pb-2">
+                <h3 className="text-sm font-semibold text-text-primary">Parlour Information</h3>
+                <button
+                  onClick={() => handleOpenEditTenant({ id: tenantDetails.parlour.id, name: tenantDetails.parlour.name, admin_email: tenantDetails.owner.email, status: tenantDetails.parlour.status })}
+                  className="text-xs font-semibold text-primary hover:underline flex items-center space-x-1"
+                >
+                  <Key className="w-3.5 h-3.5" />
+                  <span>Edit Credentials & Password</span>
+                </button>
+              </div>
               <div className="space-y-2 text-xs">
                 <div className="flex justify-between">
                   <span className="text-text-secondary">Name:</span>
@@ -1048,6 +1117,105 @@ function SuperAdmin() {
                   className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-sm font-medium"
                 >
                   {editingPlan ? "Update Plan" : "Create Plan"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Tenant Credentials & Details Modal */}
+      {showEditTenantModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div ref={modalRef} className="bg-surface max-w-md w-full rounded-lg shadow-lg border border-border-soft overflow-hidden">
+            <div className="px-6 py-4 border-b border-border-soft flex justify-between items-center bg-primary-light">
+              <div>
+                <h3 className="text-md font-semibold text-text-primary flex items-center space-x-2">
+                  <Key className="w-4 h-4 text-primary" />
+                  <span>Edit Shop Details & Password</span>
+                </h3>
+                <p className="text-xs text-text-secondary">{editingTenant?.name}</p>
+              </div>
+              <button onClick={() => setShowEditTenantModal(false)} className="text-text-secondary hover:text-text-primary">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form ref={formRef} onSubmit={handleEditTenantSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary mb-1">Beauty Parlour Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={editTenantForm.name}
+                  onChange={(e) => setEditTenantForm({ ...editTenantForm, name: e.target.value })}
+                  className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary mb-1">Admin Email (Login ID) *</label>
+                <input
+                  type="email"
+                  required
+                  value={editTenantForm.admin_email}
+                  onChange={(e) => setEditTenantForm({ ...editTenantForm, admin_email: e.target.value })}
+                  className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary mb-1">
+                  Reset Admin Password <span className="font-normal text-text-secondary">(Leave blank to keep unchanged)</span>
+                </label>
+                <input
+                  type="password"
+                  placeholder="Enter new password to reset"
+                  value={editTenantForm.new_password}
+                  onChange={(e) => setEditTenantForm({ ...editTenantForm, new_password: e.target.value })}
+                  className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Account Status</label>
+                  <select
+                    value={editTenantForm.status}
+                    onChange={(e) => setEditTenantForm({ ...editTenantForm, status: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-primary"
+                  >
+                    <option value="active">Active</option>
+                    <option value="suspended">Suspended</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Subscription Plan</label>
+                  <select
+                    value={editTenantForm.plan_id}
+                    onChange={(e) => setEditTenantForm({ ...editTenantForm, plan_id: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-primary"
+                  >
+                    {plans.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-border-soft flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowEditTenantModal(false)}
+                  className="px-4 py-2 border border-border-soft rounded-lg text-sm text-text-secondary hover:bg-background"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={updatingTenant}
+                  className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-sm font-medium transition shadow-sm disabled:opacity-50"
+                >
+                  {updatingTenant ? "Saving Changes..." : "Save Credentials"}
                 </button>
               </div>
             </form>

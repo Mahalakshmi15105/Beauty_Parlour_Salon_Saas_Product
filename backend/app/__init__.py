@@ -33,10 +33,17 @@ def create_app(config_class=Config):
             allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
             methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         )
-    # Configure Database-per-Tenant URI defaults
-    master_uri = app.config.get("MASTER_DATABASE_URI") or app.config.get("SQLALCHEMY_DATABASE_URI", "mysql+pymysql://root:root@localhost:3306/parlour_master?charset=utf8mb4")
+    # Configure Database-per-Tenant URI defaults dynamically from MASTER_DATABASE_URI
+    import re
+    master_uri = app.config.get("MASTER_DATABASE_URI") or app.config.get("SQLALCHEMY_DATABASE_URI", "mysql+pymysql://smartgo1_salon_user:Arish%40123@localhost:3306/smartgo1_salon?charset=utf8mb4")
     app.config["MASTER_DATABASE_URI"] = master_uri
-    app.config["MYSQL_BASE_URI"] = app.config.get("MYSQL_BASE_URI", "mysql+pymysql://root:root@localhost:3306/")
+
+    m_base = re.match(r"^(mysql\+[a-z0-9]+://[^/]+/).*", master_uri)
+    if m_base:
+        base_uri = m_base.group(1)
+    else:
+        base_uri = app.config.get("MYSQL_BASE_URI", "mysql+pymysql://smartgo1_salon_user:Arish%40123@localhost:3306/")
+    app.config["MYSQL_BASE_URI"] = base_uri
 
     db.init_app(app)
     migrate.init_app(app, db)
@@ -68,7 +75,7 @@ def create_app(config_class=Config):
             # Create Master DB tables (tenants, subscription_plans, tenant_lookups, users)
             db.create_all_master()
 
-            # AUTO-SEED: if the database is empty, seed default data
+            # AUTO-SEED / TENANT AUTO-CHECK
             from app.models.global_models import Tenant
             tenant_count = Tenant.query.count()
             if tenant_count == 0:
@@ -77,7 +84,26 @@ def create_app(config_class=Config):
                 seed_database()
                 app.logger.info("Auto-seed completed successfully.")
             else:
-                app.logger.info(f"Database already contains {tenant_count} tenant(s). Skipping seed.")
+                app.logger.info(f"Master Database contains {tenant_count} tenant(s). Verifying tenant databases...")
+                from app.database import tenant_metadata
+                from app.db_bootstrap import sanitize_tenant_uri
+                from sqlalchemy import create_engine
+                master_uri = app.config.get("MASTER_DATABASE_URI", "")
+                active_tenants = Tenant.query.filter_by(status="active").all()
+                for t in active_tenants:
+                    if t.db_connection_uri:
+                        try:
+                            clean_uri = sanitize_tenant_uri(t.db_connection_uri, master_uri)
+                            if clean_uri != t.db_connection_uri:
+                                t.db_connection_uri = clean_uri
+                                db.session.commit()
+                            ensure_database_exists(clean_uri)
+                            t_engine = create_engine(clean_uri, pool_pre_ping=True)
+                            tenant_metadata.create_all(bind=t_engine)
+                            t_engine.dispose()
+                        except Exception as te_err:
+                            app.logger.warning(f"Tenant DB startup check notice for ID {t.id} ({t.name}): {te_err}")
+                app.logger.info("Tenant database check completed successfully.")
         except Exception as db_error:
             app.logger.error(f"Database initialization failed: {db_error}")
             app.logger.error("App will start in degraded mode. Fix DATABASE_URL and MySQL credentials.")
@@ -174,6 +200,11 @@ def create_app(config_class=Config):
     # Centralized HTTP Exception Handler
     @app.errorhandler(Exception)
     def handle_exception(e):
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+
         # Pass HTTPExceptions through
         if isinstance(e, HTTPException):
             return error_response(
@@ -193,6 +224,25 @@ def create_app(config_class=Config):
             status_code=500,
             details={"error": error_detail}
         )
+
+    @app.before_request
+    def clear_stale_db_session():
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+
+    @app.teardown_request
+    def cleanup_db_session(exception=None):
+        if exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+        try:
+            db.session.remove()
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # REDIS CACHE INITIALIZATION

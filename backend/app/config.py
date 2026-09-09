@@ -60,10 +60,17 @@ class Config:
     REDIS_DB = int(os.getenv("REDIS_DB", 0))
     REDIS_MAX_MEMORY = os.getenv("REDIS_MAX_MEMORY", "128m")
 
+    # cPanel API Configuration for Multi-Tenant Database Provisioning
+    CPANEL_ENABLED = os.getenv("CPANEL_ENABLED", "true").lower() in ("true", "1", "yes")
+    CPANEL_HOST = os.getenv("CPANEL_HOST", "127.0.0.1")
+    CPANEL_PORT = int(os.getenv("CPANEL_PORT", 2083))
+    CPANEL_USERNAME = os.getenv("CPANEL_USERNAME", "smartgo1")
+    CPANEL_API_TOKEN = os.getenv("CPANEL_API_TOKEN", "OR8KQ13H2UONFQXJPIM5ON33M1VLNANL")
+
     # Database
     DATABASE_URL = os.getenv(
         "DATABASE_URL", 
-        "mysql+pymysql://smartgo1_salon_user:@localhost:3306/smartgo1_salon"
+        "mysql+pymysql://smartgo1_salon_user:Arish%40123@localhost:3306/smartgo1_salon?charset=utf8mb4"
     )
     SQLALCHEMY_DATABASE_URI = DATABASE_URL
     SQLALCHEMY_TRACK_MODIFICATIONS = False

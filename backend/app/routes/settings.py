@@ -36,12 +36,21 @@ def get_settings():
         branch_setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id, branch_id=g.branch_id).first()
 
     setting = branch_setting if branch_setting else main_setting
-    g.use_master_db = True
-    tenant = Tenant.query.get(g.parlour_id)
-    g.use_master_db = False
+    tenant_name = "Beauty Parlour"
+    try:
+        with db.get_master_engine().connect() as conn:
+            from sqlalchemy import text
+            res = conn.execute(text("SELECT name FROM tenants WHERE id = :id AND is_deleted = 0"), {"id": g.parlour_id}).fetchone()
+            if res and res[0]:
+                tenant_name = res[0]
+    except Exception as t_err:
+        logger.warning(f"Failed to fetch tenant name from master: {t_err}")
 
     def _get(attr, default=""):
         val = getattr(setting, attr, None) if setting else None
+        if attr == "currency_symbol":
+            if not val or str(val).strip() in ["?", "\\u20b9", ""]:
+                return "₹"
         return val if val is not None else default
 
     # Use branch logo if branch has logo; otherwise fallback to main parlour logo
@@ -59,7 +68,7 @@ def get_settings():
 
     return success_response({
         "business_profile": {
-            "name": tenant.name if tenant else "Beauty Parlour",
+            "name": tenant_name,
             "logo_url": logo_url,
             "owner_name": _get("owner_name"),
             "phone": _get("alternate_phone"),
@@ -152,10 +161,6 @@ def update_settings():
     if g.role == "BranchAdmin" and g.branch_id:
         branch = Branch.query.filter_by(id=g.branch_id, tenant_id=g.parlour_id).first()
 
-    g.use_master_db = True
-    tenant = Tenant.query.get(g.parlour_id)
-    g.use_master_db = False
-
     biz = data.get("business_profile", {})
     inv = data.get("invoice_settings", {})
     reg = data.get("regional_settings", {})
@@ -206,8 +211,12 @@ def update_settings():
                 setting.currency = str(c_code).strip()
                 if hasattr(setting, "currency_code"):
                     setting.currency_code = str(c_code).strip()
-            if reg.get("currency_symbol"):
-                setting.currency_symbol = str(reg.get("currency_symbol")).strip()
+            c_sym = reg.get("currency_symbol")
+            if c_sym is not None:
+                c_sym_str = str(c_sym).strip()
+                if not c_sym_str or c_sym_str in ["?", "\\u20b9", ""]:
+                    c_sym_str = "₹"
+                setting.currency_symbol = c_sym_str
             if reg.get("language") and hasattr(setting, "language"):
                 setting.language = str(reg.get("language")).strip()
             if reg.get("date_format") and hasattr(setting, "date_format"):
@@ -279,18 +288,23 @@ def update_settings():
 
         db.session.commit()
 
+        try:
+            with db.get_engine().connect() as conn:
+                from sqlalchemy import text
+                conn.execute(text("ALTER TABLE tenant_settings MODIFY COLUMN currency_symbol VARCHAR(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"))
+                conn.execute(text("UPDATE tenant_settings SET currency_symbol = '₹' WHERE currency_symbol = '?' OR currency_symbol IS NULL OR currency_symbol = '' OR currency_symbol = '?'"))
+                conn.commit()
+        except Exception as e:
+            logger.warning(f"Charset auto-fix notice: {e}")
+
         # Update Tenant Name in master DB separately
         if g.role == "ParlourAdmin" and biz.get("name"):
             try:
-                g.use_master_db = True
-                t_master = Tenant.query.get(g.parlour_id)
-                if t_master:
-                    t_master.name = biz["name"].strip()
-                    db.session.commit()
+                with db.get_master_engine().begin() as conn:
+                    from sqlalchemy import text
+                    conn.execute(text("UPDATE tenants SET name = :name WHERE id = :id"), {"name": biz["name"].strip(), "id": g.parlour_id})
             except Exception as t_err:
                 logger.error(f"Failed to update tenant master name: {t_err}")
-            finally:
-                g.use_master_db = False
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to update tenant settings: {str(e)}")

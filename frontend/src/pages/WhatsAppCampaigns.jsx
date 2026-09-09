@@ -26,6 +26,7 @@ import API from "../services/api";
 import { useToast } from "../context/ToastContext";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { useModalFocusTrap } from "../utils/keyboardNavigation";
+import { getFullImageUrl } from "../utils/imageUrl";
 
 export default function WhatsAppCampaigns() {
   const { showSuccess, showError } = useToast();
@@ -414,7 +415,7 @@ export default function WhatsAppCampaigns() {
                   {templateType === "IMAGE_WITH_CAPTION" && imageUrl && (
                     <div className="rounded-xl overflow-hidden max-h-48 border border-emerald-700/50">
                       <img
-                        src={imageUrl.startsWith("http") ? imageUrl : `http://localhost:5000${imageUrl}`}
+                        src={getFullImageUrl(imageUrl)}
                         alt="Offer"
                         className="w-full h-full object-cover"
                       />

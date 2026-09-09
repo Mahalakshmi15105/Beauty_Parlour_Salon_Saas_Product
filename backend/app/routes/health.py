@@ -89,3 +89,61 @@ def fix_db_charset():
             status_code=500
         )
 
+@health_bp.route("/health/init-db", methods=["GET", "POST"])
+def init_master_db():
+    """
+    On-demand endpoint to create all Master DB tables (tenants, users, plans)
+    and provision/sync all active tenant databases via cPanel API.
+    """
+    try:
+        from app.database import db, master_metadata, tenant_metadata
+        from app.db_bootstrap import ensure_database_exists
+        from app.models.global_models import Tenant
+        from seed import seed_database
+        from sqlalchemy import create_engine
+
+        # 1. Create all Master DB tables
+        from flask import g
+        g.use_master_db = True
+        db.create_all_master()
+
+        # 2. Seed default users, master tenant & lookup mapping
+        logger.info("[Init DB Endpoint] Running database seeder to ensure default accounts...")
+        seed_database()
+        seeded = True
+
+        # 3. Provision / verify all active tenant DBs
+        from app.db_bootstrap import sanitize_tenant_uri
+        from flask import current_app
+        master_uri = current_app.config.get("MASTER_DATABASE_URI") or current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
+
+        active_tenants = Tenant.query.filter_by(status="active").all()
+        synced_tenants = []
+        for t in active_tenants:
+            if t.db_connection_uri:
+                clean_uri = sanitize_tenant_uri(t.db_connection_uri, master_uri)
+                if clean_uri != t.db_connection_uri:
+                    t.db_connection_uri = clean_uri
+                    db.session.commit()
+
+                ensure_database_exists(clean_uri)
+                t_engine = create_engine(clean_uri, pool_pre_ping=True)
+                tenant_metadata.create_all(bind=t_engine)
+                t_engine.dispose()
+                synced_tenants.append({"id": t.id, "name": t.name, "db_name": t.db_name})
+
+        return success_response({
+            "message": "Master database and tenant databases initialized successfully!",
+            "total_tenants": Tenant.query.count(),
+            "initial_seeded": seeded,
+            "synced_tenants": synced_tenants
+        })
+    except Exception as e:
+        logger.error(f"[Init DB Endpoint] Failed: {str(e)}", exc_info=True)
+        return error_response(
+            error_code="INIT_DB_FAILED",
+            message=f"Failed to initialize database tables: {str(e)}",
+            status_code=500
+        )
+
+

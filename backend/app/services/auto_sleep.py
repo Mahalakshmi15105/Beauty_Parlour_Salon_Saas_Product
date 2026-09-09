@@ -87,8 +87,9 @@ def start_sleep_monitor(app):
     - App hooks are installed so `touch_activity()` fires BEFORE
       every request, keeping the server awake during active use.
     """
-    if not Config.AUTO_SLEEP_ENABLED:
-        logger.info("AUTO-SLEEP disabled via AUTO_SLEEP_ENABLED=false")
+    is_passenger = "IN_PASSENGER" in os.environ or "PASSENGER_APP_ENV" in os.environ or "SERVER_SOFTWARE" in os.environ
+    if not Config.AUTO_SLEEP_ENABLED or is_passenger:
+        logger.info("AUTO-SLEEP thread disabled (managed natively by WSGI/Passenger process manager).")
         return
 
     # Mark activity on every incoming request

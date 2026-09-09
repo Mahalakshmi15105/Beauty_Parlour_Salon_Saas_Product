@@ -85,12 +85,11 @@ def check_and_generate_expiry_notifications(target_tenant_id=None):
             plan_name = plan.name if plan else "Membership Plan"
             salon_name = "Salon"
             try:
-                from app.models.global_models import master_engine
-                from sqlalchemy.orm import Session
-                with Session(master_engine) as m_session:
-                    tenant = m_session.get(Tenant, m.tenant_id)
-                    if tenant:
-                        salon_name = tenant.name
+                with db.get_master_engine().connect() as conn:
+                    from sqlalchemy import text
+                    row = conn.execute(text("SELECT name FROM tenants WHERE id = :id"), {"id": m.tenant_id}).fetchone()
+                    if row and row[0]:
+                        salon_name = row[0]
             except Exception:
                 pass
 
@@ -173,12 +172,11 @@ def check_and_generate_inactive_customer_notifications(target_tenant_id=None):
         created_count = 0
         salon_name = "Salon"
         try:
-            from app.models.global_models import master_engine
-            from sqlalchemy.orm import Session
-            with Session(master_engine) as m_session:
-                tenant = m_session.get(Tenant, target_tenant_id)
-                if tenant:
-                    salon_name = tenant.name
+            with db.get_master_engine().connect() as conn:
+                from sqlalchemy import text
+                row = conn.execute(text("SELECT name FROM tenants WHERE id = :id"), {"id": target_tenant_id}).fetchone()
+                if row and row[0]:
+                    salon_name = row[0]
         except Exception:
             pass
 
@@ -331,7 +329,7 @@ def get_notifications():
             "message": n.message,
             "data": n.data or {},
             "is_read": n.is_read,
-            "created_at": n.created_at.isoformat()
+            "created_at": n.created_at.isoformat() if n.created_at else ""
         })
 
     return success_response({

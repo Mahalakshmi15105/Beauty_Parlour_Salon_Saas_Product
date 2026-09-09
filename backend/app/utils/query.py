@@ -2,9 +2,9 @@ def paginate_query(query, model, limit_val=20, cursor=None, sort_field="id", sor
     """
     Applies keyset cursor-based pagination and sorting to a query.
     """
-    # Parse limit
+    # Parse limit (cap at max 500 items per request for safety)
     try:
-        limit_val = min(int(limit_val), 10000)
+        limit_val = max(1, min(int(limit_val), 500))
     except (ValueError, TypeError):
         limit_val = 20
 
