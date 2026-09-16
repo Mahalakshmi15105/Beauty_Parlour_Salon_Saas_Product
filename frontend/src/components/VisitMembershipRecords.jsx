@@ -196,7 +196,7 @@ export default function VisitMembershipRecords() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-background border-b border-border-soft text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">
+              <tr className="bg-background border-b border-border-soft text-sm font-semibold text-slate-500 uppercase tracking-wider">
                 <th className="px-5 py-3.5">Customer</th>
                 <th className="px-4 py-3.5">Phone Number</th>
                 <th className="px-4 py-3.5">Visit Progress</th>
@@ -207,7 +207,7 @@ export default function VisitMembershipRecords() {
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-border-soft text-xs">
+            <tbody className="divide-y divide-border-soft text-sm">
               {loading ? (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-slate-500 font-bold">

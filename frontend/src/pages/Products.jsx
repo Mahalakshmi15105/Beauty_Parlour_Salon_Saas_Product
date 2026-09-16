@@ -656,12 +656,12 @@ function Products() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-primary-light border-b border-border-soft">
-                    <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Supplier Name</th>
-                    <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Contact Name</th>
-                    <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Phone/WhatsApp</th>
-                    <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Email</th>
-                    <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Address</th>
-                    <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase text-right">Actions</th>
+                    <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Supplier Name</th>
+                    <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Contact Name</th>
+                    <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Phone/WhatsApp</th>
+                    <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Email</th>
+                    <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Address</th>
+                    <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-soft">
@@ -786,13 +786,13 @@ function Products() {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-primary-light border-b border-border-soft">
-                      <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Product Details</th>
-                      <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Barcode</th>
-                      <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Purchase Price</th>
-                      <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase text-center">MRP</th>
-                      <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase text-center">Selling Price</th>
-                      <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase text-center">Stock Level</th>
-                      <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase text-right">Actions</th>
+                      <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Product Details</th>
+                      <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Barcode</th>
+                      <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Purchase Price</th>
+                      <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase text-center">MRP</th>
+                      <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase text-center">Selling Price</th>
+                      <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase text-center">Stock Level</th>
+                      <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border-soft">
@@ -913,23 +913,23 @@ function Products() {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-100 border-b border-border-soft">
-                      <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Date & Time</th>
-                      <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Product Details</th>
-                      <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Supplier</th>
-                      <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase text-center">Qty Added</th>
-                      <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase text-right">Cost Price</th>
-                      <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase text-right">Total Outlay</th>
-                      <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase text-center">Status</th>
+                      <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Date & Time</th>
+                      <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Product Details</th>
+                      <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Supplier</th>
+                      <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase text-center">Qty Added</th>
+                      <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase text-right">Cost Price</th>
+                      <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase text-right">Total Outlay</th>
+                      <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase text-center">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border-soft">
                     {reorderLogs.map((log) => (
                       <tr key={log.id} className="hover:bg-background/30 transition">
-                        <td className="px-6 py-4 text-xs text-text-secondary">
+                        <td className="px-6 py-4 text-sm text-text-secondary">
                           {new Date(log.created_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
                         </td>
                         <td className="px-6 py-4 text-sm font-semibold text-text-primary">{log.product_name}</td>
-                        <td className="px-6 py-4 text-xs text-text-secondary">
+                        <td className="px-6 py-4 text-sm text-text-secondary">
                           <span className="px-2 py-0.5 bg-slate-100 rounded-md border border-slate-200/50">
                             {log.supplier_name}
                           </span>
@@ -937,7 +937,7 @@ function Products() {
                         <td className="px-6 py-4 text-sm font-bold text-center text-primary">+{log.quantity}</td>
                         <td className="px-6 py-4 text-sm text-text-secondary text-right">{formatCurrency(log.cost_price)}</td>
                         <td className="px-6 py-4 text-sm font-semibold text-text-primary text-right">{formatCurrency(log.total_price)}</td>
-                        <td className="px-6 py-4 text-xs text-center">
+                        <td className="px-6 py-4 text-sm text-center">
                           <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-extrabold uppercase tracking-wider text-[10px]">
                             {log.status}
                           </span>

@@ -1003,7 +1003,7 @@ function Appointments() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="bg-background border-b border-border-soft text-[11px] font-extrabold text-text-secondary uppercase tracking-wider">
+                      <tr className="bg-background border-b border-border-soft text-sm font-semibold text-text-secondary uppercase tracking-wider">
                         <th className="py-3 px-4">Booking Ref</th>
                         <th className="py-3 px-4">Customer</th>
                         <th className="py-3 px-4">Date & Time / Token</th>
@@ -1013,7 +1013,7 @@ function Appointments() {
                         <th className="py-3 px-4 text-right">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-border-soft text-xs font-medium">
+                    <tbody className="divide-y divide-border-soft text-sm font-medium">
                       {appointments
                         .filter((a) => a.booking_channel === "Website" || (a.booking_source && a.booking_source.toLowerCase().includes("website")))
                         .map((appt) => (

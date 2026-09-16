@@ -334,7 +334,7 @@ function Reports() {
 
                 {/* Ledger Data Table */}
                 <div className="border border-border-soft rounded-xl overflow-hidden">
-                  <table className="w-full text-left border-collapse text-xs">
+                  <table className="w-full text-left border-collapse text-sm">
                     <thead>
                       <tr className="bg-primary-light border-b border-border-soft">
                         <th className="px-4 py-3 font-semibold text-text-secondary uppercase">Invoice #</th>
@@ -390,7 +390,7 @@ function Reports() {
                 </div>
 
                 <div className="border border-border-soft rounded-xl overflow-hidden">
-                  <table className="w-full text-left border-collapse text-xs">
+                  <table className="w-full text-left border-collapse text-sm">
                     <thead>
                       <tr className="bg-primary-light border-b border-border-soft">
                         <th className="px-6 py-3 font-semibold text-text-secondary uppercase">Date</th>
@@ -426,7 +426,7 @@ function Reports() {
             {reportType === "employees" && Array.isArray(reportData) && (
               <div className="p-6 space-y-6">
                 <div className="border border-border-soft rounded-xl overflow-hidden">
-                  <table className="w-full text-left border-collapse text-xs">
+                  <table className="w-full text-left border-collapse text-sm">
                     <thead>
                       <tr className="bg-primary-light border-b border-border-soft">
                         <th className="px-6 py-3 font-semibold text-text-secondary uppercase">Employee Name</th>
@@ -462,7 +462,7 @@ function Reports() {
             {reportType === "products" && Array.isArray(reportData) && (
               <div className="p-6 space-y-6">
                 <div className="border border-border-soft rounded-xl overflow-hidden">
-                  <table className="w-full text-left border-collapse text-xs">
+                  <table className="w-full text-left border-collapse text-sm">
                     <thead>
                       <tr className="bg-primary-light border-b border-border-soft">
                         <th className="px-6 py-3 font-semibold text-text-secondary uppercase">Product Details</th>
@@ -517,7 +517,7 @@ function Reports() {
 
                 {/* Ledger Data Table */}
                 <div className="border border-border-soft rounded-xl overflow-hidden">
-                  <table className="w-full text-left border-collapse text-xs">
+                  <table className="w-full text-left border-collapse text-sm">
                     <thead>
                       <tr className="bg-primary-light border-b border-border-soft">
                         <th className="px-6 py-3 font-semibold text-text-secondary uppercase">Order Date</th>
@@ -576,7 +576,7 @@ function Reports() {
 
                 {/* Ledger Data Table */}
                 <div className="border border-border-soft rounded-xl overflow-hidden">
-                  <table className="w-full text-left border-collapse text-xs">
+                  <table className="w-full text-left border-collapse text-sm">
                     <thead>
                       <tr className="bg-primary-light border-b border-border-soft">
                         <th className="px-6 py-3 font-semibold text-text-secondary uppercase">Date Sold</th>

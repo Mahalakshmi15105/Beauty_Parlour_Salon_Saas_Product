@@ -46,12 +46,13 @@ class MySQLMultiTenantSQLAlchemy(SQLAlchemy):
     def get_master_engine(self):
         master_uri = current_app.config.get("MASTER_DATABASE_URI", "mysql+pymysql://root:root@localhost:3306/parlour_master?charset=utf8mb4")
         if "master" not in self._engine_cache:
-            logger.info("Connecting to MySQL Master DB with NullPool...")
+            logger.info("Connecting to Master DB with NullPool...")
+            connect_args = {"charset": "utf8mb4"} if "mysql" in master_uri else {}
             engine = create_engine(
                 master_uri,
                 poolclass=NullPool,
                 pool_pre_ping=True,
-                connect_args={"charset": "utf8mb4"}
+                connect_args=connect_args
             )
             self._engine_cache["master"] = engine
         return self._engine_cache["master"]
@@ -68,12 +69,13 @@ class MySQLMultiTenantSQLAlchemy(SQLAlchemy):
             pass
 
         if db_uri not in self._engine_cache:
-            logger.info(f"Connecting to MySQL tenant DB with NullPool: {db_uri}")
+            logger.info(f"Connecting to tenant DB with NullPool: {db_uri}")
+            connect_args = {"charset": "utf8mb4"} if "mysql" in db_uri else {}
             engine = create_engine(
                 db_uri,
                 poolclass=NullPool,
                 pool_pre_ping=True,
-                connect_args={"charset": "utf8mb4"}
+                connect_args=connect_args
             )
             self._engine_cache[db_uri] = engine
         return self._engine_cache[db_uri]

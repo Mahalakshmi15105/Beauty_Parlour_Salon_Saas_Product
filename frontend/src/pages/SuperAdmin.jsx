@@ -366,7 +366,7 @@ function SuperAdmin() {
       {/* Tenants Management Tab */}
       {activeTab === "tenants" && (
         <div className="bg-surface border border-border-soft rounded-lg overflow-hidden">
-          <table className="w-full text-left border-collapse text-xs">
+          <table className="w-full text-left border-collapse text-sm">
             <thead>
               <tr className="bg-primary-light border-b border-border-soft">
                 <th className="px-6 py-3 font-semibold text-text-secondary uppercase">Parlour Name</th>
@@ -556,7 +556,7 @@ function SuperAdmin() {
       {/* Branches Tab */}
       {activeTab === "branches" && (
         <div className="bg-surface border border-border-soft rounded-lg overflow-hidden">
-          <table className="w-full text-left border-collapse text-xs">
+          <table className="w-full text-left border-collapse text-sm">
             <thead>
               <tr className="bg-primary-light border-b border-border-soft">
                 <th className="px-6 py-3 font-semibold text-text-secondary uppercase">Branch Name</th>
@@ -636,7 +636,7 @@ function SuperAdmin() {
       {/* Users Tab */}
       {activeTab === "users" && (
         <div className="bg-surface border border-border-soft rounded-lg overflow-hidden">
-          <table className="w-full text-left border-collapse text-xs">
+          <table className="w-full text-left border-collapse text-sm">
             <thead>
               <tr className="bg-primary-light border-b border-border-soft">
                 <th className="px-6 py-3 font-semibold text-text-secondary uppercase">Email</th>
@@ -759,7 +759,7 @@ function SuperAdmin() {
       {/* Audit Logs Tab */}
       {activeTab === "audit" && (
         <div className="bg-surface border border-border-soft rounded-lg overflow-hidden">
-          <table className="w-full text-left border-collapse text-xs">
+          <table className="w-full text-left border-collapse text-sm">
             <thead>
               <tr className="bg-primary-light border-b border-border-soft">
                 <th className="px-6 py-3 font-semibold text-text-secondary uppercase">Action</th>
@@ -878,7 +878,7 @@ function SuperAdmin() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
+              <table className="w-full text-left border-collapse text-sm">
                 <thead>
                   <tr className="bg-primary-light border-b border-border-soft text-text-primary">
                     <th className="px-4 py-3 font-bold uppercase">Salon Tenant</th>

@@ -318,11 +318,11 @@ function MembershipPlans() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-primary-light border-b border-border-soft">
-                  <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Plan Name</th>
-                  <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Price</th>
-                  <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Validity</th>
-                  <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Status</th>
-                  <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Actions</th>
+                  <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Plan Name</th>
+                  <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Price</th>
+                  <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Validity</th>
+                  <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Status</th>
+                  <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-soft">

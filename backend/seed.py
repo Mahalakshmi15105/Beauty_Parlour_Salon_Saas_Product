@@ -59,16 +59,17 @@ def seed_database():
         # 3. Create Default Beauty Parlour Tenant in Master DB
         tenant = Tenant.query.filter_by(name="SmartGoNext Beauty Salon").first()
         import re
+        master_uri = app.config.get("MASTER_DATABASE_URI", "")
+        is_sqlite = "sqlite" in master_uri
         base_uri = app.config.get("MYSQL_BASE_URI")
         if not base_uri or "root:root" in base_uri:
-            master_uri = app.config.get("MASTER_DATABASE_URI", "")
             m_b = re.match(r"^(mysql\+[a-z0-9]+://[^/]+/).*", master_uri)
             if m_b:
                 base_uri = m_b.group(1)
             else:
                 base_uri = "mysql+pymysql://smartgo1_salon_user:Arish%40123@localhost:3306/"
 
-        cpanel_user = app.config.get("CPANEL_USERNAME", "")
+        cpanel_user = app.config.get("CPANEL_USERNAME", "") if not is_sqlite else ""
         
         if not tenant:
             tenant = Tenant(
@@ -81,11 +82,16 @@ def seed_database():
             
             tenant_id = tenant.id
             slug_clean = tenant.slug.replace('-', '_')
-            if cpanel_user and not slug_clean.startswith(f"{cpanel_user}_"):
+            if is_sqlite:
+                db_name = f"tenant_{slug_clean}_{tenant_id}"
+                tenant_db_uri = f"sqlite:///{db_name}.db"
+            elif cpanel_user and not slug_clean.startswith(f"{cpanel_user}_"):
                 db_name = f"{cpanel_user}_tenant_{slug_clean}_{tenant_id}"
+                tenant_db_uri = f"{base_uri}{db_name}?charset=utf8mb4"
             else:
                 db_name = f"tenant_{slug_clean}_{tenant_id}"
-            tenant_db_uri = f"{base_uri}{db_name}?charset=utf8mb4"
+                tenant_db_uri = f"{base_uri}{db_name}?charset=utf8mb4"
+
             tenant.db_name = db_name
             tenant.db_connection_uri = tenant_db_uri
             db.session.commit()
@@ -93,20 +99,24 @@ def seed_database():
         else:
             tenant_id = tenant.id
             slug_clean = tenant.slug.replace('-', '_')
-            if cpanel_user and not slug_clean.startswith(f"{cpanel_user}_"):
-                default_dbname = f"{cpanel_user}_tenant_{slug_clean}_{tenant_id}"
+            if is_sqlite:
+                db_name = f"tenant_{slug_clean}_{tenant_id}"
+                tenant_db_uri = f"sqlite:///{db_name}.db"
             else:
-                default_dbname = f"tenant_{slug_clean}_{tenant_id}"
-            
-            raw_dbname = tenant.db_name or default_dbname
-            if cpanel_user and not raw_dbname.startswith(f"{cpanel_user}_"):
-                db_name = f"{cpanel_user}_{raw_dbname}"
-            else:
-                db_name = raw_dbname
+                if cpanel_user and not slug_clean.startswith(f"{cpanel_user}_"):
+                    default_dbname = f"{cpanel_user}_tenant_{slug_clean}_{tenant_id}"
+                else:
+                    default_dbname = f"tenant_{slug_clean}_{tenant_id}"
                 
-            tenant_db_uri = f"{base_uri}{db_name}?charset=utf8mb4"
-            from app.db_bootstrap import sanitize_tenant_uri
-            tenant_db_uri = sanitize_tenant_uri(tenant_db_uri, app.config.get("MASTER_DATABASE_URI", ""))
+                raw_dbname = tenant.db_name or default_dbname
+                if cpanel_user and not raw_dbname.startswith(f"{cpanel_user}_"):
+                    db_name = f"{cpanel_user}_{raw_dbname}"
+                else:
+                    db_name = raw_dbname
+                    
+                tenant_db_uri = f"{base_uri}{db_name}?charset=utf8mb4"
+                from app.db_bootstrap import sanitize_tenant_uri
+                tenant_db_uri = sanitize_tenant_uri(tenant_db_uri, app.config.get("MASTER_DATABASE_URI", ""))
             
             tenant.db_name = db_name
             tenant.db_connection_uri = tenant_db_uri
@@ -130,14 +140,15 @@ def seed_database():
             db.session.commit()
 
         # 4. Provision Tenant DB (via cPanel UAPI) & Schema
-        try:
-            from app.services.cpanel_service import cpanel_service
-            if cpanel_service.is_configured():
-                m_user = re.search(r"//([^:@]+)", base_uri)
-                db_user = m_user.group(1) if m_user else None
-                cpanel_service.create_database(db_name, db_user)
-        except Exception as cp_err:
-            print(f"Notice running cPanel API in seed: {cp_err}")
+        if not is_sqlite:
+            try:
+                from app.services.cpanel_service import cpanel_service
+                if cpanel_service.is_configured():
+                    m_user = re.search(r"//([^:@]+)", base_uri)
+                    db_user = m_user.group(1) if m_user else None
+                    cpanel_service.create_database(db_name, db_user)
+            except Exception as cp_err:
+                print(f"Notice running cPanel API in seed: {cp_err}")
 
         ensure_database_exists(tenant_db_uri)
         tenant_engine = create_engine(tenant_db_uri)

@@ -352,11 +352,11 @@ function Customers() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-primary-light border-b border-border-soft">
-                  <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Name</th>
-                  <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Phone</th>
-                  <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Email</th>
-                  <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Gender</th>
-                  <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Actions</th>
+                  <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Name</th>
+                  <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Phone</th>
+                  <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Email</th>
+                  <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Gender</th>
+                  <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-soft">
@@ -479,13 +479,13 @@ function Customers() {
                     </p>
                   </div>
                 ) : (
-                  <table className="w-full text-left border-collapse text-xs">
+                  <table className="w-full text-left border-collapse text-sm">
                     <thead>
                       <tr className="bg-primary-light border-b border-border-soft">
-                        <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Client</th>
-                        <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Inactivity Duration</th>
-                        <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Last Visit Date</th>
-                        <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase text-right">Quick Action</th>
+                        <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Client</th>
+                        <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Inactivity Duration</th>
+                        <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Last Visit Date</th>
+                        <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase text-right">Quick Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border-soft">

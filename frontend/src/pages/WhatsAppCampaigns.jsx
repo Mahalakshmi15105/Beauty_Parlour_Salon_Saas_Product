@@ -629,7 +629,7 @@ export default function WhatsAppCampaigns() {
             <div className="py-12 text-center text-xs font-bold text-slate-400">No campaigns launched yet.</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
+              <table className="w-full text-left border-collapse text-sm">
                 <thead>
                   <tr className="bg-slate-50 border-b border-border-soft text-slate-700">
                     <th className="py-3 px-4 font-extrabold">Campaign Name</th>
@@ -726,7 +726,7 @@ export default function WhatsAppCampaigns() {
               </div>
 
               <div className="border border-border-soft rounded-2xl overflow-hidden">
-                <table className="w-full text-left border-collapse text-xs">
+                <table className="w-full text-left border-collapse text-sm">
                   <thead>
                     <tr className="bg-slate-100 border-b border-border-soft text-slate-700">
                       <th className="py-2.5 px-3 font-bold">Customer Name</th>

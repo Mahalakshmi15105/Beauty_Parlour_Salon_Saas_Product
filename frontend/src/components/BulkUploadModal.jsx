@@ -3,7 +3,7 @@ import { Upload, Download, X, CheckCircle, AlertCircle, FileText, Loader2 } from
 import API from "../services/api";
 import { validateExcelFile, downloadErrorReport } from "../utils/bulkUploadUtils";
 
-const API_BASE = import.meta.env.VITE_API_URL || "https://salon-backend.smartgonext.com/api/v1";
+const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:5000/api/v1" : "https://salon-backend.smartgonext.com/api/v1");
 
 function BulkUploadModal({ module, onClose, onSuccess }) {
   const [step, setStep] = useState(1); // 1: Template, 2: Upload, 3: Processing, 4: Results

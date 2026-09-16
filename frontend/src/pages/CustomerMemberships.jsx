@@ -587,13 +587,13 @@ function CustomerMemberships() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-primary-light border-b border-border-soft">
-                <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Customer</th>
-                <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Mobile</th>
-                <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Membership Plan</th>
-                <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Invoice #</th>
-                <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Status</th>
-                <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Expiry Date</th>
-                <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Actions</th>
+                <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Customer</th>
+                <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Mobile</th>
+                <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Membership Plan</th>
+                <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Invoice #</th>
+                <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Status</th>
+                <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Expiry Date</th>
+                <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-soft">
@@ -607,7 +607,7 @@ function CustomerMemberships() {
                 if (filteredMemberships.length === 0) {
                   return (
                     <tr>
-                      <td colSpan="7" className="px-6 py-8 text-center text-xs text-text-secondary">
+                      <td colSpan="7" className="px-6 py-8 text-center text-sm text-text-secondary">
                         No assigned memberships found for status "{statusFilter}".
                       </td>
                     </tr>
@@ -616,35 +616,35 @@ function CustomerMemberships() {
 
                 return filteredMemberships.map((m) => (
                   <tr key={m.id} className="hover:bg-background/50 transition">
-                    <td className="px-6 py-4 text-xs font-bold text-text-primary">
+                    <td className="px-6 py-4 text-sm font-bold text-text-primary">
                       {m.customer_name}
                     </td>
-                    <td className="px-6 py-4 text-xs text-text-secondary">
+                    <td className="px-6 py-4 text-sm text-text-secondary">
                       {m.customer_phone || "N/A"}
                     </td>
-                    <td className="px-6 py-4 text-xs text-text-secondary font-semibold">
+                    <td className="px-6 py-4 text-sm text-text-secondary font-semibold">
                       {m.plan_name}
                     </td>
-                    <td className="px-6 py-4 text-xs">
+                    <td className="px-6 py-4 text-sm">
                       {m.invoice_number ? (
-                        <span className="font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded text-[11px]">
+                        <span className="font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded text-xs">
                           {m.invoice_number}
                         </span>
                       ) : (
-                        <span className="text-text-secondary text-[11px]">—</span>
+                        <span className="text-text-secondary text-xs">—</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-xs">
-                      <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${
+                    <td className="px-6 py-4 text-sm">
+                      <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
                         m.status === "active" ? "bg-success/15 text-success" : "bg-danger/15 text-danger"
                       }`}>
                         {m.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-xs text-text-secondary">
+                    <td className="px-6 py-4 text-sm text-text-secondary">
                       {new Date(m.expires_at).toLocaleDateString()}
                     </td>
-                    <td className="px-6 py-4 text-xs space-x-3">
+                    <td className="px-6 py-4 text-sm space-x-3">
                       <button
                         onClick={() => {
                           const mockCust = {

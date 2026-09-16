@@ -2508,7 +2508,7 @@ function Billing() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
+              <table className="w-full text-left border-collapse text-sm">
                 <thead>
                   <tr className="bg-primary-light border-b border-border-soft text-slate-700">
                     <th className="px-3 py-3 font-extrabold w-12 text-center">S.No</th>
@@ -2566,14 +2566,14 @@ function Billing() {
                               onFocus={(e) => e.target.select()}
                               onChange={(e) => handleUpdateQty(idx, e.target.value)}
                               onKeyDown={(e) => handleLineItemKeyDown(e, idx, "qty")}
-                              className="w-16 bg-background border border-border-soft px-2 py-1 rounded-lg text-xs font-bold text-slate-900 text-center focus:border-primary focus:outline-none"
+                              className="w-16 bg-background border border-border-soft px-2 py-1 rounded-lg text-sm font-bold text-slate-900 text-center focus:border-primary focus:outline-none"
                             />
                           </td>
 
                           {/* Editable Gross Amount / Selling RATE Input */}
                           <td className="px-3 py-3">
                             <div className="flex items-center space-x-1">
-                              <span className="text-xs text-slate-400 font-bold">{currencySymbol}</span>
+                              <span className="text-sm text-slate-400 font-bold">{currencySymbol}</span>
                               <input
                                 type="number"
                                 min="0"
@@ -2584,7 +2584,7 @@ function Billing() {
                                 onFocus={(e) => e.target.select()}
                                 onChange={(e) => handleUpdateGrossAmount(idx, e.target.value)}
                                 onKeyDown={(e) => handleLineItemKeyDown(e, idx, "gross_amount")}
-                                className="w-20 bg-background border border-border-soft px-2 py-1 rounded-lg text-xs font-bold text-slate-900 text-center focus:border-primary focus:outline-none"
+                                className="w-20 bg-background border border-border-soft px-2 py-1 rounded-lg text-sm font-bold text-slate-900 text-center focus:border-primary focus:outline-none"
                               />
                             </div>
                           </td>
@@ -2611,14 +2611,14 @@ function Billing() {
                               onFocus={(e) => e.target.select()}
                               onChange={(e) => handleUpdateDiscountPercent(idx, e.target.value)}
                               onKeyDown={(e) => handleLineItemKeyDown(e, idx, "discount_percent")}
-                              className="w-16 bg-background border border-border-soft px-2 py-1 rounded-lg text-xs font-bold text-slate-900 text-center focus:border-primary focus:outline-none"
+                              className="w-16 bg-background border border-border-soft px-2 py-1 rounded-lg text-sm font-bold text-slate-900 text-center focus:border-primary focus:outline-none"
                             />
                           </td>
 
                           {/* Editable Discount Amount Input */}
                           <td className="px-3 py-3">
                             <div className="flex items-center space-x-1">
-                              <span className="text-xs text-danger font-bold">-</span>
+                              <span className="text-sm text-danger font-bold">-</span>
                               <input
                                 type="number"
                                 min="0"
@@ -2629,7 +2629,7 @@ function Billing() {
                                 onFocus={(e) => e.target.select()}
                                 onChange={(e) => handleUpdateDiscountAmount(idx, e.target.value)}
                                 onKeyDown={(e) => handleLineItemKeyDown(e, idx, "discount_amount")}
-                                className="w-20 bg-background border border-border-soft px-2 py-1 rounded-lg text-xs font-bold text-danger text-center focus:border-primary focus:outline-none"
+                                className="w-20 bg-background border border-border-soft px-2 py-1 rounded-lg text-sm font-bold text-danger text-center focus:border-primary focus:outline-none"
                               />
                             </div>
                           </td>
@@ -2677,7 +2677,7 @@ function Billing() {
                                     handleLineItemKeyDown(e, idx, "employee");
                                   }
                                 }}
-                                className="w-full bg-background border border-border-soft px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
+                                className="w-full bg-background border border-border-soft px-2.5 py-1.5 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-primary"
                               >
                                 <option value="" disabled hidden>Choose Employee</option>
                                 {employees.map((emp) => (
@@ -2826,7 +2826,7 @@ function Billing() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full text-left border-collapse text-sm">
               <thead>
                 <tr className="bg-primary-light border-b border-border-soft text-slate-700">
                   <th className="px-4 py-3 font-extrabold">Bill #</th>
@@ -3754,8 +3754,8 @@ function Billing() {
                         {customerHistoryTab === "visits" && (
                           <div className="space-y-4">
                             <div className="border border-border-soft rounded-2xl overflow-hidden shadow-2xs">
-                              <table className="w-full text-left text-xs">
-                                <thead className="bg-background border-b border-border-soft font-extrabold text-slate-600 uppercase text-[10px]">
+                              <table className="w-full text-left text-sm">
+                                <thead className="bg-background border-b border-border-soft font-extrabold text-slate-600 uppercase text-xs">
                                   <tr>
                                     <th className="p-3">Bill No</th>
                                     <th className="p-3">Date</th>
@@ -3810,8 +3810,8 @@ function Billing() {
                         {/* TAB 3: SERVICES */}
                         {customerHistoryTab === "services" && (
                           <div className="border border-border-soft rounded-2xl overflow-hidden shadow-2xs">
-                            <table className="w-full text-left text-xs">
-                              <thead className="bg-background border-b border-border-soft font-extrabold text-slate-600 uppercase text-[10px]">
+                            <table className="w-full text-left text-sm">
+                              <thead className="bg-background border-b border-border-soft font-extrabold text-slate-600 uppercase text-xs">
                                 <tr>
                                   <th className="p-3">Service Name</th>
                                   <th className="p-3 text-center">Times Taken</th>
@@ -3844,8 +3844,8 @@ function Billing() {
                         {/* TAB 4: PRODUCTS */}
                         {customerHistoryTab === "products" && (
                           <div className="border border-border-soft rounded-2xl overflow-hidden shadow-2xs">
-                            <table className="w-full text-left text-xs">
-                              <thead className="bg-background border-b border-border-soft font-extrabold text-slate-600 uppercase text-[10px]">
+                            <table className="w-full text-left text-sm">
+                              <thead className="bg-background border-b border-border-soft font-extrabold text-slate-600 uppercase text-xs">
                                 <tr>
                                   <th className="p-3">Product Name</th>
                                   <th className="p-3 text-center">Quantity Purchased</th>
@@ -3996,7 +3996,7 @@ function Billing() {
             </div>
 
             <div className="border border-border-soft rounded-xl overflow-hidden">
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-left text-sm">
                 <thead className="bg-background border-b border-border-soft font-extrabold text-slate-600">
                   <tr>
                     <th className="p-2.5">Item</th>

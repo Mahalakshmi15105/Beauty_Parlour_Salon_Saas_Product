@@ -120,6 +120,25 @@
     margin: 0;
     padding: 0;
     min-height: 100vh;
+    font-size: 15.5px;
+    line-height: 1.5;
+  }
+
+  /* Global Table & List Readability - minimum 14px for table cells, headers, and form controls */
+  table {
+    font-size: 14px;
+  }
+  table th,
+  table td {
+    font-size: 14px;
+  }
+  table input,
+  table select,
+  table textarea {
+    font-size: 14px;
+  }
+  table .text-xs {
+    font-size: 14px;
   }
 
   /* Global Keyboard Focus-Visible & Active Focus Ring Indicator */
