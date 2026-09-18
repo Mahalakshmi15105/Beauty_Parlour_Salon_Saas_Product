@@ -167,8 +167,63 @@ def checkout():
                 line_net = max(Decimal("0.00"), line_subtotal - discount_amount)
                 product_net += line_net
 
+            elif item_type == "membership":
+                from app.models.membership import MembershipPlan
+                plan = db.session.query(MembershipPlan).filter_by(
+                    id=item_id,
+                    tenant_id=g.parlour_id,
+                    status="active"
+                ).first()
+                if not plan:
+                    raise ValueError(f"Membership Plan ID {item_id} is inactive or invalid.")
+
+                item_name = f"Membership: {plan.name}"
+                unit_price = Decimal(str(plan.price))
+                line_subtotal = unit_price * qty
+                disc_val = item.get("discount", 0)
+                discount_amount = Decimal(str(disc_val))
+                line_net = max(Decimal("0.00"), line_subtotal - discount_amount)
+                product_net += line_net
+
+                # Create CustomerMembership record if customer is specified
+                if customer_id and str(customer_id) not in ["walkin", "0"]:
+                    from datetime import datetime, timedelta
+                    days = getattr(plan, 'duration_days', None)
+                    if not days or days <= 0:
+                        duration_cnt = getattr(plan, 'duration_count', 1) or 1
+                        validity_p = getattr(plan, 'validity_plan', 'Yearly') or 'Yearly'
+                        if str(validity_p).lower() == 'monthly':
+                            days = duration_cnt * 30
+                        else:
+                            days = duration_cnt * 365
+                    expiry_date = datetime.now() + timedelta(days=days)
+
+                    cm = CustomerMembership(
+                        tenant_id=g.parlour_id,
+                        customer_id=customer_id,
+                        membership_plan_id=plan.id,
+                        expires_at=expiry_date,
+                        status="active"
+                    )
+                    db.session.add(cm)
+                    db.session.flush()
+
+                    # Add plan default benefits
+                    plan_benefits = getattr(plan, "benefits", []) or []
+                    for b in plan_benefits:
+                        svc_id = getattr(b, "service_id", None)
+                        b_qty = int(getattr(b, "quantity", 1) or 1)
+                        if svc_id:
+                            db.session.add(MembershipBenefit(
+                                tenant_id=g.parlour_id,
+                                customer_membership_id=cm.id,
+                                service_id=svc_id,
+                                total_quantity=b_qty,
+                                remaining_quantity=b_qty
+                            ))
+
             else:
-                raise ValueError("Line item type must be 'service' or 'product'.")
+                raise ValueError("Line item type must be 'service', 'product', or 'membership'.")
 
             line_total = line_subtotal - discount_amount
             if line_total < 0:
@@ -393,8 +448,19 @@ def get_invoices():
         sort_desc=sort_desc
     )
 
-    data = [
-        {
+    data = []
+    for inv in invoices:
+        mem_price = 0.0
+        for line in inv.line_items:
+            # Check if line item is a membership plan purchase
+            if not line.service_id and not line.product_id:
+                mem_price += float(line.line_total or line.unit_price or 0)
+        
+        # Fallback: if membership_name exists and subtotal matches membership price on single-item invoices
+        if mem_price == 0.0 and inv.membership_name and len(inv.line_items) == 1 and not inv.line_items[0].service_id and not inv.line_items[0].product_id:
+            mem_price = float(inv.subtotal)
+
+        data.append({
             "id": inv.id,
             "invoice_number": inv.invoice_number,
             "customer_name": f"{inv.customer.first_name} {inv.customer.last_name or ''}".strip(),
@@ -404,10 +470,10 @@ def get_invoices():
             "total": float(inv.total),
             "status": inv.status,
             "membership_name": inv.membership_name,
+            "membership_price": mem_price,
             "membership_discount": float(inv.membership_discount or 0),
             "created_at": inv.created_at.isoformat()
-        } for inv in invoices
-    ]
+        })
 
     return success_response({
         "items": data,

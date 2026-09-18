@@ -343,6 +343,130 @@ function Billing() {
   const [customerHistoryError, setCustomerHistoryError] = useState(null);
   const [readOnlyInvoiceDetail, setReadOnlyInvoiceDetail] = useState(null);
 
+  // Assign Customer Membership Modal State (Inside Billing)
+  const [showAssignMembershipModal, setShowAssignMembershipModal] = useState(false);
+  const [assignMembershipForm, setAssignMembershipForm] = useState({
+    customer_id: "",
+    plan_id: "",
+    payment_method: "Cash",
+  });
+  const [assignMembershipSaving, setAssignMembershipSaving] = useState(false);
+  const [assignMembershipError, setAssignMembershipError] = useState(null);
+  const assignMembershipModalRef = useRef(null);
+  const assignCustomerSelectRef = useRef(null);
+  const assignPlanSelectRef = useRef(null);
+  const assignPaymentSelectRef = useRef(null);
+  const assignSubmitBtnRef = useRef(null);
+
+  const openAssignMembershipModal = (cust = null) => {
+    let targetCustId = "";
+    if (cust && cust.id) {
+      targetCustId = String(cust.id);
+    } else if (selectedCustomerId && selectedCustomerId !== "walkin") {
+      targetCustId = selectedCustomerId;
+    }
+    setAssignMembershipForm({
+      customer_id: targetCustId,
+      plan_id: "",
+      payment_method: "",
+    });
+    setAssignMembershipError(null);
+    setShowAssignMembershipModal(true);
+
+    setTimeout(() => {
+      if (assignCustomerSelectRef.current) {
+        assignCustomerSelectRef.current.focus();
+        openNativeSelectDropdown(assignCustomerSelectRef.current);
+      }
+    }, 100);
+  };
+
+  const handleAssignMembershipSubmit = (e) => {
+    if (e) e.preventDefault();
+    setAssignMembershipError(null);
+
+    const { customer_id, plan_id, payment_method } = assignMembershipForm;
+    if (!customer_id) {
+      setAssignMembershipError("Please select a customer.");
+      return;
+    }
+    if (!plan_id) {
+      setAssignMembershipError("Please select a membership plan.");
+      return;
+    }
+    if (!payment_method) {
+      setAssignMembershipError("Please select a payment method.");
+      return;
+    }
+
+    const selectedPlan = membershipPlans.find((p) => String(p.id) === String(plan_id));
+    if (!selectedPlan) {
+      setAssignMembershipError("Invalid membership plan selected.");
+      return;
+    }
+
+    // Auto-select customer in POS billing screen if not selected
+    setSelectedCustomerId(String(customer_id));
+    const cust = customers.find((c) => String(c.id) === String(customer_id));
+    if (cust) {
+      setCustomerSearchQuery(`${cust.first_name} ${cust.last_name || ""} (${cust.phone || ""})`);
+      setSelectedGender(cust.gender || "Female");
+    }
+
+    const planPrice = parseFloat(selectedPlan.price || 0);
+
+    // Add membership plan directly into POS Billing Cart Table
+    setCart((prevCart) => {
+      const existingIdx = prevCart.findIndex((i) => i.type === "membership" && String(i.item_id) === String(plan_id));
+      if (existingIdx >= 0) {
+        showError(`Membership plan "${selectedPlan.name}" is already in the cart table.`);
+        return prevCart;
+      }
+      const newItem = {
+        type: "membership",
+        item_id: selectedPlan.id,
+        name: `Membership: ${selectedPlan.name}`,
+        gross_amount: planPrice,
+        mrp: planPrice,
+        quantity: 1,
+        discount_percent: 0,
+        tax_rate: 0,
+        employee_ids: [],
+      };
+      return [...prevCart, newItem];
+    });
+
+    setVisitMembershipStatus((prev) => ({
+      ...(prev || {}),
+      membership_mode: "paid_plan",
+    }));
+
+    // Instantly activate this membership in state so member discounts apply to services in cart
+    const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const todayName = weekdays[new Date().getDay()];
+    const isDayRestricted = (selectedPlan.day_restrictions || []).includes(todayName);
+
+    setActiveMembership({
+      ...selectedPlan,
+      membership_plan_id: selectedPlan.id,
+      plan_id: selectedPlan.id,
+      plan_name: selectedPlan.name,
+      service_discount_percentage: selectedPlan.service_discount_percentage || selectedPlan.discount_percentage || 0,
+      eligible_services: selectedPlan.eligible_services || [],
+      plan_services: selectedPlan.plan_services || selectedPlan.services || [],
+      isDayRestricted,
+    });
+    setUseMembership(true);
+
+    // Set payment method allocation default
+    if (payment_method) {
+      setSelectedPaymentMethods([payment_method]);
+    }
+
+    setShowAssignMembershipModal(false);
+    showSuccess(`Membership plan "${selectedPlan.name}" assigned and added to bill! Member discount applied.`);
+  };
+
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [modalProductId, setModalProductId] = useState("");
   const [modalProductQty, setModalProductQty] = useState(1);
@@ -1023,12 +1147,16 @@ function Billing() {
     if (planId && Array.isArray(discounts) && discounts.length > 0) {
       const match = discounts.find((d) => String(d.plan_id) === String(planId));
       if (match) {
-        if (match.percentage !== undefined && match.percentage !== null && parseFloat(match.percentage) > 0) {
-          return parseFloat(match.percentage);
+        if (match.percentage !== undefined && match.percentage !== null) {
+          const pVal = parseFloat(match.percentage);
+          if (pVal > 0) return pVal;
         }
-        if (match.amount !== undefined && match.amount !== null && parseFloat(match.amount) > 0 && (serviceObj.price || serviceObj.rate)) {
-          const price = parseFloat(serviceObj.price || serviceObj.rate || 1);
-          return (parseFloat(match.amount) / price) * 100;
+        if (match.amount !== undefined && match.amount !== null && (serviceObj.price || serviceObj.rate)) {
+          const aVal = parseFloat(match.amount);
+          if (aVal > 0) {
+            const price = parseFloat(serviceObj.price || serviceObj.rate || 1);
+            return (aVal / price) * 100;
+          }
         }
       }
     }
@@ -1345,7 +1473,8 @@ function Billing() {
     }
     if (useMembership && activeMembership && !activeMembership.isDayRestricted) {
       if (item.type === "service") {
-        const svcObj = services.find((s) => s.id === (item.item_id || item.id));
+        const serviceList = allServices.length > 0 ? allServices : services;
+        const svcObj = serviceList.find((s) => s.id === (item.item_id || item.id));
         const mappedDisc = svcObj ? getMembershipDiscountForService(svcObj, activeMembership) : 0;
         if (mappedDisc > 0) {
           return mappedDisc;
@@ -1548,15 +1677,17 @@ function Billing() {
 
     const payload = {
       customer_id: selectedCustomerId === "walkin" || !selectedCustomerId ? "walkin" : parseInt(selectedCustomerId),
-      line_items: cart.map((x) => ({
-        type: x.type,
-        item_id: x.item_id,
-        quantity: x.quantity,
-        employee_ids: x.employee_ids || [],
-        employee_id: x.employee_ids && x.employee_ids.length > 0 ? x.employee_ids[0] : null,
-        discount: calculateRowDiscountAmount(x),
-        customer_membership_id: null,
-      })),
+      line_items: cart
+        .filter((x) => x.type === "service" || x.type === "product" || x.type === "membership")
+        .map((x) => ({
+          type: x.type,
+          item_id: x.item_id,
+          quantity: x.quantity,
+          employee_ids: x.employee_ids || [],
+          employee_id: x.employee_ids && x.employee_ids.length > 0 ? x.employee_ids[0] : null,
+          discount: calculateRowDiscountAmount(x),
+          customer_membership_id: null,
+        })),
       payments: Object.entries(paymentAmounts)
         .map(([method, val]) => ({
           method,
@@ -1978,6 +2109,15 @@ function Billing() {
                     <div className="flex items-center space-x-2">
                       <button
                         type="button"
+                        onClick={() => openAssignMembershipModal()}
+                        className="text-xs bg-pink-600 hover:bg-pink-700 text-white px-2.5 py-1 rounded-lg font-bold flex items-center space-x-1 transition shadow-xs"
+                        title="Assign a new membership plan to this customer"
+                      >
+                        <Crown className="w-3.5 h-3.5 text-white" />
+                        <span>+ Assign Membership</span>
+                      </button>
+                      <button
+                        type="button"
                         onClick={openCustomerHistory}
                         className="text-xs bg-primary/10 hover:bg-primary/20 text-primary px-2.5 py-1 rounded-lg font-bold flex items-center space-x-1 transition shadow-2xs"
                         title="View complete customer history, visits, notes & preferences"
@@ -1997,15 +2137,26 @@ function Billing() {
                     </div>
                   )}
                   {selectedCustomerId === "walkin" && (
-                    <button
-                      type="button"
-                      onClick={() => openQuickAddCustomer()}
-                      className="text-xs text-primary hover:underline flex items-center space-x-1 font-semibold"
-                      title="Convert Walk-in to Registered Customer"
-                    >
-                      <UserPlus className="w-3 h-3" />
-                      <span>+ Convert to Customer</span>
-                    </button>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => openAssignMembershipModal()}
+                        className="text-xs bg-pink-600 hover:bg-pink-700 text-white px-2.5 py-1 rounded-lg font-bold flex items-center space-x-1 transition shadow-xs"
+                        title="Assign a new membership plan to customer"
+                      >
+                        <Crown className="w-3.5 h-3.5 text-white" />
+                        <span>+ Assign Membership</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openQuickAddCustomer()}
+                        className="text-xs text-primary hover:underline flex items-center space-x-1 font-semibold"
+                        title="Convert Walk-in to Registered Customer"
+                      >
+                        <UserPlus className="w-3 h-3" />
+                        <span>+ Convert to Customer</span>
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -2542,51 +2693,61 @@ function Billing() {
                       return (
                         <tr key={idx} className="hover:bg-background/60 transition">
                           <td className="px-3 py-3 font-bold text-slate-500 text-center">{idx + 1}</td>
-                          <td className="px-4 py-3 font-extrabold text-slate-900">
+                          <td className="px-4 py-3">
                             <div className="flex items-center space-x-2">
-                              <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase border ${
+                              <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-md ${
                                 item.type === "product"
-                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                  : "bg-pink-50 text-primary border-pink-200"
+                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                  : item.type === "membership"
+                                  ? "bg-purple-100 text-purple-800 border border-purple-200"
+                                  : "bg-pink-50 text-primary border border-pink-200"
                               }`}>
-                                {item.type === "product" ? "Product" : "Service"}
+                                {item.type === "product" ? "Product" : item.type === "membership" ? "Membership" : "Service"}
                               </span>
-                              <span>{item.name}</span>
+                              <span className="font-extrabold text-slate-900">{item.name}</span>
                             </div>
                           </td>
 
                           {/* Qty Input */}
-                          <td className="px-3 py-3">
-                            <input
-                              type="number"
-                              min="1"
-                              data-row={idx}
-                              data-field="qty"
-                              value={item.quantity}
-                              onFocus={(e) => e.target.select()}
-                              onChange={(e) => handleUpdateQty(idx, e.target.value)}
-                              onKeyDown={(e) => handleLineItemKeyDown(e, idx, "qty")}
-                              className="w-16 bg-background border border-border-soft px-2 py-1 rounded-lg text-sm font-bold text-slate-900 text-center focus:border-primary focus:outline-none"
-                            />
+                          <td className="px-3 py-3 text-center">
+                            {item.type === "membership" ? (
+                              <span className="text-xs font-bold text-slate-500">1</span>
+                            ) : (
+                              <input
+                                type="number"
+                                min="1"
+                                data-row={idx}
+                                data-field="qty"
+                                value={item.quantity}
+                                onFocus={(e) => e.target.select()}
+                                onChange={(e) => handleUpdateQty(idx, e.target.value)}
+                                onKeyDown={(e) => handleLineItemKeyDown(e, idx, "qty")}
+                                className="w-16 bg-background border border-border-soft px-2 py-1 rounded-lg text-sm font-bold text-slate-900 text-center focus:border-primary focus:outline-none"
+                              />
+                            )}
                           </td>
 
                           {/* Editable Gross Amount / Selling RATE Input */}
                           <td className="px-3 py-3">
-                            <div className="flex items-center space-x-1">
-                              <span className="text-sm text-slate-400 font-bold">{currencySymbol}</span>
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                data-row={idx}
-                                data-field="gross_amount"
-                                value={item.gross_amount}
-                                onFocus={(e) => e.target.select()}
-                                onChange={(e) => handleUpdateGrossAmount(idx, e.target.value)}
-                                onKeyDown={(e) => handleLineItemKeyDown(e, idx, "gross_amount")}
-                                className="w-20 bg-background border border-border-soft px-2 py-1 rounded-lg text-sm font-bold text-slate-900 text-center focus:border-primary focus:outline-none"
-                              />
-                            </div>
+                            {item.type === "membership" ? (
+                              <span className="text-xs font-extrabold text-slate-900">{currencySymbol} {parseFloat(item.gross_amount || 0).toFixed(2)}</span>
+                            ) : (
+                              <div className="flex items-center space-x-1">
+                                <span className="text-sm text-slate-400 font-bold">{currencySymbol}</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  data-row={idx}
+                                  data-field="gross_amount"
+                                  value={item.gross_amount}
+                                  onFocus={(e) => e.target.select()}
+                                  onChange={(e) => handleUpdateGrossAmount(idx, e.target.value)}
+                                  onKeyDown={(e) => handleLineItemKeyDown(e, idx, "gross_amount")}
+                                  className="w-20 bg-background border border-border-soft px-2 py-1 rounded-lg text-sm font-bold text-slate-900 text-center focus:border-primary focus:outline-none"
+                                />
+                              </div>
+                            )}
                           </td>
 
                           {/* MRP Column */}
@@ -2832,6 +2993,7 @@ function Billing() {
                   <th className="px-4 py-3 font-extrabold">Bill #</th>
                   <th className="px-4 py-3 font-extrabold">Date & Time</th>
                   <th className="px-4 py-3 font-extrabold">Customer Name</th>
+                  <th className="px-4 py-3 font-extrabold">Membership Plan Price</th>
                   <th className="px-4 py-3 font-extrabold">Subtotal</th>
                   <th className="px-4 py-3 font-extrabold">Discount</th>
                   <th className="px-4 py-3 font-extrabold">Tax</th>
@@ -2843,13 +3005,13 @@ function Billing() {
               <tbody className="divide-y divide-border-soft">
                 {historyLoading ? (
                   <tr>
-                    <td colSpan={9} className="p-8 text-center text-text-secondary font-medium">
+                    <td colSpan={10} className="p-8 text-center text-text-secondary font-medium">
                       Loading invoice history...
                     </td>
                   </tr>
                 ) : filteredHistory.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="p-8 text-center text-text-secondary font-medium">
+                    <td colSpan={10} className="p-8 text-center text-text-secondary font-medium">
                       No invoices found in billing history.
                     </td>
                   </tr>
@@ -2861,6 +3023,16 @@ function Billing() {
                         {new Date(inv.created_at).toLocaleString()}
                       </td>
                       <td className="px-4 py-3 font-bold text-slate-900">{inv.customer_name}</td>
+                      <td className="px-4 py-3 font-bold text-purple-700">
+                        {inv.membership_price > 0 ? (
+                          <span>
+                            {currencySymbol} {inv.membership_price.toFixed(2)}
+                            {inv.membership_name ? <span className="block text-[10px] text-slate-500 font-semibold">{inv.membership_name}</span> : null}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 font-normal">—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3">{currencySymbol} {inv.subtotal.toFixed(2)}</td>
                       <td className="px-4 py-3 text-danger">-{currencySymbol} {inv.discount.toFixed(2)}</td>
                       <td className="px-4 py-3">{currencySymbol} {inv.tax.toFixed(2)}</td>
@@ -4389,6 +4561,155 @@ function Billing() {
                   className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-extrabold shadow-md shadow-amber-500/20 disabled:opacity-50"
                 >
                   {newMembershipSaving ? "Creating Customer & Assigning..." : "Create Customer & Assign Membership"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ASSIGN CUSTOMER MEMBERSHIP MODAL (INSIDE BILLING) */}
+      {showAssignMembershipModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div
+            ref={assignMembershipModalRef}
+            className="bg-white border border-border-soft w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+          >
+            <div className="py-4 px-6 border-b border-border-soft flex justify-between items-center bg-slate-50/50">
+              <h3 className="text-sm font-extrabold text-slate-900 tracking-tight flex items-center space-x-2">
+                <Crown className="w-4 h-4 text-pink-600" />
+                <span>Assign Customer Membership</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowAssignMembershipModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAssignMembershipSubmit} className="p-6 space-y-4">
+              {assignMembershipError && (
+                <div className="p-3 bg-danger/10 border border-danger/20 rounded-xl text-xs font-bold text-danger">
+                  {assignMembershipError}
+                </div>
+              )}
+
+              {/* Field 1: Customer Selection */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Customer *</label>
+                <select
+                  ref={assignCustomerSelectRef}
+                  value={assignMembershipForm.customer_id}
+                  onChange={(e) => setAssignMembershipForm({ ...assignMembershipForm, customer_id: e.target.value })}
+                  onFocus={(e) => openNativeSelectDropdown(e.target)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === "ArrowRight") {
+                      e.preventDefault();
+                      if (assignPlanSelectRef.current) {
+                        assignPlanSelectRef.current.focus();
+                        openNativeSelectDropdown(assignPlanSelectRef.current);
+                      }
+                    }
+                  }}
+                  required
+                  className="w-full bg-background border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition shadow-2xs"
+                >
+                  <option value="">Search customer by Name or Mobile...</option>
+                  {customers.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.first_name} {c.last_name || ""} ({c.phone || "No Mobile"})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Field 2: Select Membership Plan */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Select Membership Plan *</label>
+                <select
+                  ref={assignPlanSelectRef}
+                  value={assignMembershipForm.plan_id}
+                  onChange={(e) => setAssignMembershipForm({ ...assignMembershipForm, plan_id: e.target.value })}
+                  onFocus={(e) => openNativeSelectDropdown(e.target)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === "ArrowRight") {
+                      e.preventDefault();
+                      if (assignPaymentSelectRef.current) {
+                        assignPaymentSelectRef.current.focus();
+                        openNativeSelectDropdown(assignPaymentSelectRef.current);
+                      }
+                    } else if (e.key === "ArrowLeft") {
+                      e.preventDefault();
+                      if (assignCustomerSelectRef.current) {
+                        assignCustomerSelectRef.current.focus();
+                        openNativeSelectDropdown(assignCustomerSelectRef.current);
+                      }
+                    }
+                  }}
+                  required
+                  className="w-full bg-background border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition shadow-2xs"
+                >
+                  <option value="">[ Select Membership Plan ]</option>
+                  {membershipPlans.map((plan) => (
+                    <option key={plan.id} value={plan.id}>
+                      {plan.name || plan.plan_name} - {currencySymbol} {parseFloat(plan.price || plan.cost || 0).toFixed(2)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Field 3: Payment Method */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Payment Method *</label>
+                <select
+                  ref={assignPaymentSelectRef}
+                  value={assignMembershipForm.payment_method}
+                  onChange={(e) => setAssignMembershipForm({ ...assignMembershipForm, payment_method: e.target.value })}
+                  onFocus={(e) => openNativeSelectDropdown(e.target)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === "ArrowRight") {
+                      e.preventDefault();
+                      if (assignSubmitBtnRef.current) {
+                        assignSubmitBtnRef.current.focus();
+                      }
+                    } else if (e.key === "ArrowLeft") {
+                      e.preventDefault();
+                      if (assignPlanSelectRef.current) {
+                        assignPlanSelectRef.current.focus();
+                        openNativeSelectDropdown(assignPlanSelectRef.current);
+                      }
+                    }
+                  }}
+                  required
+                  className="w-full bg-background border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition shadow-2xs"
+                >
+                  <option value="">[ Select Payment Method ]</option>
+                  {SUPPORTED_PAYMENT_METHODS.map((pm) => (
+                    <option key={pm.id} value={pm.id}>
+                      {pm.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Form Action Buttons */}
+              <div className="pt-4 border-t border-border-soft flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAssignMembershipModal(false)}
+                  className="px-5 py-2.5 border border-border-soft rounded-xl text-xs font-bold text-slate-600 hover:bg-background transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  ref={assignSubmitBtnRef}
+                  type="submit"
+                  disabled={assignMembershipSaving}
+                  className="px-6 py-2.5 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-xs font-extrabold shadow-md shadow-pink-600/20 transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2"
+                >
+                  {assignMembershipSaving ? "Assigning..." : "Pay & Assign Membership"}
                 </button>
               </div>
             </form>

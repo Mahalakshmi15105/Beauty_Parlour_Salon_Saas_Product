@@ -44,37 +44,40 @@ def paginate_query(query, model, limit_val=20, cursor=None, sort_field="id", sor
 
 def generate_unique_invoice_number(tenant_id, branch_id=None):
     """
-    Generates a unique, collision-proof sequential invoice number.
-    Format: INV-{tenant_id}-{sequential_number:06d}
+    Generates a unique, collision-proof sequential invoice number (1, 2, 3... n).
     Guarantees uniqueness against DB unique constraint (invoices.ix_invoices_invoice_number).
     """
     from app.models.billing import Invoice
     from app.database import db
 
-    prefix = f"INV-{tenant_id}-"
-
-    # Query for the latest invoice row for this tenant to find the current highest integer sequence
-    last_invoice = (
+    # Fetch all invoice numbers for this tenant to determine the highest numeric sequence
+    all_invoices = (
         db.session.query(Invoice.invoice_number)
         .filter(Invoice.tenant_id == tenant_id)
-        .filter(Invoice.invoice_number.like(f"{prefix}%"))
-        .order_by(Invoice.id.desc())
-        .first()
+        .all()
     )
 
-    next_seq = 1
-    if last_invoice and last_invoice.invoice_number:
-        try:
-            parts = last_invoice.invoice_number.split("-")
-            if len(parts) >= 3 and parts[-1].isdigit():
-                next_seq = int(parts[-1]) + 1
-        except Exception:
-            pass
+    max_seq = 0
+    for inv in all_invoices:
+        if not inv.invoice_number:
+            continue
+        num_str = inv.invoice_number
+        if "-" in num_str:
+            num_str = num_str.split("-")[-1]
+        if num_str.isdigit():
+            val = int(num_str)
+            if val > max_seq:
+                max_seq = val
 
-    # Safety loop: ensure candidate number does not exist anywhere in invoices table
+    next_seq = max_seq + 1
+
+    # Safety loop: ensure candidate number does not exist anywhere in invoices table for this tenant
     while True:
-        candidate = f"{prefix}{next_seq:06d}"
-        exists = db.session.query(Invoice.id).filter(Invoice.invoice_number == candidate).first()
+        candidate = str(next_seq)
+        exists = db.session.query(Invoice.id).filter(
+            Invoice.tenant_id == tenant_id,
+            Invoice.invoice_number == candidate
+        ).first()
         if not exists:
             return candidate
         next_seq += 1

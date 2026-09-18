@@ -319,8 +319,8 @@ export default function TouchModeBilling({
             )}
           </div>
 
-          {/* Active Membership Status Banner (Type A % Discount) */}
-          {activeMembership && (
+          {/* Active Membership Status Banner (Type A % Discount - Only when mode is not visit_based/disabled) */}
+          {activeMembership && visitMembershipStatus?.membership_mode !== "visit_based" && visitMembershipStatus?.membership_mode !== "disabled" && (
             <div className="bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-300/60 rounded-xl p-2 flex items-center justify-between text-xs">
               <div className="flex items-center space-x-1.5">
                 <Crown className="w-4 h-4 text-amber-600" />
@@ -490,7 +490,7 @@ export default function TouchModeBilling({
                       </div>
                     ) : (
                       <span className="text-[10px] text-slate-400 font-semibold">
-                        {item.discount_percent > 0 ? `(${item.discount_percent}% membership)` : "0% discount"}
+                        {getEffectiveDiscountPercent(item) > 0 ? `(${getEffectiveDiscountPercent(item)}% membership)` : "0% discount"}
                       </span>
                     )}
                   </div>

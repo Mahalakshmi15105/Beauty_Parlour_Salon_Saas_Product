@@ -476,9 +476,29 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
             const lineItems = invoice.line_items || invoice.items || [];
             const serviceItems = lineItems.filter(item => item.type === "service" || item.service_id);
             const productItems = lineItems.filter(item => item.type === "product" || item.product_id);
+            const membershipItems = lineItems.filter(item => item.type === "membership" || (!item.service_id && !item.product_id && item.item_name && item.item_name.startsWith("Membership:")));
 
             return (
               <div className="space-y-3">
+                {/* MEMBERSHIPS SECTION */}
+                {membershipItems.length > 0 && (
+                  <div className="space-y-1.5">
+                    {membershipItems.map((item, idx) => {
+                      const itemName = (item.item_name || item.name || `Membership`).toUpperCase();
+                      const amount = item.line_total || item.total || item.unit_price || 0;
+
+                      return (
+                        <div key={idx} className="space-y-0.5 text-black">
+                          <div className="flex justify-between items-start font-bold">
+                            <span className="w-2/3 break-words leading-tight">{itemName}</span>
+                            <span className="w-1/3 text-right font-extrabold">{formatCurrency(amount)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {/* SERVICES SECTION */}
                 {serviceItems.length > 0 && (
                   <div>
