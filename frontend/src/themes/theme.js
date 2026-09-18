@@ -105,6 +105,10 @@ export function applyTheme(themeId, accentColorOverride = null) {
     // If this is a primary color, use the accent color override
     if (key === 'primary' || key === 'primaryHover') {
       root.style.setProperty(cssVar, accentColor);
+    } else if (key === 'primaryLight') {
+      root.style.setProperty(cssVar, `${accentColor}1A`); // 10% opacity
+    } else if (key === 'primaryBorderSoft' || key === 'borderSoft') {
+      root.style.setProperty(cssVar, `${accentColor}33`); // 20% opacity
     } else {
       root.style.setProperty(cssVar, value);
     }
@@ -131,6 +135,10 @@ export function applyAccentColor(accentColor) {
   // Apply the accent color to primary color variables
   root.style.setProperty('--color-primary', accentColor);
   root.style.setProperty('--color-primary-hover', accentColor);
+  root.style.setProperty('--color-accent', accentColor);
+  root.style.setProperty('--color-primary-light', `${accentColor}1A`);
+  root.style.setProperty('--color-primary-border-soft', `${accentColor}33`);
+  root.style.setProperty('--color-border-soft', `${accentColor}33`);
   
   // Apply all other theme colors (backgrounds, text, etc.) - preserve theme mode
   const colorMapping = {
@@ -159,8 +167,8 @@ export function applyAccentColor(accentColor) {
   Object.entries(theme.colors).forEach(([key, value]) => {
     const cssVarName = colorMapping[key] || key.replace(/([A-Z])/g, '-$1').toLowerCase();
     const cssVar = `--color-${cssVarName}`;
-    // Skip primary and primary-hover as they're already set above
-    if (key !== 'primary' && key !== 'primaryHover') {
+    // Skip primary, primaryHover, accent, primaryLight, primaryBorderSoft, borderSoft as set dynamically above
+    if (!['primary', 'primaryHover', 'accent', 'primaryLight', 'primaryBorderSoft', 'borderSoft'].includes(key)) {
       root.style.setProperty(cssVar, value);
     }
   });

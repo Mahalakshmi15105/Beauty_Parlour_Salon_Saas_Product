@@ -112,6 +112,18 @@ function Billing() {
   const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
   const [customerHighlightedIndex, setCustomerHighlightedIndex] = useState(0);
 
+  // Category Combobox State
+  const [categorySearchQuery, setCategorySearchQuery] = useState("");
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+  const [categoryHighlightedIndex, setCategoryHighlightedIndex] = useState(0);
+  const categoryComboboxRef = useRef(null);
+
+  // Service Combobox State
+  const [serviceSearchQuery, setServiceSearchQuery] = useState("");
+  const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false);
+  const [serviceHighlightedIndex, setServiceHighlightedIndex] = useState(0);
+  const serviceComboboxRef = useRef(null);
+
   // Multi-Tab Billing State
   const [billingTabs, setBillingTabs] = useState([
     {
@@ -142,7 +154,9 @@ function Billing() {
           customerSearchQuery,
           selectedGender,
           selectedCategoryId,
+          categorySearchQuery,
           selectedServiceId,
+          serviceSearchQuery,
           cart,
           invoiceTaxAmount,
           isTaxAmountOverridden,
@@ -169,7 +183,9 @@ function Billing() {
       setCustomerSearchQuery(targetTab.customerSearchQuery || "");
       setSelectedGender(targetTab.selectedGender || "");
       setSelectedCategoryId(targetTab.selectedCategoryId || "");
+      setCategorySearchQuery(targetTab.categorySearchQuery || "");
       setSelectedServiceId(targetTab.selectedServiceId || "");
+      setServiceSearchQuery(targetTab.serviceSearchQuery || "");
       setCart(targetTab.cart || []);
       setInvoiceTaxAmount(targetTab.invoiceTaxAmount || 0);
       setIsTaxAmountOverridden(targetTab.isTaxAmountOverridden || false);
@@ -1138,6 +1154,7 @@ function Billing() {
 
   // Helper to determine discount percentage for a service given active customer membership
   const getMembershipDiscountForService = (serviceObj, activeMem) => {
+    if (visitMembershipStatus?.membership_mode === "visit_based" || visitMembershipStatus?.membership_mode === "disabled") return 0;
     if (!useMembership || !activeMem || activeMem.isDayRestricted) return 0;
     const planId = activeMem.membership_plan_id || activeMem.plan_id;
     const targetServiceId = parseInt(serviceObj.id || serviceObj.item_id);
@@ -1196,6 +1213,7 @@ function Billing() {
   };
 
   const getMembershipDiscountForProduct = (productObj, activeMem) => {
+    if (visitMembershipStatus?.membership_mode === "visit_based" || visitMembershipStatus?.membership_mode === "disabled") return 0;
     if (!useMembership || !activeMem || activeMem.isDayRestricted) return 0;
     if (activeMem.product_discount_percentage !== undefined && activeMem.product_discount_percentage !== null) {
       return parseFloat(activeMem.product_discount_percentage) || 0;
@@ -1203,12 +1221,14 @@ function Billing() {
     return 0;
   };
 
-  // Auto-recalculate cart item discounts when useMembership, activeMembership, services, or products change
+  // Auto-recalculate cart item discounts when useMembership, activeMembership, services, products, or visitMembershipStatus change
   useEffect(() => {
     setCart((prevCart) =>
       prevCart.map((item) => {
         let calcDiscount = 0;
-        if (item.type === "service") {
+        if (visitMembershipStatus?.membership_mode === "visit_based" || visitMembershipStatus?.membership_mode === "disabled") {
+          calcDiscount = item.discount_percent || 0;
+        } else if (item.type === "service") {
           const serviceList = allServices.length > 0 ? allServices : services;
           const svcObj = serviceList.find((s) => s.id === parseInt(item.item_id || item.id));
           calcDiscount = svcObj ? getMembershipDiscountForService(svcObj, activeMembership) : (useMembership && activeMembership ? parseFloat(activeMembership.service_discount_percentage || 0) : 0);
@@ -1222,7 +1242,7 @@ function Billing() {
         };
       })
     );
-  }, [useMembership, activeMembership, services, allServices, products]);
+  }, [useMembership, activeMembership, visitMembershipStatus, services, allServices, products]);
 
   const handleAddServiceToCart = (serviceIdToUse) => {
     const targetId = serviceIdToUse || selectedServiceId;
@@ -1241,22 +1261,7 @@ function Billing() {
     }
 
     setCart((prevCart) => {
-      const existingIndex = prevCart.findIndex(
-        (item) => item.type === "service" && item.item_id === serviceObj.id
-      );
-
-      if (existingIndex >= 0) {
-        // Service already in cart -> increment quantity
-        const updated = [...prevCart];
-        updated[existingIndex] = {
-          ...updated[existingIndex],
-          quantity: updated[existingIndex].quantity + 1,
-          discount_percent: initialDiscount,
-        };
-        return updated;
-      }
-
-      // New service -> add single row
+      // Always add as a new separate line item row
       const newItem = {
         type: "service",
         item_id: serviceObj.id,
@@ -2091,6 +2096,7 @@ function Billing() {
             customerComboboxRef={customerComboboxRef}
             currencySymbol={currencySymbol}
             formatCurrency={formatCurrency}
+            getEffectiveDiscountPercent={getEffectiveDiscountPercent}
           />
         ) : (
         <div className="space-y-3">
@@ -2515,100 +2521,239 @@ function Billing() {
             </div>
 
             <div className="grid md:grid-cols-3 gap-6 items-end">
-              <div>
+              {/* Category Searchable Combobox */}
+              <div ref={categoryComboboxRef} className="relative">
                 <label className="block text-xs font-bold text-slate-700 mb-1">Category *</label>
-                <select
-                  ref={categorySelectRef}
-                  value={selectedCategoryId}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setSelectedCategoryId(val);
-                    setSelectedServiceId("");
-                    if (val) {
-                      shouldFocusServiceRef.current = true;
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "ArrowRight" || e.key === "Enter") {
-                      e.preventDefault();
-                      if (selectedCategoryId) {
-                        shouldFocusServiceRef.current = true;
-                        advanceAndOpenSelect(e.target, serviceSelectRef);
+                <div className="relative">
+                  <input
+                    ref={categorySelectRef}
+                    type="text"
+                    placeholder="Search Category..."
+                    value={categorySearchQuery || (categories.find((c) => String(c.id) === String(selectedCategoryId))?.name || "")}
+                    onFocus={() => {
+                      setIsCategoryDropdownOpen(true);
+                      setCategoryHighlightedIndex(0);
+                    }}
+                    onChange={(e) => {
+                      setCategorySearchQuery(e.target.value);
+                      setIsCategoryDropdownOpen(true);
+                      setCategoryHighlightedIndex(0);
+                    }}
+                    onKeyDown={(e) => {
+                      const filtered = categories.filter((cat) => {
+                        if (!categorySearchQuery) return true;
+                        return cat.name?.toLowerCase().includes(categorySearchQuery.toLowerCase().trim());
+                      });
+
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        setIsCategoryDropdownOpen(true);
+                        setCategoryHighlightedIndex((prev) => Math.min(prev + 1, filtered.length - 1));
+                      } else if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        setIsCategoryDropdownOpen(true);
+                        setCategoryHighlightedIndex((prev) => Math.max(prev - 1, 0));
+                      } else if (e.key === "Enter" || e.key === "ArrowRight") {
+                        e.preventDefault();
+                        if (isCategoryDropdownOpen && filtered.length > 0) {
+                          const targetCat = filtered[categoryHighlightedIndex] || filtered[0];
+                          setSelectedCategoryId(String(targetCat.id));
+                          setCategorySearchQuery(targetCat.name);
+                          setIsCategoryDropdownOpen(false);
+                          setSelectedServiceId("");
+                          setServiceSearchQuery("");
+                          setTimeout(() => {
+                            if (serviceSelectRef.current) {
+                              serviceSelectRef.current.focus();
+                              setIsServiceDropdownOpen(true);
+                            }
+                          }, 50);
+                        }
+                      } else if (e.key === "Escape") {
+                        setIsCategoryDropdownOpen(false);
+                      } else if (e.key === "ArrowLeft") {
+                        e.preventDefault();
+                        if (customerSelectRef.current) {
+                          customerSelectRef.current.focus();
+                          setIsCustomerDropdownOpen(true);
+                          setCustomerHighlightedIndex(0);
+                        }
                       }
-                    } else if (e.key === "ArrowLeft") {
-                      e.preventDefault();
-                      if (customerSelectRef.current) {
-                        customerSelectRef.current.focus();
-                        setIsCustomerDropdownOpen(true);
-                        setCustomerHighlightedIndex(0);
-                      }
-                    }
-                  }}
-                  className="w-full bg-background border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
-                >
-                  <option value="">Select Category</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
+                    }}
+                    className="w-full bg-background border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary pr-8"
+                  />
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+
+                  {/* Category Dropdown List */}
+                  {isCategoryDropdownOpen && (() => {
+                    const filtered = categories.filter((cat) => {
+                      if (!categorySearchQuery) return true;
+                      return cat.name?.toLowerCase().includes(categorySearchQuery.toLowerCase().trim());
+                    });
+
+                    return (
+                      <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-border-soft rounded-xl shadow-2xl z-[100] max-h-60 overflow-y-auto p-1.5 space-y-1">
+                        {filtered.length === 0 ? (
+                          <div className="p-3 text-xs text-slate-500 font-medium text-center">No categories match</div>
+                        ) : (
+                          filtered.map((cat, idx) => {
+                            const isHighlighted = idx === categoryHighlightedIndex;
+                            const isSelected = String(cat.id) === String(selectedCategoryId);
+                            return (
+                              <button
+                                key={cat.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedCategoryId(String(cat.id));
+                                  setCategorySearchQuery(cat.name);
+                                  setIsCategoryDropdownOpen(false);
+                                  setSelectedServiceId("");
+                                  setServiceSearchQuery("");
+                                  setTimeout(() => {
+                                    if (serviceSelectRef.current) {
+                                      serviceSelectRef.current.focus();
+                                      setIsServiceDropdownOpen(true);
+                                    }
+                                  }, 50);
+                                }}
+                                className={`w-full text-left px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center justify-between ${
+                                  isHighlighted ? "bg-primary-light text-primary" : "text-slate-800 hover:bg-slate-100"
+                                }`}
+                              >
+                                <span>{cat.name}</span>
+                                {isSelected && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
 
-              <div>
+              {/* Service Searchable Combobox (Search by Name or Price) */}
+              <div ref={serviceComboboxRef} className="relative">
                 <label className="block text-xs font-bold text-slate-700 mb-1">Service *</label>
-                <select
-                  ref={serviceSelectRef}
-                  value={selectedServiceId}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val) {
-                      setSelectedServiceId(val);
-                      handleAddServiceToCart(val);
-                      setTimeout(() => {
-                        const empSelects = document.querySelectorAll('[data-field="employee"]');
-                        if (empSelects.length > 0) {
-                          const lastEmpSelect = empSelects[empSelects.length - 1];
-                          lastEmpSelect.focus();
-                          openNativeSelectDropdown(lastEmpSelect);
+                <div className="relative">
+                  <input
+                    ref={serviceSelectRef}
+                    type="text"
+                    disabled={!selectedCategoryId}
+                    placeholder={selectedCategoryId ? "Search Service by Name or Price..." : "-- Select Category First --"}
+                    value={serviceSearchQuery || (services.find((s) => String(s.id) === String(selectedServiceId)) ? `${services.find((s) => String(s.id) === String(selectedServiceId)).name} - ${currencySymbol} ${parseFloat(services.find((s) => String(s.id) === String(selectedServiceId)).price).toFixed(2)}` : "")}
+                    onFocus={() => {
+                      if (selectedCategoryId) {
+                        setIsServiceDropdownOpen(true);
+                        setServiceHighlightedIndex(0);
+                      }
+                    }}
+                    onChange={(e) => {
+                      setServiceSearchQuery(e.target.value);
+                      setIsServiceDropdownOpen(true);
+                      setServiceHighlightedIndex(0);
+                    }}
+                    onKeyDown={(e) => {
+                      const filtered = services.filter((svc) => {
+                        if (!serviceSearchQuery) return true;
+                        const q = serviceSearchQuery.toLowerCase().trim();
+                        const nameMatch = svc.name?.toLowerCase().includes(q);
+                        const priceMatch = (svc.price !== undefined && svc.price !== null) ? String(svc.price).includes(q) : false;
+                        return nameMatch || priceMatch;
+                      });
+
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        setIsServiceDropdownOpen(true);
+                        setServiceHighlightedIndex((prev) => Math.min(prev + 1, filtered.length - 1));
+                      } else if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        setIsServiceDropdownOpen(true);
+                        setServiceHighlightedIndex((prev) => Math.max(prev - 1, 0));
+                      } else if (e.key === "Enter" || e.key === "ArrowRight") {
+                        e.preventDefault();
+                        if (isServiceDropdownOpen && filtered.length > 0) {
+                          const targetSvc = filtered[serviceHighlightedIndex] || filtered[0];
+                          setSelectedServiceId(String(targetSvc.id));
+                          setServiceSearchQuery(`${targetSvc.name} - ${currencySymbol} ${parseFloat(targetSvc.price).toFixed(2)}`);
+                          setIsServiceDropdownOpen(false);
+                          handleAddServiceToCart(targetSvc.id);
+                          setTimeout(() => {
+                            const empSelects = document.querySelectorAll('[data-field="employee"]');
+                            if (empSelects.length > 0) {
+                              const lastEmpSelect = empSelects[empSelects.length - 1];
+                              lastEmpSelect.focus();
+                              openNativeSelectDropdown(lastEmpSelect);
+                            }
+                          }, 100);
                         }
-                      }, 100);
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === "ArrowRight") {
-                      e.preventDefault();
-                      if (selectedServiceId) {
-                        handleAddServiceToCart(selectedServiceId);
-                        setTimeout(() => {
-                          const empSelects = document.querySelectorAll('[data-field="employee"]');
-                          if (empSelects.length > 0) {
-                            const lastEmpSelect = empSelects[empSelects.length - 1];
-                            lastEmpSelect.focus();
-                            openNativeSelectDropdown(lastEmpSelect);
-                          }
-                        }, 100);
-                      } else {
-                        advanceToNextRef(e.target, addProductBtnRef);
+                      } else if (e.key === "Escape") {
+                        setIsServiceDropdownOpen(false);
+                      } else if (e.key === "ArrowLeft") {
+                        e.preventDefault();
+                        if (categorySelectRef.current) {
+                          categorySelectRef.current.focus();
+                          setIsCategoryDropdownOpen(true);
+                        }
                       }
-                    } else if (e.key === "ArrowLeft") {
-                      e.preventDefault();
-                      if (categorySelectRef.current) {
-                        categorySelectRef.current.focus();
-                        openNativeSelectDropdown(categorySelectRef.current);
-                      }
-                    }
-                  }}
-                  disabled={!selectedCategoryId}
-                  className="w-full bg-background border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary disabled:opacity-50"
-                >
-                  <option value="">-- Choose Service --</option>
-                  {services.map((svc) => (
-                    <option key={svc.id} value={svc.id}>
-                      {svc.name} - {currencySymbol} {parseFloat(svc.price).toFixed(2)}
-                    </option>
-                  ))}
-                </select>
+                    }}
+                    className="w-full bg-background border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary disabled:opacity-50 pr-8"
+                  />
+                  <Search className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+
+                  {/* Service Dropdown List */}
+                  {isServiceDropdownOpen && selectedCategoryId && (() => {
+                    const filtered = services.filter((svc) => {
+                      if (!serviceSearchQuery) return true;
+                      const q = serviceSearchQuery.toLowerCase().trim();
+                      const nameMatch = svc.name?.toLowerCase().includes(q);
+                      const priceMatch = (svc.price !== undefined && svc.price !== null) ? String(svc.price).includes(q) : false;
+                      return nameMatch || priceMatch;
+                    });
+
+                    return (
+                      <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-border-soft rounded-xl shadow-2xl z-[100] max-h-60 overflow-y-auto p-1.5 space-y-1">
+                        {filtered.length === 0 ? (
+                          <div className="p-3 text-xs text-slate-500 font-medium text-center">No services match query</div>
+                        ) : (
+                          filtered.map((svc, idx) => {
+                            const isHighlighted = idx === serviceHighlightedIndex;
+                            const isSelected = String(svc.id) === String(selectedServiceId);
+                            return (
+                              <button
+                                key={svc.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedServiceId(String(svc.id));
+                                  setServiceSearchQuery(`${svc.name} - ${currencySymbol} ${parseFloat(svc.price).toFixed(2)}`);
+                                  setIsServiceDropdownOpen(false);
+                                  handleAddServiceToCart(svc.id);
+                                  setTimeout(() => {
+                                    const empSelects = document.querySelectorAll('[data-field="employee"]');
+                                    if (empSelects.length > 0) {
+                                      const lastEmpSelect = empSelects[empSelects.length - 1];
+                                      lastEmpSelect.focus();
+                                      openNativeSelectDropdown(lastEmpSelect);
+                                    }
+                                  }, 100);
+                                }}
+                                className={`w-full text-left px-3.5 py-2.5 rounded-lg text-xs font-bold transition flex items-center justify-between ${
+                                  isHighlighted ? "bg-primary-light text-primary" : "text-slate-800 hover:bg-slate-100"
+                                }`}
+                              >
+                                <div className="space-y-0.5">
+                                  <span className="font-bold text-slate-900 block">{svc.name}</span>
+                                  <span className="text-[11px] text-primary font-bold block">{currencySymbol} {parseFloat(svc.price).toFixed(2)}</span>
+                                </div>
+                                {isSelected && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
 
               <div className="flex items-center space-x-3">

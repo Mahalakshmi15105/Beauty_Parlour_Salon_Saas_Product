@@ -53,22 +53,23 @@
 }
 
 .glowe-pink-gradient {
-  background: linear-gradient(90deg, #FF7EB3 0%, #FF4D94 100%) !important;
+  background-color: var(--color-primary) !important;
   color: #FFFFFF !important;
-  box-shadow: 0 6px 18px rgba(255, 77, 148, 0.45) !important;
-  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15) !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
 }
 
 .glowe-pink-gradient:hover {
   transform: translateY(-1px) !important;
-  box-shadow: 0 8px 24px rgba(255, 77, 148, 0.6) !important;
+  filter: brightness(0.92) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
 }
 
 .glowe-pill-active {
-  background: linear-gradient(90deg, #FF7EB3 0%, #FF4D94 100%) !important;
+  background-color: var(--color-primary) !important;
   color: #FFFFFF !important;
   border-radius: 9999px !important;
-  box-shadow: 0 6px 18px rgba(255, 77, 148, 0.45) !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15) !important;
 }
 
 .glowe-glow-shadow {
@@ -77,27 +78,29 @@
 
 /* Dynamic CSS Variable Driven Design System Utilities with Glass Button Aesthetics */
 .bg-primary { 
-  background: linear-gradient(90deg, #FF7EB3 0%, #FF4D94 100%) !important; 
-  box-shadow: 0 6px 18px rgba(255, 77, 148, 0.45) !important;
+  background-color: var(--color-primary) !important; 
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15) !important;
   border-radius: 9999px !important;
-  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
 }
 .bg-primary:hover {
   transform: translateY(-1px) !important;
-  box-shadow: 0 8px 24px rgba(255, 77, 148, 0.6) !important;
+  filter: brightness(0.92) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
 }
 
 .text-primary { color: var(--color-primary) !important; }
 .border-primary { border-color: var(--color-primary) !important; }
 
 .bg-primary-hover:hover, .hover\:bg-primary-hover:hover { 
-  background: linear-gradient(90deg, #FF4D94 0%, #FF7EB3 100%) !important; 
+  background-color: var(--color-primary-hover) !important; 
+  filter: brightness(0.92) !important;
 }
 .bg-primary-light { 
-  background-color: rgba(255, 240, 243, 0.8) !important; 
+  background-color: var(--color-primary-light) !important; 
   border: 1px solid var(--color-primary-border-soft) !important;
 }
-.hover\:bg-primary-light:hover { background-color: rgba(255, 240, 243, 1) !important; }
+.hover\:bg-primary-light:hover { background-color: var(--color-primary-light) !important; }
 .border-border-soft { border-color: var(--color-primary-border-soft) !important; }
 
 .bg-background { background: linear-gradient(135deg, #FFF0F5 0%, #FFF5EB 50%, #E6F0FA 100%) !important; background-attachment: fixed !important; }

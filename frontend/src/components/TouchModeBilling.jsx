@@ -45,7 +45,8 @@ export default function TouchModeBilling({
   openCustomerHistory,
   customerComboboxRef,
   currencySymbol,
-  formatCurrency
+  formatCurrency,
+  getEffectiveDiscountPercent = () => 0
 }) {
   const [selectedTab, setSelectedTab] = useState("all");
   const [discountChecked, setDiscountChecked] = useState({});
