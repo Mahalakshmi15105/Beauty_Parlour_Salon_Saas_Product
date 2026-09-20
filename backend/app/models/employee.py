@@ -15,6 +15,8 @@ class Employee(db.Model, TimestampMixin, SoftDeleteMixin):
     specialization = db.Column(db.String(100), nullable=True)
     role = db.Column(db.String(100), nullable=True)
     salary = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
+    target = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
+    level = db.Column(db.String(50), nullable=False, default="L1")
     commission_percentage = db.Column(db.Numeric(5, 2), nullable=False, default=0.00)
     joining_date = db.Column(db.Date, nullable=False, default=date.today)
     status = db.Column(db.String(50), nullable=False, default="active")  # active, inactive

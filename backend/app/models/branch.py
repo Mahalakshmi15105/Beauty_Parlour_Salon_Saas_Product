@@ -22,6 +22,12 @@ class Branch(db.Model, TimestampMixin, SoftDeleteMixin):
     secondary_color = db.Column(db.String(20), nullable=True)
     accent_color = db.Column(db.String(50), nullable=True)
 
+    # Branch Geofencing Coordinates & Main Branch Flag
+    is_main_branch = db.Column(db.Boolean, nullable=False, default=False)
+    latitude = db.Column(db.Numeric(10, 8), nullable=True)
+    longitude = db.Column(db.Numeric(11, 8), nullable=True)
+    geofence_radius_meters = db.Column(db.Integer, nullable=False, default=100)
+
     # Relationships
     users = db.relationship("User", back_populates="branch")
 

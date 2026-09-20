@@ -107,6 +107,9 @@ function Settings() {
       postal_code: "",
       website: "",
       description: "",
+      latitude: "",
+      longitude: "",
+      geofence_radius_meters: 100,
       shop_name_typography: { ...DEFAULT_TYPOGRAPHY },
     },
     invoice_settings: {
@@ -223,7 +226,7 @@ function Settings() {
     setLoading(true);
     API.get("/settings")
       .then((res) => {
-        const rawData = res.data || {};
+        const rawData = (res && typeof res === 'object' && res.data) ? res.data : (res || {});
         setSettingsData((prev) => ({
           ...prev,
           ...rawData,
@@ -1102,6 +1105,112 @@ function Settings() {
                     }
                     className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
                   />
+                </div>
+              </div>
+
+              {/* GEOFENCE & LOCATION SETUP (MAIN PARLOUR GPS) */}
+              <div className="p-6 bg-background/50 border border-border-soft rounded-2xl space-y-4">
+                <div className="flex items-center justify-between border-b border-border-soft pb-3">
+                  <div className="flex items-center space-x-2">
+                    <Building2 className="w-5 h-5 text-primary" />
+                    <div>
+                      <h3 className="text-sm font-bold text-text-primary">Geofence & Location Setup</h3>
+                      <p className="text-[11px] text-text-secondary">
+                        Configure your main parlour's GPS coordinates and geofence radius for employee check-in verification.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-text-secondary mb-1">LATITUDE</label>
+                    <input
+                      type="number"
+                      step="any"
+                      placeholder="e.g. 13.0827"
+                      value={settingsData.business_profile.latitude ?? ""}
+                      onChange={(e) =>
+                        setSettingsData({
+                          ...settingsData,
+                          business_profile: { ...settingsData.business_profile, latitude: e.target.value },
+                        })
+                      }
+                      className="w-full bg-surface border border-border-soft px-3 py-2 rounded-xl text-xs focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-text-secondary mb-1">LONGITUDE</label>
+                    <input
+                      type="number"
+                      step="any"
+                      placeholder="e.g. 80.2707"
+                      value={settingsData.business_profile.longitude ?? ""}
+                      onChange={(e) =>
+                        setSettingsData({
+                          ...settingsData,
+                          business_profile: { ...settingsData.business_profile, longitude: e.target.value },
+                        })
+                      }
+                      className="w-full bg-surface border border-border-soft px-3 py-2 rounded-xl text-xs focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-text-secondary mb-1">RADIUS (METERS)</label>
+                    <input
+                      type="number"
+                      placeholder="100"
+                      value={settingsData.business_profile.geofence_radius_meters ?? 100}
+                      onChange={(e) =>
+                        setSettingsData({
+                          ...settingsData,
+                          business_profile: { ...settingsData.business_profile, geofence_radius_meters: e.target.value },
+                        })
+                      }
+                      className="w-full bg-surface border border-border-soft px-3 py-2 rounded-xl text-xs focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!navigator.geolocation) {
+                        showError("Geolocation is not supported by your browser");
+                        return;
+                      }
+                      navigator.geolocation.getCurrentPosition(
+                        (pos) => {
+                          setSettingsData((prev) => ({
+                            ...prev,
+                            business_profile: {
+                              ...prev.business_profile,
+                              latitude: pos.coords.latitude.toFixed(6),
+                              longitude: pos.coords.longitude.toFixed(6),
+                            },
+                          }));
+                          showSuccess("Current GPS location captured successfully!");
+                        },
+                        (err) => {
+                          showError("Failed to fetch location. Please allow browser location permissions.");
+                        },
+                        { enableHighAccuracy: true, timeout: 10000 }
+                      );
+                    }}
+                    className="px-4 py-2 border border-primary text-primary hover:bg-primary/10 rounded-xl text-xs font-bold transition flex items-center space-x-1.5"
+                  >
+                    <MapPin className="w-3.5 h-3.5" />
+                    <span>Detect My Current Location</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    className="px-5 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-bold shadow-xs transition"
+                  >
+                    Save Geofence Location
+                  </button>
                 </div>
               </div>
             </div>

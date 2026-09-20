@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Layout from "./components/Layout";
-import { ThemeProvider } from "./context/ThemeContext";
+import { ThemeProvider, useTheme } from "./context/ThemeContext";
+import { applyDefaultGloweTheme, applyTheme } from "./themes/theme";
 import { ToastProvider } from "./context/ToastContext";
 import Customers from "./pages/Customers";
 import Employees from "./pages/Employees";
@@ -22,6 +23,8 @@ import SuperAdmin from "./pages/SuperAdmin";
 import LandingPage from "./pages/LandingPage";
 import Register from "./pages/Register";
 import PublicBookingPage from "./pages/PublicBookingPage";
+import CheckInPage from "./pages/CheckInPage";
+import Attendance from "./pages/Attendance";
 import API from "./services/api";
 import { LogOut, Sparkles, ShieldCheck, Eye, EyeOff } from "lucide-react";
 
@@ -63,9 +66,10 @@ function App() {
   // Detect Meta OAuth callback redirect (?code=...) and route to WhatsApp integration page
   const initialActiveTab = new URLSearchParams(window.location.search).get("code")
     ? "whatsapp_integration"
-    : "dashboard";
+    : (user?.role === "Employee" ? "attendance" : "dashboard");
 
   const [currentView, setCurrentView] = useState(() => {
+    if (window.location.pathname.startsWith("/attendance/checkin")) return "attendance_checkin";
     if (bookingRouteInfo !== null) return "public_booking";
     return localStorage.getItem("token") ? "app" : "landing";
   });
@@ -84,17 +88,28 @@ function App() {
 
     API.post("/auth/login", { email, password })
       .then((res) => {
-        const { token, user: userObj } = res.data;
+        const payload = res?.data || res;
+        const token = payload?.token || res?.token;
+        const userObj = payload?.user || res?.user;
+        if (!token) {
+          setLoginError("Invalid server response format.");
+          setLoading(false);
+          return;
+        }
         localStorage.setItem("token", token);
-        localStorage.setItem("user", JSON.stringify(userObj));
+        if (userObj) localStorage.setItem("user", JSON.stringify(userObj));
         setToken(token);
         setUser(userObj);
         setLoading(false);
         setCurrentView("app");
-        setActiveTab("dashboard");
+        if (userObj?.role === "Employee") {
+          setActiveTab("attendance");
+        } else {
+          setActiveTab("dashboard");
+        }
       })
       .catch((err) => {
-        setLoginError(err.message || "Invalid email or password.");
+        setLoginError(err.message || err.error || "Invalid email or password.");
         setLoading(false);
       });
   };
@@ -112,8 +127,9 @@ function App() {
     if (token && !user) {
       API.get("/auth/me")
         .then((res) => {
-          setUser(res.data);
-          localStorage.setItem("user", JSON.stringify(res.data));
+          const userObj = res?.data || res;
+          setUser(userObj);
+          localStorage.setItem("user", JSON.stringify(userObj));
         })
         .catch(() => handleLogout());
     }
@@ -126,7 +142,30 @@ function App() {
     }
   }, []);
 
-  // 0. PUBLIC BOOKING PORTAL VIEW
+  const { currentTheme, accentColor } = useTheme();
+
+  // Enforce Glowe Pink Theme for Public Pages (Landing, Login, Register)
+  useEffect(() => {
+    if (currentView === "landing" || currentView === "login" || currentView === "register") {
+      applyDefaultGloweTheme();
+    } else if (currentView === "app") {
+      applyTheme(currentTheme, accentColor);
+    }
+  }, [currentView, currentTheme, accentColor]);
+
+  // 0. EMPLOYEE QR ATTENDANCE CHECKIN VIEW
+  if (currentView === "attendance_checkin" || window.location.pathname.startsWith("/attendance/checkin")) {
+    return (
+      <CheckInPage
+        onNavigateHome={() => {
+          window.history.pushState({}, "", "/");
+          setCurrentView(localStorage.getItem("token") ? "app" : "landing");
+        }}
+      />
+    );
+  }
+
+  // 0.1 PUBLIC BOOKING PORTAL VIEW
   if (currentView === "public_booking" || bookingRouteInfo !== null) {
     return (
       <PublicBookingPage
@@ -329,6 +368,8 @@ function App() {
         return <Customers />;
       case "employees":
         return <Employees />;
+      case "attendance":
+        return <Attendance />;
       case "catalog":
       case "services":
       case "products":

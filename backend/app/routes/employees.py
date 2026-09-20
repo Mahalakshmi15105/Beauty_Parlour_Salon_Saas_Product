@@ -58,6 +58,8 @@ def get_employees():
             "specialization": emp.specialization or "",
             "role": emp.role or "",
             "salary": float(emp.salary or 0.0),
+            "target": float(getattr(emp, "target", 0.0) or 0.0),
+            "level": getattr(emp, "level", "L1") or "L1",
             "commission_percentage": float(emp.commission_percentage or 0.0),
             "joining_date": emp.joining_date.isoformat() if emp.joining_date else None,
             "status": emp.status or "active",
@@ -89,6 +91,8 @@ def get_employee(employee_id):
         "specialization": employee.specialization or "",
         "role": employee.role or "",
         "salary": float(employee.salary or 0.0),
+        "target": float(getattr(employee, "target", 0.0) or 0.0),
+        "level": getattr(employee, "level", "L1") or "L1",
         "commission_percentage": float(employee.commission_percentage or 0.0),
         "joining_date": employee.joining_date.isoformat() if employee.joining_date else None,
         "status": employee.status or "active",
@@ -103,6 +107,8 @@ def create_employee():
     first_name = data.get("first_name", "").strip()
     phone = data.get("phone", "").strip()
     salary = data.get("salary")
+    target = data.get("target")
+    level = data.get("level", "L1")
     commission = data.get("commission_percentage")
 
     if not first_name or not phone:
@@ -123,14 +129,19 @@ def create_employee():
         )
 
     try:
+        target_val = float(target) if target not in ("", None) else 0.0
+    except (ValueError, TypeError):
+        target_val = 0.0
+
+    try:
         comm_val = float(commission) if commission not in ("", None) else 0.0
     except (ValueError, TypeError):
         comm_val = 0.0
 
-    if salary_val < 0:
+    if salary_val < 0 or target_val < 0:
         return error_response(
             error_code="VALIDATION_FAILED",
-            message="Salary must be >= 0.",
+            message="Salary and Target must be >= 0.",
             status_code=400
         )
 
@@ -190,6 +201,8 @@ def create_employee():
             specialization=data.get("specialization"),
             role=data.get("role"),
             salary=salary_val,
+            target=target_val,
+            level=str(level or "L1").strip(),
             commission_percentage=comm_val,
             status=data.get("status", "active")
         )
@@ -198,6 +211,44 @@ def create_employee():
 
         db.session.add(employee)
         db.session.commit()
+
+        # Provision/Link User account with role 'Employee' for authentication
+        username = (data.get("username") or data.get("phone") or phone).strip().lower()
+        password = data.get("password", "").strip()
+
+        if username:
+            from app.models.user import User
+            user_rec = User.query.filter_by(email=username, is_deleted=False).first()
+            if not user_rec:
+                user_rec = User(
+                    tenant_id=g.parlour_id,
+                    branch_id=target_branch_id,
+                    email=username,
+                    role="Employee",
+                    status="active"
+                )
+            else:
+                user_rec.role = "Employee"
+                user_rec.branch_id = target_branch_id
+                user_rec.status = "active"
+
+            if password:
+                user_rec.set_password(password)
+
+            db.session.add(user_rec)
+            db.session.commit()
+
+            # Register TenantLookup in Master DB for this employee login username
+            try:
+                with db.get_master_engine().connect() as conn:
+                    from sqlalchemy import text
+                    conn.execute(
+                        text("INSERT INTO tenant_lookups (email, tenant_id, created_at, updated_at) VALUES (:e, :t, NOW(), NOW()) ON DUPLICATE KEY UPDATE tenant_id = :t, updated_at = NOW()"),
+                        {"e": username, "t": g.parlour_id}
+                    )
+                    conn.commit()
+            except Exception as lookup_err:
+                logger.warning(f"TenantLookup notice: {lookup_err}")
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error creating employee: {str(e)}")
@@ -229,6 +280,8 @@ def update_employee(employee_id):
     first_name = data.get("first_name", "").strip()
     phone = data.get("phone", "").strip()
     salary = data.get("salary")
+    target = data.get("target")
+    level = data.get("level", "L1")
     commission = data.get("commission_percentage")
 
     if not first_name or not phone:
@@ -248,14 +301,19 @@ def update_employee(employee_id):
         )
 
     try:
+        target_val = float(target) if target not in ("", None) else 0.0
+    except (ValueError, TypeError):
+        target_val = 0.0
+
+    try:
         comm_val = float(commission) if commission not in ("", None) else 0.0
     except (ValueError, TypeError):
         comm_val = 0.0
 
-    if salary_val < 0:
+    if salary_val < 0 or target_val < 0:
         return error_response(
             error_code="VALIDATION_FAILED",
-            message="Salary must be >= 0.",
+            message="Salary and Target must be >= 0.",
             status_code=400
         )
 
@@ -312,12 +370,40 @@ def update_employee(employee_id):
         employee.specialization = data.get("specialization")
         employee.role = data.get("role")
         employee.salary = salary_val
+        employee.target = target_val
+        employee.level = str(level or "L1").strip()
         employee.commission_percentage = comm_val
         employee.status = data.get("status", "active")
         if joining_date:
             employee.joining_date = joining_date
 
         db.session.commit()
+
+        # Update associated User account if username or password provided
+        username = (data.get("username") or data.get("phone") or phone).strip().lower()
+        password = data.get("password", "").strip()
+
+        if username:
+            from app.models.user import User
+            user_rec = User.query.filter((User.email == username) | (User.email == employee.phone)).first()
+            if not user_rec:
+                user_rec = User(
+                    tenant_id=g.parlour_id,
+                    branch_id=employee.branch_id,
+                    email=username,
+                    role="Employee",
+                    status="active"
+                )
+            else:
+                user_rec.role = "Employee"
+                user_rec.branch_id = employee.branch_id
+                user_rec.status = "active"
+
+            if password:
+                user_rec.set_password(password)
+
+            db.session.add(user_rec)
+            db.session.commit()
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error updating employee: {str(e)}")

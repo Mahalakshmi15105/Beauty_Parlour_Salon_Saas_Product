@@ -12,12 +12,28 @@ logger = logging.getLogger(__name__)
 branches_bp = Blueprint("branches", __name__)
 
 @branches_bp.route("/branches", methods=["GET"])
-@require_role(["ParlourAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin", "Employee", "Receptionist"])
 def get_branches():
     """Get all branches for the current tenant"""
-    branches = Branch.query.filter_by(tenant_id=g.parlour_id, is_deleted=False).all()
-    data = [
-        {
+    branches = Branch.query.filter_by(tenant_id=g.parlour_id, is_deleted=False).order_by(Branch.is_main_branch.desc(), Branch.id.asc()).all()
+    if not branches and getattr(g, "parlour_id", None):
+        # Auto-seed default Main Branch if none exist
+        default_b = Branch(
+            tenant_id=g.parlour_id,
+            name="Main Parlour (Main Branch)",
+            is_main_branch=True,
+            opening_time="09:00",
+            closing_time="20:00",
+            status="active"
+        )
+        db.session.add(default_b)
+        db.session.commit()
+        branches = [default_b]
+
+    data = []
+    for b in branches:
+        is_main = bool(b.is_main_branch)
+        data.append({
             "id": b.id,
             "name": b.name,
             "address": b.address,
@@ -26,9 +42,12 @@ def get_branches():
             "opening_time": b.opening_time,
             "closing_time": b.closing_time,
             "status": b.status,
-            "created_at": b.created_at.isoformat()
-        } for b in branches
-    ]
+            "is_main_branch": is_main,
+            "latitude": float(b.latitude) if b.latitude is not None else None,
+            "longitude": float(b.longitude) if b.longitude is not None else None,
+            "geofence_radius_meters": b.geofence_radius_meters or 100,
+            "created_at": b.created_at.isoformat() if b.created_at else ""
+        })
     return success_response(data)
 
 @branches_bp.route("/branches", methods=["POST"])
@@ -107,6 +126,10 @@ def create_branch():
             )
 
     try:
+        lat = data.get("latitude")
+        lng = data.get("longitude")
+        radius = data.get("geofence_radius_meters")
+
         # Create branch
         logger.info(f"Creating branch with tenant_id={g.parlour_id}, name={name}")
         branch = Branch(
@@ -117,7 +140,10 @@ def create_branch():
             email=email,
             opening_time=opening_time,
             closing_time=closing_time,
-            status="active"
+            status="active",
+            latitude=float(lat) if lat not in (None, "") else None,
+            longitude=float(lng) if lng not in (None, "") else None,
+            geofence_radius_meters=int(radius) if radius not in (None, "") else 100
         )
         db.session.add(branch)
         logger.info("Branch added to session, flushing...")
@@ -147,9 +173,9 @@ def create_branch():
                     t_row = m_conn.execute(text("SELECT db_name, db_connection_uri FROM tenants WHERE id = :id"), {"id": g.parlour_id}).fetchone()
                     if t_row:
                         m_conn.execute(text("""
-                            INSERT INTO tenant_lookup (tenant_id, email, db_name, db_connection_uri) 
-                            VALUES (:tenant_id, :email, :db_name, :db_connection_uri)
-                            ON DUPLICATE KEY UPDATE db_name = :db_name, db_connection_uri = :db_connection_uri
+                            INSERT INTO tenant_lookups (tenant_id, email, db_name, db_connection_uri, created_at, updated_at) 
+                            VALUES (:tenant_id, :email, :db_name, :db_connection_uri, NOW(), NOW())
+                            ON DUPLICATE KEY UPDATE tenant_id = :tenant_id, db_name = :db_name, db_connection_uri = :db_connection_uri, updated_at = NOW()
                         """), {
                             "tenant_id": g.parlour_id,
                             "email": admin_email,
@@ -229,6 +255,16 @@ def update_branch(branch_id):
         if status in ["active", "inactive"]:
             branch.status = status
 
+        if "latitude" in data:
+            branch.latitude = float(data["latitude"]) if data["latitude"] not in (None, "") else None
+        if "longitude" in data:
+            branch.longitude = float(data["longitude"]) if data["longitude"] not in (None, "") else None
+        if "geofence_radius_meters" in data:
+            try:
+                branch.geofence_radius_meters = int(data["geofence_radius_meters"])
+            except (TypeError, ValueError):
+                pass
+
         db.session.commit()
         return success_response({"message": "Branch updated successfully."})
 
@@ -270,7 +306,10 @@ def get_branch(branch_id):
         "opening_time": branch.opening_time,
         "closing_time": branch.closing_time,
         "status": branch.status,
-        "created_at": branch.created_at.isoformat()
+        "latitude": float(branch.latitude) if branch.latitude is not None else None,
+        "longitude": float(branch.longitude) if branch.longitude is not None else None,
+        "geofence_radius_meters": branch.geofence_radius_meters or 100,
+        "created_at": branch.created_at.isoformat() if branch.created_at else ""
     })
 
 @branches_bp.route("/branches/<int:branch_id>", methods=["DELETE"])
@@ -283,6 +322,13 @@ def delete_branch(branch_id):
             error_code="BRANCH_NOT_FOUND",
             message="Branch not found.",
             status_code=404
+        )
+
+    if branch.is_main_branch:
+        return error_response(
+            error_code="FORBIDDEN_ACTION",
+            message="The Main Parlour branch cannot be deleted. Configure main parlour under Parlour Profile.",
+            status_code=400
         )
 
     try:

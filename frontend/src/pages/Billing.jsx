@@ -57,10 +57,15 @@ const SUPPORTED_PAYMENT_METHODS = [
   { id: "Paytm", label: "Paytm", icon: Smartphone, color: "text-sky-600 bg-sky-50" },
 ];
 
+import AddExpenseModal from "../components/AddExpenseModal";
+import CashDenominationModal from "../components/CashDenominationModal";
+
 function Billing() {
   const { showSuccess, showError } = useToast();
   const { formatCurrency, currencySymbol, t } = useLanguageCurrency();
   const [activeSubTab, setActiveSubTab] = useState("checkout");
+  const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
+  const [showCashDenominationModal, setShowCashDenominationModal] = useState(false);
   const [isTouchMode, setIsTouchMode] = useState(() => {
     return localStorage.getItem("billing_mode") === "touch";
   });
@@ -484,12 +489,20 @@ function Billing() {
   };
 
   const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [modalProductCategoryId, setModalProductCategoryId] = useState("");
+  const [modalProductCatSearchQuery, setModalProductCatSearchQuery] = useState("");
+  const [isModalCatDropdownOpen, setIsModalCatDropdownOpen] = useState(false);
+  const [modalCatHighlightedIndex, setModalCatHighlightedIndex] = useState(0);
+  const modalCatComboboxRef = useRef(null);
+
   const [modalProductId, setModalProductId] = useState("");
   const [modalProductQty, setModalProductQty] = useState(1);
   const [productSearchQuery, setProductSearchQuery] = useState("");
   const [selectedProductIds, setSelectedProductIds] = useState([]);
   const [productQuantities, setProductQuantities] = useState({});
   const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
+  const [modalProdHighlightedIndex, setModalProdHighlightedIndex] = useState(0);
+  const modalProdComboboxRef = useRef(null);
 
   const quickCustomerModalRef = useRef(null);
   const quickCustomerFormRef = useRef(null);
@@ -497,6 +510,7 @@ function Billing() {
   const customerHistoryModalRef = useRef(null);
   const addProductModalRef = useRef(null);
   const productDropdownRef = useRef(null);
+  const modalCatSelectRef = useRef(null);
   const modalProductSelectRef = useRef(null);
   const modalProductQtyRef = useRef(null);
   const modalAddProductBtnRef = useRef(null);
@@ -1033,13 +1047,20 @@ function Billing() {
       });
   }, []);
 
-  // Auto-focus & select default product when Add Product modal opens
+  // Auto-focus category field when Add Product modal opens
   useEffect(() => {
     if (showAddProductModal) {
+      setModalProductCategoryId("");
+      setModalProductCatSearchQuery("");
+      setIsModalCatDropdownOpen(false);
       setModalProductId("");
+      setProductSearchQuery("");
+      setIsProductDropdownOpen(false);
       setModalProductQty(1);
       setTimeout(() => {
-        if (modalProductSelectRef.current) {
+        if (modalCatSelectRef.current) {
+          modalCatSelectRef.current.focus();
+        } else if (modalProductSelectRef.current) {
           modalProductSelectRef.current.focus();
         }
       }, 100);
@@ -2040,6 +2061,26 @@ function Billing() {
         </div>
 
         <div className="flex items-center space-x-3">
+          <button
+            type="button"
+            onClick={() => setShowAddExpenseModal(true)}
+            className="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-extrabold transition flex items-center space-x-1.5 shadow-xs"
+            title="Add Daily Expense"
+          >
+            <Receipt className="w-4 h-4 text-rose-600" />
+            <span>Add Expense</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowCashDenominationModal(true)}
+            className="px-3.5 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-extrabold transition flex items-center space-x-1.5 shadow-xs"
+            title="Day Close Cash Denominations"
+          >
+            <DollarSign className="w-4 h-4 text-amber-600" />
+            <span>Cash Denomination</span>
+          </button>
+
           {draftSaved && (
             <div className="bg-success/15 border border-success/30 px-4 py-2 rounded-xl text-xs font-bold text-success flex items-center space-x-2">
               <CheckCircle className="w-4 h-4 text-success" />
@@ -4369,7 +4410,7 @@ function Billing() {
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 animate-fade-in">
           <div
             ref={addProductModalRef}
-            className="bg-surface max-w-xl w-full rounded-2xl shadow-2xl border border-border-soft overflow-hidden p-6 space-y-5"
+            className="bg-surface max-w-2xl w-full rounded-2xl shadow-2xl border border-border-soft overflow-hidden p-6 space-y-5"
           >
             <div className="flex justify-between items-center border-b border-border-soft pb-3">
               <div className="flex items-center space-x-2">
@@ -4386,38 +4427,251 @@ function Billing() {
             </div>
 
             <div className="space-y-4">
-              {/* Single Product Dropdown */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Product *</label>
-                <select
-                  ref={modalProductSelectRef}
-                  value={modalProductId}
-                  onChange={(e) => setModalProductId(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === "ArrowRight") {
-                      e.preventDefault();
-                      if (modalProductQtyRef.current) {
-                        modalProductQtyRef.current.focus();
-                        if (typeof modalProductQtyRef.current.select === "function") {
-                          modalProductQtyRef.current.select();
+              {/* Row 1: Product Category & Product Name side-by-side */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Product Category Searchable Combobox */}
+                <div ref={modalCatComboboxRef} className="relative">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Product Category (Optional Filter)</label>
+                  <div className="relative">
+                    <input
+                      ref={modalCatSelectRef}
+                      type="text"
+                      placeholder="Search Product Category (e.g. Hair Care, Skin Care)..."
+                      value={modalProductCatSearchQuery || (categories.find((c) => String(c.id) === String(modalProductCategoryId))?.name || "")}
+                      onFocus={() => {
+                        setIsModalCatDropdownOpen(true);
+                        setModalCatHighlightedIndex(0);
+                      }}
+                      onChange={(e) => {
+                        setModalProductCatSearchQuery(e.target.value);
+                        setIsModalCatDropdownOpen(true);
+                        setModalCatHighlightedIndex(0);
+                        setModalProductCategoryId("");
+                      }}
+                      onKeyDown={(e) => {
+                        const filteredCats = [
+                          { id: "", name: "All Categories" },
+                          ...categories.filter((cat) => {
+                            if (!modalProductCatSearchQuery) return true;
+                            return cat.name?.toLowerCase().includes(modalProductCatSearchQuery.toLowerCase().trim());
+                          })
+                        ];
+
+                        if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          setIsModalCatDropdownOpen(true);
+                          setModalCatHighlightedIndex((prev) => Math.min(prev + 1, filteredCats.length - 1));
+                        } else if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          setIsModalCatDropdownOpen(true);
+                          setModalCatHighlightedIndex((prev) => Math.max(prev - 1, 0));
+                        } else if (e.key === "Enter" || e.key === "ArrowRight") {
+                          e.preventDefault();
+                          if (isModalCatDropdownOpen && filteredCats.length > 0) {
+                            const targetCat = filteredCats[modalCatHighlightedIndex] || filteredCats[0];
+                            setModalProductCategoryId(String(targetCat.id));
+                            setModalProductCatSearchQuery(targetCat.name === "All Categories" ? "" : targetCat.name);
+                            setIsModalCatDropdownOpen(false);
+                            setModalProductId("");
+                            setProductSearchQuery("");
+                            setTimeout(() => {
+                              if (modalProductSelectRef.current) {
+                                modalProductSelectRef.current.focus();
+                                setIsProductDropdownOpen(true);
+                              }
+                            }, 50);
+                          } else {
+                            if (modalProductSelectRef.current) {
+                              modalProductSelectRef.current.focus();
+                              setIsProductDropdownOpen(true);
+                            }
+                          }
+                        } else if (e.key === "Escape") {
+                          setShowAddProductModal(false);
                         }
-                      }
-                    } else if (e.key === "Escape") {
-                      setShowAddProductModal(false);
-                    }
-                  }}
-                  className="w-full bg-background border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
-                >
-                  <option value="">-- Choose Product --</option>
-                  {products.map((prod) => (
-                    <option key={prod.id} value={prod.id}>
-                      {prod.name} - {currencySymbol} {parseFloat(prod.selling_price || prod.price || 0).toFixed(2)} (Stock: {prod.stock_quantity !== undefined ? prod.stock_quantity : "Avail"})
-                    </option>
-                  ))}
-                </select>
+                      }}
+                      className="w-full bg-background border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary pr-8"
+                    />
+                    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+
+                    {/* Category Dropdown List */}
+                    {isModalCatDropdownOpen && (() => {
+                      const filteredCats = [
+                        { id: "", name: "All Categories" },
+                        ...categories.filter((cat) => {
+                          if (!modalProductCatSearchQuery) return true;
+                          return cat.name?.toLowerCase().includes(modalProductCatSearchQuery.toLowerCase().trim());
+                        })
+                      ];
+
+                      return (
+                        <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-border-soft rounded-xl shadow-2xl z-[100] max-h-52 overflow-y-auto p-1.5 space-y-1">
+                          {filteredCats.map((cat, idx) => {
+                            const isHighlighted = idx === modalCatHighlightedIndex;
+                            const isSelected = String(cat.id) === String(modalProductCategoryId);
+                            return (
+                              <button
+                                key={cat.id || "all"}
+                                type="button"
+                                onClick={() => {
+                                  setModalProductCategoryId(String(cat.id));
+                                  setModalProductCatSearchQuery(cat.name === "All Categories" ? "" : cat.name);
+                                  setIsModalCatDropdownOpen(false);
+                                  setModalProductId("");
+                                  setProductSearchQuery("");
+                                  setTimeout(() => {
+                                    if (modalProductSelectRef.current) {
+                                      modalProductSelectRef.current.focus();
+                                      setIsProductDropdownOpen(true);
+                                    }
+                                  }, 50);
+                                }}
+                                className={`w-full text-left px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center justify-between ${
+                                  isHighlighted ? "bg-primary-light text-primary" : "text-slate-800 hover:bg-slate-100"
+                                }`}
+                              >
+                                <span>{cat.name}</span>
+                                {isSelected && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* Product Searchable Combobox (Search by Name or Price) */}
+                <div ref={modalProdComboboxRef} className="relative">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Product *</label>
+                  <div className="relative">
+                    <input
+                      ref={modalProductSelectRef}
+                      type="text"
+                      placeholder="Search Product by Name or Price..."
+                      value={productSearchQuery || (products.find((p) => String(p.id) === String(modalProductId)) ? `${products.find((p) => String(p.id) === String(modalProductId)).name} - ${currencySymbol} ${parseFloat(products.find((p) => String(p.id) === String(modalProductId)).selling_price || products.find((p) => String(p.id) === String(modalProductId)).price || 0).toFixed(2)}` : "")}
+                      onFocus={() => {
+                        setIsProductDropdownOpen(true);
+                        setModalProdHighlightedIndex(0);
+                      }}
+                      onChange={(e) => {
+                        setProductSearchQuery(e.target.value);
+                        setIsProductDropdownOpen(true);
+                        setModalProdHighlightedIndex(0);
+                        setModalProductId("");
+                      }}
+                      onKeyDown={(e) => {
+                        const filteredProds = products.filter((prod) => {
+                          if (modalProductCategoryId && String(prod.category_id) !== String(modalProductCategoryId) && String(prod.category) !== String(modalProductCategoryId)) {
+                            return false;
+                          }
+                          if (!productSearchQuery) return true;
+                          const q = productSearchQuery.toLowerCase().trim();
+                          const nameMatch = prod.name?.toLowerCase().includes(q);
+                          const priceVal = prod.selling_price || prod.price;
+                          const priceMatch = (priceVal !== undefined && priceVal !== null) ? String(priceVal).includes(q) : false;
+                          return nameMatch || priceMatch;
+                        });
+
+                        if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          setIsProductDropdownOpen(true);
+                          setModalProdHighlightedIndex((prev) => Math.min(prev + 1, filteredProds.length - 1));
+                        } else if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          setIsProductDropdownOpen(true);
+                          setModalProdHighlightedIndex((prev) => Math.max(prev - 1, 0));
+                        } else if (e.key === "Enter" || e.key === "ArrowRight") {
+                          e.preventDefault();
+                          if (isProductDropdownOpen && filteredProds.length > 0) {
+                            const targetProd = filteredProds[modalProdHighlightedIndex] || filteredProds[0];
+                            setModalProductId(String(targetProd.id));
+                            setProductSearchQuery(`${targetProd.name} - ${currencySymbol} ${parseFloat(targetProd.selling_price || targetProd.price || 0).toFixed(2)}`);
+                            setIsProductDropdownOpen(false);
+                            setTimeout(() => {
+                              if (modalProductQtyRef.current) {
+                                modalProductQtyRef.current.focus();
+                                if (typeof modalProductQtyRef.current.select === "function") modalProductQtyRef.current.select();
+                              }
+                            }, 50);
+                          } else if (modalProductQtyRef.current) {
+                            modalProductQtyRef.current.focus();
+                            if (typeof modalProductQtyRef.current.select === "function") modalProductQtyRef.current.select();
+                          }
+                        } else if (e.key === "ArrowLeft") {
+                          e.preventDefault();
+                          if (modalCatSelectRef.current) {
+                            modalCatSelectRef.current.focus();
+                            setIsModalCatDropdownOpen(true);
+                          }
+                        } else if (e.key === "Escape") {
+                          setShowAddProductModal(false);
+                        }
+                      }}
+                      className="w-full bg-background border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary pr-8"
+                    />
+                    <Search className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+
+                    {/* Product Dropdown List */}
+                    {isProductDropdownOpen && (() => {
+                      const filteredProds = products.filter((prod) => {
+                        if (modalProductCategoryId && String(prod.category_id) !== String(modalProductCategoryId) && String(prod.category) !== String(modalProductCategoryId)) {
+                          return false;
+                        }
+                        if (!productSearchQuery) return true;
+                        const q = productSearchQuery.toLowerCase().trim();
+                        const nameMatch = prod.name?.toLowerCase().includes(q);
+                        const priceVal = prod.selling_price || prod.price;
+                        const priceMatch = (priceVal !== undefined && priceVal !== null) ? String(priceVal).includes(q) : false;
+                        return nameMatch || priceMatch;
+                      });
+
+                      return (
+                        <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-border-soft rounded-xl shadow-2xl z-[100] max-h-56 overflow-y-auto p-1.5 space-y-1">
+                          {filteredProds.length === 0 ? (
+                            <div className="p-3 text-xs text-slate-500 font-medium text-center">No products match query</div>
+                          ) : (
+                            filteredProds.map((prod, idx) => {
+                              const isHighlighted = idx === modalProdHighlightedIndex;
+                              const isSelected = String(prod.id) === String(modalProductId);
+                              return (
+                                <button
+                                  key={prod.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setModalProductId(String(prod.id));
+                                    setProductSearchQuery(`${prod.name} - ${currencySymbol} ${parseFloat(prod.selling_price || prod.price || 0).toFixed(2)}`);
+                                    setIsProductDropdownOpen(false);
+                                    setTimeout(() => {
+                                      if (modalProductQtyRef.current) {
+                                        modalProductQtyRef.current.focus();
+                                        if (typeof modalProductQtyRef.current.select === "function") modalProductQtyRef.current.select();
+                                      }
+                                    }, 50);
+                                  }}
+                                  className={`w-full text-left px-3.5 py-2.5 rounded-lg text-xs font-bold transition flex items-center justify-between ${
+                                    isHighlighted ? "bg-primary-light text-primary" : "text-slate-800 hover:bg-slate-100"
+                                  }`}
+                                >
+                                  <div className="space-y-0.5">
+                                    <span className="font-bold text-slate-900 block">{prod.name}</span>
+                                    <span className="text-[11px] text-emerald-600 font-bold block">
+                                      {currencySymbol} {parseFloat(prod.selling_price || prod.price || 0).toFixed(2)} • Stock: {prod.stock_quantity !== undefined ? prod.stock_quantity : "Avail"}
+                                    </span>
+                                  </div>
+                                  {isSelected && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
               </div>
 
-              {/* Quantity Field (Always Visible Below Product Field) */}
+              {/* Quantity Field (Row 2, cleanly positioned below without divider lines) */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Quantity *</label>
                 <input
@@ -4893,6 +5147,16 @@ function Billing() {
           businessProfile={businessProfile}
         />
       </div>
+
+      <AddExpenseModal
+        isOpen={showAddExpenseModal}
+        onClose={() => setShowAddExpenseModal(false)}
+      />
+
+      <CashDenominationModal
+        isOpen={showCashDenominationModal}
+        onClose={() => setShowCashDenominationModal(false)}
+      />
     </div>
   );
 }

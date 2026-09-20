@@ -134,6 +134,10 @@ def create_app(config_class=Config):
     from app.routes.branches import branches_bp
     from app.routes.bulk_upload import bulk_upload_bp
     from app.routes.visit_membership import visit_membership_bp
+    from app.routes.attendance import attendance_bp
+    from app.routes.expenses import expenses_bp
+    from app.routes.cash_denominations import cash_denominations_bp
+    from app.routes.payroll_adjustments import payroll_adjustments_bp
     app.register_blueprint(health_bp, url_prefix="/api/v1")
     app.register_blueprint(auth_bp, url_prefix="/api/v1")
     app.register_blueprint(customers_bp, url_prefix="/api/v1")
@@ -154,6 +158,10 @@ def create_app(config_class=Config):
     app.register_blueprint(branches_bp, url_prefix="/api/v1")
     app.register_blueprint(bulk_upload_bp, url_prefix="/api/v1")
     app.register_blueprint(visit_membership_bp, url_prefix="/api/v1")
+    app.register_blueprint(attendance_bp)
+    app.register_blueprint(expenses_bp)
+    app.register_blueprint(cash_denominations_bp)
+    app.register_blueprint(payroll_adjustments_bp)
 
     from flask import send_from_directory
     import os

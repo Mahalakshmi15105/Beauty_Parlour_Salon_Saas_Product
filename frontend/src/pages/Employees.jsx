@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
 import { useModalFocusTrap, useFormKeyboardNavigation, focusAndOpenSelect } from "../utils/keyboardNavigation";
-import { X, Printer, FileSpreadsheet, FileText, Upload } from "lucide-react";
+import { X, Printer, FileSpreadsheet, FileText, Upload, DollarSign } from "lucide-react";
 import { exportToCSV, printDataList, exportToPDF, exportToExcel } from "../utils/exportUtils";
 import BulkUploadModal from "../components/BulkUploadModal";
+import AddPayrollAdjustmentModal from "../components/AddPayrollAdjustmentModal";
 import { useToast } from "../context/ToastContext";
 
 function Employees() {
@@ -24,17 +25,23 @@ function Employees() {
   const [nextCursor, setNextCursor] = useState(null);
   const [parlourName, setParlourName] = useState("SmartGoNext Beauty SaaS");
 
-  // Form State
+  // Form & Payroll State
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState(null);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
+  const [showPayrollModal, setShowPayrollModal] = useState(false);
+  const [selectedPayrollEmpId, setSelectedPayrollEmpId] = useState(null);
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
     phone: "",
+    username: "",
+    password: "",
     specialization: "",
     role: "",
     salary: "",
+    target: "",
+    level: "L1",
     commission_percentage: "",
     joining_date: "",
     status: "active",
@@ -75,9 +82,11 @@ function Employees() {
       { header: "First Name", accessor: "first_name" },
       { header: "Last Name", accessor: "last_name" },
       { header: "Role", accessor: "role" },
+      { header: "Level", accessor: "level" },
       { header: "Phone", accessor: "phone" },
       { header: "Specialization", accessor: "specialization" },
       { header: "Salary", accessor: "salary" },
+      { header: "Target", accessor: "target" },
       { header: "Commission %", accessor: "commission_percentage" },
       { header: "Status", accessor: "status" }
     ];
@@ -88,9 +97,11 @@ function Employees() {
     const columns = [
       { header: "Name", accessor: (row) => `${row.first_name || ""} ${row.last_name || ""}`.trim() },
       { header: "Role", accessor: "role" },
+      { header: "Level", accessor: "level" },
       { header: "Phone", accessor: "phone" },
       { header: "Specialization", accessor: "specialization" },
       { header: "Salary", accessor: "salary" },
+      { header: "Target", accessor: "target" },
       { header: "Commission %", accessor: (row) => `${row.commission_percentage || 0}%` },
       { header: "Status", accessor: "status" }
     ];
@@ -102,9 +113,11 @@ function Employees() {
       { header: "First Name", accessor: "first_name" },
       { header: "Last Name", accessor: "last_name" },
       { header: "Role", accessor: "role" },
+      { header: "Level", accessor: "level" },
       { header: "Phone", accessor: "phone" },
       { header: "Specialization", accessor: "specialization" },
       { header: "Salary", accessor: "salary" },
+      { header: "Target", accessor: "target" },
       { header: "Commission %", accessor: "commission_percentage" },
       { header: "Status", accessor: "status" }
     ];
@@ -115,9 +128,11 @@ function Employees() {
     const columns = [
       { header: "Name", accessor: (row) => `${row.first_name || ""} ${row.last_name || ""}`.trim() },
       { header: "Role", accessor: "role" },
+      { header: "Level", accessor: "level" },
       { header: "Phone", accessor: "phone" },
       { header: "Specialization", accessor: "specialization" },
       { header: "Salary", accessor: "salary" },
+      { header: "Target", accessor: "target" },
       { header: "Commission %", accessor: (row) => `${row.commission_percentage || 0}%` },
       { header: "Status", accessor: "status" }
     ];
@@ -148,9 +163,13 @@ function Employees() {
       first_name: "",
       last_name: "",
       phone: "",
+      username: "",
+      password: "",
       specialization: "",
       role: "",
       salary: "",
+      target: "",
+      level: "L1",
       commission_percentage: "",
       joining_date: new Date().toISOString().split("T")[0],
       status: "active",
@@ -164,9 +183,13 @@ function Employees() {
       first_name: emp.first_name || "",
       last_name: emp.last_name || "",
       phone: emp.phone || "",
+      username: emp.username || emp.phone || "",
+      password: "",
       specialization: emp.specialization || "",
       role: emp.role || "",
       salary: emp.salary || "",
+      target: emp.target || "",
+      level: emp.level || "L1",
       commission_percentage: emp.commission_percentage || "",
       joining_date: emp.joining_date || "",
       status: emp.status || "active",
@@ -188,6 +211,8 @@ function Employees() {
     const payload = {
       ...formData,
       salary: formData.salary !== "" && formData.salary !== null ? parseFloat(formData.salary) : 0,
+      target: formData.target !== "" && formData.target !== null ? parseFloat(formData.target) : 0,
+      level: formData.level || "L1",
       commission_percentage: formData.commission_percentage !== "" && formData.commission_percentage !== null ? parseFloat(formData.commission_percentage) : 0,
     };
 
@@ -204,6 +229,8 @@ function Employees() {
           specialization: "",
           role: "",
           salary: "",
+          target: "",
+          level: "L1",
           commission_percentage: "",
           joining_date: new Date().toISOString().split("T")[0],
           status: "active",
@@ -237,6 +264,16 @@ function Employees() {
           <p className="text-xs text-text-secondary">Configure commissions, salaries, specializations, and access status.</p>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={() => {
+              setSelectedPayrollEmpId(null);
+              setShowPayrollModal(true);
+            }}
+            className="bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2"
+          >
+            <DollarSign className="w-4 h-4 text-indigo-600" />
+            Advance / Deduction
+          </button>
           <button
             onClick={() => setShowBulkUpload(true)}
             className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2"
@@ -435,6 +472,29 @@ function Employees() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Login Username / Email</label>
+                  <input
+                    type="text"
+                    placeholder="Enter login username or email"
+                    value={formData.username}
+                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Login Password</label>
+                  <input
+                    type="password"
+                    placeholder={editId ? "Leave blank to keep current" : "Set employee password"}
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-text-secondary mb-1">Specialization</label>
                 <input
@@ -446,17 +506,44 @@ function Employees() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">Salary (Monthly)</label>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Salary (₹)</label>
                   <input
                     type="number"
                     step="0.01"
+                    placeholder="20000"
                     value={formData.salary}
                     onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
                     className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
                   />
                 </div>
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Target (₹)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="100000"
+                    value={formData.target}
+                    onChange={(e) => setFormData({ ...formData, target: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Level</label>
+                  <select
+                    value={formData.level}
+                    onChange={(e) => setFormData({ ...formData, level: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                  >
+                    <option value="L1">L1</option>
+                    <option value="L2">L2</option>
+                    <option value="L3">L3</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Status</label>
                   <select
@@ -468,16 +555,15 @@ function Employees() {
                     <option value="inactive">Inactive</option>
                   </select>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1">Joining Date</label>
-                <input
-                  type="date"
-                  value={formData.joining_date}
-                  onChange={(e) => setFormData({ ...formData, joining_date: e.target.value })}
-                  className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
-                />
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Joining Date</label>
+                  <input
+                    type="date"
+                    value={formData.joining_date}
+                    onChange={(e) => setFormData({ ...formData, joining_date: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                  />
+                </div>
               </div>
 
               <div className="pt-4 border-t border-border-soft flex justify-end space-x-3">
@@ -507,6 +593,12 @@ function Employees() {
           onSuccess={fetchEmployees}
         />
       )}
+
+      <AddPayrollAdjustmentModal
+        isOpen={showPayrollModal}
+        defaultEmployeeId={selectedPayrollEmpId}
+        onClose={() => setShowPayrollModal(false)}
+      />
     </div>
   );
 }

@@ -78,6 +78,15 @@ def run_auto_migrations():
         except Exception:
             db.session.rollback()
 
+        # 4. Add geofencing & main branch columns to branches table if missing
+        for col_name, col_def in [("is_main_branch", "TINYINT(1) NOT NULL DEFAULT 0"), ("latitude", "DECIMAL(10, 8) NULL"), ("longitude", "DECIMAL(11, 8) NULL"), ("geofence_radius_meters", "INT NOT NULL DEFAULT 100")]:
+            try:
+                db.session.execute(text(f"ALTER TABLE `branches` ADD COLUMN `{col_name}` {col_def};"))
+                db.session.commit()
+                logger.info(f"AUTO-MIGRATION: Added '{col_name}' column to table 'branches'.")
+            except Exception:
+                db.session.rollback()
+
         logger.info("AUTO-MIGRATION: Database schema check completed successfully.")
     except Exception as e:
         logger.error(f"AUTO-MIGRATION ERROR: {e}")

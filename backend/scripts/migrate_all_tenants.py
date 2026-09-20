@@ -57,6 +57,37 @@ def migrate_all_tenants():
                         logger.info(f"Successfully added billing_mode to tenant_settings in Tenant {t.id} ({t.name}).")
                     else:
                         logger.info(f"Tenant {t.id} ({t.name}) tenant_settings table already has billing_mode column.")
+
+                    # Check branches table geofencing columns
+                    for col_name, col_def in [("latitude", "DECIMAL(10, 8) NULL"), ("longitude", "DECIMAL(11, 8) NULL"), ("geofence_radius_meters", "INT NOT NULL DEFAULT 100")]:
+                        res_branch_col = conn.execute(text(f"SHOW COLUMNS FROM branches LIKE '{col_name}'"))
+                        if not res_branch_col.fetchone():
+                            logger.info(f"Adding {col_name} to branches table in Tenant {t.id} ({t.name})...")
+                            conn.execute(text(f"ALTER TABLE branches ADD COLUMN `{col_name}` {col_def}"))
+                            conn.commit()
+
+                    # Create attendances table if missing
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS attendances (
+                            id INT AUTO_INCREMENT PRIMARY KEY,
+                            tenant_id INT NOT NULL,
+                            employee_id INT NOT NULL,
+                            branch_id INT NOT NULL,
+                            timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            checkin_method VARCHAR(20) NOT NULL DEFAULT 'QR',
+                            location_flagged BOOLEAN NOT NULL DEFAULT 0,
+                            location_unavailable BOOLEAN NOT NULL DEFAULT 0,
+                            latitude DECIMAL(10, 8) NULL,
+                            longitude DECIMAL(11, 8) NULL,
+                            distance_meters DECIMAL(8, 2) NULL,
+                            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            INDEX idx_att_tenant (tenant_id),
+                            INDEX idx_att_emp (employee_id),
+                            INDEX idx_att_branch (branch_id)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                    """))
+                    conn.commit()
+                    logger.info(f"Successfully verified attendances table in Tenant {t.id} ({t.name}).")
                 success_count += 1
             except Exception as e:
                 logger.error(f"Failed to migrate Tenant {t.id} ({t.name}): {e}")

@@ -1,0 +1,435 @@
+import io
+import math
+from datetime import datetime, date
+from flask import Blueprint, request, jsonify, send_file, g
+from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+import qrcode
+
+from app.database import db
+from app.models.branch import Branch
+from app.models.employee import Employee
+from app.models.attendance import Attendance
+from app.models.user import User
+
+from app.utils.auth import require_role
+
+attendance_bp = Blueprint("attendance", __name__, url_prefix="/api/v1/attendance")
+
+def haversine(lat1, lon1, lat2, lon2):
+    """Calculate the great circle distance in meters between two points on the earth."""
+    if lat1 is None or lon1 is None or lat2 is None or lon2 is None:
+        return None
+    try:
+        R = 6371000  # Radius of Earth in meters
+        dlat = math.radians(float(lat2) - float(lat1))
+        dlon = math.radians(float(lon2) - float(lon1))
+        a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(float(lat1))) * math.cos(math.radians(float(lat2))) * math.sin(dlon / 2) ** 2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        return R * c
+    except Exception:
+        return None
+
+@attendance_bp.route("/qr/image", methods=["GET"])
+@require_role(["SuperAdmin", "ParlourAdmin", "BranchAdmin", "Employee", "Receptionist"])
+def get_branch_qr_image():
+    """Generate and return QR code PNG image for a branch check-in."""
+    claims = get_jwt()
+    tenant_id = claims.get("parlour_id") or claims.get("tenant_id")
+    
+    arg_b = request.args.get("branch_id")
+    if arg_b is not None and str(arg_b).strip() != "":
+        try:
+            branch_id = int(arg_b)
+        except ValueError:
+            branch_id = None
+    else:
+        branch_id = getattr(g, "branch_id", None) or claims.get("branch_id")
+
+    if not branch_id:
+        main_branch = Branch.query.filter_by(is_main_branch=True, is_deleted=False).first() or Branch.query.filter_by(is_deleted=False).first()
+        if main_branch:
+            branch_id = main_branch.id
+
+    if not branch_id:
+        return jsonify({"message": "Branch ID is required"}), 400
+
+    branch = Branch.query.filter_by(id=branch_id, is_deleted=False).first()
+    if not branch:
+        return jsonify({"message": "Branch not found"}), 404
+
+    # Build check-in URL
+    origin = request.headers.get("Origin") or request.host_url.rstrip("/")
+    checkin_url = f"{origin}/attendance/checkin?branch_id={branch.id}&tenant_id={tenant_id}"
+
+    # Generate QR Code image
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(checkin_url)
+    qr.make(fit=True)
+
+    img = qr.make_image(fill_color="#FF4D6D", back_color="white")
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    buf.seek(0)
+
+    return send_file(buf, mimetype="image/png", download_name=f"branch_{branch.id}_attendance_qr.png")
+
+
+@attendance_bp.route("/checkin", methods=["POST"])
+@jwt_required()
+def employee_checkin():
+    """Record employee QR check-in with strict geofence radius validation."""
+    claims = get_jwt()
+    identity = get_jwt_identity()
+    user_id = int(identity) if identity else None
+    tenant_id = claims.get("parlour_id") or claims.get("tenant_id")
+
+    data = request.get_json() or {}
+    scanned_branch_id = data.get("branch_id")
+    lat = data.get("latitude")
+    lng = data.get("longitude")
+
+    if not scanned_branch_id:
+        return jsonify({"status": "error", "message": "Branch ID is required from QR scan"}), 400
+
+    branch = Branch.query.filter_by(id=scanned_branch_id).first()
+    if not branch:
+        return jsonify({"status": "error", "message": "Invalid or inactive parlour branch QR code"}), 404
+
+    # Find corresponding Employee record for user
+    user = User.query.get(user_id) if user_id else None
+    employee = None
+    if user and user.email:
+        employee = Employee.query.filter(
+            (Employee.phone == user.email) | (Employee.first_name + " " + (Employee.last_name or "") == user.email)
+        ).first()
+
+    if not employee:
+        employee = Employee.query.first()
+
+    if not employee:
+        return jsonify({"status": "error", "message": "No active Employee profile linked to this user account"}), 400
+
+    # Check if already checked in today at this branch
+    today_start = datetime.combine(date.today(), datetime.min.time())
+    today_end = datetime.combine(date.today(), datetime.max.time())
+
+    existing = Attendance.query.filter_by(
+        employee_id=employee.id,
+        branch_id=branch.id
+    ).filter(Attendance.timestamp >= today_start, Attendance.timestamp <= today_end).first()
+
+    if existing:
+        return jsonify({
+            "status": "error",
+            "message": f"You have already checked in at {branch.name} today at {existing.timestamp.strftime('%I:%M %p')}."
+        }), 400
+
+    # Strict Geofence Distance & Location Validation
+    distance_meters = None
+
+    if branch.latitude is not None and branch.longitude is not None:
+        if lat is None or lng is None:
+            return jsonify({
+                "status": "error",
+                "message": "❌ Check-in Failed: We couldn't detect your location. Please enable location access on your device and try again."
+            }), 400
+
+        distance_meters = haversine(lat, lng, branch.latitude, branch.longitude)
+        radius = branch.geofence_radius_meters or 100
+
+        if distance_meters is None or distance_meters > radius:
+            dist_val = int(distance_meters) if distance_meters is not None else 0
+            return jsonify({
+                "status": "error",
+                "message": f"❌ Check-in Failed: You are {dist_val} meters away from {branch.name}. You must be within {radius}m of the parlour to check in. Please move closer and try again."
+            }), 400
+
+    # Create Attendance record only when strict geofence passes
+    attendance = Attendance(
+        tenant_id=tenant_id or 1,
+        employee_id=employee.id,
+        branch_id=branch.id,
+        timestamp=datetime.utcnow(),
+        checkin_method="QR",
+        location_flagged=False,
+        location_unavailable=False,
+        latitude=lat,
+        longitude=lng,
+        distance_meters=round(distance_meters, 2) if distance_meters is not None else None
+    )
+
+    db.session.add(attendance)
+    db.session.commit()
+
+    return jsonify({
+        "status": "success",
+        "message": f"✅ Checked in successfully at {branch.name} at {attendance.timestamp.strftime('%I:%M %p')}.",
+        "data": {
+            "id": attendance.id,
+            "employee_name": f"{employee.first_name} {employee.last_name or ''}".strip(),
+            "branch_name": branch.name,
+            "timestamp": attendance.timestamp.strftime("%Y-%m-%d %I:%M %p"),
+            "distance_meters": attendance.distance_meters
+        }
+    }), 201
+
+
+@attendance_bp.route("", methods=["GET"])
+@jwt_required()
+def get_attendance_logs():
+    """Retrieve tenant & branch-scoped attendance logs for admin reporting."""
+    claims = get_jwt()
+    role = claims.get("role")
+    branch_id = request.args.get("branch_id", type=int)
+    start_date = request.args.get("start_date")
+    end_date = request.args.get("end_date")
+
+    query = Attendance.query
+
+    # Branch RBAC scoping
+    if role == "BranchAdmin" and claims.get("branch_id"):
+        query = query.filter_by(branch_id=claims.get("branch_id"))
+    elif branch_id:
+        query = query.filter_by(branch_id=branch_id)
+
+    if start_date:
+        try:
+            s_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            query = query.filter(Attendance.timestamp >= s_dt)
+        except ValueError:
+            pass
+
+    if end_date:
+        try:
+            e_dt = datetime.strptime(end_date + " 23:59:59", "%Y-%m-%d %H:%M:%S")
+            query = query.filter(Attendance.timestamp <= e_dt)
+        except ValueError:
+            pass
+
+    records = query.order_by(Attendance.timestamp.desc()).all()
+
+    result = []
+    for att in records:
+        emp = Employee.query.get(att.employee_id)
+        br = Branch.query.get(att.branch_id)
+        home_br = Branch.query.get(emp.branch_id) if (emp and emp.branch_id) else None
+
+        result.append({
+            "id": att.id,
+            "employee_id": att.employee_id,
+            "employee_name": f"{emp.first_name} {emp.last_name or ''}".strip() if emp else "Unknown Staff",
+            "employee_phone": emp.phone if emp else "",
+            "home_branch_name": home_br.name if home_br else (br.name if br else "Main Parlour"),
+            "work_branch_id": att.branch_id,
+            "work_branch_name": br.name if br else "Main Parlour",
+            "timestamp": att.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+            "checkin_time": att.timestamp.strftime("%I:%M %p"),
+            "checkout_time": att.check_out_time.strftime("%I:%M %p") if att.check_out_time else "-",
+            "date": att.timestamp.strftime("%Y-%m-%d"),
+            "time": att.timestamp.strftime("%I:%M %p"),
+            "checkin_method": att.checkin_method,
+            "location_flagged": att.location_flagged,
+            "location_unavailable": att.location_unavailable,
+            "latitude": float(att.latitude) if att.latitude else None,
+            "longitude": float(att.longitude) if att.longitude else None,
+            "distance_meters": float(att.distance_meters) if att.distance_meters else None,
+            "status": getattr(att, "status", "P") or "P"
+        })
+
+    return jsonify({"status": "success", "data": result})
+
+
+def parse_time_str(time_str):
+    """Convert HH:MM string into minutes from midnight."""
+    try:
+        parts = time_str.strip().split(":")
+        return int(parts[0]) * 60 + int(parts[1])
+    except Exception:
+        return None
+
+
+@attendance_bp.route("/checkout", methods=["POST"])
+@jwt_required()
+def employee_checkout():
+    """Record employee QR check-out with strict geofence radius validation and auto P/HP calculation."""
+    claims = get_jwt()
+    identity = get_jwt_identity()
+    user_id = int(identity) if identity else None
+    tenant_id = claims.get("parlour_id") or claims.get("tenant_id")
+
+    data = request.get_json() or {}
+    scanned_branch_id = data.get("branch_id")
+    lat = data.get("latitude")
+    lng = data.get("longitude")
+
+    if not scanned_branch_id:
+        return jsonify({"status": "error", "message": "Branch ID is required from QR scan"}), 400
+
+    branch = Branch.query.filter_by(id=scanned_branch_id).first()
+    if not branch:
+        return jsonify({"status": "error", "message": "Invalid or inactive parlour branch QR code"}), 404
+
+    user = User.query.get(user_id) if user_id else None
+    employee = None
+    if user and user.email:
+        employee = Employee.query.filter(
+            (Employee.phone == user.email) | (Employee.first_name + " " + (Employee.last_name or "") == user.email)
+        ).first()
+
+    if not employee:
+        employee = Employee.query.first()
+
+    if not employee:
+        return jsonify({"status": "error", "message": "No active Employee profile linked to this user account"}), 400
+
+    today_start = datetime.combine(date.today(), datetime.min.time())
+    today_end = datetime.combine(date.today(), datetime.max.time())
+
+    attendance = Attendance.query.filter_by(
+        employee_id=employee.id,
+        branch_id=branch.id
+    ).filter(Attendance.timestamp >= today_start, Attendance.timestamp <= today_end).first()
+
+    if not attendance:
+        return jsonify({
+            "status": "error",
+            "message": "❌ Check-out Failed: No check-in record found for today. Please check in first."
+        }), 400
+
+    if attendance.check_out_time:
+        return jsonify({
+            "status": "error",
+            "message": f"You have already checked out today at {attendance.check_out_time.strftime('%I:%M %p')}."
+        }), 400
+
+    # Strict Geofence Validation
+    distance_meters = None
+    if branch.latitude is not None and branch.longitude is not None:
+        if lat is None or lng is None:
+            return jsonify({
+                "status": "error",
+                "message": "❌ Check-out Failed: Location permissions disabled. Enable location to check out."
+            }), 400
+
+        distance_meters = haversine(lat, lng, branch.latitude, branch.longitude)
+        radius = branch.geofence_radius_meters or 100
+
+        if distance_meters is None or distance_meters > radius:
+            dist_val = int(distance_meters) if distance_meters is not None else 0
+            return jsonify({
+                "status": "error",
+                "message": f"❌ Check-out Failed: You are {dist_val}m away from {branch.name}. Must be within {radius}m to check out."
+            }), 400
+
+    # Set check_out_time
+    now = datetime.utcnow()
+    attendance.check_out_time = now
+
+    # Auto-calculate P vs HP status based on shift duration
+    op_mins = parse_time_str(branch.opening_time or "09:00") or (9 * 60)
+    cl_mins = parse_time_str(branch.closing_time or "21:00") or (21 * 60)
+    expected_duration_mins = max(cl_mins - op_mins, 60)  # at least 1 hour
+
+    worked_seconds = (now - attendance.timestamp).total_seconds()
+    worked_mins = worked_seconds / 60.0
+
+    if worked_mins >= (0.5 * expected_duration_mins):
+        attendance.status = "P"
+    else:
+        attendance.status = "HP"
+
+    db.session.commit()
+
+    status_label = "Full Day (Present)" if attendance.status == "P" else "Half Day (HP)"
+
+    return jsonify({
+        "status": "success",
+        "message": f"✅ Checked out successfully at {now.strftime('%I:%M %p')}. Attendance marked as {status_label}.",
+        "data": {
+            "id": attendance.id,
+            "check_out_time": now.strftime("%Y-%m-%d %I:%M %p"),
+            "status": attendance.status
+        }
+    })
+
+
+@attendance_bp.route("/<int:attendance_id>/status", methods=["PUT"])
+@jwt_required()
+def override_attendance_status(attendance_id):
+    """Admin endpoint to manually override attendance status (P / HP / OFF)."""
+    claims = get_jwt()
+    role = claims.get("role")
+    if role not in ["ParlourAdmin", "BranchAdmin", "SuperAdmin"]:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 403
+
+    data = request.get_json() or {}
+    new_status = data.get("status", "").upper()
+    if new_status not in ["P", "HP", "OFF"]:
+        return jsonify({"status": "error", "message": "Status must be P, HP, or OFF"}), 400
+
+    attendance = Attendance.query.get(attendance_id)
+    if not attendance:
+        return jsonify({"status": "error", "message": "Attendance record not found"}), 404
+
+    attendance.status = new_status
+    db.session.commit()
+
+    return jsonify({"status": "success", "message": f"Attendance status updated to {new_status}"})
+
+
+@attendance_bp.route("/mark-off", methods=["POST"])
+@jwt_required()
+def mark_employee_off():
+    """Admin endpoint to mark pre-scheduled leave (OFF) for an employee on a specific date."""
+    claims = get_jwt()
+    role = claims.get("role")
+    if role not in ["ParlourAdmin", "BranchAdmin", "SuperAdmin"]:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 403
+
+    tenant_id = claims.get("parlour_id") or claims.get("tenant_id")
+    data = request.get_json() or {}
+    employee_id = data.get("employee_id")
+    date_str = data.get("date")
+
+    if not employee_id or not date_str:
+        return jsonify({"status": "error", "message": "employee_id and date (YYYY-MM-DD) are required"}), 400
+
+    try:
+        target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return jsonify({"status": "error", "message": "Invalid date format. Use YYYY-MM-DD"}), 400
+
+    employee = Employee.query.get(employee_id)
+    if not employee:
+        return jsonify({"status": "error", "message": "Employee not found"}), 404
+
+    branch_id = employee.branch_id or getattr(g, "branch_id", 1)
+
+    start_dt = datetime.combine(target_date, datetime.min.time())
+    end_dt = datetime.combine(target_date, datetime.max.time())
+
+    existing = Attendance.query.filter_by(
+        employee_id=employee_id
+    ).filter(Attendance.timestamp >= start_dt, Attendance.timestamp <= end_dt).first()
+
+    if existing:
+        existing.status = "OFF"
+    else:
+        existing = Attendance(
+            tenant_id=tenant_id or 1,
+            employee_id=employee_id,
+            branch_id=branch_id or 1,
+            timestamp=start_dt,
+            checkin_method="Manual",
+            status="OFF"
+        )
+        db.session.add(existing)
+
+    db.session.commit()
+    return jsonify({"status": "success", "message": f"Marked {employee.first_name} as OFF for {date_str}"})
+

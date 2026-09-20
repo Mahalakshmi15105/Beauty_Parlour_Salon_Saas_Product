@@ -40,6 +40,7 @@ const getMenuIcon = (id) => {
     case "customers":
       return <Users className="w-4 h-4 shrink-0" />;
     case "employees":
+    case "attendance":
       return <UserCheck className="w-4 h-4 shrink-0" />;
     case "services":
     case "products":
@@ -208,11 +209,12 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isMobileOpen]);
 
-  const menuItems = [
+  const allMenuItems = [
     { id: "dashboard", labelKey: "dashboard", defaultLabel: "Dashboard" },
     { id: "billing", labelKey: "billing", defaultLabel: "Billing" },
     { id: "customers", labelKey: "customers", defaultLabel: "Customers" },
     { id: "employees", labelKey: "employees", defaultLabel: "Employees" },
+    { id: "attendance", labelKey: "attendance", defaultLabel: "Attendance" },
     { id: "catalog", labelKey: "services_products", defaultLabel: "Services & Products" },
     { id: "memberships", labelKey: "membership_management", defaultLabel: "Membership Management" },
     { id: "appointments", labelKey: "appointments", defaultLabel: "Appointments" },
@@ -221,6 +223,16 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
     { id: "reports", labelKey: "reports", defaultLabel: "Reports" },
     { id: "settings", labelKey: "settings", defaultLabel: "Settings" },
   ];
+
+  const menuItems = allMenuItems.filter((item) => {
+    if (user?.role === "Employee") {
+      return ["attendance", "appointments"].includes(item.id);
+    }
+    if (user?.role === "Receptionist") {
+      return ["dashboard", "billing", "customers", "appointments", "attendance"].includes(item.id);
+    }
+    return true;
+  });
 
   return (
     <div className="flex h-screen bg-background overflow-hidden font-sans">

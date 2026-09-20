@@ -140,13 +140,13 @@ function LandingPage({ isLoggedIn, onNavigateLogin, onNavigateRegister, onNaviga
             <>
               <button
                 onClick={onNavigateRegister}
-                className="w-full sm:w-auto bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white px-9 py-4 rounded-full text-sm font-extrabold shadow-lg shadow-pink-500/30 transition transform hover:-translate-y-1 hover:shadow-pink-500/50 duration-200"
+                className="w-full sm:w-auto glowe-pink-gradient text-white px-9 py-4 rounded-full text-sm font-extrabold transition transform hover:-translate-y-1 duration-200"
               >
                 Start 14-Day Free Trial
               </button>
               <button
                 onClick={onNavigateLogin}
-                className="w-full sm:w-auto bg-white border-2 border-pink-400 text-pink-600 hover:bg-pink-50 px-9 py-4 rounded-full text-sm font-bold shadow-xs transition transform hover:-translate-y-0.5 duration-200"
+                className="w-full sm:w-auto glowe-login-btn px-9 py-4 rounded-full text-sm font-bold transition transform hover:-translate-y-0.5 duration-200"
               >
                 Login to Admin Portal
               </button>

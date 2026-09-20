@@ -117,22 +117,24 @@ def login():
 
     user = User.query.filter_by(email=email, is_deleted=False).first()
     if not user:
-        current_app.logger.info(f"[Login] User '{email}' not found in tenant DB. Auto-provisioning ParlourAdmin user...")
-        try:
-            user = User(
-                tenant_id=tenant.id,
-                email=email,
-                role="ParlourAdmin",
-                status="active"
-            )
-            user.set_password(password)
-            db.session.add(user)
-            db.session.commit()
-            current_app.logger.info(f"[Login] Successfully auto-provisioned '{email}' in tenant DB '{tenant_db_uri}'")
-        except Exception as seed_err:
-            db.session.rollback()
-            current_app.logger.warning(f"[Login] Notice auto-provisioning user in tenant DB: {seed_err}")
-            user = User.query.filter_by(email=email, is_deleted=False).first()
+        from app.models.employee import Employee
+        emp = Employee.query.filter((Employee.phone == email) | (Employee.first_name.ilike(f"%{email}%"))).first()
+        if emp:
+            current_app.logger.info(f"[Login] Employee profile found for '{email}'. Provisioning Employee user...")
+            try:
+                user = User(
+                    tenant_id=tenant.id,
+                    branch_id=emp.branch_id,
+                    email=email,
+                    role="Employee",
+                    status="active"
+                )
+                user.set_password(password)
+                db.session.add(user)
+                db.session.commit()
+            except Exception as seed_err:
+                db.session.rollback()
+                user = User.query.filter_by(email=email, is_deleted=False).first()
 
     if not user:
         current_app.logger.warning(f"[Login] User '{email}' not found in tenant DB '{tenant_db_uri}'")
@@ -331,13 +333,26 @@ def register():
         db.session.commit()
         new_tenant_id = tenant.id
 
-        # 6. Seed User & Settings into new Tenant DB
+        # 6. Seed Main Branch, User & Settings into new Tenant DB
         db.session.remove()
         g.use_master_db = False
         g.tenant_db_uri = tenant_db_uri
 
+        from app.models.branch import Branch
+        main_branch = Branch(
+            tenant_id=new_tenant_id,
+            name=parlour_name,
+            phone=phone,
+            email=email,
+            is_main_branch=True,
+            status="active"
+        )
+        db.session.add(main_branch)
+        db.session.flush()
+
         user = User(
             tenant_id=new_tenant_id,
+            branch_id=main_branch.id,
             email=email,
             role="ParlourAdmin",
             status="active"
@@ -365,7 +380,7 @@ def register():
         additional_claims = {
             "parlour_id": tenant.id,
             "tenant_db_uri": tenant_db_uri,
-            "branch_id": None,
+            "branch_id": main_branch.id,
             "role": user.role
         }
         access_token = create_access_token(identity=str(user.id), additional_claims=additional_claims, expires_delta=timedelta(days=30))
@@ -375,14 +390,8 @@ def register():
             "token": access_token,
             "refresh_token": refresh_token,
             "expires_in": 2592000,
-            "user": {
-                "id": user.id,
-                "email": user.email,
-                "role": user.role,
-                "parlour_id": tenant.id,
-                "branch_id": None
-            }
-        }, 201)
+            "user": build_user_payload(user, tenant_name=parlour_name)
+        }, status_code=201)
 
     except Exception as e:
         db.session.rollback()

@@ -28,6 +28,7 @@ __all__ = [
     "Reminder",
     "CustomerFeedback",
     "Employee",
+    "Attendance",
     "MembershipPlan",
     "CustomerMembership",
     "MembershipBenefit",

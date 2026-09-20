@@ -22,13 +22,20 @@ function Register({ onRegisterSuccess, onNavigateLogin, onNavigateHome }) {
     API.post("/auth/register", formData)
       .then((res) => {
         setLoading(false);
-        const { token, user } = res.data;
-        localStorage.setItem("token", token);
-        onRegisterSuccess(token, user);
+        const payload = res?.data || res;
+        const token = payload?.token || res?.token;
+        const user = payload?.user || res?.user;
+        if (token) {
+          localStorage.setItem("token", token);
+          if (user) localStorage.setItem("user", JSON.stringify(user));
+          onRegisterSuccess(token, user);
+        } else {
+          setError(payload?.message || "Registration succeeded, but response was invalid.");
+        }
       })
       .catch((err) => {
         setLoading(false);
-        setError(err.message || "Registration failed. Please try again.");
+        setError(err.message || err.error || "Registration failed. Please try again.");
       });
   };
 

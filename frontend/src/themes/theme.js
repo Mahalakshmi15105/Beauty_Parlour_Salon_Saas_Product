@@ -173,3 +173,47 @@ export function applyAccentColor(accentColor) {
     }
   });
 }
+
+export function applyDefaultGloweTheme() {
+  const root = document.documentElement;
+  const defaultTheme = THEMES['light'];
+  const defaultPink = '#FF758F';
+
+  root.style.setProperty('--color-primary', defaultPink);
+  root.style.setProperty('--color-primary-hover', '#FF4D6D');
+  root.style.setProperty('--color-accent', defaultPink);
+  root.style.setProperty('--color-primary-light', '#FFF0F3');
+  root.style.setProperty('--color-primary-border-soft', 'rgba(255, 117, 143, 0.2)');
+  root.style.setProperty('--color-border-soft', 'rgba(255, 117, 143, 0.15)');
+
+  const colorMapping = {
+    background: 'background',
+    surface: 'surface',
+    sidebar: 'sidebar',
+    navbar: 'navbar',
+    card: 'card',
+    border: 'border',
+    inputBg: 'input-bg',
+    inputBorder: 'input-border',
+    hoverBg: 'hover-bg',
+    accent: 'accent',
+    primaryLight: 'primary-light',
+    primaryBorderSoft: 'primary-border-soft',
+    textPrimary: 'text-primary',
+    textSecondary: 'text-secondary',
+    borderSoft: 'border-soft',
+    goldAccent: 'gold-accent',
+    goldLight: 'gold-light',
+    success: 'success',
+    warning: 'warning',
+    danger: 'danger',
+  };
+
+  Object.entries(defaultTheme.colors).forEach(([key, value]) => {
+    const cssVarName = colorMapping[key] || key.replace(/([A-Z])/g, '-$1').toLowerCase();
+    const cssVar = `--color-${cssVarName}`;
+    if (!['primary', 'primaryHover', 'accent', 'primaryLight', 'primaryBorderSoft', 'borderSoft'].includes(key)) {
+      root.style.setProperty(cssVar, value);
+    }
+  });
+}

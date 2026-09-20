@@ -252,6 +252,17 @@ def create_tenant():
         )
         db.session.add(setting)
 
+        # Seed primary default Branch for tenant
+        main_branch = Branch(
+            tenant_id=tenant_id,
+            name=f"{tenant_name} (Main Branch)",
+            is_main_branch=True,
+            opening_time="09:00",
+            closing_time="20:00",
+            status="active"
+        )
+        db.session.add(main_branch)
+
         log = AuditLog(
             tenant_id=tenant_id,
             user_id=user.id,

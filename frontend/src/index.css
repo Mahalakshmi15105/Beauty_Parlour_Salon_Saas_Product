@@ -53,23 +53,25 @@
 }
 
 .glowe-pink-gradient {
-  background-color: var(--color-primary) !important;
+  background: linear-gradient(135deg, #FF758F 0%, #FF4D6D 100%) !important;
   color: #FFFFFF !important;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15) !important;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
+  box-shadow: 0 8px 20px rgba(255, 77, 148, 0.4) !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease !important;
+  border: none !important;
 }
 
 .glowe-pink-gradient:hover {
+  background: linear-gradient(135deg, #FF85A1 0%, #FF3358 100%) !important;
   transform: translateY(-1px) !important;
-  filter: brightness(0.92) !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
+  box-shadow: 0 10px 25px rgba(255, 77, 148, 0.55) !important;
+  filter: brightness(1.05) !important;
 }
 
 .glowe-pill-active {
-  background-color: var(--color-primary) !important;
+  background: linear-gradient(135deg, #FF758F 0%, #FF4D6D 100%) !important;
   color: #FFFFFF !important;
   border-radius: 9999px !important;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15) !important;
+  box-shadow: 0 8px 20px rgba(255, 77, 148, 0.4) !important;
 }
 
 .glowe-glow-shadow {

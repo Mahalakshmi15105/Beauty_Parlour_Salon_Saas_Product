@@ -66,6 +66,15 @@ def get_settings():
     secondary_color = (branch.secondary_color if branch and branch.secondary_color else _get("secondary_color", "#F472B6")) or "#F472B6"
     accent_color = (branch.accent_color if branch and branch.accent_color else _get("accent_color", "#FDF2F8")) or "#FDF2F8"
 
+    # Fetch main branch location details
+    main_branch = Branch.query.filter_by(tenant_id=g.parlour_id, is_main_branch=True, is_deleted=False).first()
+    if not main_branch:
+        main_branch = Branch.query.filter_by(tenant_id=g.parlour_id, is_deleted=False).order_by(Branch.id.asc()).first()
+
+    main_lat = float(main_branch.latitude) if main_branch and main_branch.latitude is not None else None
+    main_lng = float(main_branch.longitude) if main_branch and main_branch.longitude is not None else None
+    main_radius = main_branch.geofence_radius_meters if main_branch and main_branch.geofence_radius_meters else 100
+
     return success_response({
         "business_profile": {
             "name": tenant_name,
@@ -82,6 +91,9 @@ def get_settings():
             "postal_code": _get("postal_code"),
             "website": _get("website"),
             "description": _get("description"),
+            "latitude": main_lat,
+            "longitude": main_lng,
+            "geofence_radius_meters": main_radius,
             "shop_name_typography": {
                 "enabled": bool(_get("shop_name_font_enabled", False)),
                 "font_family": _get("shop_name_font", "Outfit") or "Outfit",
@@ -169,6 +181,28 @@ def update_settings():
     mkt = data.get("marketing_settings", {})
 
     try:
+        # Update Main Branch Geofence Coordinates if provided in Business Profile
+        if g.role == "ParlourAdmin" and ("latitude" in biz or "longitude" in biz or "geofence_radius_meters" in biz):
+            mb = Branch.query.filter_by(tenant_id=g.parlour_id, is_main_branch=True, is_deleted=False).first()
+            if not mb:
+                mb = Branch.query.filter_by(tenant_id=g.parlour_id, is_deleted=False).order_by(Branch.id.asc()).first()
+            if mb:
+                if "latitude" in biz:
+                    try:
+                        mb.latitude = float(biz["latitude"]) if biz["latitude"] not in (None, "", "null") else None
+                    except (TypeError, ValueError):
+                        pass
+                if "longitude" in biz:
+                    try:
+                        mb.longitude = float(biz["longitude"]) if biz["longitude"] not in (None, "", "null") else None
+                    except (TypeError, ValueError):
+                        pass
+                if "geofence_radius_meters" in biz:
+                    try:
+                        mb.geofence_radius_meters = int(biz["geofence_radius_meters"]) if biz["geofence_radius_meters"] not in (None, "", "null") else 100
+                    except (TypeError, ValueError):
+                        pass
+
         # Update Business Profile across tenant setting rows
         for setting in settings_list:
             if "logo_url" in biz and g.role == "ParlourAdmin":
@@ -204,58 +238,61 @@ def update_settings():
                 if "terms_and_conditions" in inv and inv["terms_and_conditions"]:
                     setting.terms_and_conditions = str(inv["terms_and_conditions"]).strip()
 
-        # Update Regional Settings
+        # Update Regional Settings across settings_list
         if reg:
             c_code = reg.get("currency_code") or reg.get("currency")
-            if c_code:
-                setting.currency = str(c_code).strip()
-                if hasattr(setting, "currency_code"):
-                    setting.currency_code = str(c_code).strip()
             c_sym = reg.get("currency_symbol")
-            if c_sym is not None:
-                c_sym_str = str(c_sym).strip()
-                if not c_sym_str or c_sym_str in ["?", "\\u20b9", ""]:
-                    c_sym_str = "₹"
-                setting.currency_symbol = c_sym_str
-            if reg.get("language") and hasattr(setting, "language"):
-                setting.language = str(reg.get("language")).strip()
-            if reg.get("date_format") and hasattr(setting, "date_format"):
-                setting.date_format = str(reg.get("date_format")).strip()
-            if reg.get("timezone") and hasattr(setting, "timezone"):
-                setting.timezone = str(reg.get("timezone")).strip()
+            c_sym_str = str(c_sym).strip() if c_sym is not None else None
+            if c_sym_str is not None and (not c_sym_str or c_sym_str in ["?", "\\u20b9", ""]):
+                c_sym_str = "₹"
 
-        # Update Receipt Settings
+            for s in settings_list:
+                if c_code:
+                    s.currency = str(c_code).strip()
+                    if hasattr(s, "currency_code"):
+                        s.currency_code = str(c_code).strip()
+                if c_sym_str is not None:
+                    s.currency_symbol = c_sym_str
+                if reg.get("language") and hasattr(s, "language"):
+                    s.language = str(reg.get("language")).strip()
+                if reg.get("date_format") and hasattr(s, "date_format"):
+                    s.date_format = str(reg.get("date_format")).strip()
+                if reg.get("timezone") and hasattr(s, "timezone"):
+                    s.timezone = str(reg.get("timezone")).strip()
+
+        # Update Receipt Settings across settings_list
         if rec:
-            if "receipt_template" in rec:
-                setting.receipt_template = rec["receipt_template"]
-            if "paper_size" in rec:
-                setting.paper_size = rec["paper_size"]
-            if "show_logo" in rec:
-                setting.show_logo = bool(rec["show_logo"])
-            if "show_gst" in rec:
-                setting.show_gst = bool(rec["show_gst"])
-            if "show_address" in rec:
-                setting.show_address = bool(rec["show_address"])
-            if "show_phone" in rec:
-                setting.show_phone = bool(rec["show_phone"])
-            if "show_email" in rec:
-                setting.show_email = bool(rec["show_email"])
-            if "show_website" in rec:
-                setting.show_website = bool(rec["show_website"])
-            if "show_qr_code" in rec:
-                setting.show_qr_code = bool(rec["show_qr_code"])
-            if "show_qty" in rec:
-                setting.show_qty = bool(rec["show_qty"])
-            if "show_rate" in rec:
-                setting.show_rate = bool(rec["show_rate"])
-            if "show_mrp" in rec:
-                setting.show_mrp = bool(rec["show_mrp"])
-            if "show_tax" in rec:
-                setting.show_tax = bool(rec["show_tax"])
-            if "auto_print" in rec:
-                setting.auto_print = bool(rec["auto_print"])
-            if "thank_you_message" in rec:
-                setting.thank_you_message = rec["thank_you_message"]
+            for s in settings_list:
+                if "receipt_template" in rec:
+                    s.receipt_template = rec["receipt_template"]
+                if "paper_size" in rec:
+                    s.paper_size = rec["paper_size"]
+                if "show_logo" in rec:
+                    s.show_logo = bool(rec["show_logo"])
+                if "show_gst" in rec:
+                    s.show_gst = bool(rec["show_gst"])
+                if "show_address" in rec:
+                    s.show_address = bool(rec["show_address"])
+                if "show_phone" in rec:
+                    s.show_phone = bool(rec["show_phone"])
+                if "show_email" in rec:
+                    s.show_email = bool(rec["show_email"])
+                if "show_website" in rec:
+                    s.show_website = bool(rec["show_website"])
+                if "show_qr_code" in rec:
+                    s.show_qr_code = bool(rec["show_qr_code"])
+                if "show_qty" in rec:
+                    s.show_qty = bool(rec["show_qty"])
+                if "show_rate" in rec:
+                    s.show_rate = bool(rec["show_rate"])
+                if "show_mrp" in rec:
+                    s.show_mrp = bool(rec["show_mrp"])
+                if "show_tax" in rec:
+                    s.show_tax = bool(rec["show_tax"])
+                if "auto_print" in rec:
+                    s.auto_print = bool(rec["auto_print"])
+                if "thank_you_message" in rec:
+                    s.thank_you_message = rec["thank_you_message"]
 
         # Update Theme Settings
         if thm:
@@ -271,14 +308,15 @@ def update_settings():
                     branch.accent_color = thm["accent_color"].strip()
             else:
                 # ParlourAdmin updates Main Parlour theme settings
-                if thm.get("theme_name"):
-                    setting.theme_name = thm["theme_name"].strip()
-                if thm.get("primary_color"):
-                    setting.primary_color = thm["primary_color"].strip()
-                if thm.get("secondary_color"):
-                    setting.secondary_color = thm["secondary_color"].strip()
-                if thm.get("accent_color"):
-                    setting.accent_color = thm["accent_color"].strip()
+                for s in settings_list:
+                    if thm.get("theme_name"):
+                        s.theme_name = thm["theme_name"].strip()
+                    if thm.get("primary_color"):
+                        s.primary_color = thm["primary_color"].strip()
+                    if thm.get("secondary_color"):
+                        s.secondary_color = thm["secondary_color"].strip()
+                    if thm.get("accent_color"):
+                        s.accent_color = thm["accent_color"].strip()
 
         # Update Billing Settings
         bil = data.get("billing_settings", {})

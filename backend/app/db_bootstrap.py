@@ -129,6 +129,10 @@ def ensure_database_exists(database_uri: str):
                 conn.execute(text("ALTER TABLE whatsapp_campaigns ADD COLUMN IF NOT EXISTS template_params_json TEXT NULL;"))
                 conn.execute(text("ALTER TABLE tenants ADD COLUMN IF NOT EXISTS db_name VARCHAR(100) NULL;"))
                 conn.execute(text("ALTER TABLE tenants ADD COLUMN IF NOT EXISTS db_connection_uri VARCHAR(255) NULL;"))
+                conn.execute(text("ALTER TABLE branches ADD COLUMN IF NOT EXISTS is_main_branch BOOLEAN NOT NULL DEFAULT FALSE;"))
+                conn.execute(text("ALTER TABLE branches ADD COLUMN IF NOT EXISTS latitude DECIMAL(10,8) NULL;"))
+                conn.execute(text("ALTER TABLE branches ADD COLUMN IF NOT EXISTS longitude DECIMAL(11,8) NULL;"))
+                conn.execute(text("ALTER TABLE branches ADD COLUMN IF NOT EXISTS geofence_radius_meters INT NOT NULL DEFAULT 100;"))
                 conn.commit()
             except Exception:
                 try:
@@ -139,6 +143,10 @@ def ensure_database_exists(database_uri: str):
                     conn.execute(text("ALTER TABLE whatsapp_campaigns ADD COLUMN template_params_json TEXT NULL;"))
                     conn.execute(text("ALTER TABLE tenants ADD COLUMN db_name VARCHAR(100) NULL;"))
                     conn.execute(text("ALTER TABLE tenants ADD COLUMN db_connection_uri VARCHAR(255) NULL;"))
+                    conn.execute(text("ALTER TABLE branches ADD COLUMN is_main_branch BOOLEAN NOT NULL DEFAULT FALSE;"))
+                    conn.execute(text("ALTER TABLE branches ADD COLUMN latitude DECIMAL(10,8) NULL;"))
+                    conn.execute(text("ALTER TABLE branches ADD COLUMN longitude DECIMAL(11,8) NULL;"))
+                    conn.execute(text("ALTER TABLE branches ADD COLUMN geofence_radius_meters INT NOT NULL DEFAULT 100;"))
                     conn.commit()
                 except Exception:
                     pass
