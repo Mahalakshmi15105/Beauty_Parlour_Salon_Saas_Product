@@ -65,13 +65,13 @@ function LandingPage({ isLoggedIn, onNavigateLogin, onNavigateRegister, onNaviga
             <>
               <button
                 onClick={onNavigateLogin}
-                className="glowe-login-btn text-xs font-bold px-6 py-2.5 rounded-full"
+                className="glowe-pink-gradient text-xs font-extrabold px-6 py-2.5 rounded-full"
               >
                 Login
               </button>
               <button
                 onClick={onNavigateRegister}
-                className="glowe-pink-gradient hover:brightness-105 text-white px-6 py-2.5 rounded-full text-xs font-extrabold shadow-md transition transform hover:-translate-y-0.5 duration-200"
+                className="glowe-pink-gradient text-xs font-extrabold px-6 py-2.5 rounded-full"
               >
                 Start Free Trial
               </button>

@@ -120,7 +120,7 @@ function Register({ onRegisterSuccess, onNavigateLogin, onNavigateHome }) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full glowe-pink-gradient hover:opacity-95 text-white py-3.5 rounded-full text-xs font-extrabold shadow-md shadow-pink-500/30 transition disabled:opacity-50 mt-2"
+            className="w-full glowe-pink-gradient text-white py-3.5 rounded-full text-xs font-extrabold transition disabled:opacity-50 mt-2"
           >
             {loading ? "Creating Your Salon Account..." : "Create Account & Start Free Trial"}
           </button>

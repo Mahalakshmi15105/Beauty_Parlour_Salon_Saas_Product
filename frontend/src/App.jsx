@@ -301,7 +301,7 @@ function App() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full glowe-pink-gradient text-white py-3.5 rounded-full text-xs font-extrabold shadow-lg transition disabled:opacity-50"
+              className="w-full glowe-pink-gradient text-white py-3.5 rounded-full text-xs font-extrabold transition disabled:opacity-50"
             >
               {loading ? "Signing in..." : "Sign in to Admin Portal"}
             </button>
