@@ -1,7 +1,7 @@
 import io
 import math
 from datetime import datetime, date
-from flask import Blueprint, request, jsonify, send_file, g
+from flask import Blueprint, request, jsonify, send_file, g, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 import qrcode
 
@@ -58,7 +58,7 @@ def get_branch_qr_image():
         return jsonify({"message": "Branch not found"}), 404
 
     # Build check-in URL
-    origin = request.headers.get("Origin") or request.host_url.rstrip("/")
+    origin = current_app.config.get("FRONTEND_URL", "https://salon.smartgonext.com").rstrip("/")
     checkin_url = f"{origin}/attendance/checkin?branch_id={branch.id}&tenant_id={tenant_id}"
 
     # Generate QR Code image

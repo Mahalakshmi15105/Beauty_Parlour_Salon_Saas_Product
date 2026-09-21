@@ -23,6 +23,9 @@ class Config:
     # Environment: development | production
     ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
 
+    # Frontend URL for QR generation & links
+    FRONTEND_URL = os.getenv("FRONTEND_URL", "https://salon.smartgonext.com")
+
     # Server Port
     PORT = int(os.getenv("PORT", 5000))
 
