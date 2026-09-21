@@ -295,18 +295,21 @@ def register():
     # 2. Build tenant database details
     slug = sanitize_slug(parlour_name)
     timestamp = int(datetime.now(timezone.utc).timestamp())
-    db_name = f"tenant_{slug}_{timestamp}"
-    base_uri = current_app.config.get("MYSQL_BASE_URI", "mysql+pymysql://root:root@localhost:3306/")
-    tenant_db_uri = f"{base_uri}{db_name}?charset=utf8mb4"
+    raw_db_name = f"tenant_{slug}_{timestamp}"
+    
+    master_uri = current_app.config.get("MASTER_DATABASE_URI") or current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    from app.db_bootstrap import sanitize_tenant_uri, ensure_database_exists
+    tenant_db_uri = sanitize_tenant_uri(f"mysql+pymysql://localhost:3306/{raw_db_name}?charset=utf8mb4", master_uri)
+
+    m_db = re.search(r"/([^/?]+)(\?.*)?$", tenant_db_uri)
+    db_name = m_db.group(1) if m_db else raw_db_name
 
     try:
         # 3. Create physical MySQL database
-        sys_engine = create_engine(base_uri)
-        with sys_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as sys_conn:
-            sys_conn.execute(text(f"CREATE DATABASE IF NOT EXISTS `{db_name}` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"))
+        ensure_database_exists(tenant_db_uri)
 
         # 4. Build schema tables in target tenant database using tenant_metadata ONLY
-        tenant_engine = create_engine(tenant_db_uri)
+        tenant_engine = db.get_tenant_engine(tenant_db_uri)
         tenant_metadata.create_all(bind=tenant_engine)
 
         # 5. Record Tenant & Lookup in Master DB
