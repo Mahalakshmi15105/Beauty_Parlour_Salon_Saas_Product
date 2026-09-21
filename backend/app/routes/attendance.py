@@ -122,10 +122,11 @@ def get_branch_qr_image():
 
 
 
+@attendance_bp.route("/auto-scan", methods=["POST"])
 @attendance_bp.route("/checkin", methods=["POST"])
 @jwt_required()
-def employee_checkin():
-    """Record employee QR check-in with strict geofence radius validation."""
+def employee_auto_scan():
+    """Automatic QR scan check-in / check-out handler with strict geofence radius validation."""
     claims = get_jwt()
     identity = get_jwt_identity()
     user_id = int(identity) if identity else None
@@ -137,11 +138,14 @@ def employee_checkin():
     lng = data.get("longitude")
 
     if not scanned_branch_id:
-        return jsonify({"status": "error", "message": "Branch ID is required from QR scan"}), 400
+        return jsonify({"status": "error", "message": "Branch ID is required from URL query parameter."}), 400
 
-    branch = Branch.query.filter_by(id=scanned_branch_id).first()
+    branch = Branch.query.filter_by(id=scanned_branch_id, is_deleted=False).first()
     if not branch:
-        return jsonify({"status": "error", "message": "Invalid or inactive parlour branch QR code"}), 404
+        branch = Branch.query.filter_by(id=scanned_branch_id).first()
+
+    if not branch:
+        return jsonify({"status": "error", "message": f"Invalid or inactive branch QR code (Branch ID: {scanned_branch_id})"}), 404
 
     # Find corresponding Employee record for user
     user = User.query.get(user_id) if user_id else None
@@ -157,66 +161,122 @@ def employee_checkin():
     if not employee:
         return jsonify({"status": "error", "message": "No active Employee profile linked to this user account"}), 400
 
-    # Check if already checked in today at this branch
+    # Locate today's attendance record for this employee and branch
     today_start = datetime.combine(date.today(), datetime.min.time())
     today_end = datetime.combine(date.today(), datetime.max.time())
 
     existing = Attendance.query.filter_by(
         employee_id=employee.id,
         branch_id=branch.id
-    ).filter(Attendance.timestamp >= today_start, Attendance.timestamp <= today_end).first()
+    ).filter(Attendance.timestamp >= today_start, Attendance.timestamp <= today_end).order_by(Attendance.timestamp.desc()).first()
 
-    if existing:
-        return jsonify({
-            "status": "error",
-            "message": f"You have already checked in at {branch.name} today at {existing.timestamp.strftime('%I:%M %p')}."
-        }), 400
-
-    # Strict Geofence Distance & Location Validation
+    # Calculate geofence distance
     distance_meters = None
-
     if branch.latitude is not None and branch.longitude is not None:
         if lat is None or lng is None:
             return jsonify({
                 "status": "error",
-                "message": "❌ Check-in Failed: We couldn't detect your location. Please enable location access on your device and try again."
+                "message": "❌ Action Failed: Location access is disabled. Please enable GPS location on your phone."
             }), 400
 
         distance_meters = haversine(lat, lng, branch.latitude, branch.longitude)
-        radius = branch.geofence_radius_meters or 100
 
+    # 1. ALREADY CHECKED IN AND CHECKED OUT TODAY -> SHOW COMPLETED STATUS
+    if existing and existing.check_out_time:
+        cin_time = existing.timestamp.strftime("%I:%M %p")
+        cout_time = existing.check_out_time.strftime("%I:%M %p")
+        return jsonify({
+            "status": "completed",
+            "message": f"You already checked in today at {cin_time} and checked out at {cout_time} for {branch.name}.",
+            "data": {
+                "id": existing.id,
+                "checkin_time": cin_time,
+                "checkout_time": cout_time,
+                "branch_name": branch.name,
+                "status": existing.status
+            }
+        }), 200
+
+    # 2. CHECKED IN, BUT NOT CHECKED OUT YET -> AUTOMATIC CHECK-OUT ATTEMPT
+    if existing and not existing.check_out_time:
+        if branch.latitude is not None and branch.longitude is not None:
+            radius = float(branch.geofence_radius_meters or 100)
+            if distance_meters is None or distance_meters > radius:
+                dist_val = int(round(distance_meters)) if distance_meters is not None else 0
+                return jsonify({
+                    "status": "error",
+                    "message": f"❌ Check-out Failed: You are {dist_val}m away from {branch.name}. You must be within {int(radius)}m to check out."
+                }), 400
+
+        now = datetime.utcnow()
+        existing.check_out_time = now
+
+        # Auto P vs HP status calculation based on shift duration
+        op_mins = parse_time_str(branch.opening_time or "09:00") or (9 * 60)
+        cl_mins = parse_time_str(branch.closing_time or "21:00") or (21 * 60)
+        expected_duration_mins = max(cl_mins - op_mins, 60)
+
+        worked_mins = (now - existing.timestamp).total_seconds() / 60.0
+        if worked_mins >= (0.5 * expected_duration_mins):
+            existing.status = "P"
+        else:
+            existing.status = "HP"
+
+        db.session.commit()
+
+        status_label = "Full Day (Present)" if existing.status == "P" else "Half Day (HP)"
+        cout_time = now.strftime("%I:%M %p")
+        return jsonify({
+            "status": "success",
+            "action": "checkout",
+            "message": f"✅ Checked out successfully at {branch.name} at {cout_time}. Attendance marked as {status_label}.",
+            "data": {
+                "id": existing.id,
+                "checkout_time": cout_time,
+                "branch_name": branch.name,
+                "status": existing.status
+            }
+        }), 200
+
+    # 3. NO ATTENDANCE TODAY YET -> AUTOMATIC CHECK-IN ATTEMPT
+    if branch.latitude is not None and branch.longitude is not None:
+        radius = float(branch.geofence_radius_meters or 100)
         if distance_meters is None or distance_meters > radius:
-            dist_val = int(distance_meters) if distance_meters is not None else 0
+            dist_val = int(round(distance_meters)) if distance_meters is not None else 0
             return jsonify({
                 "status": "error",
-                "message": f"❌ Check-in Failed: You are {dist_val} meters away from {branch.name}. You must be within {radius}m of the parlour to check in. Please move closer and try again."
+                "message": f"❌ Check-in Failed: You are {dist_val}m away from {branch.name}. You must be within {int(radius)}m to check in."
             }), 400
 
-    # Create Attendance record only when strict geofence passes
+    now = datetime.utcnow()
     attendance = Attendance(
         tenant_id=tenant_id or 1,
         employee_id=employee.id,
         branch_id=branch.id,
-        timestamp=datetime.utcnow(),
+        timestamp=now,
         checkin_method="QR",
         location_flagged=False,
         location_unavailable=False,
         latitude=lat,
         longitude=lng,
-        distance_meters=round(distance_meters, 2) if distance_meters is not None else None
+        distance_meters=round(distance_meters, 2) if distance_meters is not None else None,
+        status="P"
     )
 
     db.session.add(attendance)
     db.session.commit()
 
+    cin_time = now.strftime("%I:%M %p")
     return jsonify({
         "status": "success",
-        "message": f"✅ Checked in successfully at {branch.name} at {attendance.timestamp.strftime('%I:%M %p')}.",
+        "action": "checkin",
+        "message": f"✅ Checked in successfully at {branch.name} at {cin_time}.",
         "data": {
             "id": attendance.id,
             "employee_name": f"{employee.first_name} {employee.last_name or ''}".strip(),
             "branch_name": branch.name,
-            "timestamp": attendance.timestamp.strftime("%Y-%m-%d %I:%M %p"),
+            "timestamp": now.strftime("%Y-%m-%d %I:%M %p"),
+            "checkin_time": cin_time,
             "distance_meters": attendance.distance_meters
         }
     }), 201

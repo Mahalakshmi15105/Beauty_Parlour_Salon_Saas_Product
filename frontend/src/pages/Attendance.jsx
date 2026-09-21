@@ -12,11 +12,6 @@ export default function Attendance() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Self check-in state for Employees
-  const [checkingIn, setCheckingIn] = useState(false);
-  const [checkinMsg, setCheckinMsg] = useState(null);
-  const [checkinErr, setCheckinErr] = useState(null);
-
   // Filters
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -24,12 +19,12 @@ export default function Attendance() {
   const [branches, setBranches] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // QR Section State
+  // QR Section State (Admin Only)
   const [selectedQrBranch, setSelectedQrBranch] = useState("");
   const [qrImageUrl, setQrImageUrl] = useState("");
   const [qrLoading, setQrLoading] = useState(false);
 
-  // Fetch branches and auto-load user's branch QR code
+  // Fetch branches and auto-load default branch QR code
   useEffect(() => {
     API.get("/branches")
       .then((res) => {
@@ -78,7 +73,7 @@ export default function Attendance() {
     fetchAttendance();
   }, [startDate, endDate, branchId]);
 
-  // Generate QR image
+  // Generate QR image (Admin only)
   const fetchQrCode = (bId) => {
     if (!bId) return;
     setQrLoading(true);
@@ -104,44 +99,6 @@ export default function Attendance() {
     }
   }, [activeTab, selectedQrBranch, isEmployee]);
 
-  // Self checkin handler for logged in employee
-  const handleEmployeeSelfCheckin = () => {
-    setCheckingIn(true);
-    setCheckinErr(null);
-    setCheckinMsg(null);
-
-    if (!navigator.geolocation) {
-      setCheckinErr("GPS location is not supported by your browser.");
-      setCheckingIn(false);
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const bId = branches.length > 0 ? branches[0].id : 1;
-        API.post("/attendance/checkin", {
-          branch_id: bId,
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-        })
-          .then((res) => {
-            setCheckinMsg(res.data.message || "Successfully checked in!");
-            setCheckingIn(false);
-            fetchAttendance();
-          })
-          .catch((err) => {
-            setCheckinErr(err.response?.data?.message || err.message || "Check-in failed outside radius.");
-            setCheckingIn(false);
-          });
-      },
-      (err) => {
-        setCheckinErr("Location Permission Denied. Please enable GPS location to check in.");
-        setCheckingIn(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  };
-
   // Filtered records
   const filteredRecords = records.filter((r) => {
     if (!searchQuery) return true;
@@ -157,11 +114,10 @@ export default function Attendance() {
   // Export Table Data
   const exportColumns = [
     { header: "Employee Name", accessor: "employee_name" },
-    { header: "Home Branch", accessor: "home_branch_name" },
-    { header: "Work Location", accessor: "work_branch_name" },
+    { header: "Branch", accessor: "work_branch_name" },
     { header: "Date", accessor: "date" },
-    { header: "Time", accessor: "time" },
-    { header: "Check-in Method", accessor: "checkin_method" },
+    { header: "Check-in Time", accessor: "checkin_time" },
+    { header: "Check-out Time", accessor: "checkout_time" },
     { header: "Status", accessor: "status" },
   ];
 
@@ -173,14 +129,14 @@ export default function Attendance() {
           <div>
             <div className="flex items-center space-x-2 text-pink-600 font-extrabold text-xs uppercase tracking-wider mb-1">
               <UserCheck className="w-4 h-4" />
-              <span>Employee QR Attendance System</span>
+              <span>Employee Attendance System</span>
             </div>
             <h1 className="text-2xl font-black text-slate-900 tracking-tight">
               {isEmployee ? "My Attendance Records" : "Attendance Logs & Branch QR Generator"}
             </h1>
             <p className="text-xs text-slate-500 font-medium">
               {isEmployee
-                ? "View your personal check-in logs and record your daily attendance."
+                ? "Read-only history of your past check-ins, check-outs, and attendance status."
                 : "Manage attendance reports and generate location-scoped reception QR codes."}
             </p>
           </div>
@@ -221,37 +177,6 @@ export default function Attendance() {
       {/* 1. ATTENDANCE REPORT VIEW */}
       {activeTab === "report" && (
         <div className="space-y-4">
-          {/* Employee Self Check-In Banner */}
-          {isEmployee && (
-            <div className="bg-gradient-to-r from-pink-500/10 via-rose-500/10 to-pink-500/10 border border-pink-200 p-5 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 shadow-xs">
-              <div className="space-y-1 text-center md:text-left">
-                <h3 className="text-sm font-extrabold text-slate-900">Mark Daily Attendance</h3>
-                <p className="text-xs text-slate-600 font-medium">
-                  Scan reception QR code or click below to check in using your live GPS location.
-                </p>
-                {checkinMsg && <p className="text-xs font-bold text-emerald-600">{checkinMsg}</p>}
-                {checkinErr && <p className="text-xs font-bold text-rose-600">{checkinErr}</p>}
-              </div>
-
-              <button
-                onClick={handleEmployeeSelfCheckin}
-                disabled={checkingIn}
-                className="glowe-pink-gradient text-white px-6 py-3 rounded-full text-xs font-extrabold shadow-md flex items-center space-x-2 transition hover:brightness-105 shrink-0 disabled:opacity-50"
-              >
-                {checkingIn ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Verifying Geofence...</span>
-                  </>
-                ) : (
-                  <>
-                    <UserCheck className="w-4 h-4" />
-                    <span>Check In Now (GPS)</span>
-                  </>
-                )}
-              </button>
-            </div>
-          )}
 
           {/* Filter Toolbar */}
           <div className="bg-white/80 p-4 rounded-2xl border border-pink-100 shadow-xs flex flex-wrap items-center justify-between gap-3">
@@ -296,11 +221,11 @@ export default function Attendance() {
 
               {/* Search Box */}
               <div>
-                <label className="block text-[11px] font-bold text-slate-500 mb-1">Search Staff</label>
+                <label className="block text-[11px] font-bold text-slate-500 mb-1">Search Records</label>
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="Filter employee or branch..."
+                    placeholder="Filter by date or branch..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="bg-background border border-border-soft px-3.5 py-1.5 pl-8 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-primary w-48"
@@ -313,21 +238,21 @@ export default function Attendance() {
             {/* Export Toolbar */}
             <div className="flex items-center space-x-2 pt-4 md:pt-0">
               <button
-                onClick={() => exportToExcel("Parlour Staff Attendance Logs", filteredRecords, exportColumns, "Attendance_Report")}
+                onClick={() => exportToExcel("Attendance Logs", filteredRecords, exportColumns, "Attendance_Report")}
                 className="px-3 py-1.5 rounded-xl border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 text-xs font-bold transition flex items-center space-x-1"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Excel</span>
               </button>
               <button
-                onClick={() => exportToPDF("Parlour Staff Attendance Logs", filteredRecords, exportColumns, "Attendance_Report")}
+                onClick={() => exportToPDF("Attendance Logs", filteredRecords, exportColumns, "Attendance_Report")}
                 className="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100 text-xs font-bold transition flex items-center space-x-1"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>PDF</span>
               </button>
               <button
-                onClick={() => printDataList("Parlour Staff Attendance Logs", filteredRecords, exportColumns)}
+                onClick={() => printDataList("Attendance Logs", filteredRecords, exportColumns)}
                 className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 bg-slate-100 hover:bg-slate-200 text-xs font-bold transition flex items-center space-x-1"
               >
                 <Printer className="w-3.5 h-3.5" />
@@ -336,66 +261,63 @@ export default function Attendance() {
             </div>
           </div>
 
-          {/* Attendance Log Table */}
+          {/* Read-Only Attendance Log Table */}
           <div className="bg-white/80 rounded-2xl border border-pink-100 shadow-xs overflow-hidden">
             {loading ? (
               <div className="p-8 text-center text-xs text-slate-500 font-bold space-y-2">
                 <RefreshCw className="w-6 h-6 text-pink-600 animate-spin mx-auto" />
-                <span>Loading Attendance Records...</span>
+                <span>Loading Attendance History...</span>
               </div>
             ) : filteredRecords.length === 0 ? (
               <div className="p-10 text-center space-y-2">
                 <UserCheck className="w-10 h-10 text-slate-300 mx-auto" />
-                <p className="text-xs font-bold text-slate-600">No attendance check-ins recorded for selected filter criteria.</p>
+                <p className="text-xs font-bold text-slate-600">No attendance logs found for the selected dates.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-pink-50/60 border-b border-pink-100 text-[11px] font-black uppercase text-pink-800 tracking-wider">
-                      <th className="p-3.5">Employee</th>
-                      <th className="p-3.5">Home Branch</th>
-                      <th className="p-3.5">Work Location Branch</th>
-                      <th className="p-3.5">Date & Time</th>
-                      <th className="p-3.5">Method</th>
-                      <th className="p-3.5">Geofence Status</th>
+                      {!isEmployee && <th className="p-3.5">Employee</th>}
+                      <th className="p-3.5">Branch</th>
+                      <th className="p-3.5">Date</th>
+                      <th className="p-3.5">Check-In Time</th>
+                      <th className="p-3.5">Check-Out Time</th>
+                      <th className="p-3.5">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-pink-100/60 text-xs font-medium text-slate-800">
                     {filteredRecords.map((r) => (
                       <tr key={r.id} className="hover:bg-pink-50/30 transition">
-                        <td className="p-3.5 font-bold text-slate-900">
-                          <div>{r.employee_name}</div>
-                          {r.employee_phone && <div className="text-[11px] text-slate-400 font-normal">{r.employee_phone}</div>}
-                        </td>
-                        <td className="p-3.5 font-semibold text-slate-700">{r.home_branch_name}</td>
-                        <td className="p-3.5 font-extrabold text-pink-600">{r.work_branch_name}</td>
+                        {!isEmployee && (
+                          <td className="p-3.5 font-bold text-slate-900">
+                            <div>{r.employee_name}</div>
+                            {r.employee_phone && <div className="text-[11px] text-slate-400 font-normal">{r.employee_phone}</div>}
+                          </td>
+                        )}
+                        <td className="p-3.5 font-bold text-pink-600">{r.work_branch_name}</td>
+                        <td className="p-3.5 font-bold text-slate-900">{r.date}</td>
+                        <td className="p-3.5 font-semibold text-slate-800">{r.checkin_time || r.time || "-"}</td>
+                        <td className="p-3.5 font-semibold text-slate-800">{r.checkout_time || "-"}</td>
                         <td className="p-3.5">
-                          <div className="font-bold text-slate-900">{r.date}</div>
-                          <div className="text-[11px] text-slate-500">{r.time}</div>
-                        </td>
-                        <td className="p-3.5 font-bold text-slate-600">
-                          <span className="bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-full text-[10px] uppercase font-bold text-slate-700">
-                            {r.checkin_method}
-                          </span>
-                        </td>
-                        <td className="p-3.5">
-                          {r.status === "Present" && (
+                          {r.status === "P" || r.status === "Present" ? (
                             <span className="inline-flex items-center space-x-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-1 rounded-full text-[11px] font-extrabold">
                               <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-                              <span>Present (Verified Location)</span>
+                              <span>Present (Full Day)</span>
                             </span>
-                          )}
-                          {r.status === "Flagged" && (
-                            <span className="inline-flex items-center space-x-1.5 bg-rose-50 border border-rose-200 text-rose-700 px-3 py-1 rounded-full text-[11px] font-extrabold">
-                              <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
-                              <span>Flagged (Out of Radius)</span>
-                            </span>
-                          )}
-                          {r.status === "Unavailable" && (
+                          ) : r.status === "HP" ? (
                             <span className="inline-flex items-center space-x-1.5 bg-amber-50 border border-amber-200 text-amber-700 px-3 py-1 rounded-full text-[11px] font-extrabold">
                               <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-                              <span>Location Unavailable</span>
+                              <span>Half Day (HP)</span>
+                            </span>
+                          ) : r.status === "OFF" ? (
+                            <span className="inline-flex items-center space-x-1.5 bg-rose-50 border border-rose-200 text-rose-700 px-3 py-1 rounded-full text-[11px] font-extrabold">
+                              <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
+                              <span>Off / Leave</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center space-x-1.5 bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1 rounded-full text-[11px] font-extrabold">
+                              <span>{r.status}</span>
                             </span>
                           )}
                         </td>
