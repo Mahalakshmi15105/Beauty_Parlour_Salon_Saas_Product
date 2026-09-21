@@ -160,3 +160,69 @@ def ensure_database_exists(database_uri: str):
             engine.dispose()
         except Exception:
             pass
+
+
+def sync_metadata_columns(engine, metadata):
+    """
+    Inspects all tables in the given metadata collection and safely adds
+    any missing columns to the physical database schema.
+
+    Database-agnostic, works on MySQL 5.7+, MySQL 8.0+, MariaDB, PostgreSQL, and SQLite.
+    Each missing column is added individually in its own transaction so an issue on
+    one column never blocks subsequent columns.
+    """
+    try:
+        from sqlalchemy import inspect, text
+        inspector = inspect(engine)
+        existing_tables = set(inspector.get_table_names())
+        dialect = engine.dialect
+
+        for table in metadata.sorted_tables:
+            if table.name not in existing_tables:
+                continue
+
+            try:
+                existing_cols = {c["name"].lower() for c in inspector.get_columns(table.name)}
+            except Exception as e:
+                logger.warning(f"Could not inspect columns for table '{table.name}': {e}")
+                continue
+
+            for col in table.columns:
+                if col.name.lower() in existing_cols:
+                    continue
+
+                col_type = col.type.compile(dialect)
+                nullable = "NULL" if col.nullable else "NOT NULL"
+                default_clause = ""
+
+                if col.default is not None:
+                    arg = getattr(col.default, "arg", None)
+                    if isinstance(arg, bool):
+                        val_b = 1 if arg else 0
+                        default_clause = f" DEFAULT {val_b}"
+                    elif isinstance(arg, (int, float)):
+                        default_clause = f" DEFAULT {arg}"
+                    elif isinstance(arg, str):
+                        clean_str = arg.replace("'", "''")
+                        default_clause = f" DEFAULT '{clean_str}'"
+                    elif callable(arg):
+                        type_str = str(col_type).upper()
+                        if "DATETIME" in type_str or "TIMESTAMP" in type_str:
+                            default_clause = " DEFAULT CURRENT_TIMESTAMP"
+                        elif "DATE" in type_str:
+                            default_clause = " NULL"
+                            nullable = "NULL"
+
+                if nullable == "NOT NULL" and not default_clause:
+                    nullable = "NULL"
+
+                alter_sql = f"ALTER TABLE `{table.name}` ADD COLUMN `{col.name}` {col_type}{default_clause} {nullable}"
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(text(alter_sql))
+                    logger.info(f"Schema sync: added column `{table.name}`.`{col.name}` ({col_type})")
+                    existing_cols.add(col.name.lower())
+                except Exception as col_err:
+                    logger.warning(f"Notice adding column `{table.name}`.`{col.name}`: {col_err}")
+    except Exception as sync_err:
+        logger.warning(f"Metadata column sync notice: {sync_err}")

@@ -297,7 +297,6 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
 
   // Guard: If invoice is missing, render valid empty container so ref target DOM element ALWAYS exists!
   if (!invoice) {
-    console.log("ThermalReceipt mounted with empty invoice prop.");
     return (
       <div
         ref={ref}

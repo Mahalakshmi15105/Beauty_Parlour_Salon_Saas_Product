@@ -39,11 +39,13 @@ def get_template(module_name):
         excel_data = generate_excel_template(module_name, tenant_id=getattr(g, "parlour_id", None), branch_id=branch_id)
         
         # Return file
-        return send_file(
-            BytesIO(excel_data),
+        from flask import Response
+        return Response(
+            excel_data,
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            as_attachment=True,
-            download_name=f"{module_name}_template.xlsx"
+            headers={
+                "Content-Disposition": f'attachment; filename="{module_name}_template.xlsx"'
+            }
         )
     except Exception as e:
         logger.error(f"Error generating template for {module_name}: {str(e)}")

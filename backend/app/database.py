@@ -78,6 +78,13 @@ class MySQLMultiTenantSQLAlchemy(SQLAlchemy):
                 connect_args=connect_args
             )
             self._engine_cache[db_uri] = engine
+            # Automatically synchronize any new tables and missing columns for this tenant
+            try:
+                from app.db_bootstrap import sync_metadata_columns
+                tenant_metadata.create_all(bind=engine)
+                sync_metadata_columns(engine, tenant_metadata)
+            except Exception as sync_e:
+                logger.warning(f"Tenant schema sync notice for {db_uri}: {sync_e}")
         return self._engine_cache[db_uri]
 
     def get_engine(self, app=None, bind=None):

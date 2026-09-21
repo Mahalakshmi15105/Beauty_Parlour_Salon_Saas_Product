@@ -90,7 +90,10 @@ export default function Attendance() {
         setQrLoading(false);
       })
       .catch((err) => {
-        console.error("Failed to fetch QR code image:", err);
+        console.warn("Backend QR fetch notice, activating instant fallback QR generator:", err);
+        const checkinUrl = `${window.location.origin}/attendance/checkin?branch_id=${bId}&tenant_id=1`;
+        const fallbackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(checkinUrl)}&color=FF4D6D`;
+        setQrImageUrl(fallbackUrl);
         setQrLoading(false);
       });
   };

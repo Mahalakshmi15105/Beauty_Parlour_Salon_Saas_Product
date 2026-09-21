@@ -65,26 +65,40 @@ def _create_application():
         logger.error(f"Failed to create full application: {error_message}")
         logger.error("Returning degraded app; will retry on next Passenger restart.")
 
-        from flask import Flask, jsonify
+        from flask import Flask, jsonify, request
         from flask_cors import CORS
+        from werkzeug.exceptions import HTTPException
 
         degraded = Flask(__name__)
         # Allow CORS on the degraded app too
-        CORS(degraded, resources={r"/*": {"origins": "*"}})
+        CORS(degraded, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
-        @degraded.route("/")
-        @degraded.route("/api/v1/health")
-        def health():
+        @degraded.route("/", defaults={"path": ""}, methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+        @degraded.route("/<path:path>", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+        def degraded_catchall(path):
+            if request.method == "OPTIONS":
+                return "", 204
             return jsonify({
-                "success": True,
+                "success": False,
                 "status": "degraded",
-                "message": "Application loaded, but database is unreachable. "
-                           "Check DATABASE_URL in .env and MySQL credentials.",
+                "message": "Application failed to start: " + error_message,
                 "error": error_message,
             }), 503
 
+        @degraded.errorhandler(HTTPException)
+        def handle_http_error(err):
+            if request.method == "OPTIONS":
+                return "", 204
+            return jsonify({
+                "success": False,
+                "error_code": "NOT_FOUND" if err.code == 404 else "HTTP_ERROR",
+                "message": err.description,
+            }), err.code
+
         @degraded.errorhandler(Exception)
         def handle_error(err):
+            if request.method == "OPTIONS":
+                return "", 204
             return jsonify({
                 "success": False,
                 "error_code": "STARTUP_FAILED",

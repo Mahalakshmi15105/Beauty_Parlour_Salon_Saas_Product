@@ -3,7 +3,11 @@ import math
 from datetime import datetime, date
 from flask import Blueprint, request, jsonify, send_file, g, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
-import qrcode
+try:
+    import qrcode
+except ImportError:
+    qrcode = None
+
 
 from app.database import db
 from app.models.branch import Branch
@@ -46,7 +50,13 @@ def get_branch_qr_image():
         branch_id = getattr(g, "branch_id", None) or claims.get("branch_id")
 
     if not branch_id:
-        main_branch = Branch.query.filter_by(is_main_branch=True, is_deleted=False).first() or Branch.query.filter_by(is_deleted=False).first()
+        try:
+            main_branch = Branch.query.filter_by(is_main_branch=True, is_deleted=False).first()
+        except Exception:
+            db.session.rollback()
+            main_branch = None
+        if not main_branch:
+            main_branch = Branch.query.filter_by(is_deleted=False).first()
         if main_branch:
             branch_id = main_branch.id
 
@@ -57,26 +67,59 @@ def get_branch_qr_image():
     if not branch:
         return jsonify({"message": "Branch not found"}), 404
 
+    # Target tenant ID
+    target_tenant_id = branch.tenant_id or getattr(g, "parlour_id", None) or tenant_id or 1
+
     # Build check-in URL
     origin = current_app.config.get("FRONTEND_URL", "https://salon.smartgonext.com").rstrip("/")
-    checkin_url = f"{origin}/attendance/checkin?branch_id={branch.id}&tenant_id={tenant_id}"
+    checkin_url = f"{origin}/attendance/checkin?branch_id={branch.id}&tenant_id={target_tenant_id}"
 
     # Generate QR Code image
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_M,
-        box_size=10,
-        border=4,
-    )
-    qr.add_data(checkin_url)
-    qr.make(fit=True)
+    png_bytes = None
+    try:
+        import qrcode
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(checkin_url)
+        qr.make(fit=True)
 
-    img = qr.make_image(fill_color="#FF4D6D", back_color="white")
-    buf = io.BytesIO()
-    img.save(buf, "PNG")
-    buf.seek(0)
+        img = qr.make_image(fill_color="#FF4D6D", back_color="white")
+        buf = io.BytesIO()
+        img.save(buf, "PNG")
+        png_bytes = buf.getvalue()
+    except Exception as qr_err:
+        current_app.logger.warning(f"Local qrcode generation failed: {qr_err}. Attempting remote fallback...")
+        import urllib.parse
+        import requests
+        try:
+            encoded_url = urllib.parse.quote(checkin_url)
+            qr_res = requests.get(
+                f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={encoded_url}&color=FF4D6D",
+                timeout=5
+            )
+            if qr_res.status_code == 200:
+                png_bytes = qr_res.content
+        except Exception as fallback_err:
+            current_app.logger.error(f"Fallback QR code generation failed: {fallback_err}")
 
-    return send_file(buf, mimetype="image/png", download_name=f"branch_{branch.id}_attendance_qr.png")
+    if png_bytes:
+        from flask import Response
+        return Response(
+            png_bytes,
+            mimetype="image/png",
+            headers={
+                "Content-Type": "image/png",
+                "Content-Disposition": f'inline; filename="branch_{branch.id}_attendance_qr.png"',
+                "Cache-Control": "public, max-age=3600"
+            }
+        )
+
+    return jsonify({"message": "QR code generation failed. Please install 'qrcode' module on server."}), 500
+
 
 
 @attendance_bp.route("/checkin", methods=["POST"])
@@ -211,7 +254,16 @@ def get_attendance_logs():
         except ValueError:
             pass
 
-    records = query.order_by(Attendance.timestamp.desc()).all()
+    try:
+        records = query.order_by(Attendance.timestamp.desc()).all()
+    except Exception as e:
+        db.session.rollback()
+        try:
+            from app.database import tenant_metadata
+            tenant_metadata.create_all(bind=db.session.get_bind())
+            records = query.order_by(Attendance.timestamp.desc()).all()
+        except Exception:
+            return jsonify([]), 200
 
     result = []
     for att in records:

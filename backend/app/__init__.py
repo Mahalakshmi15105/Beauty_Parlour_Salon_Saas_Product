@@ -24,13 +24,13 @@ def create_app(config_class=Config):
     # Initialize extensions
     # CORS: allow production frontend + configured origins
     if app.config.get("CORS_ALLOW_ALL", False):
-        CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=False)
+        CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=False)
     else:
         CORS(
             app,
-            resources={r"/api/*": {"origins": app.config["CORS_ORIGINS"]}},
+            resources={r"/*": {"origins": app.config["CORS_ORIGINS"]}},
             supports_credentials=True,
-            allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+            allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
             methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         )
     # Configure Database-per-Tenant URI defaults dynamically from MASTER_DATABASE_URI
@@ -74,6 +74,9 @@ def create_app(config_class=Config):
         try:
             # Create Master DB tables (tenants, subscription_plans, tenant_lookups, users)
             db.create_all_master()
+            from app.db_bootstrap import sync_metadata_columns
+            from app.database import master_metadata, tenant_metadata
+            sync_metadata_columns(db.get_master_engine(), master_metadata)
 
             # AUTO-SEED / TENANT AUTO-CHECK
             from app.models.global_models import Tenant
@@ -85,7 +88,6 @@ def create_app(config_class=Config):
                 app.logger.info("Auto-seed completed successfully.")
             else:
                 app.logger.info(f"Master Database contains {tenant_count} tenant(s). Verifying tenant databases...")
-                from app.database import tenant_metadata
                 from app.db_bootstrap import sanitize_tenant_uri
                 from sqlalchemy import create_engine
                 master_uri = app.config.get("MASTER_DATABASE_URI", "")
@@ -100,6 +102,7 @@ def create_app(config_class=Config):
                             ensure_database_exists(clean_uri)
                             t_engine = create_engine(clean_uri, pool_pre_ping=True)
                             tenant_metadata.create_all(bind=t_engine)
+                            sync_metadata_columns(t_engine, tenant_metadata)
                             t_engine.dispose()
                         except Exception as te_err:
                             app.logger.warning(f"Tenant DB startup check notice for ID {t.id} ({t.name}): {te_err}")
