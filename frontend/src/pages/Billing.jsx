@@ -322,6 +322,7 @@ function Billing() {
   const [draftSaved, setDraftSaved] = useState(false);
 
   // Quick Add / Edit Customer Modal State
+  const [newlyCreatedCustomerId, setNewlyCreatedCustomerId] = useState(null);
   const [showQuickCustomerModal, setShowQuickCustomerModal] = useState(false);
   const [quickCustomerEditId, setQuickCustomerEditId] = useState(null);
   const [quickCustomerForm, setQuickCustomerForm] = useState({
@@ -806,6 +807,7 @@ function Billing() {
       .then((savedCust) => {
         // Select the new customer in the billing screen
         setSelectedCustomerId(String(savedCust.id));
+        setNewlyCreatedCustomerId(String(savedCust.id));
         setSelectedGender(savedCust.gender || "Female");
         setCustomerSearchQuery(`${savedCust.first_name} ${savedCust.last_name || ""} (${savedCust.phone})`);
         setShowNewMembershipModal(false);
@@ -954,6 +956,9 @@ function Billing() {
       .then((savedCust) => {
         if (savedCust && savedCust.id) {
           setSelectedCustomerId(String(savedCust.id));
+          if (!quickCustomerEditId) {
+            setNewlyCreatedCustomerId(String(savedCust.id));
+          }
           setSelectedGender(savedCust.gender || "Female");
           setCustomerSearchQuery(`${savedCust.first_name} ${savedCust.last_name || ""} (${savedCust.phone})`);
 
@@ -2134,6 +2139,8 @@ function Billing() {
             openQuickAddCustomer={openQuickAddCustomer}
             openQuickEditCustomer={openQuickEditCustomer}
             openCustomerHistory={openCustomerHistory}
+            openAssignMembershipModal={openAssignMembershipModal}
+            newlyCreatedCustomerId={newlyCreatedCustomerId}
             customerComboboxRef={customerComboboxRef}
             currencySymbol={currencySymbol}
             formatCurrency={formatCurrency}
@@ -2154,15 +2161,17 @@ function Billing() {
                   <label className="block text-xs font-bold text-slate-700">Type or Select Customer *</label>
                   {selectedCustomerId && selectedCustomerId !== "walkin" && (
                     <div className="flex items-center space-x-2">
-                      <button
-                        type="button"
-                        onClick={() => openAssignMembershipModal()}
-                        className="text-xs bg-pink-600 hover:bg-pink-700 text-white px-2.5 py-1 rounded-lg font-bold flex items-center space-x-1 transition shadow-xs"
-                        title="Assign a new membership plan to this customer"
-                      >
-                        <Crown className="w-3.5 h-3.5 text-white" />
-                        <span>+ Assign Membership</span>
-                      </button>
+                      {selectedCustomerId && newlyCreatedCustomerId && String(selectedCustomerId) === String(newlyCreatedCustomerId) && (
+                        <button
+                          type="button"
+                          onClick={() => openAssignMembershipModal()}
+                          className="text-xs bg-pink-600 hover:bg-pink-700 text-white px-2.5 py-1 rounded-lg font-bold flex items-center space-x-1 transition shadow-xs"
+                          title="Assign a new membership plan to this customer"
+                        >
+                          <Crown className="w-3.5 h-3.5 text-white" />
+                          <span>+ Assign Membership</span>
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={openCustomerHistory}
@@ -2185,15 +2194,6 @@ function Billing() {
                   )}
                   {selectedCustomerId === "walkin" && (
                     <div className="flex items-center space-x-2">
-                      <button
-                        type="button"
-                        onClick={() => openAssignMembershipModal()}
-                        className="text-xs bg-pink-600 hover:bg-pink-700 text-white px-2.5 py-1 rounded-lg font-bold flex items-center space-x-1 transition shadow-xs"
-                        title="Assign a new membership plan to customer"
-                      >
-                        <Crown className="w-3.5 h-3.5 text-white" />
-                        <span>+ Assign Membership</span>
-                      </button>
                       <button
                         type="button"
                         onClick={() => openQuickAddCustomer()}

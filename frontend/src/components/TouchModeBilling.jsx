@@ -43,6 +43,8 @@ export default function TouchModeBilling({
   openQuickAddCustomer,
   openQuickEditCustomer,
   openCustomerHistory,
+  openAssignMembershipModal,
+  newlyCreatedCustomerId,
   customerComboboxRef,
   currencySymbol,
   formatCurrency,
@@ -243,6 +245,30 @@ export default function TouchModeBilling({
                   setIsCustomerDropdownOpen(true);
                   setCustomerHighlightedIndex(0);
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    const q = (customerSearchQuery || "").trim().toLowerCase();
+                    if (!q || q === "walk-in customer") return;
+                    const filtered = customers.filter((c) => {
+                      return (
+                        c.first_name?.toLowerCase().includes(q) ||
+                        c.last_name?.toLowerCase().includes(q) ||
+                        c.phone?.includes(q)
+                      );
+                    });
+                    if (filtered.length === 1) {
+                      const c = filtered[0];
+                      setSelectedCustomerId(String(c.id));
+                      setCustomerSearchQuery(`${c.first_name} ${c.last_name || ""} (${c.phone})`);
+                      setSelectedGender(c.gender || "");
+                      setIsCustomerDropdownOpen(false);
+                    } else {
+                      openQuickAddCustomer(customerSearchQuery !== "Walk-in Customer" ? customerSearchQuery : "");
+                      setIsCustomerDropdownOpen(false);
+                    }
+                  }
+                }}
                 placeholder="Search phone or name..."
                 className="w-full bg-white border border-slate-200 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-pink-500 shadow-xs"
               />
@@ -283,7 +309,10 @@ export default function TouchModeBilling({
                       </div>
                     ))}
                   <div
-                    onClick={() => openQuickAddCustomer(customerSearchQuery)}
+                    onClick={() => {
+                      openQuickAddCustomer(customerSearchQuery !== "Walk-in Customer" ? customerSearchQuery : "");
+                      setIsCustomerDropdownOpen(false);
+                    }}
                     className="p-2.5 text-xs font-bold text-pink-600 hover:bg-pink-50 cursor-pointer text-center bg-pink-50/50"
                   >
                     + Add New Customer
@@ -319,6 +348,20 @@ export default function TouchModeBilling({
               </button>
             )}
           </div>
+
+          {/* Add Membership Button (Shown ONLY when a new customer was added in this billing session) */}
+          {selectedCustomerId && newlyCreatedCustomerId && String(selectedCustomerId) === String(newlyCreatedCustomerId) && (
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => openAssignMembershipModal && openAssignMembershipModal()}
+                className="w-full text-xs bg-pink-600 hover:bg-pink-700 text-white py-1.5 px-3 rounded-xl font-bold flex items-center justify-center space-x-1.5 shadow-sm transition-all"
+              >
+                <Crown className="w-3.5 h-3.5 text-white" />
+                <span>+ Add Membership</span>
+              </button>
+            </div>
+          )}
 
           {/* Active Membership Status Banner (Type A % Discount - Only when mode is not visit_based/disabled) */}
           {activeMembership && visitMembershipStatus?.membership_mode !== "visit_based" && visitMembershipStatus?.membership_mode !== "disabled" && (
