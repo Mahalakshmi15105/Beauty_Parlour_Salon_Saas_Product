@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import smartGoNextLogo from "../assets/smartgonext-logo.png";
 import {
   Sparkles,
   Scissors,
@@ -21,7 +22,7 @@ function LandingPage({ isLoggedIn, onNavigateLogin, onNavigateRegister, onNaviga
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-pink-100/80 px-6 lg:px-12 py-4 flex justify-between items-center shadow-xs">
         <div className="flex items-center space-x-3 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
           <img
-            src="/smartgonext-logo.png"
+            src={smartGoNextLogo}
             alt="SmartGoNext Logo"
             className="w-10 h-10 object-contain rounded-xl shadow-md shadow-slate-900/10"
           />

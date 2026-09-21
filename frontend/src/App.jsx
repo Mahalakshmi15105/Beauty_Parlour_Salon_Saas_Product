@@ -26,6 +26,7 @@ import PublicBookingPage from "./pages/PublicBookingPage";
 import CheckInPage from "./pages/CheckInPage";
 import Attendance from "./pages/Attendance";
 import API from "./services/api";
+import smartGoNextLogo from "./assets/smartgonext-logo.png";
 import { LogOut, Sparkles, ShieldCheck, Eye, EyeOff } from "lucide-react";
 
 function App() {
@@ -225,7 +226,7 @@ function App() {
               Back to Home
             </button>
             <img
-              src="/smartgonext-logo.png"
+              src={smartGoNextLogo}
               alt="SmartGoNext Logo"
               className="w-14 h-14 object-contain rounded-2xl mx-auto mb-2 shadow-lg shadow-slate-900/10"
             />
