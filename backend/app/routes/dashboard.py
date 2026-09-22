@@ -29,6 +29,8 @@ def get_summary():
         Invoice.tenant_id == g.parlour_id,
         Invoice.status != "Voided"
     )
+    if g.branch_id:
+        base_inv_query = base_inv_query.filter(Invoice.branch_id == g.branch_id)
 
     total_revenue = base_inv_query.scalar()
     today_revenue = base_inv_query.filter(Invoice.created_at >= today_start).scalar()
@@ -40,6 +42,8 @@ def get_summary():
         Invoice.tenant_id == g.parlour_id,
         Invoice.status != "Voided"
     )
+    if g.branch_id:
+        base_count_query = base_count_query.filter(Invoice.branch_id == g.branch_id)
     today_bills = base_count_query.filter(Invoice.created_at >= today_start).scalar()
     month_bills = base_count_query.filter(Invoice.created_at >= month_first_day).scalar()
 
@@ -48,24 +52,33 @@ def get_summary():
     new_customers = get_tenant_query(Customer).filter(Customer.created_at >= month_first_day).count()
 
     # 4. Membership Metrics
-    active_memberships = db.session.query(func.count(CustomerMembership.id)).filter(
+    base_mem_query = db.session.query(func.count(CustomerMembership.id)).filter(
         CustomerMembership.tenant_id == g.parlour_id,
         CustomerMembership.status == "active",
         CustomerMembership.expires_at >= now
-    ).scalar()
+    )
+    if g.branch_id:
+        base_mem_query = base_mem_query.filter(CustomerMembership.branch_id == g.branch_id)
+    active_memberships = base_mem_query.scalar()
 
-    expiring_soon = db.session.query(func.count(CustomerMembership.id)).filter(
+    base_exp_query = db.session.query(func.count(CustomerMembership.id)).filter(
         CustomerMembership.tenant_id == g.parlour_id,
         CustomerMembership.status == "active",
         CustomerMembership.expires_at >= now,
         CustomerMembership.expires_at <= now + timedelta(days=7)
-    ).scalar()
+    )
+    if g.branch_id:
+        base_exp_query = base_exp_query.filter(CustomerMembership.branch_id == g.branch_id)
+    expiring_soon = base_exp_query.scalar()
 
     # 5. Low Stock Products Alert List
-    low_stock_items = get_tenant_query(Product).filter(
+    low_stock_query = get_tenant_query(Product).filter(
         Product.stock_quantity <= Product.low_stock_threshold,
         Product.status == "active"
-    ).all()
+    )
+    if g.branch_id:
+        low_stock_query = low_stock_query.filter(Product.branch_id == g.branch_id)
+    low_stock_items = low_stock_query.all()
 
     low_stock_data = [
         {
@@ -112,14 +125,17 @@ def get_charts():
     start_date = now - timedelta(days=range_days)
 
     # 1. Daily Revenue Trend
-    daily_trend_query = db.session.query(
+    daily_trend_q = db.session.query(
         cast(Invoice.created_at, Date).label("date"),
         func.sum(Invoice.total).label("revenue")
     ).filter(
         Invoice.tenant_id == g.parlour_id,
         Invoice.status != "Voided",
         Invoice.created_at >= start_date
-    ).group_by(cast(Invoice.created_at, Date)).order_by(cast(Invoice.created_at, Date).asc()).all()
+    )
+    if g.branch_id:
+        daily_trend_q = daily_trend_q.filter(Invoice.branch_id == g.branch_id)
+    daily_trend_query = daily_trend_q.group_by(cast(Invoice.created_at, Date)).order_by(cast(Invoice.created_at, Date).asc()).all()
 
     daily_trend = [
         {
@@ -129,7 +145,7 @@ def get_charts():
     ]
 
     # 2. Top Services
-    top_services_query = db.session.query(
+    top_services_q = db.session.query(
         Service.name.label("name"),
         func.sum(InvoiceLineItem.line_total).label("total_revenue")
     ).join(InvoiceLineItem, Service.id == InvoiceLineItem.service_id).join(
@@ -137,7 +153,10 @@ def get_charts():
     ).filter(
         Invoice.tenant_id == g.parlour_id,
         Invoice.status != "Voided"
-    ).group_by(Service.id, Service.name).order_by(func.sum(InvoiceLineItem.line_total).desc()).limit(5).all()
+    )
+    if g.branch_id:
+        top_services_q = top_services_q.filter(Invoice.branch_id == g.branch_id)
+    top_services_query = top_services_q.group_by(Service.id, Service.name).order_by(func.sum(InvoiceLineItem.line_total).desc()).limit(5).all()
 
     top_services = [
         {
@@ -147,7 +166,7 @@ def get_charts():
     ]
 
     # 3. Employee Performance
-    employee_perf_query = db.session.query(
+    employee_perf_q = db.session.query(
         Employee.first_name.label("first_name"),
         func.sum(InvoiceLineItem.line_total).label("revenue")
     ).join(InvoiceLineItem, Employee.id == InvoiceLineItem.employee_id).join(
@@ -155,7 +174,10 @@ def get_charts():
     ).filter(
         Invoice.tenant_id == g.parlour_id,
         Invoice.status != "Voided"
-    ).group_by(Employee.id, Employee.first_name).order_by(func.sum(InvoiceLineItem.line_total).desc()).limit(5).all()
+    )
+    if g.branch_id:
+        employee_perf_q = employee_perf_q.filter(Invoice.branch_id == g.branch_id)
+    employee_perf_query = employee_perf_q.group_by(Employee.id, Employee.first_name).order_by(func.sum(InvoiceLineItem.line_total).desc()).limit(5).all()
 
     employee_perf = [
         {
@@ -165,13 +187,16 @@ def get_charts():
     ]
 
     # 4. Payment Method Distribution
-    payment_dist_query = db.session.query(
+    payment_dist_q = db.session.query(
         InvoicePayment.method.label("method"),
         func.sum(InvoicePayment.amount).label("amount")
     ).join(Invoice, InvoicePayment.invoice_id == Invoice.id).filter(
         Invoice.tenant_id == g.parlour_id,
         Invoice.status != "Voided"
-    ).group_by(InvoicePayment.method).all()
+    )
+    if g.branch_id:
+        payment_dist_q = payment_dist_q.filter(Invoice.branch_id == g.branch_id)
+    payment_dist_query = payment_dist_q.group_by(InvoicePayment.method).all()
 
     payment_dist = [
         {

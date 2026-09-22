@@ -302,7 +302,7 @@ def get_notifications():
     page = int(request.args.get("page", 1))
     limit = int(request.args.get("limit", 20))
 
-    query = get_tenant_query(Notification)
+    query = get_branch_query(Notification)
 
     if unread_only:
         query = query.filter_by(is_read=False)
@@ -310,7 +310,7 @@ def get_notifications():
         query = query.filter_by(type=notif_type)
 
     total_count = query.count()
-    unread_count = get_tenant_query(Notification).filter_by(is_read=False).count()
+    unread_count = get_branch_query(Notification).filter_by(is_read=False).count()
 
     notifications = query.order_by(Notification.created_at.desc()).paginate(
         page=page, per_page=limit, error_out=False

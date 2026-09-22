@@ -5,7 +5,7 @@ from flask import Blueprint, request, jsonify, g, current_app
 from app.database import db
 from app.models.whatsapp import WhatsAppSetting, WhatsAppLog
 from app.services.whatsapp_service import WhatsAppService
-from app.utils.auth import require_role, get_tenant_query
+from app.utils.auth import require_role, get_tenant_query, get_branch_query
 from app.utils.responses import success_response, error_response
 
 logger = logging.getLogger(__name__)
@@ -18,8 +18,8 @@ from app.models.global_models import PlatformSetting
 @whatsapp_bp.route("/whatsapp/settings", methods=["GET"])
 @require_role(["ParlourAdmin", "BranchAdmin"])
 def get_whatsapp_settings():
-    """Returns Meta WhatsApp Business account connection details for the logged-in parlour tenant."""
-    setting = get_tenant_query(WhatsAppSetting).filter_by(tenant_id=g.parlour_id).first()
+    """Returns Meta WhatsApp Business account connection details for the logged-in parlour tenant/branch."""
+    setting = get_branch_query(WhatsAppSetting).first()
 
     # Load dynamic platform Meta App credentials from master DB
     settings_dict = {}

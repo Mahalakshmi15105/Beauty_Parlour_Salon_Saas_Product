@@ -29,7 +29,8 @@ class WhatsAppSetting(db.Model, TimestampMixin):
     metadata = tenant_metadata
 
     id = db.Column(db.Integer, primary_key=True)
-    tenant_id = db.Column(db.Integer, nullable=False, unique=True, index=True)
+    tenant_id = db.Column(db.Integer, nullable=False, index=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     meta_waba_id = db.Column(db.String(100), nullable=True)
     meta_phone_number_id = db.Column(db.String(100), nullable=True)
     encrypted_access_token = db.Column(db.Text, nullable=True)
@@ -55,6 +56,7 @@ class WhatsAppSetting(db.Model, TimestampMixin):
         return {
             "id": self.id,
             "tenant_id": self.tenant_id,
+            "branch_id": self.branch_id,
             "meta_waba_id": self.meta_waba_id or "",
             "meta_phone_number_id": self.meta_phone_number_id or "",
             "phone_number": self.phone_number or "",
@@ -71,6 +73,7 @@ class WhatsAppCampaign(db.Model, TimestampMixin):
 
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, nullable=False, index=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     created_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     title = db.Column(db.String(200), nullable=False)
     template_type = db.Column(db.String(50), nullable=False, default="TEXT_ONLY")  # TEXT_ONLY, IMAGE_WITH_CAPTION

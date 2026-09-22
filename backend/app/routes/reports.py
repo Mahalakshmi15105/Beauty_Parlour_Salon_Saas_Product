@@ -6,7 +6,7 @@ from app.models.customer import Customer
 from app.models.employee import Employee
 from app.models.membership import CustomerMembership
 from app.utils.responses import success_response, error_response
-from app.utils.auth import require_role, get_tenant_query
+from app.utils.auth import require_role, get_tenant_query, get_branch_query
 from sqlalchemy import func, cast, Date
 from datetime import datetime, date, timedelta, timezone
 from decimal import Decimal
@@ -96,7 +96,7 @@ def get_sales_report():
     start_date, end_date = parse_date_range(preset, request.args.get("start_date"), request.args.get("end_date"))
     status_filter = request.args.get("status")
 
-    query = get_tenant_query(Invoice).filter(
+    query = get_branch_query(Invoice).filter(
         Invoice.created_at >= start_date,
         Invoice.created_at <= end_date
     )
@@ -147,7 +147,7 @@ def get_tax_report():
     preset = request.args.get("preset", "30days")
     start_date, end_date = parse_date_range(preset, request.args.get("start_date"), request.args.get("end_date"))
 
-    tax_query = db.session.query(
+    tax_q = db.session.query(
         cast(Invoice.created_at, Date).label("date"),
         func.sum(Invoice.subtotal).label("gross_subtotal"),
         func.sum(Invoice.discount).label("discount"),
@@ -158,7 +158,10 @@ def get_tax_report():
         Invoice.status != "Voided",
         Invoice.created_at >= start_date,
         Invoice.created_at <= end_date
-    ).group_by(cast(Invoice.created_at, Date)).order_by(cast(Invoice.created_at, Date).desc()).all()
+    )
+    if g.branch_id:
+        tax_q = tax_q.filter(Invoice.branch_id == g.branch_id)
+    tax_query = tax_q.group_by(cast(Invoice.created_at, Date)).order_by(cast(Invoice.created_at, Date).desc()).all()
 
     items = []
     total_tax_collected = Decimal("0.00")
@@ -186,7 +189,7 @@ def get_employee_report():
     preset = request.args.get("preset", "30days")
     start_date, end_date = parse_date_range(preset, request.args.get("start_date"), request.args.get("end_date"))
 
-    query = db.session.query(
+    emp_q = db.session.query(
         Employee.id,
         Employee.first_name,
         Employee.last_name,
@@ -200,7 +203,10 @@ def get_employee_report():
         Invoice.status != "Voided",
         Invoice.created_at >= start_date,
         Invoice.created_at <= end_date
-    ).group_by(Employee.id, Employee.first_name, Employee.last_name, Employee.commission_percentage).all()
+    )
+    if g.branch_id:
+        emp_q = emp_q.filter(Invoice.branch_id == g.branch_id)
+    query = emp_q.group_by(Employee.id, Employee.first_name, Employee.last_name, Employee.commission_percentage).all()
 
     items = []
     for row in query:
@@ -223,7 +229,7 @@ def get_employee_report():
 @reports_bp.route("/reports/products", methods=["GET"])
 @require_role(["ParlourAdmin", "BranchAdmin"])
 def get_product_report():
-    query = db.session.query(
+    prod_q = db.session.query(
         Product.id,
         Product.name,
         Product.sku,
@@ -234,7 +240,10 @@ def get_product_report():
     ).outerjoin(InvoiceLineItem, Product.id == InvoiceLineItem.product_id).filter(
         Product.tenant_id == g.parlour_id,
         Product.status == "active"
-    ).group_by(Product.id, Product.name, Product.sku, Product.stock_quantity, Product.selling_price).all()
+    )
+    if g.branch_id:
+        prod_q = prod_q.filter(Product.branch_id == g.branch_id)
+    query = prod_q.group_by(Product.id, Product.name, Product.sku, Product.stock_quantity, Product.selling_price).all()
 
     items = []
     for row in query:
@@ -257,7 +266,7 @@ def get_procurement_report():
     preset = request.args.get("preset", "30days")
     start_date, end_date = parse_date_range(preset, request.args.get("start_date"), request.args.get("end_date"))
 
-    logs = get_tenant_query(StockReorderLog).filter(
+    logs = get_branch_query(StockReorderLog).filter(
         StockReorderLog.created_at >= start_date,
         StockReorderLog.created_at <= end_date
     ).order_by(StockReorderLog.created_at.desc()).all()
@@ -297,7 +306,7 @@ def get_memberships_report():
     preset = request.args.get("preset", "30days")
     start_date, end_date = parse_date_range(preset, request.args.get("start_date"), request.args.get("end_date"))
 
-    logs = get_tenant_query(CustomerMembership).filter(
+    logs = get_branch_query(CustomerMembership).filter(
         CustomerMembership.created_at >= start_date,
         CustomerMembership.created_at <= end_date
     ).order_by(CustomerMembership.created_at.desc()).all()
@@ -342,7 +351,7 @@ def export_csv_report():
 
     if report_type == "sales":
         writer.writerow(["Invoice Number", "Date", "Customer Name", "Subtotal (INR)", "Discount (INR)", "Tax (INR)", "Total (INR)", "Status"])
-        invoices = get_tenant_query(Invoice).filter(
+        invoices = get_branch_query(Invoice).filter(
             Invoice.created_at >= start_date,
             Invoice.created_at <= end_date
         ).order_by(Invoice.created_at.desc()).all()
@@ -362,7 +371,7 @@ def export_csv_report():
 
     elif report_type == "tax":
         writer.writerow(["Date", "Gross Subtotal (INR)", "Discounts (INR)", "Tax Collected (INR)", "Net Total (INR)"])
-        tax_rows = db.session.query(
+        tax_q = db.session.query(
             cast(Invoice.created_at, Date).label("date"),
             func.sum(Invoice.subtotal).label("gross_subtotal"),
             func.sum(Invoice.discount).label("discount"),
@@ -373,7 +382,10 @@ def export_csv_report():
             Invoice.status != "Voided",
             Invoice.created_at >= start_date,
             Invoice.created_at <= end_date
-        ).group_by(cast(Invoice.created_at, Date)).all()
+        )
+        if g.branch_id:
+            tax_q = tax_q.filter(Invoice.branch_id == g.branch_id)
+        tax_rows = tax_q.group_by(cast(Invoice.created_at, Date)).all()
 
         for row in tax_rows:
             writer.writerow([
@@ -386,7 +398,7 @@ def export_csv_report():
 
     elif report_type == "employees":
         writer.writerow(["Employee Name", "Commission Rate (%)", "Services Rendered", "Total Revenue (INR)", "Estimated Commission (INR)"])
-        emp_rows = db.session.query(
+        emp_q = db.session.query(
             Employee.first_name,
             Employee.last_name,
             Employee.commission_percentage,
@@ -399,7 +411,10 @@ def export_csv_report():
             Invoice.status != "Voided",
             Invoice.created_at >= start_date,
             Invoice.created_at <= end_date
-        ).group_by(Employee.id, Employee.first_name, Employee.last_name, Employee.commission_percentage).all()
+        )
+        if g.branch_id:
+            emp_q = emp_q.filter(Invoice.branch_id == g.branch_id)
+        emp_rows = emp_q.group_by(Employee.id, Employee.first_name, Employee.last_name, Employee.commission_percentage).all()
 
         for r in emp_rows:
             rev = Decimal(str(r.total_revenue or 0.0))
@@ -415,7 +430,7 @@ def export_csv_report():
 
     elif report_type == "products":
         writer.writerow(["Product Name", "SKU", "Stock Quantity", "Selling Price (INR)", "Units Sold", "Total Revenue (INR)"])
-        prods = get_tenant_query(Product).filter_by(status="active").all()
+        prods = get_branch_query(Product).filter_by(status="active").all()
         for p in prods:
             writer.writerow([p.name, p.sku or "", p.stock_quantity, float(p.selling_price), 0, float(p.selling_price * p.stock_quantity)])
 
@@ -433,7 +448,7 @@ def export_csv_report():
 @require_role(["ParlourAdmin", "BranchAdmin", "Receptionist"])
 def get_daily_sales_statement():
     date_str = request.args.get("date") or date.today().isoformat()
-    branch_id = request.args.get("branch_id", type=int) or getattr(g, "branch_id", 1) or 1
+    branch_id = getattr(g, "branch_id", None) or request.args.get("branch_id", type=int) or 1
 
     try:
         target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
@@ -635,7 +650,7 @@ def get_daily_sales_statement():
 def get_monthly_performance_staff():
     month = request.args.get("month", type=int) or date.today().month
     year = request.args.get("year", type=int) or date.today().year
-    branch_id = request.args.get("branch_id", type=int) or getattr(g, "branch_id", 1) or 1
+    branch_id = getattr(g, "branch_id", None) or request.args.get("branch_id", type=int) or 1
 
     from app.models.branch import Branch
     all_branches = {b.id: b.name for b in Branch.query.all()}
@@ -644,7 +659,7 @@ def get_monthly_performance_staff():
     start_dt = datetime(year, month, 1, 0, 0, 0)
     end_dt = datetime(year, month, last_day, 23, 59, 59)
 
-    employees = get_tenant_query(Employee).filter_by(status="active").all()
+    employees = get_branch_query(Employee).filter_by(status="active").all()
     invoices = get_tenant_query(Invoice).filter(
         Invoice.created_at >= start_dt,
         Invoice.created_at <= end_dt,
@@ -724,7 +739,7 @@ def get_monthly_performance_staff():
             "percentage": round(pct_val, 1),
             "review": 0,
             "mc": "",
-            "branch_breakdown": branch_breakdown
+            "branch_breakdown": branch_breakdown if g.role == "ParlourAdmin" else []
         })
 
     all_walkin_cnt = len(set(inv.customer_id for inv in invoices_filtered if inv.customer_id))
@@ -766,7 +781,7 @@ def get_monthly_performance_staff():
 def get_attendance_salary_report():
     month = request.args.get("month", type=int) or date.today().month
     year = request.args.get("year", type=int) or date.today().year
-    branch_id = request.args.get("branch_id", type=int) or getattr(g, "branch_id", 1) or 1
+    branch_id = getattr(g, "branch_id", None) or request.args.get("branch_id", type=int) or 1
 
     from app.models.attendance import Attendance
     from app.models.payroll_adjustment import PayrollAdjustment
@@ -785,19 +800,24 @@ def get_attendance_salary_report():
             "full_date_label": dt_val.strftime("%A, %B %d, %Y")
         })
 
-    employees = get_tenant_query(Employee).filter_by(status="active").all()
-    attendances = Attendance.query.filter(
+    employees = get_branch_query(Employee).filter_by(status="active").all()
+    att_q = Attendance.query.filter(
         Attendance.timestamp >= start_dt,
         Attendance.timestamp <= end_dt
-    ).all()
+    )
+    if branch_id:
+        att_q = att_q.filter(Attendance.branch_id == branch_id)
+    attendances = att_q.all()
 
     invoices = get_tenant_query(Invoice).filter(
         Invoice.created_at >= start_dt,
         Invoice.created_at <= end_dt,
         Invoice.status != "Voided"
     ).all()
+    if branch_id:
+        invoices = [inv for inv in invoices if inv.branch_id == branch_id]
 
-    payroll_adjs = get_tenant_query(PayrollAdjustment).filter(
+    payroll_adjs = get_branch_query(PayrollAdjustment).filter(
         PayrollAdjustment.date >= start_dt.date(),
         PayrollAdjustment.date <= end_dt.date()
     ).all()
