@@ -172,6 +172,8 @@ function Employees() {
       level: "L1",
       commission_percentage: "",
       joining_date: new Date().toISOString().split("T")[0],
+      shift_start_time: "09:00",
+      shift_end_time: "18:00",
       status: "active",
     });
     setShowModal(true);
@@ -192,6 +194,8 @@ function Employees() {
       level: emp.level || "L1",
       commission_percentage: emp.commission_percentage || "",
       joining_date: emp.joining_date || "",
+      shift_start_time: emp.shift_start_time || "09:00",
+      shift_end_time: emp.shift_end_time || "18:00",
       status: emp.status || "active",
     });
     setShowModal(true);
@@ -561,6 +565,27 @@ function Employees() {
                     type="date"
                     value={formData.joining_date}
                     onChange={(e) => setFormData({ ...formData, joining_date: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Shift Start Time</label>
+                  <input
+                    type="time"
+                    value={formData.shift_start_time || "09:00"}
+                    onChange={(e) => setFormData({ ...formData, shift_start_time: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Shift End Time</label>
+                  <input
+                    type="time"
+                    value={formData.shift_end_time || "18:00"}
+                    onChange={(e) => setFormData({ ...formData, shift_end_time: e.target.value })}
                     className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
                   />
                 </div>

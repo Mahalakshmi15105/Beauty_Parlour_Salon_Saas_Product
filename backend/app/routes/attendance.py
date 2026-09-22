@@ -249,6 +249,15 @@ def employee_auto_scan():
                 }), 400
 
         now = datetime.utcnow()
+        worked_mins = (now - existing.timestamp).total_seconds() / 60.0
+
+        if worked_mins < 30:
+            cin_str = existing.timestamp.strftime("%I:%M %p")
+            return jsonify({
+                "status": "error",
+                "message": f"⚠️ Already checked in today at {cin_str}. You cannot check out within 30 minutes of check-in."
+            }), 400
+
         existing.check_out_time = now
 
         # Auto P vs HP status calculation based on shift duration
@@ -601,8 +610,10 @@ def manual_attendance_checkin():
     reason = (data.get("reason") or "Manual Front-Desk Fallback").strip()
     status_type = (data.get("status") or "P").upper()
 
+    action_type = (data.get("action_type") or "checkin").lower()
+
     if not employee_id:
-        return jsonify({"status": "error", "message": "Select an employee to submit manual check-in"}), 400
+        return jsonify({"status": "error", "message": "Select an employee to submit manual attendance"}), 400
 
     try:
         employee_id = int(employee_id)
@@ -628,29 +639,40 @@ def manual_attendance_checkin():
     now = datetime.utcnow()
     cin_time = now.strftime("%I:%M %p")
 
-    if existing:
+    if action_type == "checkout":
+        if not existing:
+            return jsonify({
+                "status": "error",
+                "message": f"❌ Manual Check-Out Failed: {employee.first_name} {employee.last_name or ''} has not checked in today yet."
+            }), 400
         if existing.check_out_time:
             return jsonify({
                 "status": "error",
-                "message": f"⚠️ Attendance already completed for {employee.first_name} {employee.last_name or ''} today (Checked in at {existing.timestamp.strftime('%I:%M %p')}, Checked out at {existing.check_out_time.strftime('%I:%M %p')})."
+                "message": f"⚠️ {employee.first_name} {employee.last_name or ''} has already checked out today at {existing.check_out_time.strftime('%I:%M %p')}."
             }), 400
-        else:
-            # Perform Manual Check-out if checked in already but not checked out
-            existing.check_out_time = now
-            existing.status = status_type if status_type in ["P", "HP", "OFF"] else "P"
-            db.session.commit()
-            cout_time = now.strftime("%I:%M %p")
-            return jsonify({
-                "status": "success",
-                "action": "checkout",
-                "message": f"✅ Manual check-out recorded for {employee.first_name} {employee.last_name or ''} at {cout_time}. Audit Reason: {reason}",
-                "data": {
-                    "id": existing.id,
-                    "employee_name": f"{employee.first_name} {employee.last_name or ''}".strip(),
-                    "checkout_time": cout_time,
-                    "status": existing.status
-                }
-            }), 200
+
+        existing.check_out_time = now
+        existing.status = status_type if status_type in ["P", "HP", "OFF"] else "P"
+        db.session.commit()
+        cout_time = now.strftime("%I:%M %p")
+        return jsonify({
+            "status": "success",
+            "action": "checkout",
+            "message": f"✅ Manual check-out recorded for {employee.first_name} {employee.last_name or ''} at {cout_time}. Audit Reason: {reason}",
+            "data": {
+                "id": existing.id,
+                "employee_name": f"{employee.first_name} {employee.last_name or ''}".strip(),
+                "checkout_time": cout_time,
+                "status": existing.status
+            }
+        }), 200
+
+    # Default action_type == "checkin"
+    if existing:
+        return jsonify({
+            "status": "error",
+            "message": f"Already put attendance for this employee today ({employee.first_name} {employee.last_name or ''} checked in at {existing.timestamp.strftime('%I:%M %p')})."
+        }), 400
 
     # Create new Manual Check-in
     attendance = Attendance(

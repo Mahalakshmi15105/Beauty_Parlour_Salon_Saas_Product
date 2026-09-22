@@ -62,6 +62,8 @@ def get_employees():
             "level": getattr(emp, "level", "L1") or "L1",
             "commission_percentage": float(emp.commission_percentage or 0.0),
             "joining_date": emp.joining_date.isoformat() if emp.joining_date else None,
+            "shift_start_time": getattr(emp, "shift_start_time", "09:00") or "09:00",
+            "shift_end_time": getattr(emp, "shift_end_time", "18:00") or "18:00",
             "status": emp.status or "active",
             "created_at": emp.created_at.isoformat() if emp.created_at else ""
         } for emp in employees
@@ -204,6 +206,8 @@ def create_employee():
             target=target_val,
             level=str(level or "L1").strip(),
             commission_percentage=comm_val,
+            shift_start_time=data.get("shift_start_time", "09:00") or "09:00",
+            shift_end_time=data.get("shift_end_time", "18:00") or "18:00",
             status=data.get("status", "active")
         )
         if joining_date:

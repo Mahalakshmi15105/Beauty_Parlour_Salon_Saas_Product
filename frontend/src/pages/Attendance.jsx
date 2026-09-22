@@ -26,6 +26,7 @@ export default function Attendance() {
 
   // Manual Attendance State (Admin & Receptionist)
   const [showManualForm, setShowManualForm] = useState(true);
+  const [manualActionType, setManualActionType] = useState("checkin");
   const [employeesList, setEmployeesList] = useState([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
   const [manualReason, setManualReason] = useState("");
@@ -83,6 +84,7 @@ export default function Attendance() {
     API.post("/attendance/manual-checkin", {
       employee_id: parseInt(selectedEmployeeId, 10),
       branch_id: empBranchId ? parseInt(empBranchId, 10) : undefined,
+      action_type: manualActionType,
       reason: manualReason || "Manual Front-Desk Fallback",
       status: manualStatus,
     })
@@ -212,7 +214,7 @@ export default function Attendance() {
               >
                 <div className="flex items-center space-x-1.5">
                   <UserCheck className="w-3.5 h-3.5" />
-                  <span>Manual Check-In</span>
+                  <span>Manual Attendance</span>
                 </div>
               </button>
               <button
@@ -406,6 +408,36 @@ export default function Attendance() {
 
               <div>
                 <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">
+                  ATTENDANCE ACTION TYPE *
+                </label>
+                <div className="flex items-center space-x-6 bg-slate-50 border border-slate-200 p-3 rounded-2xl">
+                  <label className="flex items-center space-x-2 text-xs font-extrabold text-slate-800 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="manualActionType"
+                      value="checkin"
+                      checked={manualActionType === "checkin"}
+                      onChange={() => setManualActionType("checkin")}
+                      className="accent-pink-600 w-4 h-4"
+                    />
+                    <span>(•) Manual Check-In</span>
+                  </label>
+                  <label className="flex items-center space-x-2 text-xs font-extrabold text-slate-800 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="manualActionType"
+                      value="checkout"
+                      checked={manualActionType === "checkout"}
+                      onChange={() => setManualActionType("checkout")}
+                      className="accent-pink-600 w-4 h-4"
+                    />
+                    <span>(•) Manual Check-Out</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">
                   SELECT MEMBER / EMPLOYEE *
                 </label>
                 <select
@@ -443,7 +475,9 @@ export default function Attendance() {
                   disabled={manualLoading}
                   className="glowe-pink-gradient text-white font-extrabold text-xs px-8 py-4 rounded-2xl shadow-md hover:shadow-lg transition disabled:opacity-50"
                 >
-                  {manualLoading ? "Submitting Manual Check-In..." : "Submit Manual Check-In"}
+                  {manualLoading
+                    ? `Submitting ${manualActionType === "checkin" ? "Check-In" : "Check-Out"}...`
+                    : `Submit Manual ${manualActionType === "checkin" ? "Check-In" : "Check-Out"}`}
                 </button>
               </div>
             </form>
