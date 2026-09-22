@@ -58,8 +58,8 @@ def migrate_all_tenants():
                     else:
                         logger.info(f"Tenant {t.id} ({t.name}) tenant_settings table already has billing_mode column.")
 
-                    # Check branches table geofencing columns
-                    for col_name, col_def in [("latitude", "DECIMAL(10, 8) NULL"), ("longitude", "DECIMAL(11, 8) NULL"), ("geofence_radius_meters", "INT NOT NULL DEFAULT 100")]:
+                    # Check branches table geofencing & opening balance columns
+                    for col_name, col_def in [("latitude", "DECIMAL(10, 8) NULL"), ("longitude", "DECIMAL(11, 8) NULL"), ("geofence_radius_meters", "INT NOT NULL DEFAULT 100"), ("initial_opening_balance", "DECIMAL(10, 2) NOT NULL DEFAULT 0.00")]:
                         res_branch_col = conn.execute(text(f"SHOW COLUMNS FROM branches LIKE '{col_name}'"))
                         if not res_branch_col.fetchone():
                             logger.info(f"Adding {col_name} to branches table in Tenant {t.id} ({t.name})...")
@@ -80,6 +80,8 @@ def migrate_all_tenants():
                             latitude DECIMAL(10, 8) NULL,
                             longitude DECIMAL(11, 8) NULL,
                             distance_meters DECIMAL(8, 2) NULL,
+                            status VARCHAR(20) NOT NULL DEFAULT 'P',
+                            check_out_time DATETIME NULL,
                             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                             INDEX idx_att_tenant (tenant_id),
                             INDEX idx_att_emp (employee_id),
@@ -87,6 +89,14 @@ def migrate_all_tenants():
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
                     """))
                     conn.commit()
+
+                    # Check attendances status & check_out_time columns
+                    for att_col, att_def in [("status", "VARCHAR(20) NOT NULL DEFAULT 'P'"), ("check_out_time", "DATETIME NULL")]:
+                        res_att = conn.execute(text(f"SHOW COLUMNS FROM attendances LIKE '{att_col}'"))
+                        if not res_att.fetchone():
+                            conn.execute(text(f"ALTER TABLE attendances ADD COLUMN `{att_col}` {att_def}"))
+                            conn.commit()
+
                     logger.info(f"Successfully verified attendances table in Tenant {t.id} ({t.name}).")
                 success_count += 1
             except Exception as e:

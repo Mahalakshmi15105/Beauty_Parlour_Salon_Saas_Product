@@ -27,6 +27,50 @@ export default function CheckInPage({ onNavigateHome }) {
 
   const hasTriggeredRef = useRef(false);
 
+  // Manual Front-Desk Fallback State
+  const [showManualForm, setShowManualForm] = useState(false);
+  const [employeesList, setEmployeesList] = useState([]);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
+  const [manualReason, setManualReason] = useState("");
+  const [manualLoading, setManualLoading] = useState(false);
+  const [manualFeedback, setManualFeedback] = useState(null);
+
+  useEffect(() => {
+    if (token) {
+      API.get("/employees?limit=100")
+        .then((res) => {
+          const items = res?.data?.items || res?.data?.data || (Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []));
+          setEmployeesList(Array.isArray(items) ? items : []);
+        })
+        .catch((err) => console.error("Failed to load employees:", err));
+    }
+  }, [token]);
+
+  const handleManualCheckIn = (e) => {
+    e.preventDefault();
+    if (!selectedEmployeeId) {
+      setManualFeedback({ type: "error", message: "Please select a member / employee." });
+      return;
+    }
+    setManualLoading(true);
+    setManualFeedback(null);
+
+    API.post("/attendance/manual-checkin", {
+      employee_id: parseInt(selectedEmployeeId, 10),
+      branch_id: parseInt(branchId, 10),
+      reason: manualReason || "Manual Front-Desk Fallback",
+    })
+      .then((res) => {
+        setManualLoading(false);
+        setManualFeedback({ type: "success", message: res.data?.message || "Manual check-in submitted successfully." });
+        setManualReason("");
+      })
+      .catch((err) => {
+        setManualLoading(false);
+        setManualFeedback({ type: "error", message: err.response?.data?.message || err.message || "Manual check-in failed." });
+      });
+  };
+
   // Handle Employee Login inside Checkin page (preserves URL branch_id)
   const handleEmployeeLogin = (e) => {
     e.preventDefault();
@@ -308,6 +352,77 @@ export default function CheckInPage({ onNavigateHome }) {
                 </button>
               </div>
             )}
+
+            {/* F. MANUAL FRONT-DESK FALLBACK CARD (Exact match of Reference UI) */}
+            <div className="bg-white/90 border border-slate-200 p-5 sm:p-6 rounded-2xl shadow-sm space-y-4 text-left pt-4 mt-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="text-sm font-black text-slate-900 tracking-tight">Manual Front-Desk Fallback</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowManualForm(!showManualForm)}
+                  className="text-xs font-extrabold text-pink-600 hover:text-pink-700 hover:underline transition"
+                >
+                  {showManualForm ? "Hide Manual Form" : "Show Manual Form"}
+                </button>
+              </div>
+
+              {showManualForm && (
+                <form onSubmit={handleManualCheckIn} className="space-y-4 pt-1">
+                  {manualFeedback && (
+                    <div
+                      className={`p-3 rounded-xl text-xs font-bold ${
+                        manualFeedback.type === "success"
+                          ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                          : "bg-rose-50 text-rose-800 border border-rose-200"
+                      }`}
+                    >
+                      {manualFeedback.message}
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider mb-1.5">
+                      SELECT MEMBER *
+                    </label>
+                    <select
+                      required
+                      value={selectedEmployeeId}
+                      onChange={(e) => setSelectedEmployeeId(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-pink-500"
+                    >
+                      <option value="">Select a member</option>
+                      {(Array.isArray(employeesList) ? employeesList : []).map((emp) => (
+                        <option key={emp.id} value={emp.id}>
+                          {emp.first_name} {emp.last_name || ""} ({emp.phone || "Staff"})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider mb-1.5">
+                      MANUAL REASON (LOGGED FOR AUDIT) *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Member phone battery dead"
+                      value={manualReason}
+                      onChange={(e) => setManualReason(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:border-pink-500"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={manualLoading}
+                    className="glowe-pink-gradient text-white font-extrabold text-xs px-6 py-3 rounded-full shadow-md hover:shadow-lg transition disabled:opacity-50"
+                  >
+                    {manualLoading ? "Submitting..." : "Submit Manual Check-In"}
+                  </button>
+                </form>
+              )}
+            </div>
 
             {onNavigateHome && (
               <button

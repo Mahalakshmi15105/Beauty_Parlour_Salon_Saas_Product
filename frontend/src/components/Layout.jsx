@@ -226,7 +226,7 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
 
   const menuItems = allMenuItems.filter((item) => {
     if (user?.role === "Employee") {
-      return ["attendance", "appointments"].includes(item.id);
+      return ["dashboard", "attendance", "appointments"].includes(item.id);
     }
     if (user?.role === "Receptionist") {
       return ["dashboard", "billing", "customers", "appointments", "attendance"].includes(item.id);

@@ -67,7 +67,7 @@ function App() {
   // Detect Meta OAuth callback redirect (?code=...) and route to WhatsApp integration page
   const initialActiveTab = new URLSearchParams(window.location.search).get("code")
     ? "whatsapp_integration"
-    : (user?.role === "Employee" ? "attendance" : "dashboard");
+    : "dashboard";
 
   const [currentView, setCurrentView] = useState(() => {
     if (window.location.pathname.startsWith("/attendance/checkin")) return "attendance_checkin";
@@ -103,11 +103,7 @@ function App() {
         setUser(userObj);
         setLoading(false);
         setCurrentView("app");
-        if (userObj?.role === "Employee") {
-          setActiveTab("attendance");
-        } else {
-          setActiveTab("dashboard");
-        }
+        setActiveTab("dashboard");
       })
       .catch((err) => {
         setLoginError(err.message || err.error || "Invalid email or password.");

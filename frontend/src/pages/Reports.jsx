@@ -560,22 +560,52 @@ function Reports() {
                   <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl space-y-1">
                     <div className="flex justify-between font-extrabold text-slate-900"><span>SALON SALES</span><span>₹{reportData.summary?.salon_sales?.sales}</span></div>
                     <div className="flex justify-between text-slate-600"><span>WALK IN</span><span>{reportData.summary?.salon_sales?.walkin}</span></div>
-                    <div className="flex justify-between text-slate-600"><span>ABV</span><span>₹{reportData.summary?.salon_sales?.abv.toFixed(2)}</span></div>
+                    <div className="flex justify-between text-slate-600"><span>ABV</span><span>₹{reportData.summary?.salon_sales?.abv?.toFixed(2)}</span></div>
                     <div className="flex justify-between text-emerald-700"><span>WITH GST</span><span>₹{reportData.summary?.salon_sales?.with_gst}</span></div>
                   </div>
 
                   <div className="bg-blue-50 border border-blue-200 p-4 rounded-2xl space-y-1">
                     <div className="flex justify-between font-extrabold text-blue-900"><span>MALE SALES</span><span>₹{reportData.summary?.male_sales?.sales}</span></div>
                     <div className="flex justify-between text-slate-600"><span>WALK IN</span><span>{reportData.summary?.male_sales?.walkin}</span></div>
-                    <div className="flex justify-between text-slate-600"><span>ABV</span><span>₹{reportData.summary?.male_sales?.abv.toFixed(2)}</span></div>
+                    <div className="flex justify-between text-slate-600"><span>ABV</span><span>₹{reportData.summary?.male_sales?.abv?.toFixed(2)}</span></div>
                   </div>
 
                   <div className="bg-pink-50 border border-pink-200 p-4 rounded-2xl space-y-1">
                     <div className="flex justify-between font-extrabold text-pink-900"><span>FEMALE SALES</span><span>₹{reportData.summary?.female_sales?.sales}</span></div>
                     <div className="flex justify-between text-slate-600"><span>WALK IN</span><span>{reportData.summary?.female_sales?.walkin}</span></div>
-                    <div className="flex justify-between text-slate-600"><span>ABV</span><span>₹{reportData.summary?.female_sales?.abv.toFixed(2)}</span></div>
+                    <div className="flex justify-between text-slate-600"><span>ABV</span><span>₹{reportData.summary?.female_sales?.abv?.toFixed(2)}</span></div>
                   </div>
                 </div>
+
+                {/* Per-Branch Staff Revenue Breakdown (For Multi-Branch Staff e.g. SAM) */}
+                {(reportData.staff_performance || []).some((st) => (st.branch_breakdown || []).length > 1) && (
+                  <div className="space-y-4 pt-4 border-t border-slate-200">
+                    <h4 className="text-xs font-black uppercase text-slate-700 tracking-wider">Multi-Branch Staff Revenue Breakdown</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                      {(reportData.staff_performance || [])
+                        .filter((st) => (st.branch_breakdown || []).length > 0)
+                        .map((st) => (
+                          <div key={st.id} className="bg-white border border-amber-300 rounded-2xl p-3 text-xs space-y-2 shadow-xs">
+                            <div className="bg-amber-300 text-slate-900 font-extrabold px-2 py-1 rounded-xl text-center uppercase tracking-wide">
+                              {st.name}
+                            </div>
+                            <div className="divide-y divide-slate-100 font-semibold">
+                              {(st.branch_breakdown || []).map((bb) => (
+                                <div key={bb.branch_id} className="py-1 flex justify-between items-center text-slate-700">
+                                  <span>{bb.branch_name}</span>
+                                  <span className="font-extrabold text-slate-900">₹{bb.achieved.toFixed(2)}</span>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="pt-1.5 border-t border-slate-200 flex justify-between font-black text-rose-700">
+                              <span>TOTAL</span>
+                              <span>₹{st.achieved.toFixed(2)}</span>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -605,19 +635,23 @@ function Reports() {
                             <td className="p-1 text-left text-slate-400">{row.sno}</td>
                             <td className="p-1 text-left font-bold text-slate-900">{row.name}</td>
                             {(reportData.days_in_month || []).map((d) => {
-                              const val = row.days?.[String(d.day)] || "1";
+                              const val = row.days?.[String(d.day)] || "";
                               return (
                                 <td
                                   key={d.day}
                                   className={`p-1 border-l border-slate-200 font-bold ${
                                     val === "OFF"
                                       ? "bg-emerald-600 text-white"
+                                      : val === "L"
+                                      ? "bg-rose-600 text-white font-black"
                                       : val === "0.5"
                                       ? "bg-amber-400 text-slate-900"
-                                      : "text-slate-700"
+                                      : val === "1"
+                                      ? "text-slate-800"
+                                      : "text-slate-300 font-normal"
                                   }`}
                                 >
-                                  {val}
+                                  {val || "—"}
                                 </td>
                               );
                             })}

@@ -1,7 +1,7 @@
 from flask import Blueprint, request, g, Response
 from app.database import db
 from app.models.billing import Invoice, InvoiceLineItem, InvoicePayment
-from app.models.catalog import Service, Product
+from app.models.catalog import Service, Product, StockReorderLog
 from app.models.customer import Customer
 from app.models.employee import Employee
 from app.models.membership import CustomerMembership
@@ -13,9 +13,21 @@ from decimal import Decimal
 import io
 import csv
 import logging
+import calendar
 
 logger = logging.getLogger(__name__)
 reports_bp = Blueprint("reports", __name__)
+
+REQUIRED_TABLE_COLUMNS = {
+    "branches": ["id", "tenant_id", "name", "is_main_branch", "latitude", "longitude", "geofence_radius_meters", "initial_opening_balance"],
+    "employees": ["id", "tenant_id", "first_name", "last_name", "phone", "salary", "target", "level", "commission_percentage", "status"],
+    "attendances": ["id", "tenant_id", "employee_id", "branch_id", "timestamp", "status", "check_out_time"],
+    "invoices": ["id", "tenant_id", "branch_id", "customer_id", "subtotal", "discount", "tax", "total", "status", "created_at"],
+    "invoice_line_items": ["id", "invoice_id", "service_id", "product_id", "employee_id", "quantity", "unit_price", "tax_rate", "line_total"],
+    "expenses": ["id", "tenant_id", "branch_id", "amount", "date", "note", "is_deleted"],
+    "cash_denominations": ["id", "tenant_id", "branch_id", "date", "total"],
+    "payroll_adjustments": ["id", "tenant_id", "employee_id", "type", "amount", "date"]
+}
 
 def parse_date_range(preset, start_str=None, end_str=None):
     now = datetime.now(timezone.utc)
@@ -53,13 +65,36 @@ def parse_date_range(preset, start_str=None, end_str=None):
     return start, end
 
 
+@reports_bp.route("/reports/system/schema-check", methods=["GET"])
+def schema_check():
+    """Deployment Safety Schema Audit Endpoint."""
+    from sqlalchemy import inspect
+    try:
+        engine = db.get_tenant_engine(g.tenant_db_uri) if hasattr(g, "tenant_db_uri") and g.tenant_db_uri else db.engine
+        inspector = inspect(engine)
+        existing_tables = inspector.get_table_names()
+        missing_details = []
+        for tbl, cols in REQUIRED_TABLE_COLUMNS.items():
+            if tbl not in existing_tables:
+                missing_details.append(f"Table '{tbl}' missing")
+            else:
+                actual = [c["name"] for c in inspector.get_columns(tbl)]
+                for c in cols:
+                    if c not in actual:
+                        missing_details.append(f"Column '{tbl}.{c}' missing")
+        if missing_details:
+            return error_response(f"Schema Check Failed: {', '.join(missing_details)}", 500)
+        return success_response({"status": "healthy", "message": "All database tables & columns verified."})
+    except Exception as e:
+        return error_response(f"Schema check error: {str(e)}", 500)
+
+
 @reports_bp.route("/reports/sales", methods=["GET"])
 @require_role(["ParlourAdmin", "BranchAdmin"])
 def get_sales_report():
     preset = request.args.get("preset", "30days")
     start_date, end_date = parse_date_range(preset, request.args.get("start_date"), request.args.get("end_date"))
     status_filter = request.args.get("status")
-    employee_id = request.args.get("employee_id")
 
     query = get_tenant_query(Invoice).filter(
         Invoice.created_at >= start_date,
@@ -82,11 +117,12 @@ def get_sales_report():
             total_tax += inv.tax
             total_discount += inv.discount
 
+        cust_name = f"{inv.customer.first_name} {inv.customer.last_name or ''}".strip() if inv.customer else "Walk-In Client"
         items.append({
             "id": inv.id,
             "invoice_number": inv.invoice_number,
             "date": inv.created_at.strftime("%Y-%m-%d %H:%M"),
-            "customer_name": f"{inv.customer.first_name} {inv.customer.last_name or ''}".strip(),
+            "customer_name": cust_name,
             "subtotal": float(inv.subtotal),
             "discount": float(inv.discount),
             "tax": float(inv.tax),
@@ -215,6 +251,85 @@ def get_product_report():
     return success_response(items)
 
 
+@reports_bp.route("/reports/procurement", methods=["GET"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
+def get_procurement_report():
+    preset = request.args.get("preset", "30days")
+    start_date, end_date = parse_date_range(preset, request.args.get("start_date"), request.args.get("end_date"))
+
+    logs = get_tenant_query(StockReorderLog).filter(
+        StockReorderLog.created_at >= start_date,
+        StockReorderLog.created_at <= end_date
+    ).order_by(StockReorderLog.created_at.desc()).all()
+
+    total_spent = Decimal("0.00")
+    total_qty = 0
+    items = []
+
+    for log in logs:
+        sub = log.cost_price * log.quantity
+        total_spent += sub
+        total_qty += log.quantity
+        items.append({
+            "id": log.id,
+            "date": log.created_at.strftime("%Y-%m-%d %H:%M"),
+            "product_name": log.product.name if log.product else "Deleted Product",
+            "supplier_name": log.supplier.name if log.supplier else "N/A",
+            "quantity": log.quantity,
+            "cost_price": float(log.cost_price),
+            "total_price": float(sub),
+            "status": log.status
+        })
+
+    return success_response({
+        "summary": {
+            "total_spent": float(total_spent),
+            "total_quantity": total_qty,
+            "total_orders": len(logs)
+        },
+        "items": items
+    })
+
+
+@reports_bp.route("/reports/memberships", methods=["GET"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
+def get_memberships_report():
+    preset = request.args.get("preset", "30days")
+    start_date, end_date = parse_date_range(preset, request.args.get("start_date"), request.args.get("end_date"))
+
+    logs = get_tenant_query(CustomerMembership).filter(
+        CustomerMembership.created_at >= start_date,
+        CustomerMembership.created_at <= end_date
+    ).order_by(CustomerMembership.created_at.desc()).all()
+
+    total_revenue = Decimal("0.00")
+    items = []
+
+    for cm in logs:
+        plan_price = cm.plan.price if cm.plan else Decimal("0.00")
+        if cm.status != "cancelled":
+            total_revenue += plan_price
+        cust_name = f"{cm.customer.first_name} {cm.customer.last_name or ''}".strip() if cm.customer else "Deleted Customer"
+        items.append({
+            "id": cm.id,
+            "customer_name": cust_name,
+            "plan_name": cm.plan.name if cm.plan else "Deleted Plan",
+            "price": float(plan_price),
+            "start_date": cm.created_at.strftime("%Y-%m-%d"),
+            "end_date": cm.expires_at.strftime("%Y-%m-%d") if cm.expires_at else "—",
+            "status": cm.status,
+            "created_at": cm.created_at.strftime("%Y-%m-%d %H:%M")
+        })
+
+    return success_response({
+        "summary": {
+            "total_revenue": float(total_revenue),
+            "total_sold": len(logs)
+        },
+        "items": items
+    })
+
+
 @reports_bp.route("/reports/export", methods=["GET"])
 @require_role(["ParlourAdmin", "BranchAdmin"])
 def export_csv_report():
@@ -233,10 +348,11 @@ def export_csv_report():
         ).order_by(Invoice.created_at.desc()).all()
 
         for inv in invoices:
+            cust_name = f"{inv.customer.first_name} {inv.customer.last_name or ''}".strip() if inv.customer else "Walk-In"
             writer.writerow([
                 inv.invoice_number,
                 inv.created_at.strftime("%Y-%m-%d %H:%M"),
-                f"{inv.customer.first_name} {inv.customer.last_name or ''}".strip(),
+                cust_name,
                 float(inv.subtotal),
                 float(inv.discount),
                 float(inv.tax),
@@ -297,6 +413,12 @@ def export_csv_report():
                 float(comm_earned)
             ])
 
+    elif report_type == "products":
+        writer.writerow(["Product Name", "SKU", "Stock Quantity", "Selling Price (INR)", "Units Sold", "Total Revenue (INR)"])
+        prods = get_tenant_query(Product).filter_by(status="active").all()
+        for p in prods:
+            writer.writerow([p.name, p.sku or "", p.stock_quantity, float(p.selling_price), 0, float(p.selling_price * p.stock_quantity)])
+
     csv_data = output.getvalue()
     filename = f"{report_type}_report_{datetime.now().strftime('%Y%m%d')}.csv"
 
@@ -305,86 +427,6 @@ def export_csv_report():
         mimetype="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
-
-
-@reports_bp.route("/reports/procurement", methods=["GET"])
-@require_role(["ParlourAdmin", "BranchAdmin"])
-def get_procurement_report():
-    preset = request.args.get("preset", "30days")
-    start_date, end_date = parse_date_range(preset, request.args.get("start_date"), request.args.get("end_date"))
-
-    from app.models.catalog import StockReorderLog
-    logs = get_tenant_query(StockReorderLog).filter(
-        StockReorderLog.created_at >= start_date,
-        StockReorderLog.created_at <= end_date
-    ).order_by(StockReorderLog.created_at.desc()).all()
-
-    total_spent = Decimal("0.00")
-    total_qty = 0
-    items = []
-
-    for log in logs:
-        sub = log.cost_price * log.quantity
-        total_spent += sub
-        total_qty += log.quantity
-        items.append({
-            "id": log.id,
-            "date": log.created_at.strftime("%Y-%m-%d %H:%M"),
-            "product_name": log.product.name if log.product else "Deleted Product",
-            "supplier_name": log.supplier.name if log.supplier else "N/A",
-            "quantity": log.quantity,
-            "cost_price": float(log.cost_price),
-            "total_price": float(sub),
-            "status": log.status
-        })
-
-    return success_response({
-        "summary": {
-            "total_spent": float(total_spent),
-            "total_quantity": total_qty,
-            "total_orders": len(logs)
-        },
-        "items": items
-    })
-
-
-@reports_bp.route("/reports/memberships", methods=["GET"])
-@require_role(["ParlourAdmin", "BranchAdmin"])
-def get_memberships_report():
-    preset = request.args.get("preset", "30days")
-    start_date, end_date = parse_date_range(preset, request.args.get("start_date"), request.args.get("end_date"))
-
-    logs = get_tenant_query(CustomerMembership).filter(
-        CustomerMembership.created_at >= start_date,
-        CustomerMembership.created_at <= end_date
-    ).order_by(CustomerMembership.created_at.desc()).all()
-
-    total_revenue = Decimal("0.00")
-    items = []
-
-    for cm in logs:
-        plan_price = cm.plan.price if cm.plan else Decimal("0.00")
-        # Only count active/non-cancelled memberships toward revenue
-        if cm.status != "cancelled":
-            total_revenue += plan_price
-        items.append({
-            "id": cm.id,
-            "customer_name": f"{cm.customer.first_name} {cm.customer.last_name or ''}".strip() if cm.customer else "Deleted Customer",
-            "plan_name": cm.plan.name if cm.plan else "Deleted Plan",
-            "price": float(plan_price),
-            "start_date": cm.created_at.strftime("%Y-%m-%d"),
-            "end_date": cm.expires_at.strftime("%Y-%m-%d") if cm.expires_at else "—",
-            "status": cm.status,
-            "created_at": cm.created_at.strftime("%Y-%m-%d %H:%M")
-        })
-
-    return success_response({
-        "summary": {
-            "total_revenue": float(total_revenue),
-            "total_sold": len(logs)
-        },
-        "items": items
-    })
 
 
 @reports_bp.route("/reports/daily-sales-statement", methods=["GET"])
@@ -401,6 +443,7 @@ def get_daily_sales_statement():
     from app.models.branch import Branch
     from app.models.expense import Expense
     from app.models.cash_denomination import CashDenomination
+    from app.models.user import TenantSetting
     from sqlalchemy import text
 
     parlour_name = "SALON"
@@ -427,6 +470,9 @@ def get_daily_sales_statement():
     if branch_id:
         invoices = [inv for inv in invoices if inv.branch_id == branch_id]
 
+    t_setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id).first()
+    default_tax_rate = Decimal(str(t_setting.tax_rate)) if t_setting and t_setting.tax_rate is not None else Decimal("18.00")
+
     line_items_data = []
     staff_sales_map = {}
     sno = 1
@@ -438,7 +484,6 @@ def get_daily_sales_statement():
     grand_total = Decimal("0.00")
 
     for inv in invoices:
-        # Check payments for payment method breakdown
         pm_list = InvoicePayment.query.filter_by(invoice_id=inv.id).all()
         cash_paid = sum(p.amount for p in pm_list if p.payment_method == "Cash") or Decimal("0.00")
         paytm_paid = sum(p.amount for p in pm_list if p.payment_method in ["Paytm", "Google Pay", "PhonePe", "UPI"]) or Decimal("0.00")
@@ -448,15 +493,23 @@ def get_daily_sales_statement():
             serv_name = item.service.name if item.service else (item.product.name if item.product else "Service Item")
             emp_name = f"{item.employee.first_name} {item.employee.last_name or ''}".strip() if item.employee else "Staff"
             
+            # BUG 3 FIX: Dynamic tax rate from line item -> service -> tenant default settings
+            tax_rate_val = Decimal("0.00")
+            if getattr(item, "tax_rate", None) is not None:
+                tax_rate_val = Decimal(str(item.tax_rate))
+            elif item.service and getattr(item.service, "tax_rate", None) is not None:
+                tax_rate_val = Decimal(str(item.service.tax_rate))
+            else:
+                tax_rate_val = default_tax_rate
+
             line_amt = item.unit_price * item.quantity
-            line_gst = line_amt * Decimal("0.18") if getattr(item.service, "tax_inclusive", False) is False else Decimal("0.00")
+            line_gst = (line_amt * (tax_rate_val / Decimal("100.00"))) if getattr(item.service, "tax_inclusive", False) is False else Decimal("0.00")
             line_total = line_amt + line_gst
 
             total_amt += line_amt
             total_gst += line_gst
             grand_total += line_total
 
-            # Track per staff
             if emp_name not in staff_sales_map:
                 staff_sales_map[emp_name] = Decimal("0.00")
             staff_sales_map[emp_name] += line_total
@@ -499,7 +552,29 @@ def get_daily_sales_statement():
         "total": float(cd_rec.total) if cd_rec else 0.0
     }
 
-    opening_bal = 130.0  # default starting balance
+    # BUG 1 FIX: Dynamic Opening Cash Balance calculation (Previous Day's Closing = Opening + Cash Pay - Expenses)
+    prev_invoices = get_tenant_query(Invoice).filter(
+        Invoice.created_at < start_dt,
+        Invoice.status != "Voided"
+    ).all()
+    if branch_id:
+        prev_invoices = [inv for inv in prev_invoices if inv.branch_id == branch_id]
+
+    prev_cash_sum = Decimal("0.00")
+    for inv in prev_invoices:
+        pm_list = InvoicePayment.query.filter_by(invoice_id=inv.id).all()
+        prev_cash_sum += sum(p.amount for p in pm_list if p.payment_method == "Cash") or Decimal("0.00")
+
+    prev_expenses = Expense.query.filter_by(tenant_id=g.parlour_id, is_deleted=False).filter(Expense.date < target_date)
+    if branch_id:
+        prev_expenses = prev_expenses.filter_by(branch_id=branch_id)
+    prev_exp_sum = Decimal(str(sum(exp.amount for exp in prev_expenses.all()))) or Decimal("0.00")
+
+    init_bal = Decimal(str(branch.initial_opening_balance)) if branch and getattr(branch, "initial_opening_balance", None) is not None else Decimal("0.00")
+    opening_bal = float(init_bal + prev_cash_sum - prev_exp_sum)
+    if opening_bal < 0:
+        opening_bal = 0.0
+
     closing_bal = opening_bal + float(total_cash) - total_expenses
 
     staff_achieved_list = [{"sno": idx + 1, "staff_name": k, "achieved": float(v)} for idx, (k, v) in enumerate(staff_sales_map.items())]
@@ -511,6 +586,9 @@ def get_daily_sales_statement():
         Invoice.created_at <= end_dt,
         Invoice.status != "Voided"
     ).all()
+    if branch_id:
+        month_invoices = [inv for inv in month_invoices if inv.branch_id == branch_id]
+
     till_date_sales = sum(float(inv.subtotal) for inv in month_invoices)
     till_date_gst = sum(float(inv.tax) for inv in month_invoices)
     till_date_walkin = len(set(inv.customer_id for inv in month_invoices if inv.customer_id))
@@ -533,21 +611,21 @@ def get_daily_sales_statement():
         "expenses": expense_list,
         "total_expenses": total_expenses,
         "balance": {
-            "opening_bal": opening_bal,
+            "opening_bal": round(opening_bal, 2),
             "total_sale": float(grand_total),
             "cash_pay": float(total_cash),
             "phone_pay": float(total_paytm),
             "card": float(total_card),
             "expense": total_expenses,
-            "closing_bal": closing_bal
+            "closing_bal": round(closing_bal, 2)
         },
         "cash_denomination": cd_data,
         "staff_achieved": staff_achieved_list,
         "till_date": {
-            "sales": till_date_sales,
-            "with_gst": till_date_sales + till_date_gst,
+            "sales": round(till_date_sales, 2),
+            "with_gst": round(till_date_sales + till_date_gst, 2),
             "walkin": till_date_walkin,
-            "abv": till_date_abv
+            "abv": round(till_date_abv, 4)
         }
     })
 
@@ -559,13 +637,14 @@ def get_monthly_performance_staff():
     year = request.args.get("year", type=int) or date.today().year
     branch_id = request.args.get("branch_id", type=int) or getattr(g, "branch_id", 1) or 1
 
-    import calendar
+    from app.models.branch import Branch
+    all_branches = {b.id: b.name for b in Branch.query.all()}
+
     _, last_day = calendar.monthrange(year, month)
     start_dt = datetime(year, month, 1, 0, 0, 0)
     end_dt = datetime(year, month, last_day, 23, 59, 59)
 
     employees = get_tenant_query(Employee).filter_by(status="active").all()
-
     invoices = get_tenant_query(Invoice).filter(
         Invoice.created_at >= start_dt,
         Invoice.created_at <= end_dt,
@@ -573,7 +652,9 @@ def get_monthly_performance_staff():
     ).all()
 
     if branch_id:
-        invoices = [inv for inv in invoices if inv.branch_id == branch_id]
+        invoices_filtered = [inv for inv in invoices if inv.branch_id == branch_id]
+    else:
+        invoices_filtered = invoices
 
     staff_records = []
     tot_achieved = 0.0
@@ -586,24 +667,36 @@ def get_monthly_performance_staff():
     salon_female_walkin = set()
 
     for idx, emp in enumerate(employees):
-        emp_items = []
         emp_cust_set = set()
         emp_achieved = 0.0
-        emp_tax = 0.0
+        emp_branch_map = {}
 
         for inv in invoices:
             for item in inv.items:
                 if item.employee_id == emp.id:
-                    emp_achieved += float(item.line_total)
-                    if inv.customer_id:
-                        emp_cust_set.add(inv.customer_id)
-                        cust = inv.customer
-                        if cust and getattr(cust, "gender", "").lower() == "male":
-                            salon_male_sales += float(item.line_total)
-                            salon_male_walkin.add(inv.customer_id)
-                        else:
-                            salon_female_sales += float(item.line_total)
-                            salon_female_walkin.add(inv.customer_id)
+                    line_tot = float(item.line_total)
+                    if not branch_id or inv.branch_id == branch_id:
+                        emp_achieved += line_tot
+                        if inv.customer_id:
+                            emp_cust_set.add(inv.customer_id)
+                            cust = inv.customer
+                            if cust and getattr(cust, "gender", "").lower() == "male":
+                                salon_male_sales += line_tot
+                                salon_male_walkin.add(inv.customer_id)
+                            else:
+                                salon_female_sales += line_tot
+                                salon_female_walkin.add(inv.customer_id)
+
+                    # Track sales per branch for multi-branch staff breakdown
+                    b_id = inv.branch_id
+                    if b_id:
+                        if b_id not in emp_branch_map:
+                            emp_branch_map[b_id] = {
+                                "branch_id": b_id,
+                                "branch_name": all_branches.get(b_id, f"Branch {b_id}"),
+                                "achieved": 0.0
+                            }
+                        emp_branch_map[b_id]["achieved"] += line_tot
 
         walkin_cnt = len(emp_cust_set)
         salary_val = float(emp.salary or 0.0)
@@ -612,8 +705,10 @@ def get_monthly_performance_staff():
         pct_val = ((emp_achieved / target_val) * 100.0) if target_val > 0 else 0.0
 
         tot_achieved += emp_achieved
-        tot_with_gst += emp_achieved  # inclusive total
+        tot_with_gst += emp_achieved
         tot_walkin += walkin_cnt
+
+        branch_breakdown = list(emp_branch_map.values())
 
         staff_records.append({
             "sno": idx + 1,
@@ -622,16 +717,17 @@ def get_monthly_performance_staff():
             "level": emp.level or "L1",
             "salary": salary_val,
             "target": target_val,
-            "achieved": emp_achieved,
-            "with_gst": emp_achieved,
+            "achieved": round(emp_achieved, 2),
+            "with_gst": round(emp_achieved, 2),
             "walkin": walkin_cnt,
-            "abv": abv_val,
-            "percentage": pct_val,
+            "abv": round(abv_val, 4),
+            "percentage": round(pct_val, 1),
             "review": 0,
-            "mc": ""
+            "mc": "",
+            "branch_breakdown": branch_breakdown
         })
 
-    all_walkin_cnt = len(set(inv.customer_id for inv in invoices if inv.customer_id))
+    all_walkin_cnt = len(set(inv.customer_id for inv in invoices_filtered if inv.customer_id))
     all_abv = (tot_achieved / all_walkin_cnt) if all_walkin_cnt > 0 else 0.0
     male_abv = (salon_male_sales / len(salon_male_walkin)) if len(salon_male_walkin) > 0 else 0.0
     female_abv = (salon_female_sales / len(salon_female_walkin)) if len(salon_female_walkin) > 0 else 0.0
@@ -640,26 +736,26 @@ def get_monthly_performance_staff():
         "month_year": f"{calendar.month_name[month].upper()}-{year}",
         "staff_performance": staff_records,
         "totals": {
-            "achieved": tot_achieved,
-            "with_gst": tot_with_gst,
+            "achieved": round(tot_achieved, 2),
+            "with_gst": round(tot_with_gst, 2),
             "walkin": tot_walkin
         },
         "summary": {
             "salon_sales": {
-                "sales": tot_achieved,
+                "sales": round(tot_achieved, 2),
                 "walkin": all_walkin_cnt,
-                "abv": all_abv,
-                "with_gst": tot_with_gst
+                "abv": round(all_abv, 4),
+                "with_gst": round(tot_with_gst, 2)
             },
             "male_sales": {
-                "sales": salon_male_sales,
+                "sales": round(salon_male_sales, 2),
                 "walkin": len(salon_male_walkin),
-                "abv": male_abv
+                "abv": round(male_abv, 4)
             },
             "female_sales": {
-                "sales": salon_female_sales,
+                "sales": round(salon_female_sales, 2),
                 "walkin": len(salon_female_walkin),
-                "abv": female_abv
+                "abv": round(female_abv, 4)
             }
         }
     })
@@ -672,13 +768,13 @@ def get_attendance_salary_report():
     year = request.args.get("year", type=int) or date.today().year
     branch_id = request.args.get("branch_id", type=int) or getattr(g, "branch_id", 1) or 1
 
-    import calendar
     from app.models.attendance import Attendance
     from app.models.payroll_adjustment import PayrollAdjustment
 
     _, total_days = calendar.monthrange(year, month)
     start_dt = datetime(year, month, 1, 0, 0, 0)
     end_dt = datetime(year, month, total_days, 23, 59, 59)
+    today_curr = date.today()
 
     days_list = []
     for d in range(1, total_days + 1):
@@ -719,22 +815,34 @@ def get_attendance_salary_report():
 
     for idx, emp in enumerate(employees):
         emp_att_map = {}
+
+        # BUG 2 FIX: Default unlogged past dates and future dates to blank ""
         for d in range(1, total_days + 1):
-            emp_att_map[str(d)] = "1"  # Default present unless logged otherwise
+            dt_val = date(year, month, d)
+            if dt_val > today_curr:
+                emp_att_map[str(d)] = ""  # Future date -> Blank
+            else:
+                emp_att_map[str(d)] = ""  # Past date unlogged -> Blank
 
         emp_atts = [att for att in attendances if att.employee_id == emp.id]
         off_count = 0
+        leave_count = 0
         total_worked_days = 0.0
 
         for att in emp_atts:
             day_num = att.timestamp.day
+            dt_val = att.timestamp.date()
+            if dt_val > today_curr:
+                continue
             st = getattr(att, "status", "P") or "P"
-            if st == "P":
+            if st in ["P", "Present"]:
                 emp_att_map[str(day_num)] = "1"
-            elif st == "HP":
+            elif st in ["HP", "HalfDay", "Half-Day"]:
                 emp_att_map[str(day_num)] = "0.5"
-            elif st == "OFF":
+            elif st in ["OFF", "DayOff"]:
                 emp_att_map[str(day_num)] = "OFF"
+            elif st in ["L", "Leave"]:
+                emp_att_map[str(day_num)] = "L"
 
         for d in range(1, total_days + 1):
             val = emp_att_map[str(d)]
@@ -744,6 +852,8 @@ def get_attendance_salary_report():
                 total_worked_days += 0.5
             elif val == "OFF":
                 off_count += 1
+            elif val == "L":
+                leave_count += 1
 
         att_matrix.append({
             "sno": idx + 1,
@@ -760,15 +870,19 @@ def get_attendance_salary_report():
                 if item.employee_id == emp.id:
                     emp_achieved += float(item.line_total)
 
-        # Advances & Deductions from Stage 5
+        # Advances & Deductions from PayrollAdjustment
         emp_adjs = [pa for pa in payroll_adjs if pa.employee_id == emp.id]
         emp_advances = sum(float(pa.amount) for pa in emp_adjs if pa.type == "Advance")
-        emp_deductions = sum(float(pa.amount) for pa in emp_adjs if pa.type == "Deduction")
+        emp_deductions = sum(float(pa.amount) for pa in emp_adjs if pa.type in ["Deduction", "Less"])
 
         salary_val = float(emp.salary or 0.0)
         target_val = float(emp.target or 0.0)
-        net_salary = (salary_val / total_days) * total_worked_days if salary_val > 0 else 0.0
-        final_payable = max(net_salary - emp_deductions + emp_advances, 0.0)
+
+        # REVERSE-ENGINEERED FORMULA: NET = (SALARY / DAYS_IN_MONTH) * TOTAL_WORKED_DAYS
+        net_salary = round((salary_val / total_days) * total_worked_days, 2) if salary_val > 0 else 0.0
+        
+        # REVERSE-ENGINEERED FORMULA: FINAL PAYABLE = NET - ADVANCE - DEDUCTIONS
+        final_payable = round(max(net_salary - emp_advances - emp_deductions, 0.0), 2)
 
         tot_salary += salary_val
         tot_target += target_val
@@ -784,8 +898,8 @@ def get_attendance_salary_report():
             "name": f"{emp.first_name} {emp.last_name or ''}".strip(),
             "salary": salary_val,
             "target": target_val,
-            "achieved": emp_achieved,
-            "off": off_count,
+            "achieved": round(emp_achieved, 2),
+            "off": off_count + leave_count,
             "total_days": total_worked_days,
             "net": net_salary,
             "advance": emp_advances,
@@ -799,14 +913,12 @@ def get_attendance_salary_report():
         "attendance_matrix": att_matrix,
         "salary_report": salary_rows,
         "totals": {
-            "salary": tot_salary,
-            "target": tot_target,
-            "achieved": tot_achieved,
-            "net": tot_net,
-            "advance": tot_advance,
-            "less_amount": tot_less,
-            "amount": tot_payable
+            "salary": round(tot_salary, 2),
+            "target": round(tot_target, 2),
+            "achieved": round(tot_achieved, 2),
+            "net": round(tot_net, 2),
+            "advance": round(tot_advance, 2),
+            "less_amount": round(tot_less, 2),
+            "amount": round(tot_payable, 2)
         }
     })
-
-

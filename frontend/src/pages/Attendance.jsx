@@ -24,7 +24,16 @@ export default function Attendance() {
   const [qrImageUrl, setQrImageUrl] = useState("");
   const [qrLoading, setQrLoading] = useState(false);
 
-  // Fetch branches and auto-load default branch QR code
+  // Manual Attendance State (Admin & Receptionist)
+  const [showManualForm, setShowManualForm] = useState(true);
+  const [employeesList, setEmployeesList] = useState([]);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
+  const [manualReason, setManualReason] = useState("");
+  const [manualStatus, setManualStatus] = useState("P");
+  const [manualLoading, setManualLoading] = useState(false);
+  const [manualFeedback, setManualFeedback] = useState(null);
+
+  // Fetch branches and employees on mount
   useEffect(() => {
     API.get("/branches")
       .then((res) => {
@@ -48,7 +57,44 @@ export default function Attendance() {
       .catch((err) => {
         console.error("Failed to load branches in Attendance:", err);
       });
+
+    // Fetch active employees for manual selection
+    API.get("/employees?limit=100")
+      .then((res) => {
+        const items = res?.data?.items || res?.data?.data || (Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []));
+        setEmployeesList(Array.isArray(items) ? items : []);
+      })
+      .catch((err) => console.error("Failed to load employees for manual attendance:", err));
   }, []);
+
+  // Submit Manual Check-In
+  const handleManualCheckInSubmit = (e) => {
+    e.preventDefault();
+    if (!selectedEmployeeId) {
+      setManualFeedback({ type: "error", message: "Please select an employee." });
+      return;
+    }
+    setManualLoading(true);
+    setManualFeedback(null);
+
+    API.post("/attendance/manual-checkin", {
+      employee_id: parseInt(selectedEmployeeId, 10),
+      branch_id: branchId !== "all" ? parseInt(branchId, 10) : undefined,
+      reason: manualReason || "Manual Front-Desk Fallback",
+      status: manualStatus,
+    })
+      .then((res) => {
+        setManualLoading(false);
+        setManualFeedback({ type: "success", message: res.data?.message || "Manual attendance recorded successfully." });
+        setManualReason("");
+        fetchAttendance();
+      })
+      .catch((err) => {
+        setManualLoading(false);
+        const msg = err.response?.data?.message || err.message || "Manual check-in failed.";
+        setManualFeedback({ type: "error", message: msg });
+      });
+  };
 
   // Fetch attendance records
   const fetchAttendance = () => {
@@ -137,7 +183,7 @@ export default function Attendance() {
             <p className="text-xs text-slate-500 font-medium">
               {isEmployee
                 ? "Read-only history of your past check-ins, check-outs, and attendance status."
-                : "Manage attendance reports and generate location-scoped reception QR codes."}
+                : "Manage attendance reports, front-desk manual fallback, and location-scoped reception QR codes."}
             </p>
           </div>
 
@@ -153,6 +199,17 @@ export default function Attendance() {
                 <div className="flex items-center space-x-1.5">
                   <FileText className="w-3.5 h-3.5" />
                   <span>Attendance Report</span>
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveTab("manual")}
+                className={`px-5 py-2 rounded-full text-xs font-extrabold transition ${
+                  activeTab === "manual" ? "glowe-pink-gradient text-white shadow-md" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <div className="flex items-center space-x-1.5">
+                  <UserCheck className="w-3.5 h-3.5" />
+                  <span>Manual Check-In</span>
                 </div>
               </button>
               <button
@@ -331,7 +388,84 @@ export default function Attendance() {
         </div>
       )}
 
-      {/* 2. ATTENDANCE QR GENERATOR VIEW (Admins Only) */}
+      {/* 2. MANUAL FRONT-DESK FALLBACK VIEW (Admins & Receptionists) */}
+      {!isEmployee && activeTab === "manual" && (
+        <div className="bg-white/90 border border-pink-100 rounded-3xl p-6 sm:p-8 space-y-6 shadow-sm max-w-3xl mx-auto">
+          <div className="flex items-center justify-between border-b border-pink-100 pb-4">
+            <div>
+              <h2 className="text-xl font-black text-slate-900 tracking-tight">Manual Front-Desk Fallback</h2>
+              <p className="text-xs text-slate-500 font-medium">Overide or log manual employee check-in when phone QR or GPS is unavailable.</p>
+            </div>
+            <button
+              onClick={() => setShowManualForm(!showManualForm)}
+              className="text-xs font-extrabold text-pink-600 hover:text-pink-700 hover:underline transition"
+            >
+              {showManualForm ? "Hide Manual Form" : "Show Manual Form"}
+            </button>
+          </div>
+
+          {showManualForm && (
+            <form onSubmit={handleManualCheckInSubmit} className="space-y-5 pt-2">
+              {manualFeedback && (
+                <div
+                  className={`p-4 rounded-2xl text-xs font-bold ${
+                    manualFeedback.type === "success"
+                      ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                      : "bg-rose-50 text-rose-800 border border-rose-200"
+                  }`}
+                >
+                  {manualFeedback.message}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">
+                  SELECT MEMBER / EMPLOYEE *
+                </label>
+                <select
+                  required
+                  value={selectedEmployeeId}
+                  onChange={(e) => setSelectedEmployeeId(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 px-4 py-3.5 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:border-pink-500 transition"
+                >
+                  <option value="">Select a member / employee</option>
+                  {(Array.isArray(employeesList) ? employeesList : []).map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.first_name} {emp.last_name || ""} ({emp.phone || "No phone"}) - {emp.role || "Staff"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">
+                  MANUAL REASON (LOGGED FOR AUDIT) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Member phone battery dead"
+                  value={manualReason}
+                  onChange={(e) => setManualReason(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 px-4 py-3.5 rounded-2xl text-xs font-medium text-slate-800 focus:outline-none focus:border-pink-500 transition"
+                />
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={manualLoading}
+                  className="glowe-pink-gradient text-white font-extrabold text-xs px-8 py-4 rounded-2xl shadow-md hover:shadow-lg transition disabled:opacity-50"
+                >
+                  {manualLoading ? "Submitting Manual Check-In..." : "Submit Manual Check-In"}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
+
+      {/* 3. ATTENDANCE QR GENERATOR VIEW (Admins Only) */}
       {!isEmployee && activeTab === "qr" && (
         <div className="bg-white/80 border border-pink-100 rounded-3xl p-6 sm:p-8 space-y-6">
           <div className="max-w-xl mx-auto space-y-6">

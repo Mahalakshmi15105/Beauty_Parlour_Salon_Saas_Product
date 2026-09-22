@@ -27,6 +27,7 @@ class Branch(db.Model, TimestampMixin, SoftDeleteMixin):
     latitude = db.Column(db.Numeric(10, 8), nullable=True)
     longitude = db.Column(db.Numeric(11, 8), nullable=True)
     geofence_radius_meters = db.Column(db.Integer, nullable=False, default=100)
+    initial_opening_balance = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
 
     # Relationships
     users = db.relationship("User", back_populates="branch")
