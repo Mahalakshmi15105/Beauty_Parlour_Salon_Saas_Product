@@ -97,6 +97,8 @@ def get_employee(employee_id):
         "level": getattr(employee, "level", "L1") or "L1",
         "commission_percentage": float(employee.commission_percentage or 0.0),
         "joining_date": employee.joining_date.isoformat() if employee.joining_date else None,
+        "shift_start_time": getattr(employee, "shift_start_time", "09:00") or "09:00",
+        "shift_end_time": getattr(employee, "shift_end_time", "18:00") or "18:00",
         "status": employee.status or "active",
         "created_at": employee.created_at.isoformat() if employee.created_at else ""
     })
@@ -192,18 +194,6 @@ def create_employee():
             target_branch_id = bid
         except ValueError:
             pass
-
-    if not target_branch_id:
-        target_branch_id = getattr(g, "branch_id", None)
-    if not target_branch_id:
-        from app.models.branch import Branch
-        main_b = Branch.query.filter_by(is_main_branch=True, is_deleted=False).first()
-        if main_b:
-            target_branch_id = main_b.id
-        else:
-            first_b = Branch.query.filter_by(is_deleted=False).first()
-            if first_b:
-                target_branch_id = first_b.id
 
     try:
         employee = Employee(
@@ -389,6 +379,10 @@ def update_employee(employee_id):
         employee.target = target_val
         employee.level = str(level or "L1").strip()
         employee.commission_percentage = comm_val
+        if "shift_start_time" in data:
+            employee.shift_start_time = data.get("shift_start_time") or "09:00"
+        if "shift_end_time" in data:
+            employee.shift_end_time = data.get("shift_end_time") or "18:00"
         employee.status = data.get("status", "active")
         if joining_date:
             employee.joining_date = joining_date

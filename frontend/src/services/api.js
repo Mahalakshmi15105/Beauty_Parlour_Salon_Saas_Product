@@ -10,16 +10,12 @@ const API = axios.create({
   timeout: 60000,
 });
 
-// Request interceptor to attach JWT token & active branch context
+// Request interceptor to attach JWT token
 API.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-    }
-    const activeBranchId = localStorage.getItem("active_branch_id");
-    if (activeBranchId) {
-      config.headers["X-Branch-Id"] = activeBranchId;
     }
     return config;
   },

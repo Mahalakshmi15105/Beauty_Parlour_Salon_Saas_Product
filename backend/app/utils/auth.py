@@ -22,70 +22,46 @@ def get_tenant_query_with_deleted(model):
 
 def get_branch_query(model):
     """
-    Returns a query object for the model filtered strictly by branch_id within the active tenant database.
-    Query is strictly scoped to g.branch_id.
+    Returns a query object for the model filtered by branch_id within the active tenant database.
+    If model has branch_id column:
+    - If g.branch_id is set: filters by model.branch_id == g.branch_id OR model.branch_id is NULL.
+    - If g.branch_id is not set (ParlourAdmin/Owner): returns all non-deleted records across main parlour & branches.
     """
     query = model.query.filter_by(is_deleted=False) if hasattr(model, "is_deleted") else model.query
     
     if hasattr(model, "branch_id"):
         if hasattr(g, "branch_id") and g.branch_id:
-            query = query.filter(model.branch_id == g.branch_id)
+            query = query.filter((model.branch_id == g.branch_id) | (model.branch_id.is_(None)))
         else:
             from flask import request
-            hdr_b = request.headers.get("X-Branch-Id") if request else None
-            param_b = request.args.get("branch_id") if request else None
-            bid_val = hdr_b or param_b
-            if bid_val and str(bid_val).strip() not in ("all", "main", "null", "0", "None"):
+            b_param = request.args.get("branch_id") if request else None
+            if b_param and b_param not in ("all", "main", "null", "0", "None"):
                 try:
-                    bid = int(bid_val)
-                    query = query.filter(model.branch_id == bid)
+                    bid = int(b_param)
+                    query = query.filter((model.branch_id == bid) | (model.branch_id.is_(None)))
                 except (ValueError, TypeError):
-                    from app.models.branch import Branch
-                    main_b = Branch.query.filter_by(is_main_branch=True, is_deleted=False).first()
-                    if main_b:
-                        query = query.filter(model.branch_id == main_b.id)
-            else:
-                from app.models.branch import Branch
-                main_b = Branch.query.filter_by(is_main_branch=True, is_deleted=False).first()
-                if main_b:
-                    query = query.filter(model.branch_id == main_b.id)
-                else:
-                    query = query.filter(model.branch_id == 1)
+                    pass
 
     return query
 
 def get_branch_query_with_deleted(model):
     """
-    Returns a query object for the model filtered strictly by branch_id, including soft deleted records.
+    Returns a query object for the model filtered by branch_id, including soft deleted records.
     """
     query = model.query
     
     if hasattr(model, "branch_id"):
         if hasattr(g, "branch_id") and g.branch_id:
-            query = query.filter(model.branch_id == g.branch_id)
+            query = query.filter((model.branch_id == g.branch_id) | (model.branch_id.is_(None)))
         else:
             from flask import request
             b_param = request.args.get("branch_id") if request else None
-            if b_param == "all":
-                pass
-            elif b_param and b_param not in ("main", "null", "0", "None"):
+            if b_param and b_param not in ("all", "main", "null", "0", "None"):
                 try:
                     bid = int(b_param)
-                    query = query.filter(model.branch_id == bid)
+                    query = query.filter((model.branch_id == bid) | (model.branch_id.is_(None)))
                 except (ValueError, TypeError):
-                    from app.models.branch import Branch
-                    main_b = Branch.query.filter_by(is_main_branch=True, is_deleted=False).first()
-                    if main_b:
-                        query = query.filter((model.branch_id == main_b.id) | (model.branch_id.is_(None)))
-                    else:
-                        query = query.filter(model.branch_id.is_(None))
-            else:
-                from app.models.branch import Branch
-                main_b = Branch.query.filter_by(is_main_branch=True, is_deleted=False).first()
-                if main_b:
-                    query = query.filter((model.branch_id == main_b.id) | (model.branch_id.is_(None)))
-                else:
-                    query = query.filter(model.branch_id.is_(None))
+                    pass
 
     return query
 
@@ -171,31 +147,7 @@ def require_role(roles):
             g.user_id = user_id
             g.parlour_id = parlour_id
             g.tenant_db_uri = tenant_db_uri
-            
-            # Resolve branch context from header/query if not directly embedded in JWT token
-            from flask import request
-            hdr_b = request.headers.get("X-Branch-Id") if request else None
-            param_b = request.args.get("branch_id") if request else None
-            active_b = hdr_b or param_b
-            if active_b and str(active_b).strip() not in ("all", "main", "null", "0", "None"):
-                try:
-                    g.branch_id = int(active_b)
-                except (ValueError, TypeError):
-                    g.branch_id = branch_id
-            else:
-                g.branch_id = branch_id
-
-            if not g.branch_id and role == "ParlourAdmin":
-                try:
-                    from app.models.branch import Branch
-                    main_b = Branch.query.filter_by(tenant_id=parlour_id, is_main_branch=True, is_deleted=False).first()
-                    if not main_b:
-                        main_b = Branch.query.filter_by(tenant_id=parlour_id, is_deleted=False).first()
-                    if main_b:
-                        g.branch_id = main_b.id
-                except Exception:
-                    pass
-
+            g.branch_id = branch_id
             g.role = role
             g.use_master_db = False
 

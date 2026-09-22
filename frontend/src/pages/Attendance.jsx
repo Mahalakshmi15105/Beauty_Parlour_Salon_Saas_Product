@@ -26,7 +26,7 @@ export default function Attendance() {
 
   // Manual Attendance State (Admin & Receptionist)
   const [showManualForm, setShowManualForm] = useState(true);
-  const [manualActionType, setManualActionType] = useState("checkin");
+  const [manualAction, setManualAction] = useState("checkin"); // "checkin" or "checkout"
   const [employeesList, setEmployeesList] = useState([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
   const [manualReason, setManualReason] = useState("");
@@ -82,9 +82,9 @@ export default function Attendance() {
     const empBranchId = selectedEmp?.branch_id || user?.branch_id;
 
     API.post("/attendance/manual-checkin", {
+      action_type: manualAction,
       employee_id: parseInt(selectedEmployeeId, 10),
       branch_id: empBranchId ? parseInt(empBranchId, 10) : undefined,
-      action_type: manualActionType,
       reason: manualReason || "Manual Front-Desk Fallback",
       status: manualStatus,
     })
@@ -96,7 +96,7 @@ export default function Attendance() {
       })
       .catch((err) => {
         setManualLoading(false);
-        const msg = err.response?.data?.message || err.message || "Manual check-in failed.";
+        const msg = err.response?.data?.message || err.message || "Manual attendance action failed.";
         setManualFeedback({ type: "error", message: msg });
       });
   };
@@ -406,32 +406,33 @@ export default function Attendance() {
                 </div>
               )}
 
+              {/* Explicit Action Selector */}
               <div>
                 <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">
-                  ATTENDANCE ACTION TYPE *
+                  ATTENDANCE ACTION *
                 </label>
-                <div className="flex items-center space-x-6 bg-slate-50 border border-slate-200 p-3 rounded-2xl">
-                  <label className="flex items-center space-x-2 text-xs font-extrabold text-slate-800 cursor-pointer">
+                <div className="flex items-center space-x-6 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                  <label className="flex items-center space-x-2.5 cursor-pointer">
                     <input
                       type="radio"
-                      name="manualActionType"
+                      name="manualAction"
                       value="checkin"
-                      checked={manualActionType === "checkin"}
-                      onChange={() => setManualActionType("checkin")}
-                      className="accent-pink-600 w-4 h-4"
+                      checked={manualAction === "checkin"}
+                      onChange={() => setManualAction("checkin")}
+                      className="w-4 h-4 text-pink-600 focus:ring-pink-500 cursor-pointer"
                     />
-                    <span>(•) Manual Check-In</span>
+                    <span className="text-xs font-bold text-slate-800">Manual Check-In</span>
                   </label>
-                  <label className="flex items-center space-x-2 text-xs font-extrabold text-slate-800 cursor-pointer">
+                  <label className="flex items-center space-x-2.5 cursor-pointer">
                     <input
                       type="radio"
-                      name="manualActionType"
+                      name="manualAction"
                       value="checkout"
-                      checked={manualActionType === "checkout"}
-                      onChange={() => setManualActionType("checkout")}
-                      className="accent-pink-600 w-4 h-4"
+                      checked={manualAction === "checkout"}
+                      onChange={() => setManualAction("checkout")}
+                      className="w-4 h-4 text-pink-600 focus:ring-pink-500 cursor-pointer"
                     />
-                    <span>(•) Manual Check-Out</span>
+                    <span className="text-xs font-bold text-slate-800">Manual Check-Out</span>
                   </label>
                 </div>
               </div>
@@ -476,8 +477,12 @@ export default function Attendance() {
                   className="glowe-pink-gradient text-white font-extrabold text-xs px-8 py-4 rounded-2xl shadow-md hover:shadow-lg transition disabled:opacity-50"
                 >
                   {manualLoading
-                    ? `Submitting ${manualActionType === "checkin" ? "Check-In" : "Check-Out"}...`
-                    : `Submit Manual ${manualActionType === "checkin" ? "Check-In" : "Check-Out"}`}
+                    ? manualAction === "checkin"
+                      ? "Submitting Manual Check-In..."
+                      : "Submitting Manual Check-Out..."
+                    : manualAction === "checkin"
+                    ? "Submit Manual Check-In"
+                    : "Submit Manual Check-Out"}
                 </button>
               </div>
             </form>

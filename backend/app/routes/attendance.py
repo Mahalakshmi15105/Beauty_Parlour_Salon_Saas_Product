@@ -221,13 +221,13 @@ def employee_auto_scan():
 
         distance_meters = haversine(lat, lng, branch.latitude, branch.longitude)
 
-    # 1. ALREADY CHECKED IN AND CHECKED OUT TODAY -> SHOW COMPLETED STATUS
+    # 1. ALREADY CHECKED IN AND CHECKED OUT TODAY -> SHOW COMPLETED STATUS NOTICE
     if existing and existing.check_out_time:
         cin_time = existing.timestamp.strftime("%I:%M %p")
         cout_time = existing.check_out_time.strftime("%I:%M %p")
         return jsonify({
-            "status": "completed",
-            "message": f"You already checked in today at {cin_time} and checked out at {cout_time} for {branch.name}.",
+            "status": "error",
+            "message": f"You have already completed attendance for today (Checked in: {cin_time}, Checked out: {cout_time}).",
             "data": {
                 "id": existing.id,
                 "checkin_time": cin_time,
@@ -235,10 +235,19 @@ def employee_auto_scan():
                 "branch_name": branch.name,
                 "status": existing.status
             }
-        }), 200
+        }), 400
 
     # 2. CHECKED IN, BUT NOT CHECKED OUT YET -> AUTOMATIC CHECK-OUT ATTEMPT
     if existing and not existing.check_out_time:
+        now = datetime.utcnow()
+        elapsed_mins = (now - existing.timestamp).total_seconds() / 60.0
+        if elapsed_mins < 30:
+            cin_time = existing.timestamp.strftime("%I:%M %p")
+            return jsonify({
+                "status": "error",
+                "message": f"You checked in recently at {cin_time}. Please scan again closer to your shift end time to check out."
+            }), 400
+
         if branch.latitude is not None and branch.longitude is not None:
             radius = float(branch.geofence_radius_meters or 100)
             if distance_meters is None or distance_meters > radius:
@@ -247,16 +256,6 @@ def employee_auto_scan():
                     "status": "error",
                     "message": f"❌ Check-out Failed: You are {dist_val}m away from {branch.name}. You must be within {int(radius)}m to check out."
                 }), 400
-
-        now = datetime.utcnow()
-        worked_mins = (now - existing.timestamp).total_seconds() / 60.0
-
-        if worked_mins < 30:
-            cin_str = existing.timestamp.strftime("%I:%M %p")
-            return jsonify({
-                "status": "error",
-                "message": f"⚠️ Already checked in today at {cin_str}. You cannot check out within 30 minutes of check-in."
-            }), 400
 
         existing.check_out_time = now
 
@@ -340,8 +339,6 @@ def get_attendance_logs():
     branch_id = request.args.get("branch_id", type=int)
     start_date = request.args.get("start_date")
     end_date = request.args.get("end_date")
-
-    query = Attendance.query
 
     target_b = getattr(g, "branch_id", None) or branch_id or (claims.get("branch_id") if role == "BranchAdmin" else None)
 
@@ -607,12 +604,11 @@ def manual_attendance_checkin():
     tenant_id = claims.get("parlour_id") or claims.get("tenant_id")
     data = request.get_json() or {}
 
+    action_type = (data.get("action_type") or data.get("action") or "checkin").lower()
     employee_id = data.get("employee_id")
     branch_id = data.get("branch_id")
     reason = (data.get("reason") or "Manual Front-Desk Fallback").strip()
     status_type = (data.get("status") or "P").upper()
-
-    action_type = (data.get("action_type") or "checkin").lower()
 
     if not employee_id:
         return jsonify({"status": "error", "message": "Select an employee to submit manual attendance"}), 400
@@ -639,23 +635,61 @@ def manual_attendance_checkin():
     ).filter(Attendance.timestamp >= today_start, Attendance.timestamp <= today_end).order_by(Attendance.timestamp.desc()).first()
 
     now = datetime.utcnow()
-    cin_time = now.strftime("%I:%M %p")
 
-    if action_type == "checkout":
+    if action_type == "checkin":
+        if existing:
+            cin_time = existing.timestamp.strftime("%I:%M %p")
+            return jsonify({
+                "status": "error",
+                "message": f"This employee already checked in today at {cin_time}."
+            }), 400
+
+        # Create new Manual Check-in
+        attendance = Attendance(
+            tenant_id=tenant_id or employee.tenant_id or 1,
+            employee_id=employee.id,
+            branch_id=target_branch_id,
+            timestamp=now,
+            checkin_method="Manual",
+            location_flagged=False,
+            location_unavailable=True,
+            status=status_type if status_type in ["P", "HP", "OFF"] else "P"
+        )
+        db.session.add(attendance)
+        db.session.commit()
+
+        cin_time = now.strftime("%I:%M %p")
+        return jsonify({
+            "status": "success",
+            "action": "checkin",
+            "message": f"✅ Manual check-in submitted for {employee.first_name} {employee.last_name or ''} at {cin_time} ({branch_name}). Audit Reason: {reason}",
+            "data": {
+                "id": attendance.id,
+                "employee_name": f"{employee.first_name} {employee.last_name or ''}".strip(),
+                "checkin_time": cin_time,
+                "status": attendance.status
+            }
+        }), 201
+
+    elif action_type == "checkout":
         if not existing:
             return jsonify({
                 "status": "error",
-                "message": f"❌ Manual Check-Out Failed: {employee.first_name} {employee.last_name or ''} has not checked in today yet."
-            }), 400
-        if existing.check_out_time:
-            return jsonify({
-                "status": "error",
-                "message": f"⚠️ {employee.first_name} {employee.last_name or ''} has already checked out today at {existing.check_out_time.strftime('%I:%M %p')}."
+                "message": "This employee has not checked in today yet."
             }), 400
 
+        if existing.check_out_time:
+            cout_time = existing.check_out_time.strftime("%I:%M %p")
+            return jsonify({
+                "status": "error",
+                "message": f"This employee already checked out today at {cout_time}."
+            }), 400
+
+        # Perform Manual Check-out
         existing.check_out_time = now
         existing.status = status_type if status_type in ["P", "HP", "OFF"] else "P"
         db.session.commit()
+
         cout_time = now.strftime("%I:%M %p")
         return jsonify({
             "status": "success",
@@ -669,37 +703,7 @@ def manual_attendance_checkin():
             }
         }), 200
 
-    # Default action_type == "checkin"
-    if existing:
-        return jsonify({
-            "status": "error",
-            "message": f"Already put attendance for this employee today ({employee.first_name} {employee.last_name or ''} checked in at {existing.timestamp.strftime('%I:%M %p')})."
-        }), 400
-
-    # Create new Manual Check-in
-    attendance = Attendance(
-        tenant_id=tenant_id or employee.tenant_id or 1,
-        employee_id=employee.id,
-        branch_id=target_branch_id,
-        timestamp=now,
-        checkin_method="Manual",
-        location_flagged=False,
-        location_unavailable=True,
-        status=status_type if status_type in ["P", "HP", "OFF"] else "P"
-    )
-    db.session.add(attendance)
-    db.session.commit()
-
-    return jsonify({
-        "status": "success",
-        "action": "checkin",
-        "message": f"✅ Manual check-in submitted for {employee.first_name} {employee.last_name or ''} at {cin_time} ({branch_name}). Audit Reason: {reason}",
-        "data": {
-            "id": attendance.id,
-            "employee_name": f"{employee.first_name} {employee.last_name or ''}".strip(),
-            "checkin_time": cin_time,
-            "status": attendance.status
-        }
-    }), 201
+    else:
+        return jsonify({"status": "error", "message": "Invalid action_type. Must be 'checkin' or 'checkout'."}), 400
 
 

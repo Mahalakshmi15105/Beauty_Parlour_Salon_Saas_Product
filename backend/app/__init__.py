@@ -30,7 +30,7 @@ def create_app(config_class=Config):
             app,
             resources={r"/*": {"origins": app.config["CORS_ORIGINS"]}},
             supports_credentials=True,
-            allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin", "X-Branch-Id"],
+            allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
             methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         )
     # Configure Database-per-Tenant URI defaults dynamically from MASTER_DATABASE_URI

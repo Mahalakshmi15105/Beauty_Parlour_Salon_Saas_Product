@@ -109,23 +109,6 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
   const [shopNameTypography, setShopNameTypography] = useState(null);
   const [imgFailed, setImgFailed] = useState(false);
   const [branchData, setBranchData] = useState(null);
-  const [branchesList, setBranchesList] = useState([]);
-
-  useEffect(() => {
-    if (user?.role === "ParlourAdmin") {
-      API.get("/branches")
-        .then((res) => {
-          const list = Array.isArray(res) ? res : (res?.data?.data || res?.data || res?.items || []);
-          setBranchesList(list);
-          const currentActive = localStorage.getItem("active_branch_id");
-          if (!currentActive && list.length > 0) {
-            const mainB = list.find((b) => b.is_main_branch) || list[0];
-            localStorage.setItem("active_branch_id", String(mainB.id));
-          }
-        })
-        .catch(() => {});
-    }
-  }, [user]);
 
   const fetchBranding = () => {
     if (user?.role === "BranchAdmin" && user?.branch_id) {
@@ -526,30 +509,6 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
           </div>
 
           <div className="flex items-center space-x-3">
-            {/* PARLOUR OWNER BRANCH CONTEXT SWITCHER */}
-            {user?.role === "ParlourAdmin" && (
-              <div className="flex items-center space-x-1.5 bg-pink-50 border border-pink-200 px-3 py-1.5 rounded-xl shadow-2xs">
-                <Building className="w-3.5 h-3.5 text-pink-600 shrink-0" />
-                <span className="text-[10px] font-bold text-slate-500 uppercase hidden sm:inline">Active Branch:</span>
-                <select
-                  value={localStorage.getItem("active_branch_id") || (branchesList.find((b) => b.is_main_branch)?.id || branchesList[0]?.id || "")}
-                  onChange={(e) => {
-                    const newBId = e.target.value;
-                    localStorage.setItem("active_branch_id", newBId);
-                    window.dispatchEvent(new Event("branch_context_changed"));
-                    window.location.reload();
-                  }}
-                  className="bg-transparent text-xs font-extrabold text-slate-900 focus:outline-none cursor-pointer"
-                >
-                  {branchesList.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name} {b.is_main_branch ? "(Main)" : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
             {/* BRANCH ADMIN INDICATOR */}
             {user?.role === "BranchAdmin" && (
               <div className="flex items-center space-x-1.5 bg-slate-900 text-white px-3 py-1.5 rounded-xl border border-pink-500/30 shadow-sm">
