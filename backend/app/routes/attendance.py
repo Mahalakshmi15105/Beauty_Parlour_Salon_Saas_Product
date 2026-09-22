@@ -341,6 +341,8 @@ def get_attendance_logs():
     start_date = request.args.get("start_date")
     end_date = request.args.get("end_date")
 
+    query = Attendance.query
+
     target_b = getattr(g, "branch_id", None) or branch_id or (claims.get("branch_id") if role == "BranchAdmin" else None)
 
     # Branch RBAC scoping

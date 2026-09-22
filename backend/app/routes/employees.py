@@ -193,6 +193,18 @@ def create_employee():
         except ValueError:
             pass
 
+    if not target_branch_id:
+        target_branch_id = getattr(g, "branch_id", None)
+    if not target_branch_id:
+        from app.models.branch import Branch
+        main_b = Branch.query.filter_by(is_main_branch=True, is_deleted=False).first()
+        if main_b:
+            target_branch_id = main_b.id
+        else:
+            first_b = Branch.query.filter_by(is_deleted=False).first()
+            if first_b:
+                target_branch_id = first_b.id
+
     try:
         employee = Employee(
             tenant_id=g.parlour_id,

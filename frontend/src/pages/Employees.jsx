@@ -75,6 +75,9 @@ function Employees() {
 
   useEffect(() => {
     fetchEmployees();
+    const handleBranchChanged = () => fetchEmployees();
+    window.addEventListener("branch_context_changed", handleBranchChanged);
+    return () => window.removeEventListener("branch_context_changed", handleBranchChanged);
   }, [search, status]);
 
   const handleExportCSV = () => {
