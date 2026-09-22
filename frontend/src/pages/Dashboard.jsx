@@ -293,7 +293,7 @@ function Dashboard() {
       )}
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
         <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow flex flex-col justify-between" style={{ boxShadow: "0 8px 24px rgba(255, 117, 143, 0.2)" }}>
           <p className="text-xs font-bold text-pink-600 uppercase tracking-wider">Today's Revenue</p>
           <p className="text-2xl font-black text-text-primary mt-2">{formatCurrency(summary?.revenue?.today)}</p>
@@ -310,6 +310,14 @@ function Dashboard() {
           <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Monthly Revenue</p>
           <p className="text-2xl font-black text-text-primary mt-2">{formatCurrency(summary?.revenue?.monthly)}</p>
           <p className="text-[10px] text-text-secondary mt-2">{summary?.invoices?.this_month} Bills This Month</p>
+        </div>
+
+        <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow flex flex-col justify-between" style={{ boxShadow: "0 8px 24px rgba(168, 85, 247, 0.15)" }}>
+          <p className="text-xs font-bold text-purple-600 uppercase tracking-wider">Today's Attendance</p>
+          <p className="text-2xl font-black text-text-primary mt-2">{summary?.attendance?.total_checked_in || 0} Checked In</p>
+          <p className="text-[10px] text-purple-700 font-medium mt-2">
+            {summary?.attendance?.present || 0} Present • {summary?.attendance?.half_day || 0} Half-Day
+          </p>
         </div>
 
         <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow flex flex-col justify-between" style={{ boxShadow: "0 8px 24px rgba(245, 158, 11, 0.15)" }}>

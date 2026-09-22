@@ -1,6 +1,6 @@
 import io
 import math
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from flask import Blueprint, request, jsonify, send_file, g, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 try:
@@ -332,24 +332,22 @@ def get_attendance_logs():
     start_date = request.args.get("start_date")
     end_date = request.args.get("end_date")
 
-    query = Attendance.query
+    target_b = getattr(g, "branch_id", None) or branch_id or (claims.get("branch_id") if role == "BranchAdmin" else None)
 
     # Branch RBAC scoping
-    if role == "BranchAdmin" and claims.get("branch_id"):
-        query = query.filter_by(branch_id=claims.get("branch_id"))
-    elif branch_id:
-        query = query.filter_by(branch_id=branch_id)
+    if target_b:
+        query = query.filter_by(branch_id=target_b)
 
     if start_date:
         try:
-            s_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            s_dt = datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=1)
             query = query.filter(Attendance.timestamp >= s_dt)
         except ValueError:
             pass
 
     if end_date:
         try:
-            e_dt = datetime.strptime(end_date + " 23:59:59", "%Y-%m-%d %H:%M:%S")
+            e_dt = datetime.strptime(end_date + " 23:59:59", "%Y-%m-%d %H:%M:%S") + timedelta(days=1)
             query = query.filter(Attendance.timestamp <= e_dt)
         except ValueError:
             pass
@@ -615,38 +613,44 @@ def manual_attendance_checkin():
     if not employee:
         return jsonify({"status": "error", "message": "Selected employee not found"}), 404
 
-    target_branch_id = branch_id or employee.branch_id or getattr(g, "branch_id", 1) or 1
+    target_branch_id = getattr(g, "branch_id", None) or branch_id or employee.branch_id or 1
     branch = Branch.query.get(target_branch_id)
     branch_name = branch.name if branch else "Main Branch"
 
     today_start = datetime.combine(date.today(), datetime.min.time())
     today_end = datetime.combine(date.today(), datetime.max.time())
 
+    # Check any attendance today for this employee across branch or tenant
     existing = Attendance.query.filter_by(
-        employee_id=employee.id,
-        branch_id=target_branch_id
+        employee_id=employee.id
     ).filter(Attendance.timestamp >= today_start, Attendance.timestamp <= today_end).order_by(Attendance.timestamp.desc()).first()
 
     now = datetime.utcnow()
     cin_time = now.strftime("%I:%M %p")
 
-    if existing and not existing.check_out_time:
-        # Perform Manual Check-out if checked in already
-        existing.check_out_time = now
-        existing.status = status_type if status_type in ["P", "HP", "OFF"] else "P"
-        db.session.commit()
-        cout_time = now.strftime("%I:%M %p")
-        return jsonify({
-            "status": "success",
-            "action": "checkout",
-            "message": f"✅ Manual check-out recorded for {employee.first_name} {employee.last_name or ''} at {cout_time}. Audit Reason: {reason}",
-            "data": {
-                "id": existing.id,
-                "employee_name": f"{employee.first_name} {employee.last_name or ''}".strip(),
-                "checkout_time": cout_time,
-                "status": existing.status
-            }
-        }), 200
+    if existing:
+        if existing.check_out_time:
+            return jsonify({
+                "status": "error",
+                "message": f"⚠️ Attendance already completed for {employee.first_name} {employee.last_name or ''} today (Checked in at {existing.timestamp.strftime('%I:%M %p')}, Checked out at {existing.check_out_time.strftime('%I:%M %p')})."
+            }), 400
+        else:
+            # Perform Manual Check-out if checked in already but not checked out
+            existing.check_out_time = now
+            existing.status = status_type if status_type in ["P", "HP", "OFF"] else "P"
+            db.session.commit()
+            cout_time = now.strftime("%I:%M %p")
+            return jsonify({
+                "status": "success",
+                "action": "checkout",
+                "message": f"✅ Manual check-out recorded for {employee.first_name} {employee.last_name or ''} at {cout_time}. Audit Reason: {reason}",
+                "data": {
+                    "id": existing.id,
+                    "employee_name": f"{employee.first_name} {employee.last_name or ''}".strip(),
+                    "checkout_time": cout_time,
+                    "status": existing.status
+                }
+            }), 200
 
     # Create new Manual Check-in
     attendance = Attendance(

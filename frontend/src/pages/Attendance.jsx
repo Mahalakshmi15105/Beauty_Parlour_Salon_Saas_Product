@@ -77,9 +77,12 @@ export default function Attendance() {
     setManualLoading(true);
     setManualFeedback(null);
 
+    const selectedEmp = employeesList.find((e) => String(e.id) === String(selectedEmployeeId));
+    const empBranchId = selectedEmp?.branch_id || user?.branch_id;
+
     API.post("/attendance/manual-checkin", {
       employee_id: parseInt(selectedEmployeeId, 10),
-      branch_id: branchId !== "all" ? parseInt(branchId, 10) : undefined,
+      branch_id: empBranchId ? parseInt(empBranchId, 10) : undefined,
       reason: manualReason || "Manual Front-Desk Fallback",
       status: manualStatus,
     })
@@ -238,27 +241,6 @@ export default function Attendance() {
           {/* Filter Toolbar */}
           <div className="bg-white/80 p-4 rounded-2xl border border-pink-100 shadow-xs flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3">
-              {/* Branch Filter - hidden for employees or scoped for BranchAdmin */}
-              {!isEmployee && (
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-500 mb-1">Branch</label>
-                  <select
-                    value={branchId}
-                    onChange={(e) => setBranchId(e.target.value)}
-                    className="bg-background border border-border-soft px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-primary"
-                  >
-                    {user?.role === "ParlourAdmin" && <option value="all">All Branches</option>}
-                    {branches
-                      .filter((b) => user?.role !== "BranchAdmin" || String(b.id) === String(user?.branch_id))
-                      .map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.name} {b.is_main_branch ? "(Main)" : ""}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-              )}
-
               {/* Date Range Filters */}
               <div>
                 <label className="block text-[11px] font-bold text-slate-500 mb-1">From Date</label>

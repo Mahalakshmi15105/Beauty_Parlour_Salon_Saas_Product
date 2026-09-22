@@ -5,6 +5,7 @@ from app.models.catalog import Service, Product
 from app.models.customer import Customer
 from app.models.employee import Employee
 from app.models.membership import CustomerMembership
+from app.models.attendance import Attendance
 from app.utils.responses import success_response, error_response
 from app.utils.auth import require_role, get_tenant_query
 from sqlalchemy import func, cast, Date
@@ -89,6 +90,19 @@ def get_summary():
         } for p in low_stock_items
     ]
 
+    # 6. Today's Attendance Metrics (Branch Scoped)
+    att_query = db.session.query(Attendance).filter(
+        Attendance.timestamp >= today_start
+    )
+    if g.branch_id:
+        att_query = att_query.filter(Attendance.branch_id == g.branch_id)
+    today_atts = att_query.all()
+
+    total_checked_in = len([a for a in today_atts if a.status in ["P", "HP", "Present", "HalfDay"]])
+    present_cnt = len([a for a in today_atts if a.status in ["P", "Present"]])
+    half_cnt = len([a for a in today_atts if a.status in ["HP", "HalfDay"]])
+    off_cnt = len([a for a in today_atts if a.status in ["OFF", "DayOff", "L", "Leave"]])
+
     return success_response({
         "revenue": {
             "today": float(today_revenue),
@@ -107,6 +121,12 @@ def get_summary():
         "memberships": {
             "active": active_memberships,
             "expiring_soon": expiring_soon
+        },
+        "attendance": {
+            "total_checked_in": total_checked_in,
+            "present": present_cnt,
+            "half_day": half_cnt,
+            "off": off_cnt
         },
         "low_stock_alerts": low_stock_data
     })
