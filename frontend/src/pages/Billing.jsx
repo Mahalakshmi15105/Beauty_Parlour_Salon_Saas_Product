@@ -1278,9 +1278,10 @@ function Billing() {
     const serviceObj = serviceList.find((s) => s.id === parseInt(targetId));
     if (!serviceObj) return;
 
-    const initialDiscount = getMembershipDiscountForService(serviceObj, activeMembership);
+    const isVisitBasedOrDisabled = visitMembershipStatus?.membership_mode === "visit_based" || visitMembershipStatus?.membership_mode === "disabled";
+    const initialDiscount = isVisitBasedOrDisabled ? 0 : getMembershipDiscountForService(serviceObj, activeMembership);
 
-    if (useMembership && activeMembership && initialDiscount === 0) {
+    if (!isVisitBasedOrDisabled && useMembership && activeMembership && initialDiscount === 0) {
       const custName = customerSearchQuery && customerSearchQuery !== "Walk-in Customer" ? customerSearchQuery.split("(")[0].trim() : "Customer";
       const planName = activeMembership.plan_name || activeMembership.name || "Membership";
       showError(`"${serviceObj.name}" is not included in ${custName}'s ${planName} plan.`);
