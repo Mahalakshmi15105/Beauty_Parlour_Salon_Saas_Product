@@ -342,20 +342,22 @@ def get_attendance_logs():
 
     target_b = getattr(g, "branch_id", None) or branch_id or (claims.get("branch_id") if role == "BranchAdmin" else None)
 
+    query = Attendance.query
+
     # Branch RBAC scoping
     if target_b:
         query = query.filter_by(branch_id=target_b)
 
     if start_date:
         try:
-            s_dt = datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=1)
+            s_dt = datetime.strptime(start_date, "%Y-%m-%d")
             query = query.filter(Attendance.timestamp >= s_dt)
         except ValueError:
             pass
 
     if end_date:
         try:
-            e_dt = datetime.strptime(end_date + " 23:59:59", "%Y-%m-%d %H:%M:%S") + timedelta(days=1)
+            e_dt = datetime.strptime(end_date + " 23:59:59", "%Y-%m-%d %H:%M:%S")
             query = query.filter(Attendance.timestamp <= e_dt)
         except ValueError:
             pass

@@ -817,10 +817,14 @@ def get_attendance_salary_report():
     if branch_id:
         invoices = [inv for inv in invoices if inv.branch_id == branch_id]
 
-    payroll_adjs = get_branch_query(PayrollAdjustment).filter(
-        PayrollAdjustment.date >= start_dt.date(),
-        PayrollAdjustment.date <= end_dt.date()
-    ).all()
+    try:
+        payroll_adjs = get_branch_query(PayrollAdjustment).filter(
+            PayrollAdjustment.date >= start_dt.date(),
+            PayrollAdjustment.date <= end_dt.date()
+        ).all()
+    except Exception:
+        db.session.rollback()
+        payroll_adjs = []
 
     att_matrix = []
     salary_rows = []
