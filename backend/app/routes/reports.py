@@ -578,7 +578,7 @@ def get_daily_sales_statement():
     prev_cash_sum = Decimal("0.00")
     for inv in prev_invoices:
         pm_list = InvoicePayment.query.filter_by(invoice_id=inv.id).all()
-        prev_cash_sum += sum(p.amount for p in pm_list if p.payment_method == "Cash") or Decimal("0.00")
+        prev_cash_sum += sum(Decimal(str(p.amount or 0)) for p in pm_list if str(getattr(p, "payment_method", getattr(p, "method", ""))).lower() == "cash") or Decimal("0.00")
 
     prev_expenses = Expense.query.filter_by(tenant_id=g.parlour_id, is_deleted=False).filter(Expense.date < target_date)
     if branch_id:

@@ -15,7 +15,7 @@ from app.models.employee import Employee
 from app.models.attendance import Attendance
 from app.models.user import User
 
-from app.utils.auth import require_role
+from app.utils.auth import require_role, get_branch_query
 
 attendance_bp = Blueprint("attendance", __name__, url_prefix="/api/v1/attendance")
 
@@ -336,17 +336,10 @@ def get_attendance_logs():
     """Retrieve tenant & branch-scoped attendance logs for admin reporting."""
     claims = get_jwt()
     role = claims.get("role")
-    branch_id = request.args.get("branch_id", type=int)
     start_date = request.args.get("start_date")
     end_date = request.args.get("end_date")
 
-    target_b = getattr(g, "branch_id", None) or branch_id or (claims.get("branch_id") if role == "BranchAdmin" else None)
-
-    query = Attendance.query
-
-    # Branch RBAC scoping
-    if target_b:
-        query = query.filter_by(branch_id=target_b)
+    query = get_branch_query(Attendance)
 
     if start_date:
         try:
@@ -366,12 +359,7 @@ def get_attendance_logs():
         records = query.order_by(Attendance.timestamp.desc()).all()
     except Exception as e:
         db.session.rollback()
-        try:
-            from app.database import tenant_metadata
-            tenant_metadata.create_all(bind=db.session.get_bind())
-            records = query.order_by(Attendance.timestamp.desc()).all()
-        except Exception:
-            return jsonify([]), 200
+        records = []
 
     result = []
     for att in records:

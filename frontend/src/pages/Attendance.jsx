@@ -12,9 +12,17 @@ export default function Attendance() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const getTodayStr = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   // Filters
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [startDate, setStartDate] = useState(getTodayStr());
+  const [endDate, setEndDate] = useState(getTodayStr());
   const [branchId, setBranchId] = useState("all");
   const [branches, setBranches] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -111,7 +119,14 @@ export default function Attendance() {
 
     API.get(url)
       .then((res) => {
-        setRecords(res.data.data || []);
+        const list = Array.isArray(res)
+          ? res
+          : Array.isArray(res?.data)
+          ? res.data
+          : Array.isArray(res?.data?.data)
+          ? res.data.data
+          : [];
+        setRecords(list);
         setLoading(false);
       })
       .catch((err) => {

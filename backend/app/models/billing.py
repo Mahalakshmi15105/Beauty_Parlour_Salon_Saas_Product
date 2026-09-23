@@ -23,6 +23,10 @@ class Invoice(db.Model, TimestampMixin):
     line_items = db.relationship("InvoiceLineItem", back_populates="invoice", cascade="all, delete-orphan")
     payments = db.relationship("InvoicePayment", back_populates="invoice", cascade="all, delete-orphan")
 
+    @property
+    def items(self):
+        return self.line_items
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -65,6 +69,14 @@ class InvoicePayment(db.Model, TimestampMixin):
 
     # Relationships
     invoice = db.relationship("Invoice", back_populates="payments")
+
+    @property
+    def payment_method(self):
+        return getattr(self, "method", "") or ""
+
+    @property
+    def payment_mode(self):
+        return getattr(self, "method", "") or ""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

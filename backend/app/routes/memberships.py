@@ -670,20 +670,38 @@ def get_all_memberships():
     from app.models.customer import Customer
     query = CustomerMembership.query.join(Customer).filter(CustomerMembership.tenant_id == g.parlour_id)
     
-    if hasattr(g, "branch_id") and g.branch_id:
-        query = query.filter(Customer.branch_id == g.branch_id)
-    else:
+    target_bid = getattr(g, "branch_id", None)
+    if not target_bid:
         b_param = request.args.get("branch_id")
-        if b_param == "all":
-            pass
-        elif b_param and b_param not in ("main", "null", "0", "None"):
+        if b_param and b_param not in ("all", "main", "null", "0", "None"):
             try:
-                bid = int(b_param)
-                query = query.filter(Customer.branch_id == bid)
+                target_bid = int(b_param)
             except (ValueError, TypeError):
-                query = query.filter(Customer.branch_id.is_(None))
-        else:
-            query = query.filter(Customer.branch_id.is_(None))
+                pass
+
+    main_b_id = None
+    try:
+        from app.models.branch import Branch
+        main_b = Branch.query.filter_by(is_main_branch=True, is_deleted=False).first()
+        if not main_b:
+            main_b = Branch.query.filter_by(is_deleted=False).first()
+        if main_b:
+            main_b_id = main_b.id
+    except Exception:
+        main_b_id = 1
+
+    if not target_bid:
+        target_bid = main_b_id or 1
+
+    if target_bid == main_b_id:
+        query = query.filter(
+            (Customer.branch_id == target_bid) | (Customer.branch_id.is_(None)) |
+            (CustomerMembership.branch_id == target_bid) | (CustomerMembership.branch_id.is_(None))
+        )
+    else:
+        query = query.filter(
+            (Customer.branch_id == target_bid) | (CustomerMembership.branch_id == target_bid)
+        )
 
     query = query.order_by(CustomerMembership.id.desc())
     
