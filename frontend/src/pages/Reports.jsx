@@ -468,7 +468,10 @@ function Reports() {
       for (let i = 0; i < maxRows; i++) {
         const att = attList[i] || {};
         const sal = salList[i] || {};
-        const dayCells = days.map((day) => (att.days ? att.days[String(day.day)] || "1" : ""));
+        const dayCells = days.map((day) => {
+          const val = att.days ? att.days[String(day.day)] || "" : "";
+          return val === "1" ? "P" : val;
+        });
 
         wsData.push([
           att.sno || "",
@@ -995,7 +998,7 @@ function Reports() {
                                       : "text-slate-300 font-normal"
                                   }`}
                                 >
-                                  {val || "—"}
+                                  {val === "1" ? "P" : (val || "—")}
                                 </td>
                               );
                             })}

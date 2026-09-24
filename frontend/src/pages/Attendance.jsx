@@ -426,7 +426,7 @@ export default function Attendance() {
                 <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">
                   ATTENDANCE ACTION *
                 </label>
-                <div className="flex items-center space-x-6 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                <div className="flex flex-wrap items-center gap-6 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
                   <label className="flex items-center space-x-2.5 cursor-pointer">
                     <input
                       type="radio"
@@ -452,6 +452,50 @@ export default function Attendance() {
                 </div>
               </div>
 
+              {/* Status Selector */}
+              {manualAction === "checkin" && (
+                <div>
+                  <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">
+                    ATTENDANCE STATUS *
+                  </label>
+                  <div className="flex flex-wrap items-center gap-4 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="manualStatus"
+                        value="P"
+                        checked={manualStatus === "P"}
+                        onChange={() => setManualStatus("P")}
+                        className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                      />
+                      <span className="text-xs font-extrabold text-emerald-700">P (Present)</span>
+                    </label>
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="manualStatus"
+                        value="HP"
+                        checked={manualStatus === "HP"}
+                        onChange={() => setManualStatus("HP")}
+                        className="w-4 h-4 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                      />
+                      <span className="text-xs font-extrabold text-amber-700">HP (Half Day)</span>
+                    </label>
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="manualStatus"
+                        value="L"
+                        checked={manualStatus === "L" || manualStatus === "OFF"}
+                        onChange={() => setManualStatus("L")}
+                        className="w-4 h-4 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                      />
+                      <span className="text-xs font-extrabold text-rose-700">L / OFF (Leave / Day Off)</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">
                   SELECT MEMBER / EMPLOYEE *
@@ -469,20 +513,6 @@ export default function Attendance() {
                     </option>
                   ))}
                 </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">
-                  MANUAL REASON (LOGGED FOR AUDIT) *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Member phone battery dead"
-                  value={manualReason}
-                  onChange={(e) => setManualReason(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 px-4 py-3.5 rounded-2xl text-xs font-medium text-slate-800 focus:outline-none focus:border-pink-500 transition"
-                />
               </div>
 
               <div className="pt-2">

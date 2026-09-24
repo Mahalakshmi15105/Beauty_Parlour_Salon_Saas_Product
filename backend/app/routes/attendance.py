@@ -643,7 +643,7 @@ def manual_attendance_checkin():
             checkin_method="Manual",
             location_flagged=False,
             location_unavailable=True,
-            status=status_type if status_type in ["P", "HP", "OFF"] else "P"
+            status=status_type if status_type in ["P", "HP", "OFF", "L"] else "P"
         )
         db.session.add(attendance)
         db.session.commit()

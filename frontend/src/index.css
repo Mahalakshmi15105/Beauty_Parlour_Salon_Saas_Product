@@ -19,7 +19,7 @@
   --color-sidebar: #FDEEF1;
   --color-navbar: #FFFFFF;
   --color-card: #FFFFFF;
-  --color-border: rgba(0, 0, 0, 0.08);
+  --color-border: rgba(255, 117, 143, 0.12);
   --color-input-bg: #FFFFFF;
   --color-input-border: #FFD8E1;
   --color-hover-bg: #FFF0F3;
@@ -27,7 +27,7 @@
   
   --color-text-primary: #1f1f1f;
   --color-text-secondary: #4a4a4a;
-  --color-border-soft: rgba(0, 0, 0, 0.1);
+  --color-border-soft: rgba(255, 117, 143, 0.15);
 }
 
 /* Glowe Theme Utility Classes & Glassmorphism Aesthetics */
@@ -146,6 +146,7 @@
     font-family: 'Georgia', 'Times New Roman', serif;
     font-weight: 700 !important;
     font-size: 14px;
+    border-collapse: collapse;
   }
   table th {
     font-family: 'Georgia', 'Times New Roman', serif;
@@ -159,6 +160,19 @@
     font-weight: 700 !important;
     font-size: 14px;
     color: #1f1f1f !important;
+  }
+  table tr,
+  table td,
+  table th {
+    border-color: rgba(255, 117, 143, 0.15) !important;
+  }
+  .divide-y > :not([hidden]) ~ :not([hidden]),
+  .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+  .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
+  .divide-border-soft > :not([hidden]) ~ :not([hidden]),
+  .divide-pink-100 > :not([hidden]) ~ :not([hidden]),
+  .divide-pink-100\/60 > :not([hidden]) ~ :not([hidden]) {
+    border-color: rgba(255, 117, 143, 0.15) !important;
   }
   table input:not(.numeric),
   table select:not(.numeric),
@@ -212,20 +226,29 @@
   }
 }
 
-/* Numeric & Tabular Data Font Class Override */
+/* Numeric & Tabular Data Font Class Override for Text, Tables, Modals, and Input Fields */
 html body .numeric,
 html body .numeric *,
 html body .mono-nums,
 html body .mono-nums *,
 html body .num-val,
 html body .num-val *,
+html body .numeric-input,
+html body .numeric-input *,
 html body [data-numeric="true"],
 html body [data-numeric="true"] *,
+input[type="number"],
+input[type="tel"],
 input[type="date"],
 input[type="time"],
 input[type="datetime-local"],
-input[type="number"],
-input[type="tel"],
+input.numeric,
+input.numeric-input,
+div[role="dialog"] input[type="number"],
+div[role="dialog"] input[type="tel"],
+div[role="dialog"] input[type="date"],
+div[role="dialog"] input.numeric,
+div[role="dialog"] input.numeric-input,
 select option.numeric,
 table td.numeric,
 table td .numeric,

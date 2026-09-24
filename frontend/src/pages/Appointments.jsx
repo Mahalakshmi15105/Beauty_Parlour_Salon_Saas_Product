@@ -487,7 +487,7 @@ function Appointments() {
                   type="date"
                   value={filterDate}
                   onChange={(e) => setFilterDate(e.target.value)}
-                  className="w-full bg-surface border border-border-soft px-3 py-1.5 rounded-xl text-xs font-bold text-text-primary focus:outline-none"
+                  className="w-full bg-surface border border-border-soft px-3 py-1.5 rounded-xl text-xs font-bold text-text-primary focus:outline-none numeric-input"
                 />
               </div>
 

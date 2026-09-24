@@ -7,6 +7,7 @@ export const TRANSLATIONS = {
     billing: "Billing",
     customers: "Customers",
     employees: "Employees",
+    attendance: "Attendance",
     services_products: "Services & Products",
     membership_management: "Membership",
     reports: "Reports",

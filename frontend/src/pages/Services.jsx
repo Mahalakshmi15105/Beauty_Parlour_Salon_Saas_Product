@@ -614,7 +614,7 @@ function Services() {
                     required
                     value={serviceForm.price}
                     onChange={(e) => handleServicePriceChange(e.target.value)}
-                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none numeric-input"
                     placeholder="0.00"
                   />
                 </div>
@@ -753,7 +753,7 @@ function Services() {
                           placeholder="%"
                           value={row.percentage}
                           onChange={(e) => handleDiscountPercentageChange(idx, e.target.value)}
-                          className="w-full bg-surface border border-border-soft px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:border-primary text-center"
+                          className="w-full bg-surface border border-border-soft px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:border-primary text-center numeric-input"
                         />
                       </div>
 
@@ -767,7 +767,7 @@ function Services() {
                           placeholder="₹ Amount"
                           value={row.amount}
                           onChange={(e) => handleDiscountAmountChange(idx, e.target.value)}
-                          className="w-full bg-surface border border-border-soft px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:border-primary text-center"
+                          className="w-full bg-surface border border-border-soft px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:border-primary text-center numeric-input"
                         />
                       </div>
 

@@ -409,7 +409,7 @@ function MembershipPlans() {
                       required
                       value={formData.price}
                       onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                      className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                      className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none numeric-input"
                     />
                   </div>
                   <div>
@@ -451,7 +451,7 @@ function MembershipPlans() {
                       placeholder={validityType === "Yearly" ? "Choose Yearly" : "Choose Months"}
                       value={validityValue}
                       onChange={(e) => setValidityValue(e.target.value)}
-                      className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-pink-500/20"
+                      className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-pink-500/20 numeric-input"
                     />
                   </div>
                 </div>

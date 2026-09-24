@@ -19,14 +19,27 @@ export default function CashDenominationModal({ isOpen, onClose, date: initialDa
     2: 0,
     1: 0,
   });
+  const [expectedCashTotal, setExpectedCashTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       fetchDenomination();
+      fetchExpectedCash();
     }
   }, [isOpen, date]);
+
+  const fetchExpectedCash = () => {
+    API.get(`/reports/daily-sales-statement?date=${date}`)
+      .then((res) => {
+        const cashVal = res?.data?.totals?.cash || res?.data?.balance?.cash_pay || 0;
+        setExpectedCashTotal(parseFloat(cashVal) || 0);
+      })
+      .catch(() => {
+        setExpectedCashTotal(0);
+      });
+  };
 
   const fetchDenomination = () => {
     setLoading(true);
@@ -96,6 +109,7 @@ export default function CashDenominationModal({ isOpen, onClose, date: initialDa
   if (!isOpen) return null;
 
   const grandTotal = calculateTotal();
+  const diff = grandTotal - expectedCashTotal;
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
@@ -111,19 +125,45 @@ export default function CashDenominationModal({ isOpen, onClose, date: initialDa
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-          <div className="flex justify-between items-center bg-emerald-50 border border-emerald-200 p-3 rounded-2xl">
-            <div>
-              <label className="block text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Date</label>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="bg-transparent text-xs font-bold text-emerald-900 focus:outline-none"
-              />
+          {/* Header Stats: System Cash vs Counted Cash & Tally Status */}
+          <div className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-2xl space-y-3">
+            <div className="flex justify-between items-center">
+              <div>
+                <label className="block text-[11px] font-bold text-emerald-800 uppercase tracking-wider">Date</label>
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="bg-transparent text-xs font-bold text-emerald-950 focus:outline-none numeric"
+                />
+              </div>
+              <div className="text-right">
+                <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">Expected System Cash</span>
+                <span className="text-sm font-extrabold text-emerald-900 numeric">₹ {expectedCashTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+              </div>
             </div>
-            <div className="text-right">
-              <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider block">Grand Total</span>
-              <span className="text-lg font-black text-emerald-700 numeric">₹ {grandTotal.toLocaleString("en-IN")}</span>
+
+            <div className="border-t border-emerald-200/80 pt-2.5 flex justify-between items-center">
+              <div>
+                <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">Tally Status</span>
+                {diff === 0 ? (
+                  <span className="inline-flex items-center space-x-1 text-xs font-extrabold text-emerald-700 bg-emerald-100/80 px-2.5 py-0.5 rounded-full">
+                    <span>✓ Cash Balanced</span>
+                  </span>
+                ) : diff > 0 ? (
+                  <span className="inline-flex items-center space-x-1 text-xs font-extrabold text-indigo-700 bg-indigo-100/80 px-2.5 py-0.5 rounded-full numeric">
+                    <span>+₹ {diff.toLocaleString("en-IN", { minimumFractionDigits: 2 })} (Excess Cash)</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center space-x-1 text-xs font-extrabold text-rose-700 bg-rose-100/80 px-2.5 py-0.5 rounded-full numeric">
+                    <span>-₹ {Math.abs(diff).toLocaleString("en-IN", { minimumFractionDigits: 2 })} (Shortage)</span>
+                  </span>
+                )}
+              </div>
+              <div className="text-right">
+                <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">Counted Total</span>
+                <span className="text-lg font-black text-emerald-700 numeric">₹ {grandTotal.toLocaleString("en-IN")}</span>
+              </div>
             </div>
           </div>
 

@@ -212,33 +212,33 @@ function App() {
   // 3. LOGIN PAGE VIEW
   if (currentView === "login" || (!token && currentView === "app")) {
     return (
-      <div className="min-h-screen glowe-bg-gradient flex flex-col items-center justify-center p-6 font-sans">
-        <div className="max-w-md w-full glowe-glass-card p-8 rounded-3xl glowe-glow-shadow space-y-6">
-          <div className="text-center space-y-2">
+      <div className="min-h-screen bg-gradient-to-br from-pink-100/70 via-pink-50/40 to-white flex flex-col items-center justify-center p-6 font-sans">
+        <div className="max-w-md w-full bg-white/95 backdrop-blur-xl p-8 rounded-3xl shadow-2xl shadow-pink-500/15 border border-pink-100 space-y-7">
+          <div className="text-center space-y-3">
             <button
               onClick={() => setCurrentView("landing")}
-              className="text-xs text-pink-600 font-bold hover:underline mb-2 block mx-auto"
+              className="text-xs text-pink-600 font-bold hover:underline mb-3 block mx-auto transition-colors"
             >
               Back to Home
             </button>
             <img
               src={smartGoNextLogo}
               alt="SmartGoNext Logo"
-              className="w-14 h-14 object-contain rounded-2xl mx-auto mb-2 shadow-lg shadow-slate-900/10"
+              className="w-14 h-14 object-contain rounded-2xl mx-auto mb-3 shadow-md shadow-pink-500/10 border border-pink-100"
             />
             <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Sign in to your account</h1>
             <p className="text-xs text-slate-500 font-medium">Enter your credentials to access your parlour dashboard.</p>
           </div>
 
           {loginError && (
-            <div className="bg-rose-50 border border-rose-200 text-rose-600 px-4 py-3 rounded-xl text-xs font-semibold text-center">
+            <div className="bg-rose-50 border border-rose-200 text-rose-600 px-4 py-3 rounded-xl text-xs font-semibold text-center shadow-xs">
               {loginError}
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleLogin} className="space-y-5">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">Email Address</label>
               <input
                 type="email"
                 required
@@ -256,12 +256,12 @@ function App() {
                   }
                 }}
                 placeholder="admin@smartgonext.com"
-                className="w-full bg-white/80 border border-pink-100 px-4 py-3 rounded-xl text-sm text-slate-800 focus:outline-none focus:border-pink-500 focus:bg-white transition font-medium"
+                className="w-full bg-white border border-slate-200 px-4 py-3 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 shadow-xs transition-all font-medium"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Password</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">Password</label>
               <div className="relative">
                 <input
                   id="login-password-input"
@@ -280,7 +280,7 @@ function App() {
                     }
                   }}
                   placeholder="••••••••"
-                  className="w-full bg-white/80 border border-pink-100 px-4 py-3 pr-10 rounded-xl text-sm text-slate-800 focus:outline-none focus:border-pink-500 focus:bg-white transition font-medium"
+                  className="w-full bg-white border border-slate-200 px-4 py-3 pr-10 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 shadow-xs transition-all font-medium"
                 />
                 <button
                   type="button"
@@ -297,16 +297,16 @@ function App() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full glowe-pink-gradient text-white py-3.5 rounded-full text-xs font-extrabold transition disabled:opacity-50"
+              className="w-full bg-gradient-to-r from-pink-500 via-rose-500 to-pink-600 hover:from-pink-600 hover:to-rose-600 text-white py-3.5 rounded-full text-xs font-extrabold shadow-lg shadow-pink-500/30 hover:shadow-xl hover:shadow-pink-500/40 transition-all active:scale-[0.99] disabled:opacity-50 mt-2"
             >
               {loading ? "Signing in..." : "Sign in to Admin Portal"}
             </button>
           </form>
 
-          <div className="text-center pt-2 border-t border-pink-100/60">
+          <div className="text-center pt-3 border-t border-pink-100">
             <p className="text-xs text-slate-500 font-medium">
               Don't have a salon account?{" "}
-              <button onClick={() => setCurrentView("register")} className="text-pink-600 font-bold hover:underline">
+              <button onClick={() => setCurrentView("register")} className="text-pink-600 font-bold hover:underline transition-colors">
                 Register Your Parlour
               </button>
             </p>

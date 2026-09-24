@@ -512,14 +512,13 @@ function Employees() {
 
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">Salary (₹)</label>
-                  <input
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Salary (₹)</label>                  <input
                     type="number"
                     step="0.01"
-                    placeholder="20000"
+                    placeholder="25000"
                     value={formData.salary}
                     onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
-                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none numeric-input"
                   />
                 </div>
                 <div>
@@ -530,7 +529,7 @@ function Employees() {
                     placeholder="100000"
                     value={formData.target}
                     onChange={(e) => setFormData({ ...formData, target: e.target.value })}
-                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none numeric-input"
                   />
                 </div>
                 <div>
