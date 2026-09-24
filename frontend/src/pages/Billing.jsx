@@ -2148,7 +2148,9 @@ function Billing() {
             getEffectiveDiscountPercent={getEffectiveDiscountPercent}
           />
         ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          {/* Left Panel: Customer selection, Item selection, and Line Items table */}
+          <div className="lg:col-span-8 space-y-4 relative z-30">
           {/* Step 1 & 2: Customer & Gender Selection */}
           <div className="relative z-40 bg-surface border border-border-soft p-4 rounded-2xl shadow-xs space-y-3">
             <div className="flex items-center space-x-2 text-xs font-extrabold text-primary uppercase tracking-wider">
@@ -2156,10 +2158,10 @@ function Billing() {
               <span>Step 1 & 2: Customer & Gender Selection</span>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="grid md:grid-cols-2 gap-6">
               <div ref={customerComboboxRef} className="relative">
                 <div className="flex justify-between items-center mb-1">
-                  <label className="block text-xs font-bold text-slate-700">Type or Select Customer *</label>
+                  <label className="block text-xs font-bold text-slate-700">Select Customer *</label>
                   {selectedCustomerId && selectedCustomerId !== "walkin" && (
                     <div className="flex items-center space-x-2">
                       {selectedCustomerId && newlyCreatedCustomerId && String(selectedCustomerId) === String(newlyCreatedCustomerId) && (
@@ -2339,7 +2341,7 @@ function Billing() {
                               >
                                 <div>
                                   <span className="font-black text-slate-900 block text-xs">{c.first_name} {c.last_name || ""}</span>
-                                  <span className="text-slate-700 font-bold text-[11px] block mt-0.5">{c.phone || "No Mobile"}</span>
+                                  <span className="text-slate-700 font-bold text-[11px] block mt-0.5 numeric">{c.phone || "No Mobile"}</span>
                                 </div>
                                 {selectedCustomerId === String(c.id) && (
                                   <span className="text-pink-700 font-bold text-[11px] flex items-center space-x-1 bg-pink-50 px-2 py-0.5 rounded-full border border-pink-200">
@@ -2387,38 +2389,6 @@ function Billing() {
                   value={selectedGender || ""}
                   className="w-full bg-slate-100 border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 cursor-not-allowed focus:outline-none"
                 />
-              </div>
-
-              <div className="bg-primary-light border border-primary/20 p-3 rounded-xl flex items-center justify-between">
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <p className="text-[10px] uppercase font-bold text-primary">Active Client</p>
-                    {selectedCustomerId && selectedCustomerId !== "walkin" && (() => {
-                      const selectedCust = customers.find((c) => c.id === parseInt(selectedCustomerId));
-                      if (selectedCust?.days_since_last_visit && selectedCust.days_since_last_visit >= 60) {
-                        return (
-                          <span className="bg-indigo-100 text-indigo-800 border border-indigo-200 text-[10px] font-extrabold px-2 py-0.5 rounded-full flex items-center space-x-1">
-                            <UserRoundX className="w-3 h-3 text-indigo-600" />
-                            <span>Inactive • {selectedCust.days_since_last_visit} Days</span>
-                          </span>
-                        );
-                      }
-                      return null;
-                    })()}
-                  </div>
-                  <p className="text-xs font-extrabold text-slate-900">
-                    {selectedCustomerId && selectedCustomerId !== "walkin"
-                      ? (customers.find((c) => c.id === parseInt(selectedCustomerId))?.first_name || "") +
-                        " " +
-                        (customers.find((c) => c.id === parseInt(selectedCustomerId))?.last_name || "")
-                      : selectedCustomerId === "walkin"
-                      ? "Walk-in Customer"
-                      : "No Customer Selected"}
-                  </p>
-                </div>
-                <span className="text-xs font-bold bg-white text-primary px-3 py-1 rounded-full border border-primary/20">
-                  {selectedGender || "No Customer Selected"}
-                </span>
               </div>
             </div>
 
@@ -2785,7 +2755,7 @@ function Billing() {
                               >
                                 <div className="space-y-0.5">
                                   <span className="font-bold text-slate-900 block">{svc.name}</span>
-                                  <span className="text-[11px] text-primary font-bold block">{currencySymbol} {parseFloat(svc.price).toFixed(2)}</span>
+                                  <span className="text-[11px] text-primary font-bold block numeric">{currencySymbol} {parseFloat(svc.price).toFixed(2)}</span>
                                 </div>
                                 {isSelected && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
                               </button>
@@ -2835,38 +2805,38 @@ function Billing() {
 
           {/* Step 5: Billing Line Items Table */}
           <div className="bg-surface border border-border-soft rounded-2xl shadow-xs overflow-hidden">
-            <div className="py-3 px-4 border-b border-border-soft flex justify-between items-center">
-              <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center space-x-2">
+            <div className="py-2.5 px-3.5 border-b border-border-soft flex justify-between items-center">
+              <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center space-x-2">
                 <FileText className="w-4 h-4 text-primary" />
-                <span>Billing Line Items Table (Services & Products)</span>
+                <span>Line Items Table</span>
               </h3>
-              <span className="text-xs font-bold text-text-secondary">
+              <span className="text-xs font-bold text-text-secondary numeric">
                 {cart.length} line item(s)
               </span>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-sm">
+              <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="bg-primary-light border-b border-border-soft text-slate-700">
-                    <th className="px-3 py-3 font-extrabold w-12 text-center">S.No</th>
-                    <th className="px-4 py-3 font-extrabold">Item Description (Service / Product)</th>
-                    <th className="px-3 py-3 font-extrabold w-20">QTY</th>
-                    <th className="px-4 py-3 font-extrabold">RATE (Unit Price)</th>
-                    <th className="px-4 py-3 font-extrabold">MRP</th>
-                    <th className="px-4 py-3 font-extrabold">Gross × Qty</th>
-                    <th className="px-3 py-3 font-extrabold w-24">Discount (%)</th>
-                    <th className="px-4 py-3 font-extrabold">Discount Amount</th>
-                    <th className="px-4 py-3 font-extrabold">Tax</th>
-                    <th className="px-4 py-3 font-extrabold">Net Amount</th>
-                    <th className="px-4 py-3 font-extrabold min-w-[200px]">Employee (Stylist / Seller) Multi-Select *</th>
-                    <th className="px-4 py-3 font-extrabold text-right">Action</th>
+                  <tr className="bg-primary-light border-b border-border-soft text-slate-700 text-[11px] uppercase tracking-wider">
+                    <th className="px-2 py-2 font-extrabold w-8 text-center">#</th>
+                    <th className="px-2.5 py-2 font-extrabold">Item / Service</th>
+                    <th className="px-2 py-2 font-extrabold w-14 text-center">QTY</th>
+                    <th className="px-2 py-2 font-extrabold">Rate</th>
+                    <th className="px-2 py-2 font-extrabold">MRP</th>
+                    <th className="px-2 py-2 font-extrabold">Gross</th>
+                    <th className="px-2 py-2 font-extrabold w-16 text-center">Disc %</th>
+                    <th className="px-2 py-2 font-extrabold">Disc Amt</th>
+                    <th className="px-2 py-2 font-extrabold">Tax</th>
+                    <th className="px-2 py-2 font-extrabold">Net</th>
+                    <th className="px-2.5 py-2 font-extrabold min-w-[130px]">Staff</th>
+                    <th className="px-2 py-2 font-extrabold text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-soft">
                   {cart.length === 0 ? (
                     <tr>
-                      <td colSpan={12} className="p-8 text-center text-text-secondary font-medium">
+                      <td colSpan={12} className="p-6 text-center text-text-secondary font-medium text-xs">
                         Table is empty. Select a <strong>Service</strong> or <strong>Product</strong> above, then click <strong>"Add to Table"</strong>.
                       </td>
                     </tr>
@@ -2878,27 +2848,27 @@ function Billing() {
                       const rowNet = calculateRowNet(item);
 
                       return (
-                        <tr key={idx} className="hover:bg-background/60 transition">
-                          <td className="px-3 py-3 font-bold text-slate-500 text-center">{idx + 1}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center space-x-2">
-                              <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-md ${
+                        <tr key={idx} className="hover:bg-background/60 transition text-xs">
+                          <td className="px-2 py-2 font-bold text-slate-500 text-center">{idx + 1}</td>
+                          <td className="px-2.5 py-2">
+                            <div className="flex items-center space-x-1.5">
+                              <span className={`text-[9px] uppercase font-bold px-1.5 py-0.5 rounded ${
                                 item.type === "product"
                                   ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                                   : item.type === "membership"
                                   ? "bg-purple-100 text-purple-800 border border-purple-200"
                                   : "bg-pink-50 text-primary border border-pink-200"
                               }`}>
-                                {item.type === "product" ? "Product" : item.type === "membership" ? "Membership" : "Service"}
+                                {item.type === "product" ? "Prod" : item.type === "membership" ? "Mem" : "Svc"}
                               </span>
-                              <span className="font-extrabold text-slate-900">{item.name}</span>
+                              <span className="font-extrabold text-slate-900 truncate max-w-[120px]" title={item.name}>{item.name}</span>
                             </div>
                           </td>
 
                           {/* Qty Input */}
-                          <td className="px-3 py-3 text-center">
+                          <td className="px-2 py-2 text-center">
                             {item.type === "membership" ? (
-                              <span className="text-xs font-bold text-slate-500">1</span>
+                              <span className="text-xs font-bold text-slate-500 numeric">1</span>
                             ) : (
                               <input
                                 type="number"
@@ -2909,18 +2879,18 @@ function Billing() {
                                 onFocus={(e) => e.target.select()}
                                 onChange={(e) => handleUpdateQty(idx, e.target.value)}
                                 onKeyDown={(e) => handleLineItemKeyDown(e, idx, "qty")}
-                                className="w-16 bg-background border border-border-soft px-2 py-1 rounded-lg text-sm font-bold text-slate-900 text-center focus:border-primary focus:outline-none"
+                                className="w-12 bg-background border border-border-soft px-1.5 py-1 rounded-lg text-xs font-bold text-slate-900 text-center focus:border-primary focus:outline-none numeric"
                               />
                             )}
                           </td>
 
                           {/* Editable Gross Amount / Selling RATE Input */}
-                          <td className="px-3 py-3">
+                          <td className="px-2 py-2">
                             {item.type === "membership" ? (
-                              <span className="text-xs font-extrabold text-slate-900">{currencySymbol} {parseFloat(item.gross_amount || 0).toFixed(2)}</span>
+                              <span className="text-xs font-extrabold text-slate-900 numeric">{currencySymbol}{parseFloat(item.gross_amount || 0).toFixed(2)}</span>
                             ) : (
-                              <div className="flex items-center space-x-1">
-                                <span className="text-sm text-slate-400 font-bold">{currencySymbol}</span>
+                              <div className="flex items-center space-x-0.5">
+                                <span className="text-xs text-slate-400 font-bold">{currencySymbol}</span>
                                 <input
                                   type="number"
                                   min="0"
@@ -2931,23 +2901,23 @@ function Billing() {
                                   onFocus={(e) => e.target.select()}
                                   onChange={(e) => handleUpdateGrossAmount(idx, e.target.value)}
                                   onKeyDown={(e) => handleLineItemKeyDown(e, idx, "gross_amount")}
-                                  className="w-20 bg-background border border-border-soft px-2 py-1 rounded-lg text-sm font-bold text-slate-900 text-center focus:border-primary focus:outline-none"
+                                  className="w-16 bg-background border border-border-soft px-1.5 py-1 rounded-lg text-xs font-bold text-slate-900 text-center focus:border-primary focus:outline-none numeric"
                                 />
                               </div>
                             )}
                           </td>
 
                           {/* MRP Column */}
-                          <td className="px-4 py-3 font-medium text-slate-500">
-                            {item.type === "product" ? `${currencySymbol} ${parseFloat(item.mrp || item.gross_amount || 0).toFixed(2)}` : "—"}
+                          <td className="px-2 py-2 font-medium text-slate-500 text-[11px] numeric">
+                            {item.type === "product" ? `${currencySymbol}${parseFloat(item.mrp || item.gross_amount || 0).toFixed(2)}` : "—"}
                           </td>
 
-                          <td className="px-4 py-3 font-bold text-slate-900">
-                            {currencySymbol} {lineGross.toFixed(2)}
+                          <td className="px-2 py-2 font-bold text-slate-900 text-xs numeric">
+                            {currencySymbol}{lineGross.toFixed(2)}
                           </td>
 
                           {/* Discount (%) Input */}
-                          <td className="px-3 py-3">
+                          <td className="px-2 py-2">
                             <input
                               type="number"
                               min="0"
@@ -2959,14 +2929,14 @@ function Billing() {
                               onFocus={(e) => e.target.select()}
                               onChange={(e) => handleUpdateDiscountPercent(idx, e.target.value)}
                               onKeyDown={(e) => handleLineItemKeyDown(e, idx, "discount_percent")}
-                              className="w-16 bg-background border border-border-soft px-2 py-1 rounded-lg text-sm font-bold text-slate-900 text-center focus:border-primary focus:outline-none"
+                              className="w-14 bg-background border border-border-soft px-1 py-1 rounded-lg text-xs font-bold text-slate-900 text-center focus:border-primary focus:outline-none numeric"
                             />
                           </td>
 
                           {/* Editable Discount Amount Input */}
-                          <td className="px-3 py-3">
-                            <div className="flex items-center space-x-1">
-                              <span className="text-sm text-danger font-bold">-</span>
+                          <td className="px-2 py-2">
+                            <div className="flex items-center space-x-0.5">
+                              <span className="text-xs text-danger font-bold">-</span>
                               <input
                                 type="number"
                                 min="0"
@@ -2977,23 +2947,23 @@ function Billing() {
                                 onFocus={(e) => e.target.select()}
                                 onChange={(e) => handleUpdateDiscountAmount(idx, e.target.value)}
                                 onKeyDown={(e) => handleLineItemKeyDown(e, idx, "discount_amount")}
-                                className="w-20 bg-background border border-border-soft px-2 py-1 rounded-lg text-sm font-bold text-danger text-center focus:border-primary focus:outline-none"
+                                className="w-16 bg-background border border-border-soft px-1 py-1 rounded-lg text-xs font-bold text-danger text-center focus:border-primary focus:outline-none numeric"
                               />
                             </div>
                           </td>
 
                           {/* Tax Column */}
-                          <td className="px-4 py-3 font-medium text-slate-600">
-                            {item.type === "product" ? "—" : `${currencySymbol} ${rowTax.toFixed(2)}`}
+                          <td className="px-2 py-2 font-medium text-slate-600 text-[11px] numeric">
+                            {item.type === "product" ? "—" : `${currencySymbol}${rowTax.toFixed(2)}`}
                           </td>
 
-                          <td className="px-4 py-3 font-extrabold text-slate-900">
-                            {currencySymbol} {rowNet.toFixed(2)}
+                          <td className="px-2 py-2 font-extrabold text-slate-900 text-xs numeric">
+                            {currencySymbol}{rowNet.toFixed(2)}
                           </td>
 
-                          {/* Employee Select Dropdown + Selected Employee Name Tags below (For both Services & Products) */}
-                          <td className="px-4 py-3">
-                            <div className="space-y-1.5 min-w-[180px]">
+                          {/* Employee Select Dropdown + Selected Employee Name Tags */}
+                          <td className="px-2.5 py-2">
+                            <div className="space-y-1 min-w-[120px]">
                               <select
                                 data-row={idx}
                                 data-field="employee"
@@ -3025,9 +2995,9 @@ function Billing() {
                                     handleLineItemKeyDown(e, idx, "employee");
                                   }
                                 }}
-                                className="w-full bg-background border border-border-soft px-2.5 py-1.5 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-primary"
+                                className="w-full bg-background border border-border-soft px-2 py-1 rounded-lg text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
                               >
-                                <option value="" disabled hidden>Choose Employee</option>
+                                <option value="" disabled hidden>Choose Staff</option>
                                 {employees.map((emp) => (
                                   <option key={emp.id} value={emp.id}>
                                     {emp.first_name} {emp.last_name || ""}
@@ -3043,13 +3013,13 @@ function Billing() {
                                   return (
                                     <span
                                       key={empId}
-                                      className="inline-flex items-center space-x-1 text-[11px] font-bold bg-pink-50 text-pink-700 border border-pink-200 px-2 py-0.5 rounded-full"
+                                      className="inline-flex items-center space-x-1 text-[10px] font-bold bg-pink-50 text-pink-700 border border-pink-200 px-1.5 py-0.5 rounded-full"
                                     >
-                                      <span>{empObj.first_name} {empObj.last_name || ""}</span>
+                                      <span>{empObj.first_name}</span>
                                       <button
                                         type="button"
                                         onClick={() => handleRemoveEmployeeTag(idx, empId)}
-                                        className="text-pink-500 hover:text-pink-900 ml-1 font-black"
+                                        className="text-pink-500 hover:text-pink-900 ml-0.5 font-black"
                                         title="Remove employee"
                                       >
                                         ×
@@ -3061,12 +3031,12 @@ function Billing() {
                             </div>
                           </td>
 
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-2 py-2 text-right">
                             <button
                               onClick={() => handleRemoveItem(idx)}
                               className="text-danger hover:text-rose-700 transition"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </td>
                         </tr>
@@ -3077,26 +3047,30 @@ function Billing() {
               </table>
             </div>
           </div>
+          </div>
 
-          {/* Invoice Summary Card */}
-          <div className="max-w-2xl mx-auto w-full">
-            <div className="bg-surface border border-border-soft p-6 rounded-2xl shadow-xs space-y-4">
-              <h4 className="text-xs font-extrabold text-slate-900 uppercase border-b border-border-soft pb-2">
-                Invoice Summary
+          {/* Right Panel: Sticky Invoice Summary & Checkout Action */}
+          <div className="lg:col-span-4 sticky top-6 z-20">
+            <div className="bg-surface border border-border-soft p-5 rounded-2xl shadow-xs space-y-4">
+              <h4 className="text-xs font-extrabold text-slate-900 uppercase border-b border-border-soft pb-2.5 flex items-center justify-between">
+                <span>Invoice Summary</span>
+                <span className="text-[10px] font-bold text-primary bg-pink-50 border border-pink-200 px-2.5 py-0.5 rounded-full numeric">
+                  {cart.length} line item(s)
+                </span>
               </h4>
 
               <div className="space-y-3 text-xs">
                 <div className="flex justify-between text-text-secondary">
                   <span>Gross Total:</span>
-                  <span className="font-bold text-slate-900">{currencySymbol} {grossTotal.toFixed(2)}</span>
+                  <span className="font-bold text-slate-900 numeric">{currencySymbol} {grossTotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-danger">
                   <span>Total Discount:</span>
-                  <span className="font-bold">-{currencySymbol} {totalDiscount.toFixed(2)}</span>
+                  <span className="font-bold numeric">-{currencySymbol} {totalDiscount.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-slate-900 font-bold border-t border-border-soft pt-2">
                   <span>Net Total (after discount):</span>
-                  <span>{currencySymbol} {netTotal.toFixed(2)}</span>
+                  <span className="numeric">{currencySymbol} {netTotal.toFixed(2)}</span>
                 </div>
                 
                 {/* Editable Tax Amount Input */}
@@ -3114,14 +3088,14 @@ function Billing() {
                         setIsTaxAmountOverridden(true);
                         setInvoiceTaxAmount(e.target.value);
                       }}
-                      className="w-28 bg-background border border-border-soft px-3 py-1.5 rounded-xl text-xs font-extrabold text-slate-900 text-right focus:border-primary focus:outline-none"
+                      className="w-24 bg-background border border-border-soft px-2.5 py-1.5 rounded-xl text-xs font-extrabold text-slate-900 text-right focus:border-primary focus:outline-none numeric"
                     />
                   </div>
                 </div>
 
                 <div className="flex justify-between text-base font-extrabold text-primary border-t-2 border-primary/20 pt-3">
                   <span>Net Payable Amount:</span>
-                  <span>{currencySymbol} {netPayable.toFixed(2)}</span>
+                  <span className="numeric">{currencySymbol} {netPayable.toFixed(2)}</span>
                 </div>
               </div>
 
@@ -3135,10 +3109,10 @@ function Billing() {
                       handleProceedToPayment();
                     }
                   }}
-                  className="w-full bg-primary hover:bg-primary-hover text-white py-3 rounded-xl text-xs font-extrabold shadow-md shadow-pink-500/20 transition flex items-center justify-center space-x-2"
+                  className="w-full bg-primary hover:bg-primary-hover text-white py-3.5 rounded-xl text-xs font-extrabold shadow-md shadow-pink-500/20 transition flex items-center justify-center space-x-2 cursor-pointer"
                 >
                   <CreditCard className="w-4 h-4" />
-                  <span>Proceed to Payment (F2 / Ctrl + Enter)</span>
+                  <span>Proceed to Payment</span>
                 </button>
               </div>
             </div>
@@ -3205,12 +3179,12 @@ function Billing() {
                 ) : (
                   filteredHistory.map((inv) => (
                     <tr key={inv.id} className="hover:bg-background/60 transition">
-                      <td className="px-4 py-3 font-extrabold text-primary">{inv.invoice_number}</td>
-                      <td className="px-4 py-3 text-slate-600">
+                      <td className="px-4 py-3 font-extrabold text-primary numeric">{inv.invoice_number}</td>
+                      <td className="px-4 py-3 text-slate-600 numeric">
                         {new Date(inv.created_at).toLocaleString()}
                       </td>
                       <td className="px-4 py-3 font-bold text-slate-900">{inv.customer_name}</td>
-                      <td className="px-4 py-3 font-bold text-purple-700">
+                      <td className="px-4 py-3 font-bold text-purple-700 numeric">
                         {inv.membership_price > 0 ? (
                           <span>
                             {currencySymbol} {inv.membership_price.toFixed(2)}
@@ -3220,10 +3194,10 @@ function Billing() {
                           <span className="text-slate-400 font-normal">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3">{currencySymbol} {inv.subtotal.toFixed(2)}</td>
-                      <td className="px-4 py-3 text-danger">-{currencySymbol} {inv.discount.toFixed(2)}</td>
-                      <td className="px-4 py-3">{currencySymbol} {inv.tax.toFixed(2)}</td>
-                      <td className="px-4 py-3 font-extrabold text-slate-900">
+                      <td className="px-4 py-3 numeric">{currencySymbol} {inv.subtotal.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-danger numeric">-{currencySymbol} {inv.discount.toFixed(2)}</td>
+                      <td className="px-4 py-3 numeric">{currencySymbol} {inv.tax.toFixed(2)}</td>
+                      <td className="px-4 py-3 font-extrabold text-slate-900 numeric">
                         {currencySymbol} {inv.total.toFixed(2)}
                       </td>
                       <td className="px-4 py-3">
@@ -3295,12 +3269,12 @@ function Billing() {
               <div className="bg-background border border-border-soft p-4 rounded-2xl flex justify-between items-center text-xs">
                 <div>
                   <span className="text-text-secondary block">Net Payable Due:</span>
-                  <span className="text-lg font-extrabold text-primary">{currencySymbol} {netPayable.toFixed(2)}</span>
+                  <span className="text-lg font-extrabold text-primary numeric">{currencySymbol} {netPayable.toFixed(2)}</span>
                 </div>
                 <div className="text-right">
                   <span className="text-text-secondary block">Total Allocated:</span>
                   <span
-                    className={`text-lg font-extrabold ${
+                    className={`text-lg font-extrabold numeric ${
                       Math.abs(totalAllocatedPayment - netPayable) < 0.01 ? "text-emerald-600" : "text-amber-600"
                     }`}
                   >
@@ -3363,7 +3337,7 @@ function Billing() {
                         }
                       }}
                       placeholder="0.00"
-                      className="w-32 bg-white border border-border-soft px-3 py-1.5 rounded-lg text-xs font-extrabold text-slate-900 text-right focus:outline-none focus:border-primary focus:ring-2 focus:ring-pink-500/20"
+                      className="w-32 bg-white border border-border-soft px-3 py-1.5 rounded-lg text-xs font-extrabold text-slate-900 text-right focus:outline-none focus:border-primary focus:ring-2 focus:ring-pink-500/20 numeric"
                     />
                   </div>
                 ))}
@@ -3513,7 +3487,7 @@ function Billing() {
             <div className="flex justify-between items-center border-b border-border-soft pb-3">
               <div>
                 <h3 className="text-sm font-extrabold text-slate-900">
-                  Invoice Details #{selectedInvoiceDetail.invoice_number || ""}
+                  Invoice Details #<span className="numeric">{selectedInvoiceDetail.invoice_number || ""}</span>
                 </h3>
                 <p className="text-[10px] text-text-secondary">
                   Customer: {selectedInvoiceDetail.customer?.first_name || "Guest"} {selectedInvoiceDetail.customer?.last_name || ""} ({selectedInvoiceDetail.customer?.phone || "N/A"})
@@ -3533,10 +3507,10 @@ function Billing() {
                     <div>
                       <span className="font-bold text-slate-900">{li.name}</span>
                       <span className="text-[10px] text-text-secondary block">
-                        Qty: {li.quantity} × {currencySymbol}{li.unit_price} (Stylist: {li.employee_name || "N/A"})
+                        Qty: <span className="numeric">{li.quantity}</span> × {currencySymbol}<span className="numeric">{li.unit_price}</span> (Stylist: {li.employee_name || "N/A"})
                       </span>
                     </div>
-                    <span className="font-extrabold text-slate-900">{currencySymbol} {(li.line_total || 0).toFixed(2)}</span>
+                    <span className="font-extrabold text-slate-900 numeric">{currencySymbol} {(li.line_total || 0).toFixed(2)}</span>
                   </div>
                 ))}
               </div>
@@ -3546,19 +3520,19 @@ function Billing() {
             <div className="bg-primary-light/50 border border-primary/20 p-3 rounded-xl space-y-1 text-xs">
               <div className="flex justify-between">
                 <span>Subtotal:</span>
-                <span className="font-bold">{currencySymbol} {(selectedInvoiceDetail.subtotal || 0).toFixed(2)}</span>
+                <span className="font-bold numeric">{currencySymbol} {(selectedInvoiceDetail.subtotal || 0).toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-danger">
                 <span>Discount:</span>
-                <span className="font-bold">-{currencySymbol} {(selectedInvoiceDetail.discount || 0).toFixed(2)}</span>
+                <span className="font-bold numeric">-{currencySymbol} {(selectedInvoiceDetail.discount || 0).toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Tax:</span>
-                <span className="font-bold">{currencySymbol} {(selectedInvoiceDetail.tax || 0).toFixed(2)}</span>
+                <span className="font-bold numeric">{currencySymbol} {(selectedInvoiceDetail.tax || 0).toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm font-extrabold text-primary border-t border-border-soft pt-1">
                 <span>Grand Total:</span>
-                <span>{currencySymbol} {(selectedInvoiceDetail.total || 0).toFixed(2)}</span>
+                <span className="numeric">{currencySymbol} {(selectedInvoiceDetail.total || 0).toFixed(2)}</span>
               </div>
             </div>
 

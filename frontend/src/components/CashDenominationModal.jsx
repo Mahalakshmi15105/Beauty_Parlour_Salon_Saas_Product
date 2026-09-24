@@ -123,7 +123,7 @@ export default function CashDenominationModal({ isOpen, onClose, date: initialDa
             </div>
             <div className="text-right">
               <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider block">Grand Total</span>
-              <span className="text-lg font-black text-emerald-700">₹ {grandTotal.toLocaleString("en-IN")}</span>
+              <span className="text-lg font-black text-emerald-700 numeric">₹ {grandTotal.toLocaleString("en-IN")}</span>
             </div>
           </div>
 
@@ -133,7 +133,7 @@ export default function CashDenominationModal({ isOpen, onClose, date: initialDa
               const subtotal = d * count;
               return (
                 <div key={d} className="py-2.5 flex items-center justify-between space-x-4">
-                  <div className="w-24 font-bold text-sm text-slate-700">₹ {d}</div>
+                  <div className="w-24 font-bold text-sm text-slate-700 numeric">₹ {d}</div>
                   <div className="flex items-center space-x-2">
                     <span className="text-xs text-slate-400">×</span>
                     <input
@@ -142,10 +142,10 @@ export default function CashDenominationModal({ isOpen, onClose, date: initialDa
                       value={count === 0 ? "" : count}
                       placeholder="0"
                       onChange={(e) => handleCountChange(d, e.target.value)}
-                      className="w-24 bg-white/90 border border-pink-100 px-3 py-1.5 rounded-xl text-sm font-extrabold text-slate-900 text-center focus:outline-none focus:border-pink-500"
+                      className="w-24 bg-white/90 border border-pink-100 px-3 py-1.5 rounded-xl text-sm font-extrabold text-slate-900 text-center focus:outline-none focus:border-pink-500 numeric"
                     />
                   </div>
-                  <div className="w-28 text-right font-black text-sm text-slate-900">
+                  <div className="w-28 text-right font-black text-sm text-slate-900 numeric">
                     = ₹ {subtotal.toLocaleString("en-IN")}
                   </div>
                 </div>

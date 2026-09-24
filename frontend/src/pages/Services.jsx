@@ -514,14 +514,14 @@ function Services() {
                                 key={idx}
                                 className="inline-flex items-center text-[11px] font-bold bg-pink-50 text-pink-700 border border-pink-200 px-2 py-0.5 rounded-full"
                               >
-                                {planLabel} ({discountStr})
+                                {planLabel} (<span className="numeric">{discountStr}</span>)
                               </span>
                             );
                           })}
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm text-text-secondary">{formatCurrency(s.price)}</td>
+                    <td className="px-6 py-4 text-sm text-text-secondary numeric">{formatCurrency(s.price)}</td>
                     <td className="px-6 py-4 text-sm">
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                         s.status === "active" ? "bg-success/15 text-success" : "bg-danger/15 text-danger"

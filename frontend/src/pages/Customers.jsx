@@ -368,12 +368,12 @@ function Customers() {
                         {c.days_since_last_visit && c.days_since_last_visit >= 60 && (
                           <span className="bg-indigo-100 text-indigo-800 border border-indigo-200 text-[10px] font-extrabold px-2 py-0.5 rounded-full flex items-center space-x-1">
                             <UserRoundX className="w-3 h-3 text-indigo-600" />
-                            <span>Inactive • {c.days_since_last_visit} Days</span>
+                            <span>Inactive • <span className="numeric">{c.days_since_last_visit}</span> Days</span>
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-text-secondary">{c.phone}</td>
+                    <td className="px-6 py-4 text-sm text-text-secondary numeric">{c.phone}</td>
                     <td className="px-6 py-4 text-sm text-text-secondary">{c.email || "-"}</td>
                     <td className="px-6 py-4 text-sm text-text-secondary">{c.gender || "-"}</td>
                     <td className="px-6 py-4 text-sm space-x-3">
@@ -588,7 +588,7 @@ function Customers() {
                   required
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                  className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none numeric"
                 />
               </div>
 
@@ -622,7 +622,7 @@ function Customers() {
                     type="date"
                     value={formData.date_of_birth}
                     onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
-                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none numeric"
                   />
                 </div>
               </div>

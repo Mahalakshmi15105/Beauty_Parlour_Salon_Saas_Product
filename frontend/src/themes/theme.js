@@ -98,6 +98,8 @@ export function applyTheme(themeId, accentColorOverride = null) {
     danger: 'danger',
   };
   
+  root.style.setProperty('--accent-color', accentColor);
+
   Object.entries(theme.colors).forEach(([key, value]) => {
     const cssVarName = colorMapping[key] || key.replace(/([A-Z])/g, '-$1').toLowerCase();
     const cssVar = `--color-${cssVarName}`;
@@ -133,6 +135,7 @@ export function applyAccentColor(accentColor) {
   const theme = getTheme(currentTheme);
   
   // Apply the accent color to primary color variables
+  root.style.setProperty('--accent-color', accentColor);
   root.style.setProperty('--color-primary', accentColor);
   root.style.setProperty('--color-primary-hover', accentColor);
   root.style.setProperty('--color-accent', accentColor);

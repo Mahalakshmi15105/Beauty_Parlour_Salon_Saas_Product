@@ -1,5 +1,46 @@
 import jsPDF from "jspdf";
-import * as XLSX from "xlsx";
+import XLSX from "xlsx-js-style";
+
+// Color Palette Constants for Excel Styling
+export const EXCEL_COLORS = {
+  PINK_HEADER: "FF758F",
+  GREEN_BANNER: "0F9D58",
+  YELLOW_ACCENT: "F59E0B",
+  LIGHT_YELLOW: "FEF3C7",
+  LIGHT_GRAY: "F8FAFC",
+  DARK_TEXT: "1E293B",
+  WHITE_TEXT: "FFFFFF",
+  BORDER_COLOR: "CBD5E1"
+};
+
+export const STANDARD_BORDER = {
+  top: { style: "thin", color: { rgb: EXCEL_COLORS.BORDER_COLOR } },
+  bottom: { style: "thin", color: { rgb: EXCEL_COLORS.BORDER_COLOR } },
+  left: { style: "thin", color: { rgb: EXCEL_COLORS.BORDER_COLOR } },
+  right: { style: "thin", color: { rgb: EXCEL_COLORS.BORDER_COLOR } }
+};
+
+export function styleCell(ws, r, c, styleObj = {}) {
+  const cellRef = XLSX.utils.encode_cell({ r, c });
+  if (!ws[cellRef]) {
+    ws[cellRef] = { v: "", t: "s" };
+  }
+  const existingCell = ws[cellRef];
+  existingCell.s = {
+    font: { name: "Calibri", sz: 10, color: { rgb: EXCEL_COLORS.DARK_TEXT }, ...(styleObj.font || {}) },
+    fill: styleObj.fill ? { fgColor: { rgb: styleObj.fill.replace("#", "") } } : undefined,
+    alignment: { vertical: "center", ...(styleObj.alignment || {}) },
+    border: styleObj.border !== undefined ? styleObj.border : STANDARD_BORDER
+  };
+}
+
+export function styleRange(ws, startR, startC, endR, endC, styleObj = {}) {
+  for (let r = startR; r <= endR; r++) {
+    for (let c = startC; c <= endC; c++) {
+      styleCell(ws, r, c, styleObj);
+    }
+  }
+}
 
 export function exportToCSV(data = [], columns = [], filename = "export") {
   const safeData = Array.isArray(data) ? data : [];
@@ -24,6 +65,8 @@ export function exportToCSV(data = [], columns = [], filename = "export") {
 export function exportToExcel(title, data = [], columns = [], filename = "export", parlourName = "SmartGoNext Beauty SaaS") {
   const safeData = Array.isArray(data) ? data : [];
   const wb = XLSX.utils.book_new();
+  
+  const numCols = Math.max(columns.length, 1);
   
   // Header rows
   const headerData = [
@@ -53,17 +96,55 @@ export function exportToExcel(title, data = [], columns = [], filename = "export
       const str = String(val ?? '');
       if (str.length > maxLen) maxLen = str.length;
     });
-    return { wch: Math.min(Math.max(maxLen + 4, 12), 50) };
+    return { wch: Math.min(Math.max(maxLen + 4, 14), 50) };
   });
   ws['!cols'] = colWidths;
   
   // Merge report title rows across all columns
-  const numCols = Math.max(columns.length, 1);
   ws['!merges'] = [
     { s: { r: 0, c: 0 }, e: { r: 0, c: numCols - 1 } },
     { s: { r: 1, c: 0 }, e: { r: 1, c: numCols - 1 } },
     { s: { r: 2, c: 0 }, e: { r: 2, c: numCols - 1 } }
   ];
+
+  // Apply Styles
+  // Row 0: Parlour Name Header (Pink Fill, Bold White Text)
+  styleRange(ws, 0, 0, 0, numCols - 1, {
+    fill: EXCEL_COLORS.PINK_HEADER,
+    font: { bold: true, sz: 14, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
+    alignment: { horizontal: "center", vertical: "center" }
+  });
+
+  // Row 1: Title Banner (Green Fill, Bold White Text)
+  styleRange(ws, 1, 0, 1, numCols - 1, {
+    fill: EXCEL_COLORS.GREEN_BANNER,
+    font: { bold: true, sz: 12, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
+    alignment: { horizontal: "center", vertical: "center" }
+  });
+
+  // Row 2: Subtitle/Timestamp Banner (Green Fill, White Text)
+  styleRange(ws, 2, 0, 2, numCols - 1, {
+    fill: EXCEL_COLORS.GREEN_BANNER,
+    font: { sz: 9, italic: true, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
+    alignment: { horizontal: "center", vertical: "center" }
+  });
+
+  // Row 4: Table Headers (Pink Fill, Bold White Text)
+  styleRange(ws, 4, 0, 4, numCols - 1, {
+    fill: EXCEL_COLORS.PINK_HEADER,
+    font: { bold: true, sz: 11, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
+    alignment: { horizontal: "center", vertical: "center" }
+  });
+
+  // Rows 5 onwards: Data Rows (Borders, Alternating fill)
+  safeData.forEach((_, idx) => {
+    const rowIdx = 5 + idx;
+    const isEven = idx % 2 === 0;
+    styleRange(ws, rowIdx, 0, rowIdx, numCols - 1, {
+      fill: isEven ? "FFFFFF" : EXCEL_COLORS.LIGHT_GRAY,
+      alignment: { vertical: "center" }
+    });
+  });
   
   XLSX.utils.book_append_sheet(wb, ws, "Report");
   XLSX.writeFile(wb, `${filename}.xlsx`);

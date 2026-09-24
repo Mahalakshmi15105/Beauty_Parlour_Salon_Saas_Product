@@ -208,17 +208,17 @@ def update_settings():
             if "logo_url" in biz and g.role == "ParlourAdmin":
                 setting.logo_url = biz.get("logo_url")
 
-            if g.role == "ParlourAdmin":
-                setting.owner_name = biz.get("owner_name")
-                setting.alternate_phone = biz.get("phone") or biz.get("alternate_phone")
-                setting.gst_number = biz.get("gst_number")
-                setting.address = biz.get("address")
-                setting.city = biz.get("city")
-                setting.state = biz.get("state")
-                setting.country = biz.get("country")
-                setting.postal_code = biz.get("postal_code")
-                setting.website = biz.get("website")
-                setting.description = biz.get("description")
+            if g.role == "ParlourAdmin" and biz:
+                if "owner_name" in biz: setting.owner_name = biz.get("owner_name")
+                if "phone" in biz or "alternate_phone" in biz: setting.alternate_phone = biz.get("phone") or biz.get("alternate_phone")
+                if "gst_number" in biz: setting.gst_number = biz.get("gst_number")
+                if "address" in biz: setting.address = biz.get("address")
+                if "city" in biz: setting.city = biz.get("city")
+                if "state" in biz: setting.state = biz.get("state")
+                if "country" in biz: setting.country = biz.get("country")
+                if "postal_code" in biz: setting.postal_code = biz.get("postal_code")
+                if "website" in biz: setting.website = biz.get("website")
+                if "description" in biz: setting.description = biz.get("description")
 
             # Update Invoice & Tax Settings
             if inv:

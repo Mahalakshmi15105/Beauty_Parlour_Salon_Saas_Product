@@ -919,7 +919,7 @@ function Appointments() {
                     {/* Read-Only Price */}
                     <div className="col-span-2 text-right">
                       <label className="block text-[10px] font-bold text-text-secondary mb-0.5">Price</label>
-                      <span className="text-xs font-extrabold text-primary block">{formatCurrency(row.price)}</span>
+                      <span className="text-xs font-extrabold text-primary block numeric">{formatCurrency(row.price)}</span>
                     </div>
 
                     {/* Delete Row Button */}
@@ -1045,7 +1045,7 @@ function Appointments() {
                                 <span className="text-text-secondary">Regular Service</span>
                               )}
                             </td>
-                            <td className="py-3 px-4 font-extrabold text-text-primary">
+                            <td className="py-3 px-4 font-extrabold text-text-primary numeric">
                               {formatCurrency(appt.total_amount)}
                             </td>
                             <td className="py-3 px-4">

@@ -872,7 +872,7 @@ function CustomerMemberships() {
                   <div className="bg-primary-light/50 border border-primary/20 p-3.5 rounded-lg space-y-1">
                     <div className="flex justify-between items-center text-xs font-semibold text-text-primary">
                       <span>Plan Price to Charge:</span>
-                      <span className="text-sm font-bold text-primary">{formatCurrency(selectedPlan.price)}</span>
+                      <span className="text-sm font-bold text-primary numeric">{formatCurrency(selectedPlan.price)}</span>
                     </div>
                     <div className="text-[11px] text-text-secondary">
                       Valid for {selectedPlan.duration_days} days. An official paid invoice will be generated upon confirmation.
@@ -948,7 +948,7 @@ function CustomerMemberships() {
                 </div>
                 <div className="text-xs text-text-secondary flex justify-between pt-1 border-t border-slate-200 mt-2">
                   <span>Renewal Price:</span>
-                  <span className="font-bold text-primary text-sm">{formatCurrency(renewTarget.price || 0)}</span>
+                  <span className="font-bold text-primary text-sm numeric">{formatCurrency(renewTarget.price || 0)}</span>
                 </div>
               </div>
 

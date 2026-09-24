@@ -448,6 +448,7 @@ def export_csv_report():
 @require_role(["ParlourAdmin", "BranchAdmin", "Receptionist"])
 def get_daily_sales_statement():
     date_str = request.args.get("date") or date.today().isoformat()
+    tenant_id = getattr(g, "parlour_id", None) or getattr(g, "tenant_id", 1)
     branch_id = getattr(g, "branch_id", None) or request.args.get("branch_id", type=int) or 1
 
     try:
@@ -463,14 +464,15 @@ def get_daily_sales_statement():
 
     parlour_name = "SALON"
     try:
-        with db.get_master_engine().connect() as conn:
-            row = conn.execute(text("SELECT name FROM tenants WHERE id = :tid"), {"tid": g.parlour_id}).fetchone()
-            if row and row[0]:
-                parlour_name = row[0]
+        if tenant_id:
+            with db.get_master_engine().connect() as conn:
+                row = conn.execute(text("SELECT name FROM tenants WHERE id = :tid"), {"tid": tenant_id}).fetchone()
+                if row and row[0]:
+                    parlour_name = row[0]
     except Exception:
         pass
 
-    branch = Branch.query.get(branch_id)
+    branch = Branch.query.get(branch_id) if branch_id else None
     branch_name = branch.name if branch else "MAIN BRANCH"
 
     start_dt = datetime.combine(target_date, datetime.min.time())
@@ -483,10 +485,10 @@ def get_daily_sales_statement():
     ).all()
 
     if branch_id:
-        invoices = [inv for inv in invoices if inv.branch_id == branch_id]
+        invoices = [inv for inv in invoices if getattr(inv, "branch_id", None) == branch_id]
 
-    t_setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id).first()
-    default_tax_rate = Decimal(str(t_setting.tax_rate)) if t_setting and t_setting.tax_rate is not None else Decimal("18.00")
+    t_setting = TenantSetting.query.filter_by(tenant_id=tenant_id).first() if tenant_id else None
+    default_tax_rate = Decimal(str(t_setting.tax_rate)) if t_setting and getattr(t_setting, "tax_rate", None) is not None else Decimal("18.00")
 
     line_items_data = []
     staff_sales_map = {}
@@ -500,25 +502,32 @@ def get_daily_sales_statement():
 
     for inv in invoices:
         pm_list = InvoicePayment.query.filter_by(invoice_id=inv.id).all()
-        cash_paid = sum(p.amount for p in pm_list if p.payment_method == "Cash") or Decimal("0.00")
-        paytm_paid = sum(p.amount for p in pm_list if p.payment_method in ["Paytm", "Google Pay", "PhonePe", "UPI"]) or Decimal("0.00")
-        card_paid = sum(p.amount for p in pm_list if p.payment_method == "Card") or Decimal("0.00")
+        
+        def _pm_str(p):
+            return str(getattr(p, "payment_method", getattr(p, "method", "")) or "").strip().lower()
 
-        for item in inv.items:
-            serv_name = item.service.name if item.service else (item.product.name if item.product else "Service Item")
-            emp_name = f"{item.employee.first_name} {item.employee.last_name or ''}".strip() if item.employee else "Staff"
+        cash_paid = sum(Decimal(str(p.amount or 0)) for p in pm_list if _pm_str(p) == "cash")
+        paytm_paid = sum(Decimal(str(p.amount or 0)) for p in pm_list if _pm_str(p) in ["paytm", "google pay", "phonepe", "upi", "online"])
+        card_paid = sum(Decimal(str(p.amount or 0)) for p in pm_list if _pm_str(p) == "card")
+
+        items = getattr(inv, "items", []) or []
+        for item in items:
+            serv_name = item.service.name if getattr(item, "service", None) else (item.product.name if getattr(item, "product", None) else "Service Item")
+            emp_name = f"{item.employee.first_name} {item.employee.last_name or ''}".strip() if getattr(item, "employee", None) else "Staff"
             
-            # BUG 3 FIX: Dynamic tax rate from line item -> service -> tenant default settings
             tax_rate_val = Decimal("0.00")
             if getattr(item, "tax_rate", None) is not None:
                 tax_rate_val = Decimal(str(item.tax_rate))
-            elif item.service and getattr(item.service, "tax_rate", None) is not None:
+            elif getattr(item, "service", None) and getattr(item.service, "tax_rate", None) is not None:
                 tax_rate_val = Decimal(str(item.service.tax_rate))
             else:
                 tax_rate_val = default_tax_rate
 
-            line_amt = item.unit_price * item.quantity
-            line_gst = (line_amt * (tax_rate_val / Decimal("100.00"))) if getattr(item.service, "tax_inclusive", False) is False else Decimal("0.00")
+            unit_price = Decimal(str(getattr(item, "unit_price", 0) or 0))
+            quantity = Decimal(str(getattr(item, "quantity", 1) or 1))
+            line_amt = unit_price * quantity
+            is_inclusive = getattr(getattr(item, "service", None), "tax_inclusive", False)
+            line_gst = (line_amt * (tax_rate_val / Decimal("100.00"))) if not is_inclusive else Decimal("0.00")
             line_total = line_amt + line_gst
 
             total_amt += line_amt
@@ -548,44 +557,46 @@ def get_daily_sales_statement():
         total_card += card_paid
 
     # Expenses for date
-    expenses = Expense.query.filter_by(tenant_id=g.parlour_id, branch_id=branch_id, is_deleted=False).filter(Expense.date == target_date).all()
-    expense_list = [{"note": exp.note or "Expense", "amount": float(exp.amount)} for exp in expenses]
-    total_expenses = sum(exp["amount"] for exp in expense_list)
+    expenses = []
+    if tenant_id and branch_id:
+        expenses = Expense.query.filter_by(tenant_id=tenant_id, branch_id=branch_id, is_deleted=False).filter(Expense.date == target_date).all()
+    expense_list = [{"note": exp.note or "Expense", "amount": float(exp.amount or 0)} for exp in expenses]
+    total_expenses = float(sum(exp["amount"] for exp in expense_list))
 
     # Cash Denominations
-    cd_rec = CashDenomination.query.filter_by(tenant_id=g.parlour_id, branch_id=branch_id, date=target_date).first()
+    cd_rec = CashDenomination.query.filter_by(tenant_id=tenant_id, branch_id=branch_id, date=target_date).first() if tenant_id and branch_id else None
     cd_data = {
-        "500": cd_rec.count_500 if cd_rec else 0,
-        "200": cd_rec.count_200 if cd_rec else 0,
-        "100": cd_rec.count_100 if cd_rec else 0,
-        "50": cd_rec.count_50 if cd_rec else 0,
-        "20": cd_rec.count_20 if cd_rec else 0,
-        "10": cd_rec.count_10 if cd_rec else 0,
-        "5": cd_rec.count_5 if cd_rec else 0,
-        "2": cd_rec.count_2 if cd_rec else 0,
-        "1": cd_rec.count_1 if cd_rec else 0,
-        "total": float(cd_rec.total) if cd_rec else 0.0
+        "500": getattr(cd_rec, "count_500", 0) if cd_rec else 0,
+        "200": getattr(cd_rec, "count_200", 0) if cd_rec else 0,
+        "100": getattr(cd_rec, "count_100", 0) if cd_rec else 0,
+        "50": getattr(cd_rec, "count_50", 0) if cd_rec else 0,
+        "20": getattr(cd_rec, "count_20", 0) if cd_rec else 0,
+        "10": getattr(cd_rec, "count_10", 0) if cd_rec else 0,
+        "5": getattr(cd_rec, "count_5", 0) if cd_rec else 0,
+        "2": getattr(cd_rec, "count_2", 0) if cd_rec else 0,
+        "1": getattr(cd_rec, "count_1", 0) if cd_rec else 0,
+        "total": float(getattr(cd_rec, "total", 0) or 0) if cd_rec else 0.0
     }
 
-    # BUG 1 FIX: Dynamic Opening Cash Balance calculation (Previous Day's Closing = Opening + Cash Pay - Expenses)
+    # Opening Cash Balance calculation
     prev_invoices = get_tenant_query(Invoice).filter(
         Invoice.created_at < start_dt,
         Invoice.status != "Voided"
     ).all()
     if branch_id:
-        prev_invoices = [inv for inv in prev_invoices if inv.branch_id == branch_id]
+        prev_invoices = [inv for inv in prev_invoices if getattr(inv, "branch_id", None) == branch_id]
 
     prev_cash_sum = Decimal("0.00")
     for inv in prev_invoices:
         pm_list = InvoicePayment.query.filter_by(invoice_id=inv.id).all()
-        prev_cash_sum += sum(Decimal(str(p.amount or 0)) for p in pm_list if str(getattr(p, "payment_method", getattr(p, "method", ""))).lower() == "cash") or Decimal("0.00")
+        prev_cash_sum += sum(Decimal(str(p.amount or 0)) for p in pm_list if str(getattr(p, "payment_method", getattr(p, "method", ""))).lower() == "cash")
 
-    prev_expenses = Expense.query.filter_by(tenant_id=g.parlour_id, is_deleted=False).filter(Expense.date < target_date)
-    if branch_id:
-        prev_expenses = prev_expenses.filter_by(branch_id=branch_id)
-    prev_exp_sum = Decimal(str(sum(exp.amount for exp in prev_expenses.all()))) or Decimal("0.00")
+    prev_expenses_q = Expense.query.filter_by(tenant_id=tenant_id, is_deleted=False).filter(Expense.date < target_date) if tenant_id else None
+    if prev_expenses_q and branch_id:
+        prev_expenses_q = prev_expenses_q.filter_by(branch_id=branch_id)
+    prev_exp_sum = sum(Decimal(str(exp.amount or 0)) for exp in (prev_expenses_q.all() if prev_expenses_q else []))
 
-    init_bal = Decimal(str(branch.initial_opening_balance)) if branch and getattr(branch, "initial_opening_balance", None) is not None else Decimal("0.00")
+    init_bal = Decimal(str(getattr(branch, "initial_opening_balance", 0) or 0)) if branch else Decimal("0.00")
     opening_bal = float(init_bal + prev_cash_sum - prev_exp_sum)
     if opening_bal < 0:
         opening_bal = 0.0
@@ -602,11 +613,11 @@ def get_daily_sales_statement():
         Invoice.status != "Voided"
     ).all()
     if branch_id:
-        month_invoices = [inv for inv in month_invoices if inv.branch_id == branch_id]
+        month_invoices = [inv for inv in month_invoices if getattr(inv, "branch_id", None) == branch_id]
 
-    till_date_sales = sum(float(inv.subtotal) for inv in month_invoices)
-    till_date_gst = sum(float(inv.tax) for inv in month_invoices)
-    till_date_walkin = len(set(inv.customer_id for inv in month_invoices if inv.customer_id))
+    till_date_sales = sum(float(getattr(inv, "subtotal", 0) or 0) for inv in month_invoices)
+    till_date_gst = sum(float(getattr(inv, "tax", 0) or 0) for inv in month_invoices)
+    till_date_walkin = len(set(inv.customer_id for inv in month_invoices if getattr(inv, "customer_id", None)))
     till_date_abv = (till_date_sales / till_date_walkin) if till_date_walkin > 0 else 0.0
 
     return success_response({

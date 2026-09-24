@@ -1,10 +1,11 @@
 @import "tailwindcss";
 
 :root {
-  --color-primary: #FF758F;
-  --color-primary-hover: #FF4D6D;
-  --color-primary-light: #FFF0F3;
-  --color-primary-border-soft: rgba(255, 117, 143, 0.2);
+  --accent-color: #FF758F;
+  --color-primary: var(--accent-color);
+  --color-primary-hover: var(--accent-color);
+  --color-primary-light: rgba(255, 117, 143, 0.15);
+  --color-primary-border-soft: rgba(255, 117, 143, 0.25);
 
   --color-gold-accent: #D4AF37;
   --color-gold-light: #FFF8E7;
@@ -13,74 +14,71 @@
   --color-warning: #F59E0B;
   --color-danger: #F43F5E;
   
-  --color-background: #FFF7F2;
+  --color-background: #FFFFFF;
   --color-surface: #FFFFFF;
-  --color-sidebar: rgba(255, 240, 235, 0.75);
-  --color-navbar: rgba(255, 255, 255, 0.85);
-  --color-card: rgba(255, 255, 255, 0.9);
-  --color-border: rgba(255, 220, 215, 0.6);
+  --color-sidebar: #FDEEF1;
+  --color-navbar: #FFFFFF;
+  --color-card: #FFFFFF;
+  --color-border: rgba(0, 0, 0, 0.08);
   --color-input-bg: #FFFFFF;
   --color-input-border: #FFD8E1;
   --color-hover-bg: #FFF0F3;
-  --color-accent: #FF758F;
+  --color-accent: var(--accent-color);
   
-  --color-text-primary: #4A2E35;
-  --color-text-secondary: #8C6A75;
-  --color-border-soft: rgba(255, 117, 143, 0.15);
+  --color-text-primary: #1f1f1f;
+  --color-text-secondary: #4a4a4a;
+  --color-border-soft: rgba(0, 0, 0, 0.1);
 }
 
 /* Glowe Theme Utility Classes & Glassmorphism Aesthetics */
 .glowe-bg-gradient {
-  background: linear-gradient(135deg, #FFF0F5 0%, #FFF5EB 50%, #E6F0FA 100%) !important;
-  background-attachment: fixed !important;
+  background: #FFFFFF !important;
 }
 
 .glowe-sidebar-gradient {
-  background: rgba(255, 255, 255, 0.65) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  border-right: 1px solid rgba(255, 255, 255, 0.6) !important;
-  box-shadow: 0 8px 24px rgba(255, 117, 143, 0.12) !important;
+  background: #FDEEF1 !important;
+  color: #1f1f1f !important;
+  border-right: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 2px 0 16px rgba(0, 0, 0, 0.08) !important;
 }
 
 .glowe-glass-card {
-  background: rgba(255, 255, 255, 0.6) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.6) !important;
-  box-shadow: 0 8px 24px rgba(255, 117, 143, 0.15) !important;
+  background: #FFFFFF !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.04) !important;
   border-radius: 1.5rem !important;
 }
 
 .glowe-pink-gradient {
-  background: linear-gradient(135deg, #FF758F 0%, #FF4D6D 100%) !important;
+  background: var(--accent-color) !important;
   color: #FFFFFF !important;
-  box-shadow: 0 8px 22px rgba(255, 77, 148, 0.45) !important;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.15) !important;
   transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease !important;
   border: none !important;
 }
 
 .glowe-pink-gradient:hover {
-  background: linear-gradient(135deg, #FF85A1 0%, #FF3358 100%) !important;
+  background: var(--accent-color) !important;
+  filter: brightness(0.92) !important;
   transform: translateY(-2px) !important;
-  box-shadow: 0 12px 28px rgba(255, 77, 148, 0.65) !important;
-  filter: brightness(1.05) !important;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2) !important;
 }
 
 .glowe-pill-active {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%) !important;
+  background: var(--accent-color) !important;
   color: #FFFFFF !important;
   border-radius: 9999px !important;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12) !important;
 }
 
 .glowe-glow-shadow {
-  box-shadow: 0 8px 24px rgba(255, 117, 143, 0.15) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06) !important;
 }
 
 /* Dynamic CSS Variable Driven Design System Utilities with Glass Button Aesthetics */
 .bg-primary { 
-  background-color: var(--color-primary) !important; 
+  background-color: var(--accent-color) !important; 
+  color: #ffffff !important;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15) !important;
   border-radius: 9999px !important;
   transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
@@ -91,11 +89,11 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
 }
 
-.text-primary { color: var(--color-primary) !important; }
-.border-primary { border-color: var(--color-primary) !important; }
+.text-primary { color: var(--accent-color) !important; }
+.border-primary { border-color: var(--accent-color) !important; }
 
 .bg-primary-hover:hover, .hover\:bg-primary-hover:hover { 
-  background-color: var(--color-primary-hover) !important; 
+  background-color: var(--accent-color) !important; 
   filter: brightness(0.92) !important;
 }
 .bg-primary-light { 
@@ -105,22 +103,24 @@
 .hover\:bg-primary-light:hover { background-color: var(--color-primary-light) !important; }
 .border-border-soft { border-color: var(--color-primary-border-soft) !important; }
 
-.bg-background { background: linear-gradient(135deg, #FFF0F5 0%, #FFF5EB 50%, #E6F0FA 100%) !important; background-attachment: fixed !important; }
-.bg-surface { background: rgba(255, 255, 255, 0.6) !important; backdrop-filter: blur(20px) saturate(180%) !important; -webkit-backdrop-filter: blur(20px) saturate(180%) !important; }
+.bg-background { background: #FFFFFF !important; }
+.bg-surface { background: #FFFFFF !important; }
 
-.text-text-primary { color: var(--color-text-primary) !important; }
-.text-text-secondary { color: var(--color-text-secondary) !important; }
+.text-text-primary { color: #1f1f1f !important; }
+.text-text-secondary { color: #4a4a4a !important; }
 
 @layer base {
-  * {
+  *:not(.numeric):not(.numeric *):not(.mono-nums):not(.mono-nums *):not(.num-val):not(.num-val *):not([data-numeric="true"]):not([data-numeric="true"] *) {
     transition: background-color 250ms ease-in-out, border-color 250ms ease-in-out, color 250ms ease-in-out, box-shadow 250ms ease-in-out;
+    font-family: 'Georgia', 'Times New Roman', serif !important;
+    font-weight: 700 !important;
   }
 
   body {
-    background: linear-gradient(135deg, #FFF0F5 0%, #FFF6EC 50%, #E8F4FE 100%);
-    background-attachment: fixed;
-    color: var(--color-text-primary);
-    font-family: "Outfit", "Inter", system-ui, -apple-system, sans-serif;
+    background: #FFFFFF !important;
+    color: #1f1f1f !important;
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-weight: 700 !important;
     -webkit-font-smoothing: antialiased;
     margin: 0;
     padding: 0;
@@ -129,20 +129,42 @@
     line-height: 1.5;
   }
 
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-weight: 700 !important;
+    color: #1f1f1f;
+  }
+
+  label {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-weight: 700 !important;
+    color: #1f1f1f !important;
+  }
+
   /* Global Table & List Readability - minimum 14px for table cells, headers, and form controls */
   table {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-weight: 700 !important;
     font-size: 14px;
   }
-  table th,
-  table td {
+  table th {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-weight: 700 !important;
     font-size: 14px;
+    background-color: var(--accent-color) !important;
+    color: #ffffff !important;
   }
-  table input,
-  table select,
-  table textarea {
+  table td:not(.numeric):not(.numeric *) {
+    font-family: 'Georgia', 'Times New Roman', serif !important;
+    font-weight: 700 !important;
     font-size: 14px;
+    color: #1f1f1f !important;
   }
-  table .text-xs {
+  table input:not(.numeric),
+  table select:not(.numeric),
+  table textarea:not(.numeric) {
+    font-family: 'Georgia', 'Times New Roman', serif !important;
+    font-weight: 700 !important;
     font-size: 14px;
   }
 
@@ -153,22 +175,22 @@
   button:focus-visible,
   [tabindex="0"]:focus-visible {
     outline: none !important;
-    border-color: #FF758F !important;
-    box-shadow: 0 0 0 3.5px rgba(255, 117, 143, 0.25), 0 2px 8px -2px rgba(255, 117, 143, 0.18) !important;
+    border-color: var(--accent-color) !important;
+    box-shadow: 0 0 0 3.5px rgba(0, 0, 0, 0.1) !important;
     transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out !important;
   }
 
   /* Select Dropdown Open State Visibility & Curved Option Popup Styling */
   select {
     border-radius: 0.75rem !important;
-    color: #4A2E35 !important;
+    color: #1f1f1f !important;
     background-color: #FFFFFF !important;
   }
 
   select option {
     background-color: #FFFFFF !important;
-    color: #1E293B !important;
-    font-weight: 600 !important;
+    color: #1f1f1f !important;
+    font-weight: 700 !important;
     padding: 10px 14px !important;
     border-radius: 0.5rem !important;
   }
@@ -178,16 +200,40 @@
   div[role="dialog"] select,
   div[role="dialog"] textarea {
     background-color: #FFF7F9 !important;
-    border-color: #FFD8E1 !important;
-    color: #1E293B !important;
-    font-weight: 600 !important;
+    border-color: var(--accent-color) !important;
+    color: #1f1f1f !important;
+    font-weight: 700 !important;
   }
 
   .fixed.inset-0 label,
   div[role="dialog"] label {
-    color: #334155 !important;
+    color: #1f1f1f !important;
     font-weight: 700 !important;
   }
+}
+
+/* Numeric & Tabular Data Font Class Override */
+html body .numeric,
+html body .numeric *,
+html body .mono-nums,
+html body .mono-nums *,
+html body .num-val,
+html body .num-val *,
+html body [data-numeric="true"],
+html body [data-numeric="true"] *,
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+input[type="number"],
+input[type="tel"],
+select option.numeric,
+table td.numeric,
+table td .numeric,
+table th.numeric,
+table th .numeric {
+  font-family: 'Arial', 'Helvetica', 'Segoe UI', sans-serif !important;
+  font-variant-numeric: tabular-nums !important;
+  font-feature-settings: "tnum" 1 !important;
 }
 
 /* Keyframe Animations for Landing Page Glowe Theme */
@@ -213,12 +259,12 @@
 
 @keyframes pulseGlow {
   0%, 100% {
-    box-shadow: 0 4px 14px rgba(255, 117, 143, 0.25);
-    border-color: rgba(255, 117, 143, 0.4);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+    border-color: var(--accent-color);
   }
   50% {
-    box-shadow: 0 8px 22px rgba(255, 117, 143, 0.45);
-    border-color: rgba(255, 77, 148, 0.7);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.2);
+    border-color: var(--accent-color);
   }
 }
 
@@ -256,12 +302,7 @@
 }
 
 .animate-shimmer-text {
-  background: linear-gradient(90deg, #FF4D94 0%, #FF7EB3 25%, #E11D48 50%, #FF7EB3 75%, #FF4D94 100%);
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: textShimmer 5s ease infinite;
+  color: var(--accent-color);
 }
 
 .animate-float-soft {
@@ -275,17 +316,16 @@
 /* Secondary Login Glass Outline Button Styling */
 .glowe-login-btn {
   background: rgba(255, 255, 255, 0.8) !important;
-  border: 2px solid #FF758F !important;
-  color: #FF4D94 !important;
-  box-shadow: 0 4px 12px rgba(255, 117, 143, 0.15) !important;
+  border: 2px solid var(--accent-color) !important;
+  color: var(--accent-color) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
   transition: all 0.3s ease !important;
-  animation: pulseGlow 3s ease-in-out infinite;
 }
 
 .glowe-login-btn:hover {
-  background: linear-gradient(90deg, #FF7EB3 0%, #FF4D94 100%) !important;
+  background: var(--accent-color) !important;
   border-color: transparent !important;
   color: #FFFFFF !important;
-  box-shadow: 0 8px 24px rgba(255, 77, 148, 0.5) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
   transform: translateY(-1px) !important;
 }

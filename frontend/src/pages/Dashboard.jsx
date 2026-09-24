@@ -296,34 +296,34 @@ function Dashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
         <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow flex flex-col justify-between" style={{ boxShadow: "0 8px 24px rgba(255, 117, 143, 0.2)" }}>
           <p className="text-xs font-bold text-pink-600 uppercase tracking-wider">Today's Revenue</p>
-          <p className="text-2xl font-black text-text-primary mt-2">{formatCurrency(summary?.revenue?.today)}</p>
-          <p className="text-[10px] text-success font-medium mt-2">▲ {summary?.invoices?.today} Bills Processed</p>
+          <p className="text-2xl font-black text-text-primary mt-2 numeric">{formatCurrency(summary?.revenue?.today)}</p>
+          <p className="text-[10px] text-success font-medium mt-2"><span className="numeric">▲ {summary?.invoices?.today}</span> Bills Processed</p>
         </div>
 
         <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow flex flex-col justify-between" style={{ boxShadow: "0 8px 24px rgba(99, 102, 241, 0.15)" }}>
           <p className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Weekly Revenue</p>
-          <p className="text-2xl font-black text-text-primary mt-2">{formatCurrency(summary?.revenue?.weekly)}</p>
-          <p className="text-[10px] text-text-secondary mt-2">Last 7 Days Rolling</p>
+          <p className="text-2xl font-black text-text-primary mt-2 numeric">{formatCurrency(summary?.revenue?.weekly)}</p>
+          <p className="text-[10px] text-text-secondary mt-2">Last <span className="numeric">7</span> Days Rolling</p>
         </div>
 
         <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow flex flex-col justify-between" style={{ boxShadow: "0 8px 24px rgba(16, 185, 129, 0.15)" }}>
           <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Monthly Revenue</p>
-          <p className="text-2xl font-black text-text-primary mt-2">{formatCurrency(summary?.revenue?.monthly)}</p>
-          <p className="text-[10px] text-text-secondary mt-2">{summary?.invoices?.this_month} Bills This Month</p>
+          <p className="text-2xl font-black text-text-primary mt-2 numeric">{formatCurrency(summary?.revenue?.monthly)}</p>
+          <p className="text-[10px] text-text-secondary mt-2"><span className="numeric">{summary?.invoices?.this_month}</span> Bills This Month</p>
         </div>
 
         <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow flex flex-col justify-between" style={{ boxShadow: "0 8px 24px rgba(168, 85, 247, 0.15)" }}>
           <p className="text-xs font-bold text-purple-600 uppercase tracking-wider">Today's Attendance</p>
-          <p className="text-2xl font-black text-text-primary mt-2">{summary?.attendance?.total_checked_in || 0} Checked In</p>
+          <p className="text-2xl font-black text-text-primary mt-2"><span className="numeric">{summary?.attendance?.total_checked_in || 0}</span> Checked In</p>
           <p className="text-[10px] text-purple-700 font-medium mt-2">
-            {summary?.attendance?.present || 0} Present • {summary?.attendance?.half_day || 0} Half-Day
+            <span className="numeric">{summary?.attendance?.present || 0}</span> Present • <span className="numeric">{summary?.attendance?.half_day || 0}</span> Half-Day
           </p>
         </div>
 
         <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow flex flex-col justify-between" style={{ boxShadow: "0 8px 24px rgba(245, 158, 11, 0.15)" }}>
           <p className="text-xs font-bold text-amber-600 uppercase tracking-wider">{t("active_customers")}</p>
-          <p className="text-2xl font-black text-text-primary mt-2">{summary?.memberships?.active}</p>
-          <p className="text-[10px] text-warning font-medium mt-2">{summary?.memberships?.expiring_soon} Expiring Soon</p>
+          <p className="text-2xl font-black text-text-primary mt-2 numeric">{summary?.memberships?.active || 0}</p>
+          <p className="text-[10px] text-warning font-medium mt-2"><span className="numeric">{summary?.memberships?.expiring_soon || 0}</span> Expiring Soon</p>
         </div>
       </div>
 
@@ -388,11 +388,11 @@ function Dashboard() {
               {activities?.recent_invoices?.map((inv) => (
                 <div key={inv.id} className="py-3 flex justify-between items-center text-xs">
                   <div>
-                    <p className="font-semibold text-text-primary">{inv.invoice_number}</p>
+                    <p className="font-semibold text-text-primary numeric">{inv.invoice_number}</p>
                     <p className="text-text-secondary">{inv.customer_name || "Walk-In Client"}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-text-primary">{formatCurrency(inv.total)}</p>
+                    <p className="font-semibold text-text-primary numeric">{formatCurrency(inv.total)}</p>
                     <span className={`text-[10px] font-medium ${
                       inv.status === "Paid" ? "text-success" : "text-danger"
                     }`}>{inv.status}</span>

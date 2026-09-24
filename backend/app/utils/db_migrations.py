@@ -53,12 +53,20 @@ def run_auto_migrations():
         # 0. Create any new missing tables
         db.create_all()
 
-        # 1. Add branch_id to all relevant tables if missing
+        # 1. Add branch_id and tenant_id to all relevant tables if missing
         for table in BRANCH_TABLES:
             try:
                 db.session.execute(text(f"ALTER TABLE `{table}` ADD COLUMN `branch_id` INT NULL;"))
                 db.session.commit()
                 logger.info(f"AUTO-MIGRATION: Added 'branch_id' column to table '{table}'.")
+            except Exception:
+                db.session.rollback()
+
+        for table in ["users", "tenant_settings"]:
+            try:
+                db.session.execute(text(f"ALTER TABLE `{table}` ADD COLUMN `tenant_id` INT NULL;"))
+                db.session.commit()
+                logger.info(f"AUTO-MIGRATION: Added 'tenant_id' column to table '{table}'.")
             except Exception:
                 db.session.rollback()
 

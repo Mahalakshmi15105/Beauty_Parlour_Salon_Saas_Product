@@ -4,7 +4,8 @@ import { useToast } from "../context/ToastContext";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { useTheme } from "../context/ThemeContext";
 import { exportToCSV, printDataList, exportToPDF, exportToExcel } from "../utils/exportUtils";
-import * as XLSX from "xlsx";
+import XLSX from "xlsx-js-style";
+import { EXCEL_COLORS, styleCell, styleRange } from "../utils/exportUtils";
 import { 
   Printer, 
   FileSpreadsheet, 
@@ -82,11 +83,15 @@ function Reports() {
 
     if (reportType === "daily_sales_statement") {
       const d = reportData;
+      const parlourNameStr = d.parlour_name || "SALON";
+      const branchNameStr = d.branch_name || "PARLOUR BRANCH";
+      const dateStrInfo = `DATE: ${d.date_str || ""} (${d.day_name || ""})`;
+
       const wsData = [
-        [d.parlour_name || "SALON"],
-        [d.branch_name || "PARLOUR BRANCH"],
+        [parlourNameStr],
+        [branchNameStr],
         ["DAILY SALES STATEMENT"],
-        ["DATE", d.date_str || "", "DAY", d.day_name || ""],
+        [dateStrInfo],
         [],
         ["S.NO", "SERVICE", "STAFF", "AMT", "GST", "CASH", "PAYTM", "CARD", "M/C", "TOTAL", "", "EXPENSES", "AMOUNT"],
       ];
@@ -110,28 +115,33 @@ function Reports() {
           item.mc !== undefined ? item.mc : "",
           item.total !== undefined ? item.total : "",
           "",
-          exp.note || (i === 0 ? "No Expenses" : ""),
+          exp.note || (i === 0 && expenses.length === 0 ? "No Expenses" : ""),
           exp.amount !== undefined ? exp.amount : ""
         ]);
       }
 
+      const totalRowIdx = 6 + maxRows;
       wsData.push(["TOTAL", "", "", d.totals?.amt || 0, d.totals?.gst || 0, d.totals?.cash || 0, d.totals?.paytm || 0, d.totals?.card || 0, 0, d.totals?.total || 0, "", "TOTAL EXPENSES", d.total_expenses || 0]);
       wsData.push([]);
-      wsData.push(["", "", "", "", "", "", "", "", "", "", "", "OPENING BAL :", d.balance?.opening_bal || 130]);
-      wsData.push(["STAFF NAME", "ACHIEVED", "", "", "", "", "", "", "", "", "", "* TOTAL SALE", d.balance?.total_sale || 0]);
       
       const staffList = d.staff_achieved || [];
       const denomKeys = ["500", "200", "100", "50", "20", "10", "5", "2", "1"];
       const cd = d.cash_denomination || {};
 
-      wsData.push([staffList[0]?.staff_name || "-", staffList[0]?.achieved || 0, "", "", "", "", "", "", "", "", "", "* CASH PAY", d.balance?.cash_pay || 0]);
-      wsData.push([staffList[1]?.staff_name || "-", staffList[1]?.achieved || 0, "", "", "", "", "", "", "", "", "", "* PHONE PAY", d.balance?.phone_pay || 0]);
-      wsData.push([staffList[2]?.staff_name || "-", staffList[2]?.achieved || 0, "", "", "", "", "", "", "", "", "", "* CARD", d.balance?.card || 0]);
-      wsData.push([staffList[3]?.staff_name || "-", staffList[3]?.achieved || 0, "", "", "", "", "", "", "", "", "", "* EXPENCE", d.balance?.expense || 0]);
-      wsData.push([staffList[4]?.staff_name || "-", staffList[4]?.achieved || 0, "", "", "", "", "", "", "", "", "", "CLOSING BAL", d.balance?.closing_bal || 0]);
+      const summaryStartRowIdx = totalRowIdx + 2;
+      wsData.push(["STAFF ACHIEVED", "", "", "", "", "", "", "", "", "", "", "SUMMARY BALANCE", ""]);
+      wsData.push(["S.NO", "STAFF NAME", "ACHIEVED", "", "", "", "", "", "", "", "", "OPENING BAL :", d.balance?.opening_bal || 130]);
+      wsData.push([staffList[0]?.sno || 1, staffList[0]?.staff_name || "-", staffList[0]?.achieved || 0, "", "", "", "", "", "", "", "", "* TOTAL SALE", d.balance?.total_sale || 0]);
+      wsData.push([staffList[1]?.sno || 2, staffList[1]?.staff_name || "-", staffList[1]?.achieved || 0, "", "", "", "", "", "", "", "", "* CASH PAY", d.balance?.cash_pay || 0]);
+      wsData.push([staffList[2]?.sno || 3, staffList[2]?.staff_name || "-", staffList[2]?.achieved || 0, "", "", "", "", "", "", "", "", "* PHONE PAY", d.balance?.phone_pay || 0]);
+      wsData.push([staffList[3]?.sno || 4, staffList[3]?.staff_name || "-", staffList[3]?.achieved || 0, "", "", "", "", "", "", "", "", "* CARD", d.balance?.card || 0]);
+      wsData.push([staffList[4]?.sno || 5, staffList[4]?.staff_name || "-", staffList[4]?.achieved || 0, "", "", "", "", "", "", "", "", "* EXPENCE", d.balance?.expense || 0]);
+      wsData.push(["", "", "", "", "", "", "", "", "", "", "", "CLOSING BAL", d.balance?.closing_bal || 0]);
 
       wsData.push([]);
-      wsData.push(["CASH DENOMINATION"]);
+      const denomHeaderRowIdx = summaryStartRowIdx + 9;
+      wsData.push(["CASH DENOMINATION", "", ""]);
+      wsData.push(["DENOMINATION", "COUNT", "SUBTOTAL"]);
       denomKeys.forEach((k) => {
         const cnt = cd[k] || 0;
         const sub = parseInt(k, 10) * cnt;
@@ -140,16 +150,194 @@ function Reports() {
       wsData.push(["CASH DENOMINATION TOTAL", "", cd.total || 0]);
 
       const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+      // Auto Column Widths
+      ws["!cols"] = [
+        { wch: 8 },  // S.NO
+        { wch: 22 }, // SERVICE
+        { wch: 16 }, // STAFF
+        { wch: 10 }, // AMT
+        { wch: 10 }, // GST
+        { wch: 10 }, // CASH
+        { wch: 10 }, // PAYTM
+        { wch: 10 }, // CARD
+        { wch: 8 },  // M/C
+        { wch: 12 }, // TOTAL
+        { wch: 4 },  // GAP
+        { wch: 22 }, // EXPENSES / SUMMARY
+        { wch: 14 }  // AMOUNT
+      ];
+
+      // Merges
+      ws["!merges"] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 12 } }, // Parlour Name
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 12 } }, // Branch Name
+        { s: { r: 2, c: 0 }, e: { r: 2, c: 12 } }, // Daily Sales Statement Title
+        { s: { r: 3, c: 0 }, e: { r: 3, c: 12 } }, // Date & Day Info
+        { s: { r: summaryStartRowIdx, c: 0 }, e: { r: summaryStartRowIdx, c: 2 } }, // Staff Achieved Header
+        { s: { r: summaryStartRowIdx, c: 11 }, e: { r: summaryStartRowIdx, c: 12 } }, // Summary Balance Header
+        { s: { r: denomHeaderRowIdx, c: 0 }, e: { r: denomHeaderRowIdx, c: 2 } }, // Cash Denomination Header
+        { s: { r: denomHeaderRowIdx + 11, c: 0 }, e: { r: denomHeaderRowIdx + 11, c: 1 } } // Cash Denomination Total Label
+      ];
+
+      // Apply Cell Styling
+      // 1. Parlour Name & Branch Header (Pink Fill)
+      styleRange(ws, 0, 0, 0, 12, {
+        fill: EXCEL_COLORS.PINK_HEADER,
+        font: { bold: true, sz: 14, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
+        alignment: { horizontal: "center", vertical: "center" }
+      });
+      styleRange(ws, 1, 0, 1, 12, {
+        fill: EXCEL_COLORS.PINK_HEADER,
+        font: { bold: true, sz: 11, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
+        alignment: { horizontal: "center", vertical: "center" }
+      });
+
+      // 2. Green Title & Date Banner
+      styleRange(ws, 2, 0, 2, 12, {
+        fill: EXCEL_COLORS.GREEN_BANNER,
+        font: { bold: true, sz: 12, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
+        alignment: { horizontal: "center", vertical: "center" }
+      });
+      styleRange(ws, 3, 0, 3, 12, {
+        fill: EXCEL_COLORS.GREEN_BANNER,
+        font: { bold: true, sz: 10, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
+        alignment: { horizontal: "center", vertical: "center" }
+      });
+
+      // 3. Table Headers Row (Row 5)
+      styleRange(ws, 5, 0, 5, 9, {
+        fill: EXCEL_COLORS.PINK_HEADER,
+        font: { bold: true, sz: 10, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
+        alignment: { horizontal: "center", vertical: "center" }
+      });
+      styleRange(ws, 5, 11, 5, 12, {
+        fill: EXCEL_COLORS.YELLOW_ACCENT,
+        font: { bold: true, sz: 10, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
+        alignment: { horizontal: "center", vertical: "center" }
+      });
+
+      // 4. Data Rows (Rows 6 to 6 + maxRows - 1)
+      for (let i = 0; i < maxRows; i++) {
+        const r = 6 + i;
+        const fill = i % 2 === 0 ? "FFFFFF" : EXCEL_COLORS.LIGHT_GRAY;
+        styleRange(ws, r, 0, r, 9, { fill, alignment: { vertical: "center" } });
+        // Right align numeric cells in line items
+        for (let c = 3; c <= 9; c++) {
+          styleCell(ws, r, c, { fill, alignment: { horizontal: "right", vertical: "center" } });
+        }
+        // Expense cells
+        styleRange(ws, r, 11, r, 12, { fill });
+        styleCell(ws, r, 12, { fill, alignment: { horizontal: "right", vertical: "center" } });
+      }
+
+      // 5. Total Row
+      ws["!merges"].push({ s: { r: totalRowIdx, c: 0 }, e: { r: totalRowIdx, c: 2 } });
+      styleRange(ws, totalRowIdx, 0, totalRowIdx, 9, {
+        fill: EXCEL_COLORS.LIGHT_YELLOW,
+        font: { bold: true, sz: 10 },
+        alignment: { vertical: "center" }
+      });
+      for (let c = 3; c <= 9; c++) {
+        styleCell(ws, totalRowIdx, c, {
+          fill: EXCEL_COLORS.LIGHT_YELLOW,
+          font: { bold: true, sz: 10 },
+          alignment: { horizontal: "right", vertical: "center" }
+        });
+      }
+      styleRange(ws, totalRowIdx, 11, totalRowIdx, 12, {
+        fill: EXCEL_COLORS.LIGHT_YELLOW,
+        font: { bold: true, sz: 10 },
+        alignment: { vertical: "center" }
+      });
+      styleCell(ws, totalRowIdx, 12, {
+        fill: EXCEL_COLORS.LIGHT_YELLOW,
+        font: { bold: true, sz: 10 },
+        alignment: { horizontal: "right", vertical: "center" }
+      });
+
+      // 6. Staff Achieved Header & Table
+      styleRange(ws, summaryStartRowIdx, 0, summaryStartRowIdx, 2, {
+        fill: EXCEL_COLORS.YELLOW_ACCENT,
+        font: { bold: true, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
+        alignment: { horizontal: "center", vertical: "center" }
+      });
+      styleRange(ws, summaryStartRowIdx + 1, 0, summaryStartRowIdx + 1, 2, {
+        fill: EXCEL_COLORS.LIGHT_YELLOW,
+        font: { bold: true }
+      });
+      for (let i = 0; i < 6; i++) {
+        const r = summaryStartRowIdx + 2 + i;
+        styleRange(ws, r, 0, r, 2, { alignment: { vertical: "center" } });
+        styleCell(ws, r, 2, { alignment: { horizontal: "right", vertical: "center" } });
+      }
+
+      // 7. Summary Balance Box
+      styleRange(ws, summaryStartRowIdx, 11, summaryStartRowIdx, 12, {
+        fill: EXCEL_COLORS.GREEN_BANNER,
+        font: { bold: true, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
+        alignment: { horizontal: "center", vertical: "center" }
+      });
+      for (let i = 0; i < 7; i++) {
+        const r = summaryStartRowIdx + 1 + i;
+        const isClosing = i === 6;
+        const bg = isClosing ? EXCEL_COLORS.LIGHT_YELLOW : EXCEL_COLORS.LIGHT_GRAY;
+        styleRange(ws, r, 11, r, 12, {
+          fill: bg,
+          font: { bold: isClosing || i === 0 },
+          alignment: { vertical: "center" }
+        });
+        styleCell(ws, r, 12, {
+          fill: bg,
+          font: { bold: isClosing || i === 0 },
+          alignment: { horizontal: "right", vertical: "center" }
+        });
+      }
+
+      // 8. Cash Denomination Section
+      styleRange(ws, denomHeaderRowIdx, 0, denomHeaderRowIdx, 2, {
+        fill: EXCEL_COLORS.YELLOW_ACCENT,
+        font: { bold: true, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
+        alignment: { horizontal: "center", vertical: "center" }
+      });
+      styleRange(ws, denomHeaderRowIdx + 1, 0, denomHeaderRowIdx + 1, 2, {
+        fill: EXCEL_COLORS.LIGHT_YELLOW,
+        font: { bold: true },
+        alignment: { horizontal: "center", vertical: "center" }
+      });
+      for (let i = 0; i < denomKeys.length; i++) {
+        const r = denomHeaderRowIdx + 2 + i;
+        styleRange(ws, r, 0, r, 2, { alignment: { vertical: "center" } });
+        styleCell(ws, r, 1, { alignment: { horizontal: "center", vertical: "center" } });
+        styleCell(ws, r, 2, { alignment: { horizontal: "right", vertical: "center" } });
+      }
+      const denomTotalR = denomHeaderRowIdx + 11;
+      styleRange(ws, denomTotalR, 0, denomTotalR, 2, {
+        fill: EXCEL_COLORS.LIGHT_YELLOW,
+        font: { bold: true }
+      });
+      styleCell(ws, denomTotalR, 2, {
+        fill: EXCEL_COLORS.LIGHT_YELLOW,
+        font: { bold: true },
+        alignment: { horizontal: "right", vertical: "center" }
+      });
+
       XLSX.utils.book_append_sheet(wb, ws, "Daily Sales Statement");
       XLSX.writeFile(wb, `Daily_Sales_Statement_${d.date_str || "today"}.xlsx`);
     } else if (reportType === "monthly_staff_performance") {
       const d = reportData;
+      const parlourNameStr = d.parlour_name || "SmartGoNext Beauty SaaS";
+      const titleStr = `MONTHLY PERFORMANCE STAFF - ${d.month_year || ""}`;
+
       const wsData = [
-        [`MONTHLY PERFORMANCE STAFF - ${d.month_year || ""}`],
+        [parlourNameStr],
+        [titleStr],
+        [],
         ["S.NO", "NAME", "LEVEL", "SALARY", "TARGET", "ACHIEVED", "WITH GST", "WALKIN", "ABV", "%", "REVIEW", "M/C"]
       ];
 
-      (d.staff_performance || []).forEach((row) => {
+      const performanceList = d.staff_performance || [];
+      performanceList.forEach((row) => {
         wsData.push([
           row.sno,
           row.name,
@@ -159,30 +347,117 @@ function Reports() {
           row.achieved,
           row.with_gst,
           row.walkin,
-          row.abv.toFixed(2),
-          row.percentage.toFixed(1),
+          Number(row.abv || 0).toFixed(2),
+          Number(row.percentage || 0).toFixed(1) + "%",
           row.review,
           row.mc
         ]);
       });
 
-      wsData.push(["", "", "", "", "TOTAL", d.totals?.achieved || 0, d.totals?.with_gst || 0, d.totals?.walkin || 0, "", "", 0, 0]);
+      const totalRowIdx = 4 + performanceList.length;
+      wsData.push(["TOTAL", "", "", "", "", d.totals?.achieved || 0, d.totals?.with_gst || 0, d.totals?.walkin || 0, "", "", "", ""]);
       wsData.push([]);
+      
+      const summaryRowIdx = totalRowIdx + 2;
       wsData.push(["SALON SALES", d.summary?.salon_sales?.sales || 0, "", "MALE SALES", d.summary?.male_sales?.sales || 0, "", "FEMALE SALES", d.summary?.female_sales?.sales || 0]);
       wsData.push(["WALK IN", d.summary?.salon_sales?.walkin || 0, "", "WALK IN", d.summary?.male_sales?.walkin || 0, "", "WALK IN", d.summary?.female_sales?.walkin || 0]);
-      wsData.push(["ABV", (d.summary?.salon_sales?.abv || 0).toFixed(2), "", "ABV", (d.summary?.male_sales?.abv || 0).toFixed(2), "", "ABV", (d.summary?.female_sales?.abv || 0).toFixed(2)]);
+      wsData.push(["ABV", Number(d.summary?.salon_sales?.abv || 0).toFixed(2), "", "ABV", Number(d.summary?.male_sales?.abv || 0).toFixed(2), "", "ABV", Number(d.summary?.female_sales?.abv || 0).toFixed(2)]);
       wsData.push(["WITH GST", d.summary?.salon_sales?.with_gst || 0]);
 
       const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+      ws["!cols"] = [
+        { wch: 8 },  // S.NO
+        { wch: 20 }, // NAME
+        { wch: 12 }, // LEVEL
+        { wch: 12 }, // SALARY
+        { wch: 12 }, // TARGET
+        { wch: 14 }, // ACHIEVED
+        { wch: 14 }, // WITH GST
+        { wch: 10 }, // WALKIN
+        { wch: 12 }, // ABV
+        { wch: 10 }, // %
+        { wch: 14 }, // REVIEW
+        { wch: 8 }   // M/C
+      ];
+
+      ws["!merges"] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 11 } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 11 } },
+        { s: { r: totalRowIdx, c: 0 }, e: { r: totalRowIdx, c: 4 } }
+      ];
+
+      // Parlour Header (Pink)
+      styleRange(ws, 0, 0, 0, 11, {
+        fill: EXCEL_COLORS.PINK_HEADER,
+        font: { bold: true, sz: 14, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
+        alignment: { horizontal: "center", vertical: "center" }
+      });
+      // Title Banner (Green)
+      styleRange(ws, 1, 0, 1, 11, {
+        fill: EXCEL_COLORS.GREEN_BANNER,
+        font: { bold: true, sz: 12, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
+        alignment: { horizontal: "center", vertical: "center" }
+      });
+      // Table Header Row 3 (Pink Header)
+      styleRange(ws, 3, 0, 3, 11, {
+        fill: EXCEL_COLORS.PINK_HEADER,
+        font: { bold: true, sz: 10, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
+        alignment: { horizontal: "center", vertical: "center" }
+      });
+
+      // Data Rows
+      performanceList.forEach((_, idx) => {
+        const r = 4 + idx;
+        const fill = idx % 2 === 0 ? "FFFFFF" : EXCEL_COLORS.LIGHT_GRAY;
+        styleRange(ws, r, 0, r, 11, { fill, alignment: { vertical: "center" } });
+        // Alignment
+        styleCell(ws, r, 0, { fill, alignment: { horizontal: "center" } });
+        styleCell(ws, r, 2, { fill, alignment: { horizontal: "center" } });
+        [3, 4, 5, 6, 8].forEach(c => styleCell(ws, r, c, { fill, alignment: { horizontal: "right" } }));
+        [7, 9, 10, 11].forEach(c => styleCell(ws, r, c, { fill, alignment: { horizontal: "center" } }));
+      });
+
+      // Total Row
+      styleRange(ws, totalRowIdx, 0, totalRowIdx, 11, {
+        fill: EXCEL_COLORS.LIGHT_YELLOW,
+        font: { bold: true },
+        alignment: { vertical: "center" }
+      });
+      [5, 6, 7].forEach(c => styleCell(ws, totalRowIdx, c, {
+        fill: EXCEL_COLORS.LIGHT_YELLOW,
+        font: { bold: true },
+        alignment: { horizontal: c === 7 ? "center" : "right" }
+      }));
+
+      // Summary Blocks
+      for (let i = 0; i < 4; i++) {
+        const r = summaryRowIdx + i;
+        styleRange(ws, r, 0, r, 7, { fill: EXCEL_COLORS.LIGHT_GRAY });
+        styleCell(ws, r, 0, { fill: EXCEL_COLORS.LIGHT_YELLOW, font: { bold: true } });
+        if (i < 3) {
+          styleCell(ws, r, 3, { fill: EXCEL_COLORS.LIGHT_YELLOW, font: { bold: true } });
+          styleCell(ws, r, 6, { fill: EXCEL_COLORS.LIGHT_YELLOW, font: { bold: true } });
+        }
+      }
+
       XLSX.utils.book_append_sheet(wb, ws, "Staff Performance");
       XLSX.writeFile(wb, `Monthly_Staff_Performance_${d.month_year || "report"}.xlsx`);
     } else if (reportType === "attendance_salary") {
       const d = reportData;
       const days = d.days_in_month || [];
+      const numDays = days.length;
+      const parlourNameStr = d.parlour_name || "SmartGoNext Beauty SaaS";
+      const titleStr = `ATTENDANCE & SALARY REPORT - ${d.month_year || ""}`;
+
+      const totalCols = 2 + numDays + 1 + 1 + 11; // Attendance + Gap + Salary
+
       const headerRow = ["S.NO", "NAME", ...days.map((day) => `Day ${day.day}`), "TOTAL DAYS", "", "S.NO", "NAME", "SALARY", "TARGET", "ACHIEVED", "OFF", "TOTAL DAYS", "NET", "ADVANCE", "LESS AMOUNT", "AMOUNT"];
 
       const wsData = [
-        [`ATTENDANCE & SALARY REPORT - ${d.month_year || ""}`],
+        [parlourNameStr],
+        [titleStr],
+        [],
         headerRow
       ];
 
@@ -193,7 +468,6 @@ function Reports() {
       for (let i = 0; i < maxRows; i++) {
         const att = attList[i] || {};
         const sal = salList[i] || {};
-
         const dayCells = days.map((day) => (att.days ? att.days[String(day.day)] || "1" : ""));
 
         wsData.push([
@@ -209,24 +483,94 @@ function Reports() {
           sal.achieved !== undefined ? sal.achieved : "",
           sal.off !== undefined ? sal.off : "",
           sal.total_days !== undefined ? sal.total_days : "",
-          sal.net !== undefined ? sal.net.toFixed(2) : "",
+          sal.net !== undefined ? Number(sal.net).toFixed(2) : "",
           sal.advance !== undefined ? sal.advance : "",
           sal.less_amount !== undefined ? sal.less_amount : "",
-          sal.amount !== undefined ? sal.amount.toFixed(2) : ""
+          sal.amount !== undefined ? Number(sal.amount).toFixed(2) : ""
         ]);
       }
 
-      wsData.push(["", "", ...days.map(() => ""), "", "", "", "TOTAL", d.totals?.salary || 0, d.totals?.target || 0, d.totals?.achieved || 0, "", "", d.totals?.net?.toFixed(2) || 0, d.totals?.advance || 0, d.totals?.less_amount || 0, d.totals?.amount?.toFixed(2) || 0]);
+      const totalRowIdx = 4 + maxRows;
+      wsData.push(["TOTAL", "", ...days.map(() => ""), "", "", "", "TOTAL", d.totals?.salary || 0, d.totals?.target || 0, d.totals?.achieved || 0, "", "", Number(d.totals?.net || 0).toFixed(2), d.totals?.advance || 0, d.totals?.less_amount || 0, Number(d.totals?.amount || 0).toFixed(2)]);
 
       const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+      ws["!merges"] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } },
+        { s: { r: totalRowIdx, c: 0 }, e: { r: totalRowIdx, c: numDays + 1 } }
+      ];
+
+      // Parlour Header (Pink)
+      styleRange(ws, 0, 0, 0, totalCols - 1, {
+        fill: EXCEL_COLORS.PINK_HEADER,
+        font: { bold: true, sz: 14, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
+        alignment: { horizontal: "center", vertical: "center" }
+      });
+      // Title Banner (Green)
+      styleRange(ws, 1, 0, 1, totalCols - 1, {
+        fill: EXCEL_COLORS.GREEN_BANNER,
+        font: { bold: true, sz: 12, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
+        alignment: { horizontal: "center", vertical: "center" }
+      });
+      // Header Row 3 (Pink for Attendance, Green/Pink for Salary)
+      styleRange(ws, 3, 0, 3, 2 + numDays, {
+        fill: EXCEL_COLORS.PINK_HEADER,
+        font: { bold: true, sz: 9, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
+        alignment: { horizontal: "center", vertical: "center" }
+      });
+      styleRange(ws, 3, 2 + numDays + 2, 3, totalCols - 1, {
+        fill: EXCEL_COLORS.PINK_HEADER,
+        font: { bold: true, sz: 9, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
+        alignment: { horizontal: "center", vertical: "center" }
+      });
+
+      // Data Rows
+      for (let i = 0; i < maxRows; i++) {
+        const r = 4 + i;
+        const fill = i % 2 === 0 ? "FFFFFF" : EXCEL_COLORS.LIGHT_GRAY;
+        styleRange(ws, r, 0, r, totalCols - 1, { fill, alignment: { vertical: "center" } });
+        // Center attendance cells
+        for (let c = 2; c < 2 + numDays + 1; c++) {
+          styleCell(ws, r, c, { fill, alignment: { horizontal: "center" } });
+        }
+        // Right align salary numbers
+        for (let c = 2 + numDays + 4; c < totalCols; c++) {
+          styleCell(ws, r, c, { fill, alignment: { horizontal: "right" } });
+        }
+      }
+
+      // Total Row
+      styleRange(ws, totalRowIdx, 0, totalRowIdx, totalCols - 1, {
+        fill: EXCEL_COLORS.LIGHT_YELLOW,
+        font: { bold: true },
+        alignment: { vertical: "center" }
+      });
+      for (let c = 2 + numDays + 4; c < totalCols; c++) {
+        styleCell(ws, totalRowIdx, c, {
+          fill: EXCEL_COLORS.LIGHT_YELLOW,
+          font: { bold: true },
+          alignment: { horizontal: "right" }
+        });
+      }
+
       XLSX.utils.book_append_sheet(wb, ws, "Attendance & Salary");
       XLSX.writeFile(wb, `Attendance_Salary_Report_${d.month_year || "report"}.xlsx`);
     } else {
       // Standard reports fallback
       const dataArr = Array.isArray(reportData) ? reportData : (reportData.items || []);
-      const ws = XLSX.utils.json_to_sheet(dataArr);
-      XLSX.utils.book_append_sheet(wb, ws, "Report");
-      XLSX.writeFile(wb, `${reportType}_report.xlsx`);
+      if (dataArr.length === 0) return showError("No records available to export.");
+
+      const sample = dataArr[0] || {};
+      const columns = Object.keys(sample).map(k => ({
+        header: k.toUpperCase().replace(/_/g, ' '),
+        accessor: k
+      }));
+
+      const parlourNameStr = reportData?.parlour_name || "SmartGoNext Beauty SaaS";
+      const titleStr = `${reportType.toUpperCase().replace(/_/g, ' ')} REPORT`;
+
+      exportToExcel(titleStr, dataArr, columns, `${reportType}_report`, parlourNameStr);
     }
   };
 
@@ -392,15 +736,15 @@ function Reports() {
                         ) : (
                           (reportData.line_items || []).map((row) => (
                             <tr key={row.sno} className="hover:bg-slate-50">
-                              <td className="p-2 text-center font-bold text-slate-400">{row.sno}</td>
+                              <td className="p-2 text-center font-bold text-slate-400 numeric">{row.sno}</td>
                               <td className="p-2 font-bold text-slate-900">{row.service}</td>
                               <td className="p-2">{row.staff}</td>
-                              <td className="p-2 text-right">₹{row.amt}</td>
-                              <td className="p-2 text-right">₹{row.gst}</td>
-                              <td className="p-2 text-right">₹{row.cash}</td>
-                              <td className="p-2 text-right">₹{row.paytm}</td>
-                              <td className="p-2 text-right">₹{row.card}</td>
-                              <td className="p-2 text-right font-black text-slate-900">₹{row.total}</td>
+                              <td className="p-2 text-right numeric">₹{row.amt}</td>
+                              <td className="p-2 text-right numeric">₹{row.gst}</td>
+                              <td className="p-2 text-right numeric">₹{row.cash}</td>
+                              <td className="p-2 text-right numeric">₹{row.paytm}</td>
+                              <td className="p-2 text-right numeric">₹{row.card}</td>
+                              <td className="p-2 text-right font-black text-slate-900 numeric">₹{row.total}</td>
                             </tr>
                           ))
                         )}
@@ -408,12 +752,12 @@ function Reports() {
                       <tfoot className="bg-amber-300 text-slate-900 font-black">
                         <tr>
                           <td colSpan="3" className="p-2 uppercase">TOTAL</td>
-                          <td className="p-2 text-right">₹{reportData.totals?.amt}</td>
-                          <td className="p-2 text-right">₹{reportData.totals?.gst}</td>
-                          <td className="p-2 text-right">₹{reportData.totals?.cash}</td>
-                          <td className="p-2 text-right">₹{reportData.totals?.paytm}</td>
-                          <td className="p-2 text-right">₹{reportData.totals?.card}</td>
-                          <td className="p-2 text-right text-rose-700">₹{reportData.totals?.total}</td>
+                          <td className="p-2 text-right numeric">₹{reportData.totals?.amt}</td>
+                          <td className="p-2 text-right numeric">₹{reportData.totals?.gst}</td>
+                          <td className="p-2 text-right numeric">₹{reportData.totals?.cash}</td>
+                          <td className="p-2 text-right numeric">₹{reportData.totals?.paytm}</td>
+                          <td className="p-2 text-right numeric">₹{reportData.totals?.card}</td>
+                          <td className="p-2 text-right text-rose-700 numeric">₹{reportData.totals?.total}</td>
                         </tr>
                       </tfoot>
                     </table>
@@ -433,26 +777,26 @@ function Reports() {
                           (reportData.expenses || []).map((exp, idx) => (
                             <div key={idx} className="flex justify-between">
                               <span>{exp.note}</span>
-                              <span className="font-bold text-rose-600">₹{exp.amount}</span>
+                              <span className="font-bold text-rose-600 numeric">₹{exp.amount}</span>
                             </div>
                           ))
                         )}
                         <div className="border-t border-slate-200 pt-2 flex justify-between font-black text-slate-900">
                           <span>TOTAL EXPENSES</span>
-                          <span>₹{reportData.total_expenses}</span>
+                          <span className="numeric">₹{reportData.total_expenses}</span>
                         </div>
                       </div>
                     </div>
 
                     {/* Summary Balance Box */}
                     <div className="bg-emerald-600 text-white p-3 rounded-2xl text-xs space-y-1 font-bold">
-                      <div className="flex justify-between"><span>OPENING BAL :</span><span>₹{reportData.balance?.opening_bal}</span></div>
-                      <div className="flex justify-between text-rose-200"><span>* TOTAL SALE</span><span>₹{reportData.balance?.total_sale}</span></div>
-                      <div className="flex justify-between"><span>* CASH PAY</span><span>₹{reportData.balance?.cash_pay}</span></div>
-                      <div className="flex justify-between"><span>* PHONE PAY</span><span>₹{reportData.balance?.phone_pay}</span></div>
-                      <div className="flex justify-between"><span>* CARD</span><span>₹{reportData.balance?.card}</span></div>
-                      <div className="flex justify-between text-rose-200"><span>* EXPENSE</span><span>₹{reportData.balance?.expense}</span></div>
-                      <div className="border-t border-emerald-400 pt-1 flex justify-between text-sm font-black"><span>CLOSING BAL</span><span>₹{reportData.balance?.closing_bal}</span></div>
+                      <div className="flex justify-between"><span>OPENING BAL :</span><span className="numeric">₹{reportData.balance?.opening_bal}</span></div>
+                      <div className="flex justify-between text-rose-200"><span>* TOTAL SALE</span><span className="numeric">₹{reportData.balance?.total_sale}</span></div>
+                      <div className="flex justify-between"><span>* CASH PAY</span><span className="numeric">₹{reportData.balance?.cash_pay}</span></div>
+                      <div className="flex justify-between"><span>* PHONE PAY</span><span className="numeric">₹{reportData.balance?.phone_pay}</span></div>
+                      <div className="flex justify-between"><span>* CARD</span><span className="numeric">₹{reportData.balance?.card}</span></div>
+                      <div className="flex justify-between text-rose-200"><span>* EXPENSE</span><span className="numeric">₹{reportData.balance?.expense}</span></div>
+                      <div className="border-t border-emerald-400 pt-1 flex justify-between text-sm font-black"><span>CLOSING BAL</span><span className="numeric">₹{reportData.balance?.closing_bal}</span></div>
                     </div>
 
                     {/* Cash Denomination Box */}
@@ -463,14 +807,14 @@ function Reports() {
                       <div className="p-3 divide-y divide-slate-100 font-semibold text-slate-800">
                         {["500", "200", "100", "50", "20", "10", "5", "2", "1"].map((k) => (
                           <div key={k} className="py-1 flex justify-between">
-                            <span>₹{k}</span>
-                            <span>{reportData.cash_denomination?.[k] || 0}</span>
-                            <span className="font-bold text-slate-900">₹{(parseInt(k, 10) * (reportData.cash_denomination?.[k] || 0))}</span>
+                            <span className="numeric">₹{k}</span>
+                            <span className="numeric">{reportData.cash_denomination?.[k] || 0}</span>
+                            <span className="font-bold text-slate-900 numeric">₹{(parseInt(k, 10) * (reportData.cash_denomination?.[k] || 0))}</span>
                           </div>
                         ))}
                         <div className="pt-2 flex justify-between font-black text-emerald-700">
                           <span>RUNNING TOTAL</span>
-                          <span>₹{reportData.cash_denomination?.total || 0}</span>
+                          <span className="numeric">₹{reportData.cash_denomination?.total || 0}</span>
                         </div>
                       </div>
                     </div>
@@ -489,9 +833,9 @@ function Reports() {
                     <tbody className="divide-y divide-slate-100 font-semibold">
                       {(reportData.staff_achieved || []).map((st) => (
                         <tr key={st.sno}>
-                          <td className="p-2 text-slate-400">{st.sno}</td>
+                          <td className="p-2 text-slate-400 numeric">{st.sno}</td>
                           <td className="p-2 font-bold text-slate-900">{st.staff_name}</td>
-                          <td className="p-2 text-right font-black text-emerald-600">₹{st.achieved}</td>
+                          <td className="p-2 text-right font-black text-emerald-600 numeric">₹{st.achieved}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -528,27 +872,27 @@ function Reports() {
                     <tbody className="divide-y divide-slate-100 font-semibold text-slate-800">
                       {(reportData.staff_performance || []).map((row) => (
                         <tr key={row.sno} className="hover:bg-slate-50">
-                          <td className="p-2 text-center text-slate-400">{row.sno}</td>
+                          <td className="p-2 text-center text-slate-400 numeric">{row.sno}</td>
                           <td className="p-2 font-bold text-slate-900">{row.name}</td>
                           <td className="p-2 text-center font-bold text-indigo-600">{row.level}</td>
-                          <td className="p-2 text-right">₹{row.salary}</td>
-                          <td className="p-2 text-right">₹{row.target}</td>
-                          <td className="p-2 text-right font-black text-rose-600">₹{row.achieved}</td>
-                          <td className="p-2 text-right font-black text-rose-600">₹{row.with_gst}</td>
-                          <td className="p-2 text-center font-bold">{row.walkin}</td>
-                          <td className="p-2 text-right font-bold text-slate-900">₹{row.abv.toFixed(2)}</td>
-                          <td className="p-2 text-center font-extrabold text-emerald-600">{row.percentage.toFixed(1)}%</td>
+                          <td className="p-2 text-right numeric">₹{row.salary}</td>
+                          <td className="p-2 text-right numeric">₹{row.target}</td>
+                          <td className="p-2 text-right font-black text-rose-600 numeric">₹{row.achieved}</td>
+                          <td className="p-2 text-right font-black text-rose-600 numeric">₹{row.with_gst}</td>
+                          <td className="p-2 text-center font-bold numeric">{row.walkin}</td>
+                          <td className="p-2 text-right font-bold text-slate-900 numeric">₹{row.abv.toFixed(2)}</td>
+                          <td className="p-2 text-center font-extrabold text-emerald-600 numeric">{row.percentage.toFixed(1)}%</td>
                           <td className="p-2 text-center text-slate-400">{row.review}</td>
-                          <td className="p-2 text-center text-slate-400">{row.mc}</td>
+                          <td className="p-2 text-center text-slate-400 numeric">{row.mc}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot className="bg-amber-300 text-slate-900 font-black uppercase">
                       <tr>
                         <td colSpan="5" className="p-2 text-right">TOTAL</td>
-                        <td className="p-2 text-right text-rose-700">₹{reportData.totals?.achieved}</td>
-                        <td className="p-2 text-right text-rose-700">₹{reportData.totals?.with_gst}</td>
-                        <td className="p-2 text-center">{reportData.totals?.walkin}</td>
+                        <td className="p-2 text-right text-rose-700 numeric">₹{reportData.totals?.achieved}</td>
+                        <td className="p-2 text-right text-rose-700 numeric">₹{reportData.totals?.with_gst}</td>
+                        <td className="p-2 text-center numeric">{reportData.totals?.walkin}</td>
                         <td colSpan="4"></td>
                       </tr>
                     </tfoot>
@@ -558,22 +902,22 @@ function Reports() {
                 {/* Summary Boxes */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-bold">
                   <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl space-y-1">
-                    <div className="flex justify-between font-extrabold text-slate-900"><span>SALON SALES</span><span>₹{reportData.summary?.salon_sales?.sales}</span></div>
-                    <div className="flex justify-between text-slate-600"><span>WALK IN</span><span>{reportData.summary?.salon_sales?.walkin}</span></div>
-                    <div className="flex justify-between text-slate-600"><span>ABV</span><span>₹{reportData.summary?.salon_sales?.abv?.toFixed(2)}</span></div>
-                    <div className="flex justify-between text-emerald-700"><span>WITH GST</span><span>₹{reportData.summary?.salon_sales?.with_gst}</span></div>
+                    <div className="flex justify-between font-extrabold text-slate-900"><span>SALON SALES</span><span className="numeric">₹{reportData.summary?.salon_sales?.sales}</span></div>
+                    <div className="flex justify-between text-slate-600"><span>WALK IN</span><span className="numeric">{reportData.summary?.salon_sales?.walkin}</span></div>
+                    <div className="flex justify-between text-slate-600"><span>ABV</span><span className="numeric">₹{reportData.summary?.salon_sales?.abv?.toFixed(2)}</span></div>
+                    <div className="flex justify-between text-emerald-700"><span>WITH GST</span><span className="numeric">₹{reportData.summary?.salon_sales?.with_gst}</span></div>
                   </div>
 
                   <div className="bg-blue-50 border border-blue-200 p-4 rounded-2xl space-y-1">
-                    <div className="flex justify-between font-extrabold text-blue-900"><span>MALE SALES</span><span>₹{reportData.summary?.male_sales?.sales}</span></div>
-                    <div className="flex justify-between text-slate-600"><span>WALK IN</span><span>{reportData.summary?.male_sales?.walkin}</span></div>
-                    <div className="flex justify-between text-slate-600"><span>ABV</span><span>₹{reportData.summary?.male_sales?.abv?.toFixed(2)}</span></div>
+                    <div className="flex justify-between font-extrabold text-blue-900"><span>MALE SALES</span><span className="numeric">₹{reportData.summary?.male_sales?.sales}</span></div>
+                    <div className="flex justify-between text-slate-600"><span>WALK IN</span><span className="numeric">{reportData.summary?.male_sales?.walkin}</span></div>
+                    <div className="flex justify-between text-slate-600"><span>ABV</span><span className="numeric">₹{reportData.summary?.male_sales?.abv?.toFixed(2)}</span></div>
                   </div>
 
                   <div className="bg-pink-50 border border-pink-200 p-4 rounded-2xl space-y-1">
-                    <div className="flex justify-between font-extrabold text-pink-900"><span>FEMALE SALES</span><span>₹{reportData.summary?.female_sales?.sales}</span></div>
-                    <div className="flex justify-between text-slate-600"><span>WALK IN</span><span>{reportData.summary?.female_sales?.walkin}</span></div>
-                    <div className="flex justify-between text-slate-600"><span>ABV</span><span>₹{reportData.summary?.female_sales?.abv?.toFixed(2)}</span></div>
+                    <div className="flex justify-between font-extrabold text-pink-900"><span>FEMALE SALES</span><span className="numeric">₹{reportData.summary?.female_sales?.sales}</span></div>
+                    <div className="flex justify-between text-slate-600"><span>WALK IN</span><span className="numeric">{reportData.summary?.female_sales?.walkin}</span></div>
+                    <div className="flex justify-between text-slate-600"><span>ABV</span><span className="numeric">₹{reportData.summary?.female_sales?.abv?.toFixed(2)}</span></div>
                   </div>
                 </div>
 
@@ -593,13 +937,13 @@ function Reports() {
                               {(st.branch_breakdown || []).map((bb) => (
                                 <div key={bb.branch_id} className="py-1 flex justify-between items-center text-slate-700">
                                   <span>{bb.branch_name}</span>
-                                  <span className="font-extrabold text-slate-900">₹{bb.achieved.toFixed(2)}</span>
+                                  <span className="font-extrabold text-slate-900 numeric">₹{bb.achieved.toFixed(2)}</span>
                                 </div>
                               ))}
                             </div>
                             <div className="pt-1.5 border-t border-slate-200 flex justify-between font-black text-rose-700">
                               <span>TOTAL</span>
-                              <span>₹{st.achieved.toFixed(2)}</span>
+                              <span className="numeric">₹{st.achieved.toFixed(2)}</span>
                             </div>
                           </div>
                         ))}
@@ -624,7 +968,7 @@ function Reports() {
                           <th className="p-1 text-left">S.NO</th>
                           <th className="p-1 text-left min-w-[100px]">NAME</th>
                           {(reportData.days_in_month || []).map((d) => (
-                            <th key={d.day} className="p-1 border-l border-slate-200">{d.day}</th>
+                            <th key={d.day} className="p-1 border-l border-slate-200 numeric">{d.day}</th>
                           ))}
                           <th className="p-1 border-l border-slate-200 font-black">TOTAL</th>
                         </tr>
@@ -632,14 +976,14 @@ function Reports() {
                       <tbody className="divide-y divide-slate-100 font-semibold">
                         {(reportData.attendance_matrix || []).map((row) => (
                           <tr key={row.sno} className="hover:bg-slate-50">
-                            <td className="p-1 text-left text-slate-400">{row.sno}</td>
+                            <td className="p-1 text-left text-slate-400 numeric">{row.sno}</td>
                             <td className="p-1 text-left font-bold text-slate-900">{row.name}</td>
                             {(reportData.days_in_month || []).map((d) => {
                               const val = row.days?.[String(d.day)] || "";
                               return (
                                 <td
                                   key={d.day}
-                                  className={`p-1 border-l border-slate-200 font-bold ${
+                                  className={`p-1 border-l border-slate-200 font-bold numeric ${
                                     val === "OFF"
                                       ? "bg-emerald-600 text-white"
                                       : val === "L"
@@ -655,7 +999,7 @@ function Reports() {
                                 </td>
                               );
                             })}
-                            <td className="p-1 border-l border-slate-200 font-black text-slate-900">{row.total_days}</td>
+                            <td className="p-1 border-l border-slate-200 font-black text-slate-900 numeric">{row.total_days}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -682,22 +1026,22 @@ function Reports() {
                         {(reportData.salary_report || []).map((sal) => (
                           <tr key={sal.sno} className="hover:bg-slate-50">
                             <td className="p-2 font-bold text-slate-900">{sal.name}</td>
-                            <td className="p-2 text-right">₹{sal.salary}</td>
-                            <td className="p-2 text-right font-bold">₹{sal.net.toFixed(2)}</td>
-                            <td className="p-2 text-right font-bold text-emerald-600">₹{sal.advance}</td>
-                            <td className="p-2 text-right font-bold text-rose-600">₹{sal.less_amount}</td>
-                            <td className="p-2 text-right font-black text-emerald-700">₹{sal.amount.toFixed(2)}</td>
+                            <td className="p-2 text-right numeric">₹{sal.salary}</td>
+                            <td className="p-2 text-right font-bold numeric">₹{sal.net.toFixed(2)}</td>
+                            <td className="p-2 text-right font-bold text-emerald-600 numeric">₹{sal.advance}</td>
+                            <td className="p-2 text-right font-bold text-rose-600 numeric">₹{sal.less_amount}</td>
+                            <td className="p-2 text-right font-black text-emerald-700 numeric">₹{sal.amount.toFixed(2)}</td>
                           </tr>
                         ))}
                       </tbody>
                       <tfoot className="bg-amber-300 text-slate-900 font-black uppercase text-xs">
                         <tr>
                           <td className="p-2">TOTAL</td>
-                          <td className="p-2 text-right">₹{reportData.totals?.salary}</td>
-                          <td className="p-2 text-right">₹{reportData.totals?.net?.toFixed(2)}</td>
-                          <td className="p-2 text-right">₹{reportData.totals?.advance}</td>
-                          <td className="p-2 text-right">₹{reportData.totals?.less_amount}</td>
-                          <td className="p-2 text-right text-emerald-800">₹{reportData.totals?.amount?.toFixed(2)}</td>
+                          <td className="p-2 text-right numeric">₹{reportData.totals?.salary}</td>
+                          <td className="p-2 text-right numeric">₹{reportData.totals?.net?.toFixed(2)}</td>
+                          <td className="p-2 text-right numeric">₹{reportData.totals?.advance}</td>
+                          <td className="p-2 text-right numeric">₹{reportData.totals?.less_amount}</td>
+                          <td className="p-2 text-right text-emerald-800 numeric">₹{reportData.totals?.amount?.toFixed(2)}</td>
                         </tr>
                       </tfoot>
                     </table>

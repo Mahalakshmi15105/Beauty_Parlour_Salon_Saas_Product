@@ -265,7 +265,7 @@ export default function Attendance() {
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="bg-background border border-border-soft px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-primary"
+                  className="bg-background border border-border-soft px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-primary numeric"
                 />
               </div>
 
@@ -275,7 +275,7 @@ export default function Attendance() {
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="bg-background border border-border-soft px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-primary"
+                  className="bg-background border border-border-soft px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-primary numeric"
                 />
               </div>
 
@@ -352,13 +352,13 @@ export default function Attendance() {
                         {!isEmployee && (
                           <td className="p-3.5 font-bold text-slate-900">
                             <div>{r.employee_name}</div>
-                            {r.employee_phone && <div className="text-[11px] text-slate-400 font-normal">{r.employee_phone}</div>}
+                            {r.employee_phone && <div className="text-[11px] text-slate-400 font-normal numeric">{r.employee_phone}</div>}
                           </td>
                         )}
                         <td className="p-3.5 font-bold text-pink-600">{r.work_branch_name}</td>
-                        <td className="p-3.5 font-bold text-slate-900">{r.date}</td>
-                        <td className="p-3.5 font-semibold text-slate-800">{r.checkin_time || r.time || "-"}</td>
-                        <td className="p-3.5 font-semibold text-slate-800">{r.checkout_time || "-"}</td>
+                        <td className="p-3.5 font-bold text-slate-900 numeric">{r.date}</td>
+                        <td className="p-3.5 font-semibold text-slate-800 numeric">{r.checkin_time || r.time || "-"}</td>
+                        <td className="p-3.5 font-semibold text-slate-800 numeric">{r.checkout_time || "-"}</td>
                         <td className="p-3.5">
                           {r.status === "P" || r.status === "Present" ? (
                             <span className="inline-flex items-center space-x-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-1 rounded-full text-[11px] font-extrabold">
@@ -460,11 +460,11 @@ export default function Attendance() {
                   required
                   value={selectedEmployeeId}
                   onChange={(e) => setSelectedEmployeeId(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 px-4 py-3.5 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:border-pink-500 transition"
+                  className="w-full bg-slate-50 border border-slate-200 px-4 py-3.5 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:border-pink-500 transition numeric"
                 >
                   <option value="">Select a member / employee</option>
                   {(Array.isArray(employeesList) ? employeesList : []).map((emp) => (
-                    <option key={emp.id} value={emp.id}>
+                    <option key={emp.id} value={emp.id} className="numeric">
                       {emp.first_name} {emp.last_name || ""} ({emp.phone || "No phone"}) - {emp.role || "Staff"}
                     </option>
                   ))}

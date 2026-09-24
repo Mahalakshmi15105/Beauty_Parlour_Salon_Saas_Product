@@ -331,8 +331,8 @@ function MembershipPlans() {
                     <td className="px-6 py-4 text-sm font-medium text-text-primary">
                       <p>{p.name}</p>
                     </td>
-                    <td className="px-6 py-4 text-sm text-text-secondary">{formatCurrency(p.price)}</td>
-                    <td className="px-6 py-4 text-sm text-text-secondary">{p.duration_days} Days</td>
+                    <td className="px-6 py-4 text-sm text-text-secondary numeric">{formatCurrency(p.price)}</td>
+                    <td className="px-6 py-4 text-sm text-text-secondary"><span className="numeric">{p.duration_days}</span> Days</td>
                     <td className="px-6 py-4 text-sm">
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                         p.status === "active" ? "bg-success/15 text-success" : "bg-danger/15 text-danger"

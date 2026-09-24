@@ -8,7 +8,7 @@ export const TRANSLATIONS = {
     customers: "Customers",
     employees: "Employees",
     services_products: "Services & Products",
-    membership_management: "Membership Management",
+    membership_management: "Membership",
     reports: "Reports",
     settings: "Settings",
     logout: "Logout",

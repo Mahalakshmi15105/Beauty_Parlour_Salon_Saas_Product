@@ -209,6 +209,9 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isMobileOpen]);
 
+  // Logout Confirmation Modal State
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
   const allMenuItems = [
     { id: "dashboard", labelKey: "dashboard", defaultLabel: "Dashboard" },
     { id: "billing", labelKey: "billing", defaultLabel: "Billing" },
@@ -216,7 +219,7 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
     { id: "employees", labelKey: "employees", defaultLabel: "Employees" },
     { id: "attendance", labelKey: "attendance", defaultLabel: "Attendance" },
     { id: "catalog", labelKey: "services_products", defaultLabel: "Services & Products" },
-    { id: "memberships", labelKey: "membership_management", defaultLabel: "Membership Management" },
+    { id: "memberships", labelKey: "membership_management", defaultLabel: "Membership" },
     { id: "appointments", labelKey: "appointments", defaultLabel: "Appointments" },
     { id: "notifications", labelKey: "notifications", defaultLabel: "Notifications" },
     { id: "marketing", labelKey: "whatsapp_marketing", defaultLabel: "WhatsApp Campaigns" },
@@ -247,13 +250,13 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
       {/* SIDEBAR COMPONENT (DESKTOP + MOBILE DRAWER) */}
       <aside
         ref={sidebarRef}
-        className={`bg-surface border-r border-border-soft flex flex-col z-50 transition-all duration-300 ease-in-out glowe-sidebar-gradient glowe-glow-shadow ${
+        className={`border-r border-black/10 flex flex-col z-50 transition-all duration-300 ease-in-out glowe-sidebar-gradient glowe-glow-shadow ${
           // Desktop behavior
           `hidden md:flex ${isCollapsed ? "w-20" : "w-64"}`
         }`}
       >
         {/* Sidebar Header / Logo */}
-        <div className={`py-3.5 border-b border-border-soft flex items-center ${isCollapsed ? "justify-center px-2" : "px-4 justify-between"}`}>
+        <div className={`py-3.5 border-b border-black/10 flex items-center ${isCollapsed ? "justify-center px-2" : "px-4 justify-between"}`}>
           {isCollapsed ? (
             <div className="relative group cursor-pointer flex justify-center w-full" onClick={onNavigateHome}>
               <div className="w-12 h-12 rounded-full border-2 border-primary/20 bg-primary-light flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
@@ -282,8 +285,8 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
               </div>
             </div>
           ) : (
-            <div className="flex items-center space-x-3 cursor-pointer w-full py-0.5" onClick={onNavigateHome}>
-              <div className="w-12 h-12 rounded-full border-2 border-primary/20 bg-primary-light flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+            <div className="flex items-center space-x-3 cursor-pointer w-full py-1 text-left" onClick={onNavigateHome}>
+              <div className="w-12 h-12 rounded-full border-2 border-white/30 bg-black flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
                 {logoUrl && !imgFailed ? (
                   <img
                     src={logoUrl}
@@ -292,29 +295,29 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
                     onError={() => setImgFailed(true)}
                   />
                 ) : (
-                  <div className="w-full h-full bg-primary flex items-center justify-center text-white font-extrabold text-sm rounded-full">
-                    {(parlourName || user?.parlour_name || "P").charAt(0).toUpperCase()}
+                  <div className="w-full h-full bg-black flex items-center justify-center text-white font-extrabold text-base rounded-full">
+                    {(parlourName || user?.parlour_name || "S").charAt(0).toUpperCase()}
                   </div>
                 )}
               </div>
               <div className="overflow-hidden leading-tight">
                 <span
-                  className="font-extrabold text-slate-900 text-sm block truncate transition-all duration-200"
+                  className="font-black text-slate-900 text-sm block truncate transition-all duration-200"
                   style={getShopNameStyle(shopNameTypography)}
                 >
-                  {parlourName || user?.branch_name || "Branch"}
+                  {parlourName || user?.branch_name || user?.parlour_name || "SmartGoNext Beauty"}
                 </span>
                 {user?.role === "BranchAdmin" ? (
                   <>
-                    <span className="text-[11px] font-extrabold text-slate-800 block truncate mt-0.5">
+                    <span className="text-[11px] font-bold text-slate-900/90 block truncate mt-0.5">
                       {user?.parlour_name || "Main Parlour"}
                     </span>
-                    <span className="text-[10px] font-bold text-slate-500 block truncate mt-0.5">
+                    <span className="text-[10px] font-extrabold text-slate-900/70 block truncate mt-0.5">
                       Powered By SmartGoNext
                     </span>
                   </>
                 ) : (
-                  <span className="text-[11px] font-bold text-slate-500 block mt-0.5 whitespace-nowrap">
+                  <span className="text-[10px] font-extrabold text-slate-900/70 block mt-0.5 whitespace-nowrap">
                     Powered By SmartGoNext
                   </span>
                 )}
@@ -336,8 +339,8 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
                     isCollapsed ? "justify-center px-2 py-3" : "space-x-3 px-3.5 py-2.5"
                   } rounded-full text-xs font-bold transition-all ${
                     isActive
-                      ? "glowe-pill-active text-white shadow-md scale-[1.02]"
-                      : "text-slate-800 hover:bg-primary-light hover:text-primary"
+                      ? "bg-primary text-white font-extrabold shadow-md scale-[1.02]"
+                      : "text-[#1f1f1f] hover:bg-black/10"
                   }`}
                 >
                   <span>{getMenuIcon(item.id)}</span>
@@ -373,12 +376,12 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
           )}
           <div className="relative group">
             <button
-              onClick={onLogout}
+              onClick={() => setShowLogoutModal(true)}
               className={`w-full flex items-center ${
                 isCollapsed ? "justify-center px-2 py-3" : "space-x-3 px-3.5 py-2.5"
-              } rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition-all`}
+              } rounded-xl text-xs font-bold text-slate-900 hover:bg-white/20 transition-all`}
             >
-              <LogOut className="w-4 h-4 shrink-0" />
+              <LogOut className="w-4 h-4 shrink-0 text-slate-900" />
               {!isCollapsed && <span>{t("logout") || "Logout"}</span>}
             </button>
 
@@ -403,7 +406,7 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
 
       {/* Mobile Drawer */}
       <div
-        className={`fixed inset-y-0 left-0 w-64 bg-surface border-r border-border-soft z-50 transform transition-transform duration-300 md:hidden flex flex-col ${
+        className={`fixed inset-y-0 left-0 w-64 glowe-sidebar-gradient border-r border-black/10 z-50 transform transition-transform duration-300 md:hidden flex flex-col ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -482,7 +485,7 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
               </p>
             </div>
           </div>
-          <button onClick={onLogout} className="flex items-center space-x-1 text-xs text-danger font-semibold hover:underline">
+          <button onClick={() => setShowLogoutModal(true)} className="flex items-center space-x-1 text-xs text-danger font-semibold hover:underline">
             <LogOut className="w-3.5 h-3.5" />
             <span>{t("logout")}</span>
           </button>
@@ -640,6 +643,40 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
           {children}
         </div>
       </main>
+
+      {/* LOGOUT CONFIRMATION POPUP MODAL */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 bg-slate-900/60 z-[9999] flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in-up">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl border border-slate-100 text-center space-y-5">
+            <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center mx-auto text-rose-500 shadow-xs">
+              <LogOut className="w-7 h-7" />
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-lg font-black text-slate-900">Confirm Logout</h3>
+              <p className="text-xs font-bold text-slate-600">
+                Are you sure you want to log out of your session?
+              </p>
+            </div>
+            <div className="flex space-x-3 pt-2">
+              <button
+                onClick={() => setShowLogoutModal(false)}
+                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-2xl text-xs font-extrabold transition shadow-2xs cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowLogoutModal(false);
+                  onLogout();
+                }}
+                className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white rounded-2xl text-xs font-extrabold shadow-md transition cursor-pointer"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -447,7 +447,7 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
       <div className="text-xs space-y-0.5 text-black">
         <div className="flex justify-between font-bold">
           <span>Bill No:</span>
-          <span className="font-extrabold">{cleanBillNo}</span>
+          <span className="font-extrabold numeric">{cleanBillNo}</span>
         </div>
         <div className="flex justify-between font-bold">
           <span>Client:</span>
@@ -455,7 +455,7 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
         </div>
         <div className="flex justify-between font-semibold">
           <span>Date:</span>
-          <span>{formattedDate}</span>
+          <span className="numeric">{formattedDate}</span>
         </div>
         {!hideLoyaltyStatus && invoice.membership_name && (
           <div className="flex justify-between font-bold text-black border-t border-dotted border-slate-300 pt-1 mt-1">
@@ -490,7 +490,7 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
                         <div key={idx} className="space-y-0.5 text-black">
                           <div className="flex justify-between items-start font-bold">
                             <span className="w-2/3 break-words leading-tight">{itemName}</span>
-                            <span className="w-1/3 text-right font-extrabold">{formatCurrency(amount)}</span>
+                            <span className="w-1/3 text-right font-extrabold numeric">{formatCurrency(amount)}</span>
                           </div>
                         </div>
                       );
@@ -525,20 +525,20 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
                                   </span>
                                 )}
                               </span>
-                              <span className="w-1/3 text-right font-extrabold">
+                              <span className="w-1/3 text-right font-extrabold numeric">
                                 {isFreeReward ? "FREE" : formatCurrency(amount)}
                               </span>
                             </div>
                             {(showQty || showRate || staffName) && (
                               <div className="text-[11px] text-black space-x-2">
-                                {showQty && <span>Qty: {qty}</span>}
-                                {showRate && <span>Rate: {formatCurrency(rate)}</span>}
+                                {showQty && <span>Qty: <span className="numeric">{qty}</span></span>}
+                                {showRate && <span>Rate: <span className="numeric">{formatCurrency(rate)}</span></span>}
                                 {staffName && <span className="italic">Staff: {staffName}</span>}
                               </div>
                             )}
                             {item.discount > 0 && !isFreeReward && (
                               <div className="text-[11px] text-black">
-                                Disc: -{formatCurrency(item.discount)}
+                                Disc: -<span className="numeric">{formatCurrency(item.discount)}</span>
                               </div>
                             )}
                           </div>
@@ -567,18 +567,18 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
                           <div key={idx} className="space-y-0.5 text-black">
                             <div className="flex justify-between items-start">
                               <span className="w-2/3 break-words leading-tight font-bold">{itemName}</span>
-                              <span className="w-1/3 text-right font-extrabold">{formatCurrency(amount)}</span>
+                              <span className="w-1/3 text-right font-extrabold numeric">{formatCurrency(amount)}</span>
                             </div>
                             {(showQty || showRate || showMrp) && (
                               <div className="text-[11px] text-black space-x-2">
-                                {showQty && <span>Qty: {qty}</span>}
-                                {showRate && <span>Rate: {formatCurrency(rate)}</span>}
-                                {showMrp && <span>MRP: {formatCurrency(mrp)}</span>}
+                                {showQty && <span>Qty: <span className="numeric">{qty}</span></span>}
+                                {showRate && <span>Rate: <span className="numeric">{formatCurrency(rate)}</span></span>}
+                                {showMrp && <span>MRP: <span className="numeric">{formatCurrency(mrp)}</span></span>}
                               </div>
                             )}
                             {item.discount > 0 && (
                               <div className="text-[11px] text-black text-right">
-                                Disc: -{formatCurrency(item.discount)}
+                                Disc: -<span className="numeric">{formatCurrency(item.discount)}</span>
                               </div>
                             )}
                           </div>
@@ -600,34 +600,34 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
       <div className="text-xs space-y-0.5 text-black">
         <div className="flex justify-between">
           <span>Subtotal:</span>
-          <span className="font-semibold">{formatCurrency(invoice.subtotal || 0)}</span>
+          <span className="font-semibold numeric">{formatCurrency(invoice.subtotal || 0)}</span>
         </div>
 
         {(invoice.discount || 0) > 0 && (
           <div className="flex justify-between font-bold">
             <span>Discount:</span>
-            <span>-{formatCurrency(invoice.discount)}</span>
+            <span className="numeric">-{formatCurrency(invoice.discount)}</span>
           </div>
         )}
 
         {invoice.membership_name && (
           <div className="flex justify-between font-bold text-black border-t border-dashed border-slate-300 pt-0.5">
             <span>Membership ({invoice.membership_name}):</span>
-            <span>-{formatCurrency(invoice.membership_discount || 0)}</span>
+            <span className="numeric">-{formatCurrency(invoice.membership_discount || 0)}</span>
           </div>
         )}
 
         {showTax && (invoice.tax || 0) > 0 && (
           <div className="flex justify-between">
             <span>GST (Service):</span>
-            <span>{formatCurrency(invoice.tax)}</span>
+            <span className="numeric">{formatCurrency(invoice.tax)}</span>
           </div>
         )}
 
         {/* HIGHLIGHTED NET PAYABLE BOX */}
         <div className="flex justify-between items-center text-sm font-bold text-black border border-slate-300 p-1.5 my-1.5">
           <span>NET PAYABLE:</span>
-          <span className="text-base font-black">{formatCurrency(invoice.total || invoice.net_payable || 0)}</span>
+          <span className="text-base font-black numeric">{formatCurrency(invoice.total || invoice.net_payable || 0)}</span>
         </div>
       </div>
 
@@ -641,20 +641,20 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
           invoice.payments.map((p, idx) => (
             <div key={idx} className="flex justify-between">
               <span>Paid ({p.method || p.payment_method}):</span>
-              <span className="font-bold">{formatCurrency(p.amount || 0)}</span>
+              <span className="font-bold numeric">{formatCurrency(p.amount || 0)}</span>
             </div>
           ))
         ) : (
           <div className="flex justify-between">
             <span>Paid ({invoice.payment_method || "Cash"}):</span>
-            <span className="font-bold">{formatCurrency(invoice.total || 0)}</span>
+            <span className="font-bold numeric">{formatCurrency(invoice.total || 0)}</span>
           </div>
         )}
 
         {invoice.change_returned > 0 && (
           <div className="flex justify-between font-bold border-t border-dotted border-slate-300 pt-0.5 mt-0.5">
             <span>Change Returned:</span>
-            <span>{formatCurrency(invoice.change_returned)}</span>
+            <span className="numeric">{formatCurrency(invoice.change_returned)}</span>
           </div>
         )}
       </div>

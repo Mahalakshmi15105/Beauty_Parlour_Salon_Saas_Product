@@ -376,7 +376,7 @@ function Employees() {
                       {emp.first_name} {emp.last_name}
                     </td>
                     <td className="px-6 py-4 text-sm text-text-secondary">{emp.role || "-"}</td>
-                    <td className="px-6 py-4 text-sm text-text-secondary">{emp.phone}</td>
+                    <td className="px-6 py-4 text-sm text-text-secondary numeric">{emp.phone}</td>
                     <td className="px-6 py-4 text-sm">
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                         emp.status === "active" ? "bg-success/15 text-success" : "bg-danger/15 text-danger"

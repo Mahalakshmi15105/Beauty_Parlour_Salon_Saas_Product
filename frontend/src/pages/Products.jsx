@@ -816,25 +816,25 @@ function Products() {
                             </div>
                           </td>
                           <td className="px-6 py-4 text-xs text-text-secondary">
-                            <p>Barcode: {p.barcode || "—"}</p>
+                            <p>Barcode: <span className="numeric">{p.barcode || "—"}</span></p>
                           </td>
-                          <td className="px-6 py-4 text-sm text-text-secondary">
+                          <td className="px-6 py-4 text-sm text-text-secondary numeric">
                             {formatCurrency(p.cost_price)}
                           </td>
-                          <td className="px-6 py-4 text-sm text-text-primary font-bold text-center">
+                          <td className="px-6 py-4 text-sm text-text-primary font-bold text-center numeric">
                             {formatCurrency(p.mrp)}
                           </td>
-                          <td className="px-6 py-4 text-sm text-text-secondary text-center">
+                          <td className="px-6 py-4 text-sm text-text-secondary text-center numeric">
                             {formatCurrency(p.selling_price)}
                           </td>
                           <td className="px-6 py-4 text-sm text-center">
                             <div className="inline-flex flex-col items-center">
-                              <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-bold numeric ${
                                 isLowStock ? "bg-danger/15 text-danger animate-pulse" : "bg-success/15 text-success"
                               }`}>
                                 {p.stock_quantity} units
                               </span>
-                              <span className="text-[10px] text-text-secondary mt-0.5">Limit: {p.low_stock_threshold}</span>
+                              <span className="text-[10px] text-text-secondary mt-0.5">Limit: <span className="numeric">{p.low_stock_threshold}</span></span>
                             </div>
                           </td>
                           <td className="px-6 py-4 text-sm text-right space-x-3">
