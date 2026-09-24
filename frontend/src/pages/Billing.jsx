@@ -306,6 +306,8 @@ function Billing() {
   // Billing History State
   const [invoicesHistory, setInvoicesHistory] = useState([]);
   const [historySearch, setHistorySearch] = useState("");
+  const [historyFromDate, setHistoryFromDate] = useState("");
+  const [historyToDate, setHistoryToDate] = useState("");
   const [historyLoading, setHistoryLoading] = useState(false);
 
   // Sub-Modals for Bill Actions
@@ -3135,19 +3137,75 @@ function Billing() {
               </p>
             </div>
 
-            <div className="w-72 relative">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-              <input
-                type="text"
-                placeholder="Search by Invoice # or Client Name..."
-                value={historySearch}
-                onChange={(e) => setHistorySearch(e.target.value)}
-                className="w-full bg-background border border-border-soft pl-9 pr-4 py-2 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
-              />
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center space-x-1.5 text-xs">
+                <span className="font-bold text-slate-700">From:</span>
+                <input
+                  type="date"
+                  value={historyFromDate}
+                  onChange={(e) => setHistoryFromDate(e.target.value)}
+                  className="bg-background border border-border-soft px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              <div className="flex items-center space-x-1.5 text-xs">
+                <span className="font-bold text-slate-700">To:</span>
+                <input
+                  type="date"
+                  value={historyToDate}
+                  onChange={(e) => setHistoryToDate(e.target.value)}
+                  className="bg-background border border-border-soft px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              {(historyFromDate || historyToDate || historySearch) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHistoryFromDate("");
+                    setHistoryToDate("");
+                    setHistorySearch("");
+                  }}
+                  className="text-xs text-rose-600 hover:text-rose-800 font-bold underline px-1"
+                >
+                  Clear Filters
+                </button>
+              )}
+
+              <div className="w-64 relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <input
+                  type="text"
+                  placeholder="Search Invoice # or Client..."
+                  value={historySearch}
+                  onChange={(e) => setHistorySearch(e.target.value)}
+                  className="w-full bg-background border border-border-soft pl-9 pr-4 py-2 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary"
+                />
+              </div>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          {(() => {
+            const filteredHistory = invoicesHistory.filter((inv) => {
+              // Search filter
+              const q = historySearch.toLowerCase().trim();
+              const matchesSearch = !q || 
+                (inv.invoice_number && inv.invoice_number.toLowerCase().includes(q)) ||
+                (inv.customer_name && inv.customer_name.toLowerCase().includes(q));
+
+              // Date filter
+              let matchesDate = true;
+              if (inv.created_at) {
+                const invDateStr = inv.created_at.split("T")[0];
+                if (historyFromDate && invDateStr < historyFromDate) matchesDate = false;
+                if (historyToDate && invDateStr > historyToDate) matchesDate = false;
+              }
+
+              return matchesSearch && matchesDate;
+            });
+
+            return (
+              <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-sm">
               <thead>
                 <tr className="bg-primary-light border-b border-border-soft text-slate-700">
@@ -3248,6 +3306,8 @@ function Billing() {
               </tbody>
             </table>
           </div>
+        );
+      })()}
         </div>
       )}
 

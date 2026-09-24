@@ -34,12 +34,19 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [range, setRange] = useState(7);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   const fetchDashboardData = () => {
     setLoading(true);
+    let chartUrl = `/dashboard/charts?range=${range}`;
+    if (startDate && endDate) {
+      chartUrl = `/dashboard/charts?start_date=${startDate}&end_date=${endDate}`;
+    }
+
     const requests = [
       API.get("/dashboard/summary"),
-      API.get(`/dashboard/charts?range=${range}`),
+      API.get(chartUrl),
       API.get("/dashboard/activities"),
     ];
 
@@ -65,7 +72,7 @@ function Dashboard() {
 
   useEffect(() => {
     fetchDashboardData();
-  }, [range]);
+  }, [range, startDate, endDate]);
 
   if (loading) {
     return (
@@ -264,16 +271,39 @@ function Dashboard() {
           <h1 className="text-xl font-semibold text-text-primary">{t("dashboard_overview")}</h1>
           <p className="text-xs text-text-secondary">Real-time revenue metrics, staff performance, and inventory health.</p>
         </div>
-        <div className="flex items-center space-x-3">
-          <label className="text-xs text-text-secondary font-medium">Timeframe:</label>
-          <select
-            value={range}
-            onChange={(e) => setRange(e.target.value)}
-            className="bg-surface border border-border-soft px-3 py-1.5 rounded-lg text-xs text-text-primary focus:outline-none"
-          >
-            <option value={7}>Last 7 Days</option>
-            <option value={30}>Last 30 Days</option>
-          </select>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center space-x-1.5 text-xs">
+            <span className="font-semibold text-text-secondary">From:</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="bg-surface border border-border-soft px-3 py-1 rounded-lg text-xs text-text-primary focus:outline-none focus:border-primary"
+            />
+          </div>
+
+          <div className="flex items-center space-x-1.5 text-xs">
+            <span className="font-semibold text-text-secondary">To:</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="bg-surface border border-border-soft px-3 py-1 rounded-lg text-xs text-text-primary focus:outline-none focus:border-primary"
+            />
+          </div>
+
+          {(startDate || endDate) && (
+            <button
+              type="button"
+              onClick={() => {
+                setStartDate("");
+                setEndDate("");
+              }}
+              className="text-xs text-rose-600 hover:text-rose-800 font-bold underline px-1"
+            >
+              Clear
+            </button>
+          )}
         </div>
       </div>
 

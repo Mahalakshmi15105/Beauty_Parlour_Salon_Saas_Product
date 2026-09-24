@@ -73,7 +73,7 @@ function Reports() {
 
   useEffect(() => {
     fetchReport();
-  }, [reportType, selectedDate, selectedMonth, selectedYear, preset]);
+  }, [reportType, selectedDate, selectedMonth, selectedYear, preset, startDate, endDate]);
 
   // Excel Export Handler for 3 New Reports + Standard Reports
   const handleExportCustomExcel = () => {
@@ -628,19 +628,45 @@ function Reports() {
               </select>
             </div>
           ) : (
-            <div className="flex items-center space-x-2">
-              <span className="font-bold text-slate-700">Billing Period:</span>
-              <select
-                value={preset}
-                onChange={(e) => setPreset(e.target.value)}
-                className="bg-white border border-pink-200 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-pink-500"
-              >
-                <option value="today">Today</option>
-                <option value="7days">Last 7 Days</option>
-                <option value="30days">Last 30 Days</option>
-                <option value="this_month">This Month</option>
-                <option value="last_month">Last Month</option>
-              </select>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center space-x-2">
+                <span className="font-bold text-slate-700">Billing Period:</span>
+                <select
+                  value={preset}
+                  onChange={(e) => setPreset(e.target.value)}
+                  className="bg-white border border-pink-200 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-pink-500"
+                >
+                  <option value="today">Today</option>
+                  <option value="7days">Last 7 Days</option>
+                  <option value="30days">Last 30 Days</option>
+                  <option value="this_month">This Month</option>
+                  <option value="last_month">Last Month</option>
+                  <option value="custom">Custom Date Range</option>
+                </select>
+              </div>
+
+              {preset === "custom" && (
+                <div className="flex items-center space-x-3 bg-pink-50/50 p-1.5 rounded-xl border border-pink-100">
+                  <div className="flex items-center space-x-1.5">
+                    <span className="font-bold text-slate-700">From:</span>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="bg-white border border-pink-200 px-2.5 py-1 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:border-pink-500"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-1.5">
+                    <span className="font-bold text-slate-700">To:</span>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="bg-white border border-pink-200 px-2.5 py-1 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:border-pink-500"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

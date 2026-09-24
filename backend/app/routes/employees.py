@@ -49,12 +49,21 @@ def get_employees():
         sort_desc=sort_desc
     )
 
-    data = [
-        {
+    from app.models.user import User
+    data = []
+    for emp in employees:
+        u_rec = User.query.filter(
+            (User.email == emp.phone) | 
+            (User.email.ilike(f"%{emp.first_name}%"))
+        ).filter_by(is_deleted=False).first()
+        data.append({
             "id": emp.id,
             "first_name": emp.first_name or "",
             "last_name": emp.last_name or "",
             "phone": emp.phone or "",
+            "email": u_rec.email if u_rec else (emp.phone + "@salon.com"),
+            "username": u_rec.email if u_rec else emp.phone,
+            "password": getattr(emp, "password_plain", None) or emp.phone or "123456",
             "specialization": emp.specialization or "",
             "role": emp.role or "",
             "salary": float(emp.salary or 0.0),
@@ -66,8 +75,7 @@ def get_employees():
             "shift_end_time": getattr(emp, "shift_end_time", "18:00") or "18:00",
             "status": emp.status or "active",
             "created_at": emp.created_at.isoformat() if emp.created_at else ""
-        } for emp in employees
-    ]
+        })
 
     return success_response({
         "items": data,
@@ -85,11 +93,19 @@ def get_employee(employee_id):
             message="Employee not found or access denied.",
             status_code=404
         )
+    from app.models.user import User
+    u_rec = User.query.filter(
+        (User.email == employee.phone) | 
+        (User.email.ilike(f"%{employee.first_name}%"))
+    ).filter_by(is_deleted=False).first()
     return success_response({
         "id": employee.id,
         "first_name": employee.first_name or "",
         "last_name": employee.last_name or "",
         "phone": employee.phone or "",
+        "email": u_rec.email if u_rec else (employee.phone + "@salon.com"),
+        "username": u_rec.email if u_rec else employee.phone,
+        "password": getattr(employee, "password_plain", None) or employee.phone or "123456",
         "specialization": employee.specialization or "",
         "role": employee.role or "",
         "salary": float(employee.salary or 0.0),
@@ -215,12 +231,15 @@ def create_employee():
         if joining_date:
             employee.joining_date = joining_date
 
+        password = data.get("password", "").strip()
+        if password:
+            employee.password_plain = password
+
         db.session.add(employee)
         db.session.commit()
 
         # Provision/Link User account with role 'Employee' for authentication
         username = (data.get("username") or data.get("phone") or phone).strip().lower()
-        password = data.get("password", "").strip()
 
         if username:
             from app.models.user import User
@@ -384,8 +403,9 @@ def update_employee(employee_id):
         if "shift_end_time" in data:
             employee.shift_end_time = data.get("shift_end_time") or "18:00"
         employee.status = data.get("status", "active")
-        if joining_date:
-            employee.joining_date = joining_date
+        password = data.get("password", "").strip()
+        if password:
+            employee.password_plain = password
 
         db.session.commit()
 

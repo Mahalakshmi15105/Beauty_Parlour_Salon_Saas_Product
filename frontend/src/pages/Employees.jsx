@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
 import { useModalFocusTrap, useFormKeyboardNavigation, focusAndOpenSelect } from "../utils/keyboardNavigation";
-import { X, Printer, FileSpreadsheet, FileText, Upload, DollarSign } from "lucide-react";
+import { X, Printer, FileSpreadsheet, FileText, Upload, DollarSign, Eye, EyeOff, Check, Copy, UserCheck } from "lucide-react";
 import { exportToCSV, printDataList, exportToPDF, exportToExcel } from "../utils/exportUtils";
 import BulkUploadModal from "../components/BulkUploadModal";
 import AddPayrollAdjustmentModal from "../components/AddPayrollAdjustmentModal";
@@ -24,6 +24,11 @@ function Employees() {
   const [cursorHistory, setCursorHistory] = useState([]);
   const [nextCursor, setNextCursor] = useState(null);
   const [parlourName, setParlourName] = useState("SmartGoNext Beauty SaaS");
+
+  // View Modal & Password Toggle State
+  const [viewEmp, setViewEmp] = useState(null);
+  const [visiblePasswords, setVisiblePasswords] = useState({});
+  const [copiedField, setCopiedField] = useState(null);
 
   // Form & Payroll State
   const [showModal, setShowModal] = useState(false);
@@ -362,38 +367,83 @@ function Employees() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-primary-light border-b border-border-soft">
-                  <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Name</th>
-                  <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Role</th>
-                  <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Phone</th>
-                  <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Status</th>
-                  <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Actions</th>
+                  <th className="px-5 py-3 text-sm font-semibold text-text-secondary uppercase">Name</th>
+                  <th className="px-5 py-3 text-sm font-semibold text-text-secondary uppercase">Email / Username</th>
+                  <th className="px-5 py-3 text-sm font-semibold text-text-secondary uppercase">Password</th>
+                  <th className="px-5 py-3 text-sm font-semibold text-text-secondary uppercase">Phone</th>
+                  <th className="px-5 py-3 text-sm font-semibold text-text-secondary uppercase">Status</th>
+                  <th className="px-5 py-3 text-sm font-semibold text-text-secondary uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-soft">
-                {employees.map((emp) => (
-                  <tr key={emp.id} className="hover:bg-background/50 transition">
-                    <td className="px-6 py-4 text-sm font-medium text-text-primary">
-                      {emp.first_name} {emp.last_name}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-text-secondary">{emp.role || "-"}</td>
-                    <td className="px-6 py-4 text-sm text-text-secondary numeric">{emp.phone}</td>
-                    <td className="px-6 py-4 text-sm">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        emp.status === "active" ? "bg-success/15 text-success" : "bg-danger/15 text-danger"
-                      }`}>
-                        {emp.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm space-x-3">
-                      <button onClick={() => openEditModal(emp)} className="text-primary hover:underline">
-                        Edit
-                      </button>
-                      <button onClick={() => handleDelete(emp.id)} className="text-danger hover:underline">
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {employees.map((emp) => {
+                  const showPass = !!visiblePasswords[emp.id];
+                  const displayEmail = emp.email || emp.username || (emp.phone ? `${emp.phone}@salon.com` : "-");
+                  const displayPass = emp.password || emp.phone || "123456";
+
+                  return (
+                    <tr key={emp.id} className="hover:bg-background/50 transition">
+                      <td className="px-5 py-4 text-sm font-bold text-text-primary">
+                        {emp.first_name} {emp.last_name || ""}
+                      </td>
+                      <td className="px-5 py-4 text-sm text-text-secondary font-medium">
+                        {displayEmail}
+                      </td>
+                      <td className="px-5 py-4 text-sm text-text-secondary">
+                        <div className="flex items-center space-x-2">
+                          <span className="numeric text-xs bg-slate-100 px-2 py-1 rounded-md text-slate-800 font-bold">
+                            {showPass ? displayPass : "••••••••"}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setVisiblePasswords((prev) => ({
+                                ...prev,
+                                [emp.id]: !prev[emp.id],
+                              }))
+                            }
+                            className="text-slate-400 hover:text-slate-600 p-1 rounded-md transition"
+                            title={showPass ? "Hide Password" : "Show Password"}
+                          >
+                            {showPass ? <EyeOff className="w-3.5 h-3.5 text-pink-600" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                          {!emp.password && (
+                            <button
+                              type="button"
+                              onClick={() => openEditModal(emp)}
+                              className="text-[10px] font-semibold text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-1.5 py-0.5 rounded border border-amber-200 transition"
+                              title="Older record - click to set a new plain password"
+                            >
+                              Reset
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-5 py-4 text-sm text-text-secondary numeric">{emp.phone}</td>
+                      <td className="px-5 py-4 text-sm">
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          emp.status === "active" ? "bg-success/15 text-success" : "bg-danger/15 text-danger"
+                        }`}>
+                          {emp.status}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 text-sm space-x-3">
+                        <button
+                          onClick={() => setViewEmp(emp)}
+                          className="text-indigo-600 hover:text-indigo-800 font-bold hover:underline"
+                        >
+                          View
+                        </button>
+                        <button onClick={() => openEditModal(emp)} className="text-primary hover:underline font-bold">
+                          Edit
+                        </button>
+                        <button onClick={() => handleDelete(emp.id)} className="text-danger hover:underline">
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
 
@@ -623,6 +673,143 @@ function Employees() {
         defaultEmployeeId={selectedPayrollEmpId}
         onClose={() => setShowPayrollModal(false)}
       />
+
+      {/* View Employee Profile Modal */}
+      {viewEmp && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="glowe-glass-card max-w-lg w-full rounded-3xl shadow-2xl border border-white/70 overflow-hidden">
+            <div className="px-6 py-4 border-b border-pink-100/60 flex justify-between items-center bg-white/50 backdrop-blur-md">
+              <div className="flex items-center space-x-2">
+                <UserCheck className="w-5 h-5 text-pink-600" />
+                <h3 className="text-md font-bold text-slate-900">Employee Details Profile</h3>
+              </div>
+              <button onClick={() => setViewEmp(null)} className="text-text-secondary hover:text-text-primary p-1">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="flex items-center space-x-4 bg-pink-50/60 p-4 rounded-2xl border border-pink-100">
+                <div className="w-12 h-12 rounded-full bg-pink-500 text-white flex items-center justify-center font-black text-lg">
+                  {viewEmp.first_name?.[0]?.toUpperCase() || "E"}
+                </div>
+                <div>
+                  <h4 className="text-base font-black text-slate-900">{viewEmp.first_name} {viewEmp.last_name || ""}</h4>
+                  <p className="text-xs font-semibold text-pink-600">{viewEmp.role || "Salon Staff"} (<span className="numeric">{viewEmp.level || "L1"}</span>)</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Email / Username</span>
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-900 truncate">{viewEmp.email || viewEmp.username || (viewEmp.phone + "@salon.com")}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const txt = viewEmp.email || viewEmp.username || (viewEmp.phone + "@salon.com");
+                        navigator.clipboard.writeText(txt);
+                        setCopiedField("email");
+                        setTimeout(() => setCopiedField(null), 1500);
+                      }}
+                      className="text-slate-400 hover:text-pink-600 p-1"
+                      title="Copy Email"
+                    >
+                      {copiedField === "email" ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Login Password</span>
+                  <div className="flex items-center justify-between">
+                    <span className="numeric text-xs font-bold text-slate-900 bg-slate-100 px-2 py-1 rounded-md">
+                      {visiblePasswords[`modal_${viewEmp.id}`] ? (viewEmp.password || viewEmp.phone || "123456") : "••••••••"}
+                    </span>
+                    <div className="flex items-center space-x-1">
+                      <button
+                        type="button"
+                        onClick={() => setVisiblePasswords((prev) => ({ ...prev, [`modal_${viewEmp.id}`]: !prev[`modal_${viewEmp.id}`] }))}
+                        className="text-slate-400 hover:text-pink-600 p-1"
+                        title={visiblePasswords[`modal_${viewEmp.id}`] ? "Hide Password" : "Show Password"}
+                      >
+                        {visiblePasswords[`modal_${viewEmp.id}`] ? <EyeOff className="w-3.5 h-3.5 text-pink-600" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                      {!viewEmp.password && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const empToEdit = viewEmp;
+                            setViewEmp(null);
+                            openEditModal(empToEdit);
+                          }}
+                          className="text-[10px] font-semibold text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-1.5 py-0.5 rounded border border-amber-200 transition"
+                          title="Older record - click to set password"
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Phone Number</span>
+                  <span className="font-bold text-slate-900 numeric">{viewEmp.phone}</span>
+                </div>
+
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Specialization</span>
+                  <span className="font-bold text-slate-900">{viewEmp.specialization || "-"}</span>
+                </div>
+
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Base Salary</span>
+                  <span className="font-extrabold text-slate-900 numeric">₹ {parseFloat(viewEmp.salary || 0).toLocaleString("en-IN")}</span>
+                </div>
+
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Monthly Target</span>
+                  <span className="font-extrabold text-slate-900 numeric">₹ {parseFloat(viewEmp.target || 0).toLocaleString("en-IN")}</span>
+                </div>
+
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Commission %</span>
+                  <span className="font-extrabold text-emerald-600 numeric">{viewEmp.commission_percentage || 0}%</span>
+                </div>
+
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Status</span>
+                  <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${viewEmp.status === "active" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
+                    {viewEmp.status}
+                  </span>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const empToEdit = viewEmp;
+                    setViewEmp(null);
+                    openEditModal(empToEdit);
+                  }}
+                  className="px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold rounded-xl shadow-xs"
+                >
+                  Edit Employee
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewEmp(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
