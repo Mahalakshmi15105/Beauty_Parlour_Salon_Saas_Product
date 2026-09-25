@@ -51,6 +51,7 @@ export default function TouchModeBilling({
   getEffectiveDiscountPercent = () => 0
 }) {
   const [selectedTab, setSelectedTab] = useState("all");
+  const [itemSearchQuery, setItemSearchQuery] = useState("");
   const [discountChecked, setDiscountChecked] = useState({});
 
   // Combine actual categories from tenant
@@ -60,7 +61,7 @@ export default function TouchModeBilling({
     { id: "products", name: "Products" }
   ];
 
-  // Filter items based on category tab
+  // Filter items based on category tab and search query
   const getFilteredItems = () => {
     let items = [];
 
@@ -112,6 +113,16 @@ export default function TouchModeBilling({
       }));
     }
 
+    if (itemSearchQuery.trim()) {
+      const q = itemSearchQuery.toLowerCase().trim();
+      items = items.filter((item) => {
+        const nameMatch = item.displayName?.toLowerCase().includes(q);
+        const priceMatch = item.displayPrice ? String(item.displayPrice).includes(q) : false;
+        const badgeMatch = item.badge?.toLowerCase().includes(q);
+        return nameMatch || priceMatch || badgeMatch;
+      });
+    }
+
     return items;
   };
 
@@ -143,8 +154,28 @@ export default function TouchModeBilling({
     <div className="grid grid-cols-12 gap-4 h-[calc(100vh-140px)] min-h-[600px] overflow-hidden">
       {/* 1. LARGER PANEL (LEFT, ~65% width / col-span-8) — CATEGORY & SERVICE BROWSER */}
       <div className="col-span-12 lg:col-span-8 flex flex-col glowe-glass-card rounded-3xl p-4 border border-white/60 shadow-xl overflow-hidden bg-white/40 backdrop-blur-md">
-        {/* Category Tabs Row */}
-        <div className="mb-4 shrink-0">
+        {/* Top Search Bar & Category Tabs Row */}
+        <div className="mb-4 shrink-0 space-y-3">
+          <div className="relative">
+            <Search className="w-4 h-4 text-pink-500 absolute left-3.5 top-3 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search services or products by name, price..."
+              value={itemSearchQuery}
+              onChange={(e) => setItemSearchQuery(e.target.value)}
+              className="w-full bg-white/90 border border-pink-200/90 pl-10 pr-9 py-2 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:border-pink-500 shadow-xs placeholder:text-slate-400"
+            />
+            {itemSearchQuery && (
+              <button
+                type="button"
+                onClick={() => setItemSearchQuery("")}
+                className="absolute right-3 top-2.5 text-xs text-slate-400 hover:text-slate-600 font-bold bg-slate-100 hover:bg-slate-200 rounded-full w-5 h-5 flex items-center justify-center transition"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
           <div className="flex items-center space-x-2 overflow-x-auto pb-1 scrollbar-none w-full">
             {categoryTabs.map((tab) => {
               const isActive = selectedTab === tab.id;

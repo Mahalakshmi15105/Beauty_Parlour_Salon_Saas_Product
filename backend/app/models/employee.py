@@ -21,6 +21,7 @@ class Employee(db.Model, TimestampMixin, SoftDeleteMixin):
     joining_date = db.Column(db.Date, nullable=False, default=date.today)
     shift_start_time = db.Column(db.String(10), nullable=True, default="09:00")
     shift_end_time = db.Column(db.String(10), nullable=True, default="18:00")
+    monthly_offs = db.Column(db.Integer, nullable=False, default=4)
     password_plain = db.Column(db.String(100), nullable=True)
     status = db.Column(db.String(50), nullable=False, default="active")  # active, inactive
 

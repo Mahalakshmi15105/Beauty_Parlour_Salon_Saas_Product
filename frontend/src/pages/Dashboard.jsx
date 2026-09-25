@@ -14,7 +14,7 @@ import {
   Tooltip,
   CartesianGrid,
 } from "recharts";
-import { AlertTriangle, Clock, Calendar, UserCheck, CheckCircle, QrCode, Sparkles, ArrowRight } from "lucide-react";
+import { AlertTriangle, Clock, Calendar, UserCheck, CheckCircle, QrCode, Sparkles, ArrowRight, Award, Target, TrendingUp } from "lucide-react";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { useTheme } from "../context/ThemeContext";
 
@@ -113,7 +113,7 @@ function Dashboard() {
               </h1>
             </div>
             <p className="text-xs font-semibold text-slate-600 mt-1">
-              Employee Portal Overview • View shift status, today's appointments, and attendance history.
+              Employee Portal Overview • View your shift status, personal service performance, and attendance log.
             </p>
           </div>
 
@@ -131,7 +131,7 @@ function Dashboard() {
         </div>
 
         {/* Employee Summary Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Card 1: Attendance Status */}
           <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow flex flex-col justify-between" style={{ boxShadow: "0 8px 24px rgba(255, 117, 143, 0.2)" }}>
             <div className="flex items-center justify-between">
@@ -152,19 +152,7 @@ function Dashboard() {
             </p>
           </div>
 
-          {/* Card 2: Today's Appointments */}
-          <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow flex flex-col justify-between" style={{ boxShadow: "0 8px 24px rgba(99, 102, 241, 0.15)" }}>
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Today's Appointments</p>
-              <Calendar className="w-5 h-5 text-indigo-500" />
-            </div>
-            <p className="text-2xl font-black text-slate-900 mt-3">
-              {summary?.invoices?.today || 0}
-            </p>
-            <p className="text-[11px] font-semibold text-slate-500 mt-2">Scheduled client appointments</p>
-          </div>
-
-          {/* Card 3: Monthly Services Completed */}
+          {/* Card 2: Services Completed This Month */}
           <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow flex flex-col justify-between" style={{ boxShadow: "0 8px 24px rgba(16, 185, 129, 0.15)" }}>
             <div className="flex items-center justify-between">
               <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Services This Month</p>
@@ -173,10 +161,10 @@ function Dashboard() {
             <p className="text-2xl font-black text-slate-900 mt-3">
               {summary?.invoices?.this_month || 0}
             </p>
-            <p className="text-[11px] font-semibold text-slate-500 mt-2">Treatments & services logged</p>
+            <p className="text-[11px] font-semibold text-slate-500 mt-2">Total parlour services logged</p>
           </div>
 
-          {/* Card 4: Attendance Record Count */}
+          {/* Card 3: Attendance Record Count */}
           <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow flex flex-col justify-between" style={{ boxShadow: "0 8px 24px rgba(245, 158, 11, 0.15)" }}>
             <div className="flex items-center justify-between">
               <p className="text-xs font-bold text-amber-600 uppercase tracking-wider">Attendance Logs</p>
@@ -185,79 +173,46 @@ function Dashboard() {
             <p className="text-2xl font-black text-slate-900 mt-3">
               {(employeeAttendance || []).length} Logs
             </p>
-            <p className="text-[11px] font-semibold text-slate-500 mt-2">Past check-in history records</p>
+            <p className="text-[11px] font-semibold text-slate-500 mt-2">Past check-in & out history</p>
           </div>
         </div>
 
-        {/* Employee Activity Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Recent Attendance Logs Feed */}
-          <div className="glowe-glass-card p-6 rounded-3xl glowe-glow-shadow space-y-4 border border-pink-100">
-            <div className="flex justify-between items-center">
-              <h3 className="text-sm font-extrabold text-slate-900 flex items-center space-x-2">
-                <Clock className="w-4 h-4 text-pink-600" />
-                <span>My Recent Attendance Logs</span>
-              </h3>
-            </div>
-
-            {(!employeeAttendance || employeeAttendance.length === 0) ? (
-              <div className="p-6 text-center text-xs font-semibold text-slate-500 bg-pink-50/50 rounded-2xl border border-pink-100">
-                No attendance logs found yet. Scan the reception QR code to check in!
-              </div>
-            ) : (
-              <div className="divide-y divide-slate-100 text-xs">
-                {employeeAttendance.slice(0, 5).map((log, idx) => (
-                  <div key={log.id || idx} className="py-3 flex items-center justify-between">
-                    <div>
-                      <p className="font-bold text-slate-900">
-                        {log.timestamp ? new Date(log.timestamp).toLocaleDateString() : "Today"}
-                      </p>
-                      <p className="text-[10px] text-slate-500 font-medium">
-                        {log.branch_name || "Main Branch"} • {log.checkin_method || "QR"}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold ${
-                        log.status === "P" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
-                      }`}>
-                        {log.status === "P" ? "Present" : log.status || "P"}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Today's Salon Activity Summary */}
-          <div className="glowe-glass-card p-6 rounded-3xl glowe-glow-shadow space-y-4 border border-pink-100">
+        {/* Employee Recent Attendance Logs Card */}
+        <div className="glowe-glass-card p-6 rounded-3xl glowe-glow-shadow space-y-4 border border-pink-100 max-w-3xl">
+          <div className="flex justify-between items-center">
             <h3 className="text-sm font-extrabold text-slate-900 flex items-center space-x-2">
-              <Calendar className="w-4 h-4 text-indigo-600" />
-              <span>Recent Salon Appointments</span>
+              <Clock className="w-4 h-4 text-pink-600" />
+              <span>My Recent Attendance Logs</span>
             </h3>
-
-            {activities?.recent_invoices?.length === 0 ? (
-              <p className="text-xs text-slate-500 font-medium">No recent appointment activity.</p>
-            ) : (
-              <div className="divide-y divide-slate-100 text-xs">
-                {activities?.recent_invoices?.slice(0, 5).map((inv) => (
-                  <div key={inv.id} className="py-3 flex justify-between items-center">
-                    <div>
-                      <p className="font-bold text-slate-900">{inv.customer_name || "Client"}</p>
-                      <p className="text-[10px] text-slate-500 font-medium">{inv.invoice_number}</p>
-                    </div>
-                    <div className="text-right">
-                      <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
-                        inv.status === "Paid" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
-                      }`}>
-                        {inv.status}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
+
+          {(!employeeAttendance || employeeAttendance.length === 0) ? (
+            <div className="p-6 text-center text-xs font-semibold text-slate-500 bg-pink-50/50 rounded-2xl border border-pink-100">
+              No attendance logs found yet. Scan the reception QR code to check in!
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100 text-xs">
+              {employeeAttendance.slice(0, 5).map((log, idx) => (
+                <div key={log.id || idx} className="py-3 flex items-center justify-between">
+                  <div>
+                    <p className="font-bold text-slate-900">
+                      {log.timestamp ? new Date(log.timestamp).toLocaleDateString() : "Today"}
+                    </p>
+                    <p className="text-[10px] text-slate-500 font-medium">
+                      {log.branch_name || "Main Branch"} • {log.checkin_method || "QR"}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold ${
+                      log.status === "P" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                    }`}>
+                      {log.status === "P" ? "Present" : log.status || "P"}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -357,103 +312,76 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* Charts Row 1: Daily Revenue Trend & Top Services */}
-      <div className="grid grid-cols-12 gap-8">
-        {/* Daily Revenue Area Chart */}
-        <div className="col-span-8 glowe-glass-card p-6 rounded-2xl glowe-glow-shadow space-y-4">
-          <h3 className="text-sm font-bold text-text-primary">{t("revenue_chart")}</h3>
-          <div className="h-64">
-            {charts?.daily_trend?.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-xs text-text-secondary">No billing activity recorded in this period.</div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={charts?.daily_trend}>
-                  <defs>
-                    <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#FF758F" stopOpacity={0.45} />
-                      <stop offset="95%" stopColor="#FF758F" stopOpacity={0.02} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#FFE4E8" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(value) => [formatCurrency(value), "Revenue"]} />
-                  <Area type="monotone" dataKey="revenue" stroke="#FF758F" strokeWidth={2.5} fillOpacity={1} fill="url(#colorRev)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            )}
+      {/* Top 3 Employee Target Performers Section */}
+      <div className="glowe-glass-card p-6 rounded-3xl glowe-glow-shadow border border-pink-100/80 space-y-6">
+        <div className="flex justify-between items-center flex-wrap gap-2">
+          <div>
+            <h3 className="text-base font-extrabold text-slate-900 flex items-center space-x-2">
+              <Award className="w-5 h-5 text-amber-500 fill-amber-500" />
+              <span>Top 3 Target Performers (This Month)</span>
+            </h3>
+            <p className="text-xs text-text-secondary mt-0.5">Employees leading in sales target completion for the current month.</p>
           </div>
+          <span className="text-xs font-bold text-pink-600 bg-pink-50 border border-pink-200 px-3 py-1 rounded-full">
+            Monthly Target Tracking
+          </span>
         </div>
 
-        {/* Top Services Bar Chart */}
-        <div className="col-span-4 glowe-glass-card p-6 rounded-2xl glowe-glow-shadow space-y-4">
-          <h3 className="text-sm font-bold text-text-primary">Top Treatments by Sales</h3>
-          <div className="h-64">
-            {charts?.top_services?.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-xs text-text-secondary">No treatment data.</div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={charts?.top_services} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                  <XAxis type="number" tick={{ fontSize: 10 }} />
-                  <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={80} />
-                  <Tooltip formatter={(value) => [formatCurrency(value), "Revenue"]} />
-                  <Bar dataKey="revenue" fill="#10B981" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
+        {(!summary?.top_performers || summary.top_performers.length === 0) ? (
+          <div className="p-8 text-center text-xs font-semibold text-text-secondary bg-slate-50/50 rounded-2xl border border-slate-100">
+            No employee target data available for this period.
           </div>
-        </div>
-      </div>
+        ) : (
+          <div className="flex flex-col space-y-4">
+            {summary.top_performers.map((emp, idx) => {
+              const ranks = [
+                { badge: "🥇 Rank 1", color: "from-amber-400 to-yellow-500", text: "text-amber-700", border: "border-amber-300", bg: "bg-amber-50" },
+                { badge: "🥈 Rank 2", color: "from-slate-300 to-slate-400", text: "text-slate-700", border: "border-slate-300", bg: "bg-slate-50" },
+                { badge: "🥉 Rank 3", color: "from-amber-600 to-amber-700", text: "text-amber-900", border: "border-amber-200", bg: "bg-orange-50" }
+              ];
+              const rank = ranks[idx] || ranks[2];
+              const pct = Math.min(100, Math.round(emp.percentage || 0));
 
-      {/* Activity Feeds */}
-      <div className="grid grid-cols-2 gap-8">
-        {/* Latest Checkout Invoices */}
-        <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow space-y-4">
-          <h3 className="text-sm font-bold text-text-primary">{t("pos_billing")}</h3>
-          {activities?.recent_invoices?.length === 0 ? (
-            <p className="text-xs text-text-secondary">No recent transactions.</p>
-          ) : (
-            <div className="divide-y divide-border-soft">
-              {activities?.recent_invoices?.map((inv) => (
-                <div key={inv.id} className="py-3 flex justify-between items-center text-xs">
-                  <div>
-                    <p className="font-semibold text-text-primary numeric">{inv.invoice_number}</p>
-                    <p className="text-text-secondary">{inv.customer_name || "Walk-In Client"}</p>
+              return (
+                <div
+                  key={emp.id || idx}
+                  className={`p-4 md:p-5 rounded-2xl border ${rank.border} ${rank.bg} flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm hover:shadow-md transition`}
+                >
+                  <div className="flex items-center space-x-4 min-w-[200px]">
+                    <span className="text-xs font-extrabold px-3 py-1.5 rounded-full bg-white text-slate-800 border border-slate-200 shadow-2xs shrink-0">
+                      {rank.badge}
+                    </span>
+                    <div className="truncate">
+                      <h4 className="text-base font-extrabold text-slate-900 truncate">{emp.name}</h4>
+                      <p className="text-xs text-text-secondary font-medium">{emp.role || "Salon Staff"}</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-text-primary numeric">{formatCurrency(inv.total)}</p>
-                    <span className={`text-[10px] font-medium ${
-                      inv.status === "Paid" ? "text-success" : "text-danger"
-                    }`}>{inv.status}</span>
+
+                  {/* Progress Bar & Amounts stacked vertically in row */}
+                  <div className="flex-1 w-full max-w-xl space-y-1.5">
+                    <div className="flex justify-between items-center text-xs font-bold">
+                      <span className="text-slate-700">
+                        Achieved: <strong className="text-emerald-600 numeric">{formatCurrency(emp.achieved)}</strong>
+                        <span className="text-text-secondary font-normal mx-2">/</span>
+                        Target: <strong className="numeric">{formatCurrency(emp.target)}</strong>
+                      </span>
+                      <span className={`text-xs font-black ${rank.text}`}>
+                        {emp.percentage}% Achieved
+                      </span>
+                    </div>
+
+                    <div className="w-full bg-white/80 rounded-full h-3 overflow-hidden border border-slate-200/60">
+                      <div
+                        className={`h-full rounded-full bg-gradient-to-r ${rank.color} transition-all duration-500`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Latest Registered Customers */}
-        <div className="glowe-glass-card p-6 rounded-2xl glowe-glow-shadow space-y-4">
-          <h3 className="text-sm font-semibold text-text-primary">{t("recent_activities")}</h3>
-          {activities?.recent_customers?.length === 0 ? (
-            <p className="text-xs text-text-secondary">No new registrations.</p>
-          ) : (
-            <div className="divide-y divide-border-soft">
-              {activities?.recent_customers?.map((cust) => (
-                <div key={cust.id} className="py-3 flex justify-between items-center text-xs">
-                  <div>
-                    <p className="font-semibold text-text-primary">{cust.name}</p>
-                    <p className="text-text-secondary">{cust.phone}</p>
-                  </div>
-                  <span className="text-text-secondary text-[10px]">
-                    {new Date(cust.created_at).toLocaleDateString()}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

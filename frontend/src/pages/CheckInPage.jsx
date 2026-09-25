@@ -332,15 +332,31 @@ export default function CheckInPage({ onNavigateHome }) {
               </div>
             )}
 
-            {/* E. ERROR SCREEN (Geofence Rejection / Out of Radius) */}
+            {/* E. ERROR SCREEN (Geofence Rejection / Already Checked-In / Out of Radius) */}
             {status === "error" && (
-              <div className="bg-rose-50 border-2 border-rose-300 p-6 rounded-3xl text-center space-y-4 shadow-md">
-                <div className="w-14 h-14 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto">
-                  <ShieldAlert className="w-8 h-8 text-rose-600" />
+              <div className={`border-2 p-6 rounded-3xl text-center space-y-4 shadow-md ${
+                resultMessage?.includes("Already") || resultMessage?.includes("already")
+                  ? "bg-amber-50 border-amber-300 text-amber-900"
+                  : "bg-rose-50 border-rose-300 text-rose-900"
+              }`}>
+                <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto ${
+                  resultMessage?.includes("Already") || resultMessage?.includes("already")
+                    ? "bg-amber-100 text-amber-600"
+                    : "bg-rose-100 text-rose-600"
+                }`}>
+                  {resultMessage?.includes("Already") || resultMessage?.includes("already") ? (
+                    <UserCheck className="w-8 h-8 text-amber-600" />
+                  ) : (
+                    <ShieldAlert className="w-8 h-8 text-rose-600" />
+                  )}
                 </div>
                 <div>
-                  <h3 className="text-base font-black text-rose-900 uppercase tracking-wide">Check-in Rejected</h3>
-                  <p className="text-xs font-extrabold text-rose-700 mt-2 leading-relaxed">{resultMessage}</p>
+                  <h3 className="text-base font-black uppercase tracking-wide">
+                    {resultMessage?.includes("Already") || resultMessage?.includes("already")
+                      ? "Attendance Already Logged"
+                      : "Check-in Rejected"}
+                  </h3>
+                  <p className="text-xs font-extrabold mt-2 leading-relaxed">{resultMessage}</p>
                 </div>
 
                 <button
@@ -348,7 +364,7 @@ export default function CheckInPage({ onNavigateHome }) {
                   className="glowe-pink-gradient text-white px-6 py-3 rounded-full text-xs font-extrabold shadow-md flex items-center justify-center space-x-2 mx-auto mt-2"
                 >
                   <RefreshCw className="w-4 h-4" />
-                  <span>Retry Geofence Verification</span>
+                  <span>Re-verify Geofence & Location</span>
                 </button>
               </div>
             )}

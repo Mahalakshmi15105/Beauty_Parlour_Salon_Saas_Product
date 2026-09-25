@@ -15,6 +15,7 @@ from app.models.employee import Employee
 from app.models.attendance import Attendance
 from app.models.user import User
 
+from sqlalchemy import func
 from app.utils.auth import require_role, get_branch_query
 
 attendance_bp = Blueprint("attendance", __name__, url_prefix="/api/v1/attendance")
@@ -167,47 +168,55 @@ def employee_auto_scan():
         db.session.add(branch)
         db.session.commit()
 
-    # Find corresponding Employee record for user
+    # Find corresponding Employee record for user strictly matching email or phone
     user = User.query.get(user_id) if user_id else None
     employee = None
     if user and user.email:
         u_email = (user.email or "").strip().lower()
         u_prefix = u_email.split("@")[0] if "@" in u_email else u_email
         all_emps = Employee.query.filter_by(is_deleted=False).all()
+        
+        # 1. Exact match by email/phone or exact name
         for e in all_emps:
-            e_name = f"{e.first_name or ''} {e.last_name or ''}".strip().lower()
             e_phone = (e.phone or "").strip().lower()
             e_fn = (e.first_name or "").strip().lower()
-            if (e_phone and e_phone in u_email) or (u_email and u_email in e_phone) or (e_fn and e_fn == u_prefix) or (e_name and e_name in u_email):
+            e_full = f"{e.first_name or ''} {e.last_name or ''}".strip().lower()
+            if u_email == e_phone or u_prefix == e_fn or u_prefix == e_full:
                 employee = e
                 break
 
-    if not employee:
-        employee = Employee.query.filter_by(is_deleted=False, status="active").first()
-    if not employee:
-        employee = Employee.query.first()
+        # 2. Substring match fallback
+        if not employee:
+            for e in all_emps:
+                e_phone = (e.phone or "").strip().lower()
+                e_fn = (e.first_name or "").strip().lower()
+                if (e_phone and e_phone in u_email) or (e_fn and e_fn in u_prefix):
+                    employee = e
+                    break
 
-    # Fallback: Auto-create Employee profile for user if no employee profile exists
-    if not employee:
-        emp_name = user.email.split("@")[0].title() if (user and user.email) else "Staff"
+    # If no existing employee matched for user, auto-create a dedicated Employee record for this user
+    if not employee and user:
+        emp_name = user.email.split("@")[0].title() if user.email else "Staff"
         employee = Employee(
             tenant_id=tenant_id or 1,
             branch_id=branch.id,
             first_name=emp_name,
-            phone=user.email if user else "9999999999",
-            role=user.role if user else "Employee",
+            phone=user.email or "9999999999",
+            role=user.role or "Employee",
             status="active"
         )
         db.session.add(employee)
         db.session.commit()
 
-    # Locate today's attendance record for this employee and branch
+    if not employee:
+        return jsonify({"status": "error", "message": "No active Employee profile found for your account."}), 400
+
+    # Locate today's attendance record for this employee (across ANY branch for today)
     today_start = datetime.combine(date.today(), datetime.min.time())
     today_end = datetime.combine(date.today(), datetime.max.time())
 
     existing = Attendance.query.filter_by(
-        employee_id=employee.id,
-        branch_id=branch.id
+        employee_id=employee.id
     ).filter(Attendance.timestamp >= today_start, Attendance.timestamp <= today_end).order_by(Attendance.timestamp.desc()).first()
 
     # Calculate geofence distance
@@ -245,7 +254,7 @@ def employee_auto_scan():
             cin_time = existing.timestamp.strftime("%I:%M %p")
             return jsonify({
                 "status": "error",
-                "message": f"You checked in recently at {cin_time}. Please scan again closer to your shift end time to check out."
+                "message": f"Already marked attendance for today (Checked in at {cin_time}). Please scan again closer to your shift end time to check out."
             }), 400
 
         if branch.latitude is not None and branch.longitude is not None:
@@ -340,6 +349,21 @@ def get_attendance_logs():
     end_date = request.args.get("end_date")
 
     query = get_branch_query(Attendance)
+
+    if role == "Employee":
+        identity = get_jwt_identity()
+        user_id = int(identity) if identity else None
+        user = User.query.get(user_id) if user_id else None
+        if user and user.email:
+            u_email = (user.email or "").strip().lower()
+            u_prefix = u_email.split("@")[0] if "@" in u_email else u_email
+            matched_emp = Employee.query.filter(
+                (Employee.phone == user.email) | 
+                (func.lower(Employee.first_name) == u_prefix) |
+                (func.lower(Employee.first_name + " " + func.coalesce(Employee.last_name, "")) == u_prefix)
+            ).first()
+            if matched_emp:
+                query = query.filter(Attendance.employee_id == matched_emp.id)
 
     if start_date:
         try:

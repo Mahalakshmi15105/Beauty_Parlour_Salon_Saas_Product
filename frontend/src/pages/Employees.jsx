@@ -179,6 +179,7 @@ function Employees() {
       joining_date: new Date().toISOString().split("T")[0],
       shift_start_time: "09:00",
       shift_end_time: "18:00",
+      monthly_offs: 4,
       status: "active",
     });
     setShowModal(true);
@@ -201,6 +202,7 @@ function Employees() {
       joining_date: emp.joining_date || "",
       shift_start_time: emp.shift_start_time || "09:00",
       shift_end_time: emp.shift_end_time || "18:00",
+      monthly_offs: emp.monthly_offs !== undefined ? emp.monthly_offs : 4,
       status: emp.status || "active",
     });
     setShowModal(true);
@@ -619,7 +621,7 @@ function Employees() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Shift Start Time</label>
                   <input
@@ -636,6 +638,18 @@ function Employees() {
                     value={formData.shift_end_time || "18:00"}
                     onChange={(e) => setFormData({ ...formData, shift_end_time: e.target.value })}
                     className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Monthly Paid Offs</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="15"
+                    placeholder="4"
+                    value={formData.monthly_offs}
+                    onChange={(e) => setFormData({ ...formData, monthly_offs: parseInt(e.target.value, 10) || 0 })}
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none numeric-input"
                   />
                 </div>
               </div>

@@ -73,6 +73,7 @@ def get_employees():
             "joining_date": emp.joining_date.isoformat() if emp.joining_date else None,
             "shift_start_time": getattr(emp, "shift_start_time", "09:00") or "09:00",
             "shift_end_time": getattr(emp, "shift_end_time", "18:00") or "18:00",
+            "monthly_offs": int(getattr(emp, "monthly_offs", 4) or 4),
             "status": emp.status or "active",
             "created_at": emp.created_at.isoformat() if emp.created_at else ""
         })
@@ -226,6 +227,7 @@ def create_employee():
             commission_percentage=comm_val,
             shift_start_time=data.get("shift_start_time", "09:00") or "09:00",
             shift_end_time=data.get("shift_end_time", "18:00") or "18:00",
+            monthly_offs=int(data.get("monthly_offs", 4) or 4),
             status=data.get("status", "active")
         )
         if joining_date:
@@ -402,6 +404,8 @@ def update_employee(employee_id):
             employee.shift_start_time = data.get("shift_start_time") or "09:00"
         if "shift_end_time" in data:
             employee.shift_end_time = data.get("shift_end_time") or "18:00"
+        if "monthly_offs" in data:
+            employee.monthly_offs = int(data.get("monthly_offs") or 4)
         employee.status = data.get("status", "active")
         password = data.get("password", "").strip()
         if password:

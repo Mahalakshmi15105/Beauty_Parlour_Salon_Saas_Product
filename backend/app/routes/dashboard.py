@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 dashboard_bp = Blueprint("dashboard", __name__)
 
 @dashboard_bp.route("/dashboard/summary", methods=["GET"])
-@require_role(["ParlourAdmin", "BranchAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin", "Employee"])
 def get_summary():
     now = datetime.now(timezone.utc)
     today_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
@@ -97,11 +97,53 @@ def get_summary():
     if g.branch_id:
         att_query = att_query.filter(Attendance.branch_id == g.branch_id)
     today_atts = att_query.all()
-
     total_checked_in = len([a for a in today_atts if a.status in ["P", "HP", "Present", "HalfDay"]])
     present_cnt = len([a for a in today_atts if a.status in ["P", "Present"]])
     half_cnt = len([a for a in today_atts if a.status in ["HP", "HalfDay"]])
     off_cnt = len([a for a in today_atts if a.status in ["OFF", "DayOff", "L", "Leave"]])
+
+    # 7. Top 3 Target Performers (Current Month)
+    employees = get_tenant_query(Employee).filter(Employee.status == "active").all()
+    top_performers = []
+
+    for emp in employees:
+        target_val = float(getattr(emp, "target", 0.0) or 0.0)
+        achieved_val = 0.0
+
+        try:
+            filter_conds = [
+                Invoice.tenant_id == g.parlour_id,
+                Invoice.status != "Voided",
+                Invoice.created_at >= month_first_day,
+                InvoiceLineItem.employee_id == emp.id
+            ]
+
+            emp_items = db.session.query(func.coalesce(func.sum(InvoiceLineItem.line_total), Decimal("0.00"))).join(
+                Invoice, Invoice.id == InvoiceLineItem.invoice_id
+            ).filter(*filter_conds)
+
+            if g.branch_id:
+                emp_items = emp_items.filter(Invoice.branch_id == g.branch_id)
+            
+            achieved_val = float(emp_items.scalar() or 0.0)
+        except Exception as e:
+            logger.error(f"Error calculating target performance for employee {emp.id}: {e}")
+            achieved_val = 0.0
+
+        percentage = (achieved_val / target_val * 100) if target_val > 0 else 0.0
+
+        top_performers.append({
+            "id": emp.id,
+            "name": f"{emp.first_name} {emp.last_name or ''}".strip(),
+            "role": emp.role or "Staff",
+            "target": target_val,
+            "achieved": achieved_val,
+            "percentage": round(percentage, 1)
+        })
+
+    # Sort by percentage & achieved revenue desc, pick top 3
+    top_performers.sort(key=lambda x: (x["percentage"], x["achieved"]), reverse=True)
+    top_3_performers = top_performers[:3]
 
     return success_response({
         "revenue": {
@@ -128,12 +170,13 @@ def get_summary():
             "half_day": half_cnt,
             "off": off_cnt
         },
-        "low_stock_alerts": low_stock_data
+        "low_stock_alerts": low_stock_data,
+        "top_performers": top_3_performers
     })
 
 
 @dashboard_bp.route("/dashboard/charts", methods=["GET"])
-@require_role(["ParlourAdmin", "BranchAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin", "Employee"])
 def get_charts():
     range_days = request.args.get("range", 7)
     try:
@@ -234,7 +277,7 @@ def get_charts():
 
 
 @dashboard_bp.route("/dashboard/activities", methods=["GET"])
-@require_role(["ParlourAdmin", "BranchAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin", "Employee"])
 def get_activities():
     recent_invoices = get_tenant_query(Invoice).order_by(Invoice.created_at.desc()).limit(5).all()
     recent_customers = get_tenant_query(Customer).order_by(Customer.created_at.desc()).limit(5).all()
