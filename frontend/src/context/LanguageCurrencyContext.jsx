@@ -8,6 +8,7 @@ export function LanguageCurrencyProvider({ children }) {
   const [currencyCode, setCurrencyCode] = useState(() => localStorage.getItem("app_currency_code") || "INR");
   const [currencySymbol, setCurrencySymbol] = useState(() => localStorage.getItem("app_currency_symbol") || "₹");
   const [language, setLanguage] = useState(() => localStorage.getItem("app_language") || "English");
+  const [parlourName, setParlourName] = useState(() => localStorage.getItem("app_parlour_name") || "");
 
   // Fetch settings from API on initial load / login
   const fetchTenantSettings = () => {
@@ -17,13 +18,19 @@ export function LanguageCurrencyProvider({ children }) {
     API.get("/settings")
       .then((res) => {
         const reg = res.data?.regional_settings || {};
+        const biz = res.data?.business_profile || {};
         const code = reg.currency_code || reg.currency || "INR";
         const sym = reg.currency_symbol || "₹";
         const lang = reg.language || "English";
+        const name = biz.name || res.data?.parlour_name || localStorage.getItem("app_parlour_name") || "";
 
         setCurrencyCode(code);
         setCurrencySymbol(sym);
         setLanguage(lang);
+        if (name) {
+          setParlourName(name);
+          localStorage.setItem("app_parlour_name", name);
+        }
 
         localStorage.setItem("app_currency_code", code);
         localStorage.setItem("app_currency_symbol", sym);
@@ -92,6 +99,7 @@ export function LanguageCurrencyProvider({ children }) {
         currencyCode,
         currencySymbol,
         language,
+        parlourName,
         formatCurrency,
         t,
         updateCurrency,

@@ -62,15 +62,31 @@ export function exportToCSV(data = [], columns = [], filename = "export") {
   document.body.removeChild(link);
 }
 
-export function exportToExcel(title, data = [], columns = [], filename = "export", parlourName = "SmartGoNext Beauty SaaS") {
+function resolveParlourName(customName) {
+  if (customName && customName !== "SmartGoNext Beauty SaaS") return customName;
+  const storedName = localStorage.getItem("app_parlour_name");
+  if (storedName && storedName.trim()) return storedName;
+  try {
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      const u = JSON.parse(userStr);
+      if (u.parlour_name) return u.parlour_name;
+      if (u.branch_name) return u.branch_name;
+    }
+  } catch (e) {}
+  return "Beauty Parlour";
+}
+
+export function exportToExcel(title, data = [], columns = [], filename = "export", parlourName = "") {
   const safeData = Array.isArray(data) ? data : [];
+  const finalParlourName = resolveParlourName(parlourName);
   const wb = XLSX.utils.book_new();
   
   const numCols = Math.max(columns.length, 1);
   
   // Header rows
   const headerData = [
-    [parlourName],
+    [finalParlourName],
     [title],
     [`Generated on ${new Date().toLocaleString()}`],
     [], // Empty spacing row
@@ -150,8 +166,9 @@ export function exportToExcel(title, data = [], columns = [], filename = "export
   XLSX.writeFile(wb, `${filename}.xlsx`);
 }
 
-export function printDataList(title, data = [], columns = [], parlourName = "SmartGoNext Beauty SaaS") {
+export function printDataList(title, data = [], columns = [], parlourName = "") {
   const safeData = Array.isArray(data) ? data : [];
+  const finalParlourName = resolveParlourName(parlourName);
   const printWin = window.open('', '_blank');
   
   const headersHtml = columns.map(c => 
@@ -161,7 +178,9 @@ export function printDataList(title, data = [], columns = [], parlourName = "Sma
   const rowsHtml = safeData.length > 0 ? safeData.map(row => 
     `<tr>${columns.map(c => {
       const val = typeof c.accessor === 'function' ? c.accessor(row) : row[c.accessor];
-      return `<td>${val ?? '—'}</td>`;
+      // Clean up string values (strip unusual currency glyphs if needed or format numbers nicely)
+      const cleanVal = String(val ?? '—').replace(/[\u20B9\u00A0\u1E00-\u1EFF]/g, (match) => match === '₹' ? 'Rs. ' : '');
+      return `<td>${cleanVal}</td>`;
     }).join('')}</tr>`
   ).join('') : `<tr><td colspan="${columns.length}" style="text-align:center; padding: 20px;">No records available.</td></tr>`;
 
@@ -180,10 +199,10 @@ export function printDataList(title, data = [], columns = [], parlourName = "Sma
             margin: 0; 
             padding: 16px;
             background: white;
-            color: #0f172a;
+            color: #000000;
           }
           .page-border {
-            border: 2px solid #cbd5e1;
+            border: 2px solid #000000;
             border-radius: 8px;
             padding: 24px;
             box-sizing: border-box;
@@ -192,27 +211,27 @@ export function printDataList(title, data = [], columns = [], parlourName = "Sma
           .report-header {
             text-align: center;
             margin-bottom: 20px;
-            border-bottom: 3px solid #ff758f;
+            border-bottom: 3px solid #000000;
             padding-bottom: 12px;
           }
           .parlour-name {
             font-size: 24px;
             font-weight: 800;
-            color: #0f172a;
+            color: #000000;
             margin: 0;
             letter-spacing: -0.5px;
           }
           .report-title {
             font-size: 16px;
-            font-weight: 700;
-            color: #ff758f;
+            font-weight: 800;
+            color: #d946ef;
             margin: 6px 0 0 0;
           }
           .report-meta {
             text-align: right;
             font-size: 11px;
-            font-weight: 600;
-            color: #64748b;
+            font-weight: 700;
+            color: #000000;
             margin-bottom: 16px;
           }
           table { 
@@ -225,13 +244,13 @@ export function printDataList(title, data = [], columns = [], parlourName = "Sma
             display: table-header-group;
           }
           th {
-            border: 1px solid #cbd5e1;
+            border: 1.5px solid #000000;
             padding: 10px 12px;
             text-align: left;
-            background-color: #f8fafc;
-            font-weight: 700;
+            background-color: #f1f5f9;
+            font-weight: 800;
             font-size: 11px;
-            color: #334155;
+            color: #000000;
             text-transform: uppercase;
             letter-spacing: 0.5px;
           }
@@ -239,16 +258,18 @@ export function printDataList(title, data = [], columns = [], parlourName = "Sma
             page-break-inside: avoid;
           }
           td {
-            border: 1px solid #e2e8f0;
+            border: 1px solid #475569;
             padding: 9px 12px;
             font-size: 11px;
-            color: #334155;
+            font-weight: 600;
+            color: #000000;
           }
           tr:nth-child(even) td {
             background-color: #f8fafc;
           }
           @media print {
-            body { margin: 0; padding: 0; }
+            body { margin: 0; padding: 0; color: #000000 !important; }
+            td, th { color: #000000 !important; }
             .no-print { display: none !important; }
           }
         </style>
@@ -256,7 +277,7 @@ export function printDataList(title, data = [], columns = [], parlourName = "Sma
       <body>
         <div class="page-border">
           <div class="report-header">
-            <h1 class="parlour-name">${parlourName}</h1>
+            <h1 class="parlour-name">${finalParlourName}</h1>
             <div class="report-title">${title}</div>
           </div>
           <div class="report-meta">Generated on ${new Date().toLocaleString()}</div>
@@ -279,8 +300,9 @@ export function printDataList(title, data = [], columns = [], parlourName = "Sma
   printWin.document.close();
 }
 
-export function exportToPDF(title, data = [], columns = [], filename = "export", parlourName = "SmartGoNext Beauty SaaS") {
+export function exportToPDF(title, data = [], columns = [], filename = "export", parlourName = "") {
   const safeData = Array.isArray(data) ? data : [];
+  const finalParlourName = resolveParlourName(parlourName);
   const doc = new jsPDF();
   const pageWidth = 210; // A4 width in mm
   const pageHeight = 297; // A4 height in mm
@@ -297,68 +319,81 @@ export function exportToPDF(title, data = [], columns = [], filename = "export",
     
     let y = margin + 8;
     
-    // Clean Page Frame / Border
-    doc.setDrawColor(203, 213, 225); // Slate 300
-    doc.setLineWidth(0.6);
+    // Clean Page Frame / Border - Solid Dark Line
+    doc.setDrawColor(15, 23, 42); // Dark Slate 900
+    doc.setLineWidth(0.7);
     doc.rect(margin, margin, contentWidth, pageHeight - (2 * margin));
     
     // Header section: Business Name
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
-    doc.setTextColor(15, 23, 42); // Slate 900
-    doc.text(parlourName, pageWidth / 2, y, { align: "center" });
+    doc.setTextColor(0, 0, 0); // Pure Black
+    doc.text(finalParlourName, pageWidth / 2, y, { align: "center" });
     y += 7;
     
     // Report Title
     doc.setFontSize(12);
-    doc.setTextColor(236, 72, 153); // Pink accent
+    doc.setTextColor(219, 39, 119); // Vibrant Pink Accent
     doc.text(title, pageWidth / 2, y, { align: "center" });
     y += 6;
     
     // Timestamp
-    doc.setFont("helvetica", "normal");
+    doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
-    doc.setTextColor(100, 116, 139);
+    doc.setTextColor(30, 41, 59); // Dark Text
     doc.text(`Generated on ${new Date().toLocaleString()}`, pageWidth / 2, y, { align: "center" });
     y += 8;
     
     // Horizontal divider
-    doc.setDrawColor(236, 72, 153);
-    doc.setLineWidth(0.8);
+    doc.setDrawColor(219, 39, 119);
+    doc.setLineWidth(1.0);
     doc.line(margin + 5, y, pageWidth - margin - 5, y);
     y += 6;
-    
-    // Table header box
-    doc.setFillColor(248, 250, 252);
-    doc.rect(margin + 4, y, contentWidth - 8, 9, 'F');
-    doc.setDrawColor(203, 213, 225);
-    doc.setLineWidth(0.4);
-    doc.rect(margin + 4, y, contentWidth - 8, 9);
-    
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.setTextColor(30, 41, 59);
     
     // Compute total width sum of custom widths
     const totalCustomWidth = columns.reduce((acc, c) => acc + (c.width || 30), 0);
     const scaleFactor = (contentWidth - 8) / (totalCustomWidth || 1);
-    
-    let x = margin + 6;
-    columns.forEach(c => {
-      const colWidth = (c.width || 30) * scaleFactor;
-      doc.text(String(c.header || ''), x, y + 6);
-      x += colWidth;
+
+    // Compute split text lines for each column header to handle multi-line headers cleanly
+    const headerLinesList = columns.map(c => {
+      const colW = (c.width || 30) * scaleFactor;
+      const text = String(c.header || '');
+      return doc.splitTextToSize(text, Math.max(colW - 2, 8));
     });
-    
-    y += 13;
+
+    const maxHeaderLines = Math.max(...headerLinesList.map(lines => lines.length), 1);
+    const headerBoxHeight = Math.max(7 + (maxHeaderLines - 1) * 3.5, 9);
+
+    // Render Table Header Background Box
+    doc.setFillColor(241, 245, 249); // Light Gray Background
+    doc.rect(margin + 4, y, contentWidth - 8, headerBoxHeight, 'F');
+    doc.setDrawColor(15, 23, 42); // Dark Outline Border
+    doc.setLineWidth(0.5);
+    doc.rect(margin + 4, y, contentWidth - 8, headerBoxHeight);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.setTextColor(0, 0, 0); // Pure Black Headers
+
+    let xHeader = margin + 6;
+    columns.forEach((c, idx) => {
+      const colWidth = (c.width || 30) * scaleFactor;
+      const lines = headerLinesList[idx];
+      lines.forEach((lineText, lineIdx) => {
+        doc.text(lineText, xHeader, y + 4.5 + (lineIdx * 3.5));
+      });
+      xHeader += colWidth;
+    });
+
+    y += headerBoxHeight + 5;
     
     // Table rows for this page
     const startIndex = page * rowsPerPage;
     const endIndex = Math.min(startIndex + rowsPerPage, safeData.length);
     
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(51, 65, 85);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.setTextColor(0, 0, 0); // Pure Black Table Text
     
     if (safeData.length === 0) {
       doc.text("No records available.", pageWidth / 2, y, { align: "center" });
@@ -369,30 +404,32 @@ export function exportToPDF(title, data = [], columns = [], filename = "export",
         
         columns.forEach(c => {
           const colWidth = (c.width || 30) * scaleFactor;
-          const val = typeof c.accessor === 'function' ? c.accessor(row) : row[c.accessor];
-          const valStr = String(val ?? '—');
+          const rawVal = typeof c.accessor === 'function' ? c.accessor(row) : row[c.accessor];
           
+          // Replace non-standard Rupee symbol with clean 'Rs.' or sanitize string to standard ASCII characters
+          const valStr = String(rawVal ?? '—').replace(/₹/g, "Rs. ").replace(/[^\x00-\x7F]/g, "").trim();
+
           // Truncate long text cleanly
-          const maxChars = Math.floor(colWidth / 2.2);
+          const maxChars = Math.floor(colWidth / 2.0);
           const truncated = valStr.length > maxChars ? valStr.substring(0, Math.max(maxChars - 3, 1)) + '...' : valStr;
           doc.text(truncated, xRow, y);
           
           xRow += colWidth;
         });
         
-        y += 4;
-        // Row separator line
-        doc.setDrawColor(226, 232, 240);
-        doc.setLineWidth(0.2);
+        y += 4.5;
+        // Row separator line - Clear Dark Line
+        doc.setDrawColor(203, 213, 225); // Slate 300
+        doc.setLineWidth(0.3);
         doc.line(margin + 4, y, pageWidth - margin - 4, y);
-        y += 4;
+        y += 3.5;
       }
     }
     
     // Page footer
-    doc.setFont("helvetica", "normal");
+    doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
-    doc.setTextColor(148, 163, 184);
+    doc.setTextColor(15, 23, 42); // Pure Dark Slate
     doc.text(`Page ${page + 1} of ${totalPages}`, pageWidth / 2, pageHeight - margin - 3, { align: "center" });
   }
 

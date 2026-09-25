@@ -86,13 +86,18 @@ function Employees() {
     const columns = [
       { header: "First Name", accessor: "first_name" },
       { header: "Last Name", accessor: "last_name" },
+      { header: "Email / Username", accessor: (row) => row.email || row.username || (row.phone ? `${row.phone}@salon.com` : "") },
+      { header: "Password", accessor: (row) => row.password || row.phone || "123456" },
+      { header: "Phone", accessor: "phone" },
       { header: "Role", accessor: "role" },
       { header: "Level", accessor: "level" },
-      { header: "Phone", accessor: "phone" },
       { header: "Specialization", accessor: "specialization" },
       { header: "Salary", accessor: "salary" },
       { header: "Target", accessor: "target" },
       { header: "Commission %", accessor: "commission_percentage" },
+      { header: "Monthly Paid Offs", accessor: (row) => row.monthly_offs || 4 },
+      { header: "Joining Date", accessor: "joining_date" },
+      { header: "Shift Hours", accessor: (row) => `${row.shift_start_time || "09:00"} - ${row.shift_end_time || "18:00"}` },
       { header: "Status", accessor: "status" }
     ];
     exportToCSV("Employees List", employees, columns, "employees_list", parlourName);
@@ -101,9 +106,11 @@ function Employees() {
   const handlePrint = () => {
     const columns = [
       { header: "Name", accessor: (row) => `${row.first_name || ""} ${row.last_name || ""}`.trim() },
+      { header: "Email / Username", accessor: (row) => row.email || row.username || (row.phone ? `${row.phone}@salon.com` : "") },
+      { header: "Password", accessor: (row) => row.password || row.phone || "123456" },
+      { header: "Phone", accessor: "phone" },
       { header: "Role", accessor: "role" },
       { header: "Level", accessor: "level" },
-      { header: "Phone", accessor: "phone" },
       { header: "Specialization", accessor: "specialization" },
       { header: "Salary", accessor: "salary" },
       { header: "Target", accessor: "target" },
@@ -117,13 +124,12 @@ function Employees() {
     const columns = [
       { header: "First Name", accessor: "first_name" },
       { header: "Last Name", accessor: "last_name" },
-      { header: "Role", accessor: "role" },
-      { header: "Level", accessor: "level" },
-      { header: "Phone", accessor: "phone" },
+      { header: "Phone Number", accessor: "phone" },
       { header: "Specialization", accessor: "specialization" },
-      { header: "Salary", accessor: "salary" },
-      { header: "Target", accessor: "target" },
-      { header: "Commission %", accessor: "commission_percentage" },
+      { header: "Role", accessor: "role" },
+      { header: "Salary", accessor: (row) => parseFloat(row.salary || 0).toFixed(2) },
+      { header: "Commission %", accessor: (row) => parseFloat(row.commission_percentage || 0) },
+      { header: "Joining Date", accessor: "joining_date" },
       { header: "Status", accessor: "status" }
     ];
     exportToExcel("Employees List", employees, columns, "employees_list", parlourName);
@@ -131,15 +137,16 @@ function Employees() {
 
   const handleExportPDF = () => {
     const columns = [
-      { header: "Name", accessor: (row) => `${row.first_name || ""} ${row.last_name || ""}`.trim() },
-      { header: "Role", accessor: "role" },
-      { header: "Level", accessor: "level" },
-      { header: "Phone", accessor: "phone" },
-      { header: "Specialization", accessor: "specialization" },
-      { header: "Salary", accessor: "salary" },
-      { header: "Target", accessor: "target" },
-      { header: "Commission %", accessor: (row) => `${row.commission_percentage || 0}%` },
-      { header: "Status", accessor: "status" }
+      { header: "Name", accessor: (row) => `${row.first_name || ""} ${row.last_name || ""}`.trim(), width: 28 },
+      { header: "Email / Username", accessor: (row) => row.email || row.username || (row.phone ? `${row.phone}@salon.com` : ""), width: 38 },
+      { header: "Phone", accessor: "phone", width: 26 },
+      { header: "Role", accessor: "role", width: 20 },
+      { header: "Level", accessor: "level", width: 14 },
+      { header: "Specialization", accessor: "specialization", width: 26 },
+      { header: "Salary", accessor: "salary", width: 20 },
+      { header: "Target", accessor: "target", width: 20 },
+      { header: "Commission %", accessor: (row) => `${row.commission_percentage || 0}%`, width: 22 },
+      { header: "Status", accessor: "status", width: 18 }
     ];
     exportToPDF("Employees List", employees, columns, "employees_list", parlourName);
   };

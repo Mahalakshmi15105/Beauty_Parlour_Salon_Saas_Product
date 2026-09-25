@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
 import { useModalFocusTrap, useFormKeyboardNavigation, focusAndOpenSelect } from "../utils/keyboardNavigation";
-import { UserRoundX, X, MessageSquare, Phone, AlertTriangle, Calendar, Settings as SettingsIcon, Printer, FileSpreadsheet, FileText, Upload } from "lucide-react";
+import { UserRoundX, X, MessageSquare, Phone, AlertTriangle, Calendar, Settings as SettingsIcon, Printer, FileSpreadsheet, FileText, Upload, Eye } from "lucide-react";
 import { exportToCSV, printDataList, exportToPDF, exportToExcel } from "../utils/exportUtils";
 import BulkUploadModal from "../components/BulkUploadModal";
 import { useToast } from "../context/ToastContext";
@@ -34,6 +34,7 @@ function Customers() {
 
   // Form State
   const [showModal, setShowModal] = useState(false);
+  const [viewCustomer, setViewCustomer] = useState(null);
   const [editId, setEditId] = useState(null);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [formData, setFormData] = useState({
@@ -129,11 +130,12 @@ function Customers() {
     const columns = [
       { header: "First Name", accessor: "first_name" },
       { header: "Last Name", accessor: "last_name" },
-      { header: "Phone", accessor: "phone" },
+      { header: "Phone Number", accessor: "phone" },
       { header: "Email", accessor: "email" },
       { header: "Gender", accessor: "gender" },
-      { header: "DOB", accessor: "date_of_birth" },
-      { header: "Address", accessor: "address" }
+      { header: "Date of Birth", accessor: "date_of_birth" },
+      { header: "Address", accessor: "address" },
+      { header: "Notes", accessor: "notes" }
     ];
     exportToExcel(title, exportData, columns, filename);
   };
@@ -377,6 +379,9 @@ function Customers() {
                     <td className="px-6 py-4 text-sm text-text-secondary">{c.email || "-"}</td>
                     <td className="px-6 py-4 text-sm text-text-secondary">{c.gender || "-"}</td>
                     <td className="px-6 py-4 text-sm space-x-3">
+                      <button onClick={() => setViewCustomer(c)} className="text-indigo-600 font-medium hover:underline">
+                        View
+                      </button>
                       <button onClick={() => openEditModal(c)} className="text-primary hover:underline">
                         Edit
                       </button>
@@ -667,6 +672,94 @@ function Customers() {
         </div>
       )}
       
+      {/* View Customer Details Modal */}
+      {viewCustomer && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="glowe-glass-card max-w-lg w-full rounded-3xl shadow-2xl border border-white/70 overflow-hidden">
+            <div className="px-6 py-4 border-b border-pink-100/60 flex justify-between items-center bg-white/50 backdrop-blur-md">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-black text-xs">
+                  {viewCustomer.first_name?.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h3 className="text-md font-extrabold text-slate-900">
+                    {viewCustomer.first_name} {viewCustomer.last_name || ""}
+                  </h3>
+                  <p className="text-[10px] text-slate-500 font-semibold">Customer Details Profile</p>
+                </div>
+              </div>
+              <button onClick={() => setViewCustomer(null)} className="text-text-secondary hover:text-text-primary p-1">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs font-sans">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Phone Number</span>
+                  <span className="text-sm font-extrabold text-slate-900 numeric mt-0.5 block">{viewCustomer.phone || "-"}</span>
+                </div>
+                <div className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Email Address</span>
+                  <span className="text-sm font-extrabold text-slate-900 mt-0.5 block truncate">{viewCustomer.email || "-"}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Gender</span>
+                  <span className="text-sm font-extrabold text-slate-900 mt-0.5 block">{viewCustomer.gender || "-"}</span>
+                </div>
+                <div className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Date of Birth</span>
+                  <span className="text-sm font-extrabold text-slate-900 numeric mt-0.5 block">{viewCustomer.date_of_birth || "-"}</span>
+                </div>
+              </div>
+
+              <div className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Address</span>
+                <p className="text-xs font-semibold text-slate-800 mt-1 leading-relaxed">{viewCustomer.address || "No address specified."}</p>
+              </div>
+
+              <div className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Customer Notes</span>
+                <p className="text-xs font-medium text-slate-700 mt-1 italic">{viewCustomer.notes || "No additional notes."}</p>
+              </div>
+
+              {viewCustomer.days_since_last_visit !== undefined && (
+                <div className="bg-pink-50/60 p-3.5 rounded-2xl border border-pink-100 flex justify-between items-center">
+                  <span className="text-xs font-bold text-pink-700">Days Since Last Visit:</span>
+                  <span className="text-xs font-black text-pink-900 bg-white px-3 py-1 rounded-full border border-pink-200 numeric">
+                    {viewCustomer.days_since_last_visit} Days
+                  </span>
+                </div>
+              )}
+
+              <div className="pt-3 border-t border-border-soft flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setViewCustomer(null)}
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-extrabold transition"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const custToEdit = viewCustomer;
+                    setViewCustomer(null);
+                    openEditModal(custToEdit);
+                  }}
+                  className="px-5 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-extrabold shadow-md transition"
+                >
+                  Edit Profile
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showBulkUpload && (
         <BulkUploadModal
           module="customers"

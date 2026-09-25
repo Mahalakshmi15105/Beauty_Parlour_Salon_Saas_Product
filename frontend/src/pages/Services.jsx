@@ -138,20 +138,10 @@ function Services() {
   const handleExportExcel = () => {
     const columns = [
       { header: "Service Name", accessor: "name" },
-      { header: "Category", accessor: "category_name" },
-      {
-        header: "Plan",
-        accessor: (row) =>
-          (row.membership_discounts || [])
-            .map((d) => {
-              const pObj = membershipPlans.find((p) => String(p.id) === String(d.plan_id));
-              const planLabel = d.plan_name || pObj?.name || pObj?.plan_name || `Plan #${d.plan_id}`;
-              const discountStr = d.percentage > 0 ? `${d.percentage}%` : `${currencySymbol}${d.amount}`;
-              return `${planLabel} (${discountStr})`;
-            })
-            .join(", ") || "-"
-      },
-      { header: "Price", accessor: (row) => `${currencySymbol}${parseFloat(row.price || 0).toFixed(2)}` },
+      { header: "Category Name", accessor: "category_name" },
+      { header: "Price", accessor: (row) => parseFloat(row.price || 0).toFixed(2) },
+      { header: "Duration (minutes)", accessor: (row) => row.duration_minutes || 30 },
+      { header: "Description", accessor: (row) => row.description || "" },
       { header: "Status", accessor: "status" }
     ];
     exportToExcel("Services & Treatments Catalog", services, columns, "services_list");
@@ -387,6 +377,9 @@ function Services() {
       });
   };
 
+  // View Service Modal State
+  const [viewService, setViewService] = useState(null);
+
   return (
     <div className="space-y-6">
       {/* Title Bar */}
@@ -530,6 +523,9 @@ function Services() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm space-x-3">
+                      <button onClick={() => setViewService(s)} className="text-indigo-600 hover:text-indigo-800 font-bold hover:underline">
+                        View
+                      </button>
                       <button onClick={() => openEditServiceModal(s)} className="text-primary hover:underline font-semibold">
                         Edit
                       </button>
@@ -912,6 +908,109 @@ function Services() {
           onClose={() => setShowBulkUpload(false)}
           onSuccess={fetchServices}
         />
+      )}
+
+      {/* View Service Details Modal */}
+      {viewService && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="glowe-glass-card max-w-lg w-full rounded-3xl shadow-2xl border border-white/70 overflow-hidden">
+            <div className="px-6 py-4 border-b border-pink-100/60 flex justify-between items-center bg-white/50 backdrop-blur-md">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-black text-xs">
+                  {viewService.name?.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h3 className="text-md font-extrabold text-slate-900">
+                    {viewService.name}
+                  </h3>
+                  <p className="text-[10px] text-slate-500 font-semibold">Service Details & Membership Plans</p>
+                </div>
+              </div>
+              <button onClick={() => setViewService(null)} className="text-text-secondary hover:text-text-primary p-1">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs font-sans">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Service Category</span>
+                  <span className="text-sm font-extrabold text-slate-900 mt-0.5 block">{viewService.category_name || "-"}</span>
+                </div>
+                <div className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Standard Price</span>
+                  <span className="text-sm font-extrabold text-slate-900 numeric mt-0.5 block">{formatCurrency(viewService.price)}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Duration</span>
+                  <span className="text-sm font-extrabold text-slate-900 numeric mt-0.5 block">{viewService.duration_minutes || 30} mins</span>
+                </div>
+                <div className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Service Status</span>
+                  <span className={`inline-block mt-1 px-2.5 py-0.5 text-xs font-bold rounded-full ${
+                    viewService.status === "active" ? "bg-emerald-100 text-emerald-800 border border-emerald-200" : "bg-rose-100 text-rose-800 border border-rose-200"
+                  }`}>
+                    {viewService.status}
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100 space-y-2">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Membership Plan Discounts</span>
+                {(!viewService.membership_discounts || viewService.membership_discounts.length === 0) ? (
+                  <p className="text-xs text-slate-500 italic">No membership discounts linked to this service.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {viewService.membership_discounts.map((d, idx) => {
+                      const pObj = membershipPlans.find((p) => String(p.id) === String(d.plan_id));
+                      const planLabel = d.plan_name || pObj?.name || pObj?.plan_name || `Plan #${d.plan_id}`;
+                      const discountStr = d.percentage > 0 ? `${d.percentage}%` : formatCurrency(d.amount);
+                      return (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center text-xs font-extrabold bg-pink-50 text-pink-700 border border-pink-200 px-3 py-1 rounded-full"
+                        >
+                          {planLabel} — <span className="numeric ml-1">{discountStr} off</span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {viewService.description && (
+                <div className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Description</span>
+                  <p className="text-xs font-medium text-slate-700 mt-1">{viewService.description}</p>
+                </div>
+              )}
+
+              <div className="pt-3 border-t border-border-soft flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setViewService(null)}
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-extrabold transition"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const servToEdit = viewService;
+                    setViewService(null);
+                    openEditServiceModal(servToEdit);
+                  }}
+                  className="px-5 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-extrabold shadow-md transition"
+                >
+                  Edit Service
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

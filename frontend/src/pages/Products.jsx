@@ -422,11 +422,11 @@ function Products() {
       { header: "Category", accessor: "category" },
       { header: "SKU", accessor: "sku" },
       { header: "Barcode", accessor: "barcode" },
-      { header: "Purchase Price", accessor: (row) => `${currencySymbol}${parseFloat(row.cost_price || 0).toFixed(2)}` },
-      { header: "Selling Price", accessor: (row) => `${currencySymbol}${parseFloat(row.selling_price || 0).toFixed(2)}` },
-      { header: "MRP", accessor: (row) => `${currencySymbol}${parseFloat(row.mrp || 0).toFixed(2)}` },
-      { header: "Stock", accessor: "stock_quantity" },
-      { header: "Threshold", accessor: "low_stock_threshold" },
+      { header: "Cost Price", accessor: (row) => parseFloat(row.cost_price || 0).toFixed(2) },
+      { header: "Selling Price", accessor: (row) => parseFloat(row.selling_price || 0).toFixed(2) },
+      { header: "MRP", accessor: (row) => parseFloat(row.mrp || 0).toFixed(2) },
+      { header: "Stock Quantity", accessor: (row) => row.stock_quantity ?? 0 },
+      { header: "Low Stock Threshold", accessor: (row) => row.low_stock_threshold ?? 5 },
       { header: "Status", accessor: "status" }
     ];
     exportToExcel(activeTab === "reorders" ? "Low Stock & Reorders Report" : "Products & Inventory Catalog", products, columns, activeTab === "reorders" ? "reorders_report" : "products_catalog");
