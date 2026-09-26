@@ -1000,6 +1000,7 @@ function Reports() {
                             <th key={d.day} className="p-1 border-l border-slate-200 numeric">{d.day}</th>
                           ))}
                           <th className="p-1 border-l border-slate-200 font-black">TOTAL</th>
+                          <th className="p-1 border-l border-slate-200 font-black text-rose-600 min-w-[50px]">OFF USED</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 font-semibold">
@@ -1029,6 +1030,9 @@ function Reports() {
                               );
                             })}
                             <td className="p-1 border-l border-slate-200 font-black text-slate-900 numeric">{row.total_days}</td>
+                            <td className="p-1 border-l border-slate-200 font-black text-rose-600 numeric">
+                              {row.leaves_summary || `${row.leaves_taken || 0}/${row.allowed_offs || 4}`}
+                            </td>
                           </tr>
                         ))}
                       </tbody>

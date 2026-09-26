@@ -98,6 +98,7 @@ function App() {
           return;
         }
         localStorage.setItem("token", token);
+        localStorage.setItem("sidebar_collapsed", "true");
         if (userObj) localStorage.setItem("user", JSON.stringify(userObj));
         setToken(token);
         setUser(userObj);

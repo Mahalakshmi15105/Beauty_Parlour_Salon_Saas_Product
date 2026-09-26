@@ -27,6 +27,7 @@ function Register({ onRegisterSuccess, onNavigateLogin, onNavigateHome }) {
         const user = payload?.user || res?.user;
         if (token) {
           localStorage.setItem("token", token);
+          localStorage.setItem("sidebar_collapsed", "true");
           if (user) localStorage.setItem("user", JSON.stringify(user));
           onRegisterSuccess(token, user);
         } else {

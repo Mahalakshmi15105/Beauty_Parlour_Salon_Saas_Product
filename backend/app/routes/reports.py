@@ -699,7 +699,8 @@ def get_monthly_performance_staff():
 
         for inv in invoices:
             for item in inv.items:
-                if item.employee_id == emp.id:
+                # Target achieved is strictly calculated ONLY from Services (service_id is present)
+                if item.employee_id == emp.id and item.service_id is not None:
                     line_tot = float(item.line_total)
                     if not branch_id or inv.branch_id == branch_id:
                         emp_achieved += line_tot
@@ -895,14 +896,17 @@ def get_attendance_salary_report():
             "id": emp.id,
             "name": f"{emp.first_name} {emp.last_name or ''}".strip(),
             "days": emp_att_map,
-            "total_days": total_worked_days
+            "total_days": total_worked_days,
+            "leaves_taken": off_count + leave_count,
+            "allowed_offs": getattr(emp, "monthly_offs", 4) or 4,
+            "leaves_summary": f"{off_count + leave_count}/{getattr(emp, 'monthly_offs', 4) or 4}"
         })
 
-        # Achieved revenue this month
+        # Achieved revenue this month (strictly calculated ONLY from Services)
         emp_achieved = 0.0
         for inv in invoices:
             for item in inv.items:
-                if item.employee_id == emp.id:
+                if item.employee_id == emp.id and item.service_id is not None:
                     emp_achieved += float(item.line_total)
 
         # Advances & Deductions from PayrollAdjustment
@@ -935,6 +939,8 @@ def get_attendance_salary_report():
             "target": target_val,
             "achieved": round(emp_achieved, 2),
             "off": off_count + leave_count,
+            "allowed_offs": getattr(emp, "monthly_offs", 4) or 4,
+            "leaves_summary": f"{off_count + leave_count}/{getattr(emp, 'monthly_offs', 4) or 4}",
             "total_days": total_worked_days,
             "net": net_salary,
             "advance": emp_advances,

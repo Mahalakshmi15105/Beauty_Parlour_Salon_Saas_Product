@@ -110,10 +110,8 @@
 .text-text-secondary { color: #4a4a4a !important; }
 
 @layer base {
-  *:not(.numeric):not(.numeric *):not(.mono-nums):not(.mono-nums *):not(.num-val):not(.num-val *):not([data-numeric="true"]):not([data-numeric="true"] *) {
+  *:not(.numeric):not(.numeric *):not(.mono-nums):not(.mono-nums *):not(.num-val):not(.num-val *):not([data-numeric="true"]):not([data-numeric="true"] *):not(input):not(select):not(textarea):not(button) {
     transition: background-color 250ms ease-in-out, border-color 250ms ease-in-out, color 250ms ease-in-out, box-shadow 250ms ease-in-out;
-    font-family: 'Georgia', 'Times New Roman', serif !important;
-    font-weight: 700 !important;
   }
 
   body {
@@ -237,23 +235,31 @@ html body .numeric-input,
 html body .numeric-input *,
 html body [data-numeric="true"],
 html body [data-numeric="true"] *,
+/* Force all input fields, select boxes, date/time pickers, and numeric fields to clean sans-serif */
+input,
+select,
+textarea,
+input[type="text"],
 input[type="number"],
 input[type="tel"],
 input[type="date"],
 input[type="time"],
 input[type="datetime-local"],
+input[type="password"],
+input[type="email"],
 input.numeric,
 input.numeric-input,
-div[role="dialog"] input[type="number"],
-div[role="dialog"] input[type="tel"],
-div[role="dialog"] input[type="date"],
-div[role="dialog"] input.numeric,
-div[role="dialog"] input.numeric-input,
-select option.numeric,
-table td.numeric,
-table td .numeric,
-table th.numeric,
-table th .numeric {
+.numeric,
+.num-val,
+.numeric-val,
+[data-numeric],
+div[role="dialog"] input,
+div[role="dialog"] select,
+div[role="dialog"] textarea,
+.price,
+.amount,
+.total,
+.currency {
   font-family: 'Arial', 'Helvetica', 'Segoe UI', sans-serif !important;
   font-variant-numeric: tabular-nums !important;
   font-feature-settings: "tnum" 1 !important;
@@ -352,3 +358,27 @@ table th .numeric {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
   transform: translateY(-1px) !important;
 }
+
+/* Global Tabular Sans-Serif Numeric Font Rule */
+input, 
+input[type="number"], 
+input[type="tel"], 
+.numeric, 
+.num-val, 
+.numeric-val,
+[data-numeric], 
+td.numeric-cell, 
+th.numeric-cell, 
+.price, 
+.amount, 
+.total, 
+.currency,
+.stat-value,
+.badge-numeric,
+td,
+th {
+  font-family: 'Arial', 'Helvetica', 'Segoe UI', sans-serif !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+

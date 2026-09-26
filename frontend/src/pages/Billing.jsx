@@ -4081,25 +4081,25 @@ function Billing() {
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                               <div className="p-4 bg-primary/5 border border-primary/20 rounded-2xl">
                                 <p className="text-[10px] font-bold uppercase text-slate-500">Total Visits</p>
-                                <p className="text-xl font-black text-slate-900 mt-1">{summary.total_visits || 0}</p>
+                                <p className="text-xl font-black text-slate-900 mt-1 numeric font-sans">{summary.total_visits || 0}</p>
                                 <p className="text-[10px] text-slate-500 mt-0.5">Completed bills</p>
                               </div>
                               <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl">
                                 <p className="text-[10px] font-bold uppercase text-slate-500">Total Spent</p>
-                                <p className="text-xl font-black text-emerald-700 mt-1">{formatCurrency(summary.total_amount_spent || 0)}</p>
+                                <p className="text-xl font-black text-emerald-700 mt-1 numeric font-sans">{formatCurrency(summary.total_amount_spent || 0)}</p>
                                 <p className="text-[10px] text-emerald-600 mt-0.5">Lifetime revenue</p>
                               </div>
                               <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl">
                                 <p className="text-[10px] font-bold uppercase text-slate-500">Loyalty Points</p>
-                                <p className="text-xl font-black text-amber-700 mt-1 flex items-center space-x-1">
+                                <p className="text-xl font-black text-amber-700 mt-1 flex items-center space-x-1 numeric font-sans">
                                   <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-                                  <span>{summary.loyalty_points || 0}</span>
+                                  <span className="numeric font-sans">{summary.loyalty_points || 0}</span>
                                 </p>
                                 <p className="text-[10px] text-amber-600 mt-0.5">Available balance</p>
                               </div>
                               <div className="p-4 bg-purple-50 border border-purple-200 rounded-2xl">
                                 <p className="text-[10px] font-bold uppercase text-slate-500">Last Visit</p>
-                                <p className="text-sm font-black text-purple-900 mt-1">{summary.last_visit_date || "No visits yet"}</p>
+                                <p className="text-sm font-black text-purple-900 mt-1 numeric font-sans">{summary.last_visit_date || "No visits yet"}</p>
                                 <p className="text-[10px] text-purple-600 mt-0.5">Stylist: {summary.preferred_stylist || "None"}</p>
                               </div>
                             </div>
@@ -4141,23 +4141,23 @@ function Billing() {
                               <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-center">
                                 <div className="p-3 bg-background rounded-xl border border-border-soft">
                                   <span className="text-[10px] text-slate-500 block font-bold">Services Total</span>
-                                  <span className="text-xs font-black text-slate-800">{formatCurrency(financialSummary.total_services_amount || 0)}</span>
+                                  <span className="text-xs font-black text-slate-800 numeric font-sans">{formatCurrency(financialSummary.total_services_amount || 0)}</span>
                                 </div>
                                 <div className="p-3 bg-background rounded-xl border border-border-soft">
                                   <span className="text-[10px] text-slate-500 block font-bold">Products Total</span>
-                                  <span className="text-xs font-black text-slate-800">{formatCurrency(financialSummary.total_products_amount || 0)}</span>
+                                  <span className="text-xs font-black text-slate-800 numeric font-sans">{formatCurrency(financialSummary.total_products_amount || 0)}</span>
                                 </div>
                                 <div className="p-3 bg-background rounded-xl border border-border-soft">
                                   <span className="text-[10px] text-slate-500 block font-bold">Discounts Received</span>
-                                  <span className="text-xs font-black text-emerald-600">-{formatCurrency(financialSummary.total_discounts_given || 0)}</span>
+                                  <span className="text-xs font-black text-emerald-600 numeric font-sans">-{formatCurrency(financialSummary.total_discounts_given || 0)}</span>
                                 </div>
                                 <div className="p-3 bg-background rounded-xl border border-border-soft">
                                   <span className="text-[10px] text-slate-500 block font-bold">Tax Paid</span>
-                                  <span className="text-xs font-black text-slate-800">{formatCurrency(financialSummary.total_tax_paid || 0)}</span>
+                                  <span className="text-xs font-black text-slate-800 numeric font-sans">{formatCurrency(financialSummary.total_tax_paid || 0)}</span>
                                 </div>
                                 <div className="p-3 bg-primary/10 rounded-xl border border-primary/20">
                                   <span className="text-[10px] text-primary block font-bold">Grand Total</span>
-                                  <span className="text-xs font-black text-primary">{formatCurrency(financialSummary.grand_total_spent || 0)}</span>
+                                  <span className="text-xs font-black text-primary numeric font-sans">{formatCurrency(financialSummary.grand_total_spent || 0)}</span>
                                 </div>
                               </div>
                             </div>
