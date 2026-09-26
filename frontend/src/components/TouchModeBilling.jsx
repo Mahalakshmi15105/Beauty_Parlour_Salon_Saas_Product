@@ -31,6 +31,8 @@ export default function TouchModeBilling({
   handleEmployeeToggle,
   employees,
   taxRate,
+  isTaxEnabled = true,
+  setIsTaxEnabled = () => {},
   invoiceTaxAmount,
   setInvoiceTaxAmount,
   isTaxAmountOverridden,
@@ -588,9 +590,26 @@ export default function TouchModeBilling({
                 <span>-{formatCurrency(totalDiscountAmount)}</span>
               </div>
             )}
-            <div className="flex justify-between text-slate-500 text-[11px]">
-              <span>Tax ({taxRate}%)</span>
-              <span>{formatCurrency(totalTaxAmount)}</span>
+            <div className="flex justify-between items-center text-slate-500 text-[11px]">
+              <label className="flex items-center space-x-1.5 font-bold text-slate-700 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={isTaxEnabled}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setIsTaxEnabled(checked);
+                    if (!checked) {
+                      setIsTaxAmountOverridden(false);
+                      setInvoiceTaxAmount(0);
+                    }
+                  }}
+                  className="w-3.5 h-3.5 rounded text-pink-600 focus:ring-pink-500 border-slate-300 cursor-pointer"
+                />
+                <span>Tax ({taxRate}%)</span>
+              </label>
+              <span className={`font-extrabold ${isTaxEnabled ? "text-slate-800" : "text-slate-400 line-through"}`}>
+                {formatCurrency(totalTaxAmount)}
+              </span>
             </div>
             <div className="flex justify-between text-sm font-extrabold text-slate-900 pt-1 border-t border-slate-200">
               <span>Grand Total</span>

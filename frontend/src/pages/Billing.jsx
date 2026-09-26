@@ -109,6 +109,7 @@ function Billing() {
 
   // Regional & Tax Settings
   const [taxRate, setTaxRate] = useState(18.0);
+  const [isTaxEnabled, setIsTaxEnabled] = useState(true);
   const [invoiceTaxAmount, setInvoiceTaxAmount] = useState(0);
   const [isTaxAmountOverridden, setIsTaxAmountOverridden] = useState(false);
 
@@ -1562,10 +1563,10 @@ function Billing() {
   const grossTotal = cart.reduce((sum, item) => sum + item.gross_amount * item.quantity, 0);
   const totalDiscount = cart.reduce((sum, item) => sum + calculateRowDiscountAmount(item), 0);
   const netTotal = Math.max(0, grossTotal - totalDiscount);
-  const defaultTaxAmountFromSettings = (netTotal * (taxRate || 0)) / 100;
-  const totalTaxAmount = isTaxAmountOverridden
-    ? (parseFloat(invoiceTaxAmount) || 0)
-    : defaultTaxAmountFromSettings;
+  const defaultTaxAmountFromSettings = isTaxEnabled ? (netTotal * (taxRate || 0)) / 100 : 0;
+  const totalTaxAmount = isTaxEnabled
+    ? (isTaxAmountOverridden ? (parseFloat(invoiceTaxAmount) || 0) : defaultTaxAmountFromSettings)
+    : 0;
   const netPayable = netTotal + totalTaxAmount;
 
   // Touch Mode alias bindings
@@ -2130,6 +2131,8 @@ function Billing() {
             handleEmployeeToggle={handleSelectEmployee}
             employees={employees}
             taxRate={taxRate}
+            isTaxEnabled={isTaxEnabled}
+            setIsTaxEnabled={setIsTaxEnabled}
             invoiceTaxAmount={invoiceTaxAmount}
             setInvoiceTaxAmount={setInvoiceTaxAmount}
             isTaxAmountOverridden={isTaxAmountOverridden}
@@ -3075,22 +3078,40 @@ function Billing() {
                   <span className="numeric">{currencySymbol} {netTotal.toFixed(2)}</span>
                 </div>
                 
-                {/* Editable Tax Amount Input */}
+                {/* Tax Amount with Default Checked Checkbox */}
                 <div className="flex justify-between items-center text-text-secondary pt-1">
-                  <span className="font-bold text-slate-700">Tax Amount ({taxRate}%):</span>
+                  <label className="flex items-center space-x-2 font-bold text-slate-700 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={isTaxEnabled}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setIsTaxEnabled(checked);
+                        if (!checked) {
+                          setIsTaxAmountOverridden(false);
+                          setInvoiceTaxAmount(0);
+                        }
+                      }}
+                      className="w-4 h-4 rounded text-primary focus:ring-primary border-border-soft cursor-pointer"
+                    />
+                    <span>Tax Amount ({taxRate}%):</span>
+                  </label>
                   <div className="flex items-center space-x-1">
-                    <span className="text-xs text-slate-400 font-bold">{currencySymbol}</span>
+                    <span className={`text-xs font-bold ${isTaxEnabled ? "text-slate-400" : "text-slate-300"}`}>{currencySymbol}</span>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
-                      value={isTaxAmountOverridden ? invoiceTaxAmount : totalTaxAmount.toFixed(2)}
+                      disabled={!isTaxEnabled}
+                      value={isTaxEnabled ? (isTaxAmountOverridden ? invoiceTaxAmount : totalTaxAmount.toFixed(2)) : "0.00"}
                       onFocus={(e) => e.target.select()}
                       onChange={(e) => {
                         setIsTaxAmountOverridden(true);
                         setInvoiceTaxAmount(e.target.value);
                       }}
-                      className="w-24 bg-background border border-border-soft px-2.5 py-1.5 rounded-xl text-xs font-extrabold text-slate-900 text-right focus:border-primary focus:outline-none numeric"
+                      className={`w-24 border px-2.5 py-1.5 rounded-xl text-xs font-extrabold text-right focus:border-primary focus:outline-none numeric ${
+                        isTaxEnabled ? "bg-background border-border-soft text-slate-900" : "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
+                      }`}
                     />
                   </div>
                 </div>
