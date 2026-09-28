@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
 import { QrCode, MapPin, CheckCircle, AlertTriangle, ShieldAlert, Lock, ArrowRight, RefreshCw, UserCheck } from "lucide-react";
 
+const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "/api/v1" : "https://salon-backend.smartgonext.com/api/v1");
+
 export default function CheckInPage({ onNavigateHome }) {
   const [token, setToken] = useState(localStorage.getItem("token"));
   const [user, setUser] = useState(() => {
@@ -37,10 +39,10 @@ export default function CheckInPage({ onNavigateHome }) {
 
   useEffect(() => {
     if (token) {
-      fetch("/api/v1/employees?limit=100", {
+      fetch(`${API_BASE}/employees?limit=100`, {
         headers: { Authorization: `Bearer ${token}` }
       })
-        .then((res) => res.json())
+        .then((res) => res.json().catch(() => ({})))
         .then((res) => {
           const items = res?.data?.items || res?.data?.data || (Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []));
           setEmployeesList(Array.isArray(items) ? items : []);
@@ -59,7 +61,7 @@ export default function CheckInPage({ onNavigateHome }) {
     setManualFeedback(null);
 
     try {
-      const res = await fetch("/api/v1/attendance/manual-checkin", {
+      const res = await fetch(`${API_BASE}/attendance/manual-checkin`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -71,7 +73,7 @@ export default function CheckInPage({ onNavigateHome }) {
           reason: manualReason || "Manual Front-Desk Fallback",
         })
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       setManualLoading(false);
       if (res.ok && data.success) {
         setManualFeedback({ type: "success", message: data.message || "Manual check-in submitted successfully." });
@@ -92,7 +94,7 @@ export default function CheckInPage({ onNavigateHome }) {
     setLoginError(null);
 
     try {
-      const res = await fetch("/api/v1/auth/login", {
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -101,7 +103,7 @@ export default function CheckInPage({ onNavigateHome }) {
           tenant_id: tenantId ? parseInt(tenantId, 10) : undefined
         })
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok || data.success === false) {
         setLoginError(data?.message || data?.error || "Invalid credentials. Please check your username/phone and password.");
@@ -135,7 +137,7 @@ export default function CheckInPage({ onNavigateHome }) {
     setStatus("submitting");
     try {
       const currentToken = localStorage.getItem("token") || token;
-      const res = await fetch("/api/v1/attendance/auto-scan", {
+      const res = await fetch(`${API_BASE}/attendance/auto-scan`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -147,7 +149,7 @@ export default function CheckInPage({ onNavigateHome }) {
           longitude: lng,
         })
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (data.status === "completed") {
         setStatus("completed");
         setResultMessage(data.message);
@@ -197,7 +199,7 @@ export default function CheckInPage({ onNavigateHome }) {
     setStatus("submitting");
     try {
       const currentToken = localStorage.getItem("token") || token;
-      const res = await fetch("/api/v1/attendance/auto-scan", {
+      const res = await fetch(`${API_BASE}/attendance/auto-scan`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -208,7 +210,7 @@ export default function CheckInPage({ onNavigateHome }) {
           test_mode: true,
         })
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (data.status === "completed") {
         setStatus("completed");
         setResultMessage(data.message);
