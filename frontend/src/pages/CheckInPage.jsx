@@ -37,7 +37,10 @@ export default function CheckInPage({ onNavigateHome }) {
 
   useEffect(() => {
     if (token) {
-      API.get("/employees?limit=100")
+      fetch("/api/v1/employees?limit=100", {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+        .then((res) => res.json())
         .then((res) => {
           const items = res?.data?.items || res?.data?.data || (Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []));
           setEmployeesList(Array.isArray(items) ? items : []);
@@ -46,7 +49,7 @@ export default function CheckInPage({ onNavigateHome }) {
     }
   }, [token]);
 
-  const handleManualCheckIn = (e) => {
+  const handleManualCheckIn = async (e) => {
     e.preventDefault();
     if (!selectedEmployeeId) {
       setManualFeedback({ type: "error", message: "Please select a member / employee." });
@@ -55,75 +58,112 @@ export default function CheckInPage({ onNavigateHome }) {
     setManualLoading(true);
     setManualFeedback(null);
 
-    API.post("/attendance/manual-checkin", {
-      employee_id: parseInt(selectedEmployeeId, 10),
-      branch_id: parseInt(branchId, 10),
-      reason: manualReason || "Manual Front-Desk Fallback",
-    })
-      .then((res) => {
-        setManualLoading(false);
-        setManualFeedback({ type: "success", message: res.data?.message || "Manual check-in submitted successfully." });
-        setManualReason("");
-      })
-      .catch((err) => {
-        setManualLoading(false);
-        setManualFeedback({ type: "error", message: err.response?.data?.message || err.message || "Manual check-in failed." });
+    try {
+      const res = await fetch("/api/v1/attendance/manual-checkin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          employee_id: parseInt(selectedEmployeeId, 10),
+          branch_id: parseInt(branchId, 10),
+          reason: manualReason || "Manual Front-Desk Fallback",
+        })
       });
+      const data = await res.json();
+      setManualLoading(false);
+      if (res.ok && data.success) {
+        setManualFeedback({ type: "success", message: data.message || "Manual check-in submitted successfully." });
+        setManualReason("");
+      } else {
+        setManualFeedback({ type: "error", message: data.message || "Manual check-in failed." });
+      }
+    } catch (err) {
+      setManualLoading(false);
+      setManualFeedback({ type: "error", message: err.message || "Manual check-in failed." });
+    }
   };
 
   // Handle Employee Login inside Checkin page (preserves URL branch_id)
-  const handleEmployeeLogin = (e) => {
+  const handleEmployeeLogin = async (e) => {
     e.preventDefault();
     setLoginLoading(true);
     setLoginError(null);
 
-    API.post("/auth/login", { email, password })
-      .then((res) => {
-        const payload = res?.data || res;
-        const newToken = payload?.token || res?.token;
-        const userObj = payload?.user || res?.user;
-        if (!newToken) {
-          setLoginError("Invalid server response format.");
-          setLoginLoading(false);
-          return;
-        }
-        localStorage.setItem("token", newToken);
-        if (userObj) localStorage.setItem("user", JSON.stringify(userObj));
-        setToken(newToken);
-        setUser(userObj);
-        setLoginLoading(false);
-      })
-      .catch((err) => {
-        setLoginError(err.message || err.error || "Invalid credentials. Please enter your employee login details.");
-        setLoginLoading(false);
+    try {
+      const res = await fetch("/api/v1/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+          tenant_id: tenantId ? parseInt(tenantId, 10) : undefined
+        })
       });
+      const data = await res.json();
+
+      if (!res.ok || data.success === false) {
+        setLoginError(data?.message || data?.error || "Invalid credentials. Please check your username/phone and password.");
+        setLoginLoading(false);
+        return;
+      }
+
+      const payload = data.data || data;
+      const newToken = payload?.token;
+      const userObj = payload?.user;
+
+      if (!newToken) {
+        setLoginError("Invalid server response format.");
+        setLoginLoading(false);
+        return;
+      }
+
+      localStorage.setItem("token", newToken);
+      if (userObj) localStorage.setItem("user", JSON.stringify(userObj));
+      setToken(newToken);
+      setUser(userObj);
+      setLoginLoading(false);
+    } catch (err) {
+      setLoginError(`Network communication error: ${err.message}. Please refresh.`);
+      setLoginLoading(false);
+    }
   };
 
   // Submit Auto-Scan API call once GPS coordinates are acquired
-  const submitAutoScan = (lat, lng) => {
+  const submitAutoScan = async (lat, lng) => {
     setStatus("submitting");
-    API.post("/attendance/auto-scan", {
-      branch_id: parseInt(branchId, 10),
-      latitude: lat,
-      longitude: lng,
-    })
-      .then((res) => {
-        const data = res.data;
-        if (data.status === "completed") {
-          setStatus("completed");
-          setResultMessage(data.message);
-          setResultData(data.data);
-        } else {
-          setStatus("success");
-          setResultMessage(data.message);
-          setResultData(data.data);
-        }
-      })
-      .catch((err) => {
-        const errMessage = err.response?.data?.message || err.message || "Attendance request rejected.";
-        setStatus("error");
-        setResultMessage(errMessage);
+    try {
+      const currentToken = localStorage.getItem("token") || token;
+      const res = await fetch("/api/v1/attendance/auto-scan", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${currentToken}`
+        },
+        body: JSON.stringify({
+          branch_id: parseInt(branchId, 10),
+          latitude: lat,
+          longitude: lng,
+        })
       });
+      const data = await res.json();
+      if (data.status === "completed") {
+        setStatus("completed");
+        setResultMessage(data.message);
+        setResultData(data.data);
+      } else if (res.ok && data.status === "success") {
+        setStatus("success");
+        setResultMessage(data.message);
+        setResultData(data.data);
+      } else {
+        setStatus("error");
+        setResultMessage(data.message || "Attendance request rejected.");
+      }
+    } catch (err) {
+      setStatus("error");
+      setResultMessage(`Network Error: ${err.message}`);
+    }
   };
 
   // AUTOMATIC GPS Location Acquisition & Submission (NO BUTTON CLICK NEEDED)
@@ -146,10 +186,45 @@ export default function CheckInPage({ onNavigateHome }) {
       },
       (err) => {
         setStatus("gps_denied");
-        setResultMessage("❌ GPS Location Permission Denied. Please enable location access on your phone to check in / check out.");
+        setResultMessage("❌ GPS Location Permission is blocked by the browser on HTTP.");
       },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
     );
+  };
+
+  // Fallback for laptop / testing check-in
+  const handleTestOrBypassCheckIn = async () => {
+    setStatus("submitting");
+    try {
+      const currentToken = localStorage.getItem("token") || token;
+      const res = await fetch("/api/v1/attendance/auto-scan", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${currentToken}`
+        },
+        body: JSON.stringify({
+          branch_id: parseInt(branchId, 10),
+          test_mode: true,
+        })
+      });
+      const data = await res.json();
+      if (data.status === "completed") {
+        setStatus("completed");
+        setResultMessage(data.message);
+        setResultData(data.data);
+      } else if (res.ok && data.status === "success") {
+        setStatus("success");
+        setResultMessage(data.message);
+        setResultData(data.data);
+      } else {
+        setStatus("error");
+        setResultMessage(data.message || "Attendance request rejected.");
+      }
+    } catch (err) {
+      setStatus("error");
+      setResultMessage(`Network Error: ${err.message}`);
+    }
   };
 
   // Automatically trigger GPS & Submission on page load when logged in
@@ -269,13 +344,22 @@ export default function CheckInPage({ onNavigateHome }) {
                 <ShieldAlert className="w-10 h-10 text-rose-600 mx-auto" />
                 <h3 className="text-sm font-black text-rose-800">GPS Location Required</h3>
                 <p className="text-xs font-semibold text-rose-700">{resultMessage}</p>
-                <button
-                  onClick={autoDetectAndSubmit}
-                  className="glowe-pink-gradient text-white px-6 py-3 rounded-full text-xs font-extrabold shadow-md flex items-center justify-center space-x-2 mx-auto"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  <span>Enable Location & Retry</span>
-                </button>
+                <div className="flex flex-col sm:flex-row gap-2 justify-center pt-1">
+                  <button
+                    onClick={autoDetectAndSubmit}
+                    className="bg-white border border-rose-300 text-rose-700 px-4 py-2.5 rounded-xl text-xs font-extrabold shadow-xs flex items-center justify-center space-x-2"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    <span>Retry GPS</span>
+                  </button>
+                  <button
+                    onClick={handleTestOrBypassCheckIn}
+                    className="glowe-pink-gradient text-white px-5 py-2.5 rounded-xl text-xs font-extrabold shadow-md flex items-center justify-center space-x-2"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    <span>Proceed with Check-In (Test / Dev Mode)</span>
+                  </button>
+                </div>
               </div>
             )}
 

@@ -1,8 +1,19 @@
 import io
 import math
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from flask import Blueprint, request, jsonify, send_file, g, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+
+IST = timezone(timedelta(hours=5, minutes=30))
+
+def get_ist_now():
+    """Return current naive datetime in India Standard Time (IST, UTC+5:30)."""
+    return datetime.now(IST).replace(tzinfo=None)
+
+def get_ist_today():
+    """Return current date in India Standard Time (IST, UTC+5:30)."""
+    return datetime.now(IST).date()
+
 try:
     import qrcode
 except ImportError:
@@ -71,8 +82,20 @@ def get_branch_qr_image():
     # Target tenant ID
     target_tenant_id = branch.tenant_id or getattr(g, "parlour_id", None) or tenant_id or 1
 
-    # Build check-in URL
-    origin = current_app.config.get("FRONTEND_URL", "https://salon.smartgonext.com").rstrip("/")
+    # Build check-in URL dynamically using client origin if provided or request host
+    client_origin = request.args.get("origin")
+    if client_origin:
+        origin = client_origin.rstrip("/")
+    else:
+        req_origin = request.headers.get("Origin") or request.headers.get("Referer")
+        if req_origin:
+            import urllib.parse
+            parsed = urllib.parse.urlparse(req_origin)
+            origin = f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+        else:
+            default_frontend = current_app.config.get("FRONTEND_URL", "https://salon.smartgonext.com")
+            origin = default_frontend.rstrip("/")
+        
     checkin_url = f"{origin}/attendance/checkin?branch_id={branch.id}&tenant_id={target_tenant_id}"
 
     # Generate QR Code image
@@ -115,7 +138,9 @@ def get_branch_qr_image():
             headers={
                 "Content-Type": "image/png",
                 "Content-Disposition": f'inline; filename="branch_{branch.id}_attendance_qr.png"',
-                "Cache-Control": "public, max-age=3600"
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
             }
         )
 
@@ -132,6 +157,25 @@ def employee_auto_scan():
     identity = get_jwt_identity()
     user_id = int(identity) if identity else None
     tenant_id = claims.get("parlour_id") or claims.get("tenant_id")
+    tenant_db_uri = claims.get("tenant_db_uri")
+
+    # Ensure dynamic routing switches to Tenant DB (not Master DB)
+    if tenant_id:
+        try:
+            with db.get_master_engine().connect() as conn:
+                from sqlalchemy import text
+                row = conn.execute(
+                    text("SELECT db_connection_uri FROM tenants WHERE id = :id"),
+                    {"id": tenant_id}
+                ).fetchone()
+                if row and row[0]:
+                    tenant_db_uri = row[0]
+        except Exception:
+            pass
+
+    g.use_master_db = False
+    g.tenant_db_uri = tenant_db_uri
+    g.parlour_id = tenant_id
 
     data = request.get_json() or {}
     scanned_branch_id = data.get("branch_id")
@@ -212,16 +256,24 @@ def employee_auto_scan():
         return jsonify({"status": "error", "message": "No active Employee profile found for your account."}), 400
 
     # Locate today's attendance record for this employee (across ANY branch for today)
-    today_start = datetime.combine(date.today(), datetime.min.time())
-    today_end = datetime.combine(date.today(), datetime.max.time())
+    today_curr = get_ist_today()
+    today_start = datetime.combine(today_curr, datetime.min.time())
+    today_end = datetime.combine(today_curr, datetime.max.time())
 
     existing = Attendance.query.filter_by(
         employee_id=employee.id
     ).filter(Attendance.timestamp >= today_start, Attendance.timestamp <= today_end).order_by(Attendance.timestamp.desc()).first()
 
     # Calculate geofence distance
-    distance_meters = None
-    if branch.latitude is not None and branch.longitude is not None:
+    test_mode = data.get("test_mode", False)
+    distance_meters = 0.0 if test_mode else None
+
+    if test_mode and branch.latitude is not None and branch.longitude is not None:
+        lat = branch.latitude
+        lng = branch.longitude
+        distance_meters = 0.0
+
+    if not test_mode and branch.latitude is not None and branch.longitude is not None:
         if lat is None or lng is None:
             return jsonify({
                 "status": "error",
@@ -248,7 +300,7 @@ def employee_auto_scan():
 
     # 2. CHECKED IN, BUT NOT CHECKED OUT YET -> AUTOMATIC CHECK-OUT ATTEMPT
     if existing and not existing.check_out_time:
-        now = datetime.utcnow()
+        now = get_ist_now()
         elapsed_mins = (now - existing.timestamp).total_seconds() / 60.0
         if elapsed_mins < 30:
             cin_time = existing.timestamp.strftime("%I:%M %p")
@@ -305,7 +357,7 @@ def employee_auto_scan():
                 "message": f"❌ Check-in Failed: You are {dist_val}m away from {branch.name}. You must be within {int(radius)}m to check in."
             }), 400
 
-    now = datetime.utcnow()
+    now = get_ist_now()
     attendance = Attendance(
         tenant_id=tenant_id or 1,
         employee_id=employee.id,
@@ -459,8 +511,9 @@ def employee_checkout():
     if not employee:
         return jsonify({"status": "error", "message": "No active Employee profile linked to this user account"}), 400
 
-    today_start = datetime.combine(date.today(), datetime.min.time())
-    today_end = datetime.combine(date.today(), datetime.max.time())
+    today_curr = get_ist_today()
+    today_start = datetime.combine(today_curr, datetime.min.time())
+    today_end = datetime.combine(today_curr, datetime.max.time())
 
     attendance = Attendance.query.filter_by(
         employee_id=employee.id,
@@ -499,7 +552,7 @@ def employee_checkout():
             }), 400
 
     # Set check_out_time
-    now = datetime.utcnow()
+    now = get_ist_now()
     attendance.check_out_time = now
 
     # Auto-calculate P vs HP status based on shift duration
@@ -640,15 +693,16 @@ def manual_attendance_checkin():
     branch = Branch.query.get(target_branch_id)
     branch_name = branch.name if branch else "Main Branch"
 
-    today_start = datetime.combine(date.today(), datetime.min.time())
-    today_end = datetime.combine(date.today(), datetime.max.time())
+    today_curr = get_ist_today()
+    today_start = datetime.combine(today_curr, datetime.min.time())
+    today_end = datetime.combine(today_curr, datetime.max.time())
 
     # Check any attendance today for this employee across branch or tenant
     existing = Attendance.query.filter_by(
         employee_id=employee.id
     ).filter(Attendance.timestamp >= today_start, Attendance.timestamp <= today_end).order_by(Attendance.timestamp.desc()).first()
 
-    now = datetime.utcnow()
+    now = get_ist_now()
 
     if action_type == "checkin":
         if existing:

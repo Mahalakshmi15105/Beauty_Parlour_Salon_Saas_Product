@@ -103,7 +103,10 @@ def get_summary():
     off_cnt = len([a for a in today_atts if a.status in ["OFF", "DayOff", "L", "Leave"]])
 
     # 7. Top 3 Target Performers (Current Month)
-    employees = get_tenant_query(Employee).filter(Employee.status == "active").all()
+    emp_query = get_tenant_query(Employee).filter(Employee.status == "active")
+    if g.branch_id:
+        emp_query = emp_query.filter(Employee.branch_id == g.branch_id)
+    employees = emp_query.all()
     top_performers = []
 
     for emp in employees:

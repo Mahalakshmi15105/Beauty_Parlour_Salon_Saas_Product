@@ -97,9 +97,9 @@ class Config:
     # Ensure production frontend is always allowed
     if "https://salon.smartgonext.com" not in _cors_list:
         _cors_list.append("https://salon.smartgonext.com")
-    CORS_ORIGINS = _cors_list
-    # Allow all origins in production if CORS_ALLOW_ALL is set
-    CORS_ALLOW_ALL = os.getenv("CORS_ALLOW_ALL", "false").lower() in ("true", "1", "yes")
+    # Allow all origins (all local network IPs, mobile devices, localports & production domains)
+    CORS_ALLOW_ALL = True
+    CORS_ORIGINS = ["*"]
 
     # Meta Developer Portal Credentials
     META_APP_ID = os.getenv("META_APP_ID", "")

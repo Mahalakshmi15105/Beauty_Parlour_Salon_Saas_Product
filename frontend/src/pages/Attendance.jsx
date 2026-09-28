@@ -143,7 +143,8 @@ export default function Attendance() {
   const fetchQrCode = (bId) => {
     if (!bId) return;
     setQrLoading(true);
-    API.get(`/attendance/qr/image?branch_id=${bId}`, { responseType: "blob" })
+    const clientOrigin = "https://salon.smartgonext.com";
+    API.get(`/attendance/qr/image?branch_id=${bId}&origin=${encodeURIComponent(clientOrigin)}&_t=${Date.now()}`, { responseType: "blob" })
       .then((res) => {
         const blobData = res instanceof Blob ? res : (res?.data instanceof Blob ? res.data : new Blob([res]));
         const url = URL.createObjectURL(blobData);
@@ -152,7 +153,7 @@ export default function Attendance() {
       })
       .catch((err) => {
         console.warn("Backend QR fetch notice, activating instant fallback QR generator:", err);
-        const checkinUrl = `${window.location.origin}/attendance/checkin?branch_id=${bId}&tenant_id=1`;
+        const checkinUrl = `${clientOrigin}/attendance/checkin?branch_id=${bId}&tenant_id=${user?.parlour_id || 1}`;
         const fallbackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(checkinUrl)}&color=FF4D6D`;
         setQrImageUrl(fallbackUrl);
         setQrLoading(false);
@@ -563,6 +564,9 @@ export default function Attendance() {
                       {branches.find((b) => String(b.id) === String(selectedQrBranch))?.name || "Main Parlour"}
                     </h3>
                     <p className="text-xs font-bold text-pink-600 mt-1">Reception Desk Attendance QR Code</p>
+                    <div className="mt-3 bg-white/90 border border-pink-200 rounded-xl px-4 py-2 text-[11px] font-mono text-slate-600 select-all break-all shadow-xs">
+                      https://salon.smartgonext.com/attendance/checkin?branch_id={selectedQrBranch}&tenant_id={user?.parlour_id || 1}
+                    </div>
                   </div>
                 </>
               ) : (

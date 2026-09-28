@@ -23,38 +23,30 @@ def get_tenant_query_with_deleted(model):
 def get_branch_query(model):
     """
     Returns a query object for the model filtered by branch_id within the active tenant database.
-    Strictly scopes to the active branch context (g.branch_id or default Main Branch).
+    Strictly scopes BranchAdmin to their assigned branch.
+    Allows ParlourAdmin/SuperAdmin to view all records or filter by selected branch.
     """
     query = model.query.filter_by(is_deleted=False) if hasattr(model, "is_deleted") else model.query
     
     if hasattr(model, "branch_id"):
+        role = getattr(g, "role", None)
         target_bid = getattr(g, "branch_id", None)
-        if not target_bid:
-            from flask import request
-            b_param = request.args.get("branch_id") if request else None
-            if b_param and b_param not in ("all", "main", "null", "0", "None"):
+        
+        from flask import request
+        b_param = request.args.get("branch_id") if request else None
+
+        if role in ["ParlourAdmin", "SuperAdmin"]:
+            # If Parlour Owner explicitly asks for all branches or no branch is specified, return all tenant records
+            if b_param == "all" or (not b_param and not target_bid):
+                return query
+            if b_param and b_param not in ("all", "null", "0", "None"):
                 try:
                     target_bid = int(b_param)
                 except (ValueError, TypeError):
                     pass
 
-        main_b_id = None
-        try:
-            from app.models.branch import Branch
-            main_b = Branch.query.filter_by(is_main_branch=True, is_deleted=False).first()
-            if not main_b:
-                main_b = Branch.query.filter_by(is_deleted=False).first()
-            if main_b:
-                main_b_id = main_b.id
-        except Exception:
-            main_b_id = 1
-
-        if not target_bid:
-            target_bid = main_b_id or 1
-
-        if target_bid == main_b_id:
-            query = query.filter((model.branch_id == target_bid) | (model.branch_id.is_(None)))
-        else:
+        # BranchAdmin or explicit branch selection
+        if target_bid:
             query = query.filter(model.branch_id == target_bid)
 
     return query
@@ -62,38 +54,27 @@ def get_branch_query(model):
 def get_branch_query_with_deleted(model):
     """
     Returns a query object for the model filtered by branch_id, including soft deleted records.
-    Strictly scopes to the active branch context (g.branch_id or default Main Branch).
+    Strictly scopes BranchAdmin to their assigned branch.
     """
     query = model.query
     
     if hasattr(model, "branch_id"):
+        role = getattr(g, "role", None)
         target_bid = getattr(g, "branch_id", None)
-        if not target_bid:
-            from flask import request
-            b_param = request.args.get("branch_id") if request else None
-            if b_param and b_param not in ("all", "main", "null", "0", "None"):
+        
+        from flask import request
+        b_param = request.args.get("branch_id") if request else None
+
+        if role in ["ParlourAdmin", "SuperAdmin"]:
+            if b_param == "all" or (not b_param and not target_bid):
+                return query
+            if b_param and b_param not in ("all", "null", "0", "None"):
                 try:
                     target_bid = int(b_param)
                 except (ValueError, TypeError):
                     pass
 
-        main_b_id = None
-        try:
-            from app.models.branch import Branch
-            main_b = Branch.query.filter_by(is_main_branch=True, is_deleted=False).first()
-            if not main_b:
-                main_b = Branch.query.filter_by(is_deleted=False).first()
-            if main_b:
-                main_b_id = main_b.id
-        except Exception:
-            main_b_id = 1
-
-        if not target_bid:
-            target_bid = main_b_id or 1
-
-        if target_bid == main_b_id:
-            query = query.filter((model.branch_id == target_bid) | (model.branch_id.is_(None)))
-        else:
+        if target_bid:
             query = query.filter(model.branch_id == target_bid)
 
     return query
@@ -157,8 +138,8 @@ def require_role(roles):
                         status_code=403
                     )
 
-            # Resolve tenant database URI if not embedded directly in JWT
-            if parlour_id and not tenant_db_uri:
+            # Resolve tenant database URI from Master DB to ensure accurate database routing
+            if parlour_id:
                 try:
                     with db.get_master_engine().connect() as conn:
                         from sqlalchemy import text
@@ -166,13 +147,8 @@ def require_role(roles):
                             text("SELECT db_connection_uri, status, is_deleted FROM tenants WHERE id = :id"),
                             {"id": parlour_id}
                         ).fetchone()
-                        if not row or row[1] != "active" or row[2]:
-                            return error_response(
-                                error_code="INVALID_TENANT",
-                                message="The associated parlour tenant does not exist, is deleted, or is suspended.",
-                                status_code=400
-                            )
-                        tenant_db_uri = row[0]
+                        if row and row[0]:
+                            tenant_db_uri = row[0]
                 except Exception as e:
                     logger.error(f"Failed to fetch tenant DB URI in auth: {e}")
 

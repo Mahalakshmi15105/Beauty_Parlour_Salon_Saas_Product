@@ -1,6 +1,6 @@
 import os
 import logging
-from flask import Flask
+from flask import Flask, request
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from werkzeug.exceptions import HTTPException
@@ -22,17 +22,26 @@ def create_app(config_class=Config):
     app.config.from_object(config_class)
 
     # Initialize extensions
-    # CORS: allow production frontend + configured origins
-    if app.config.get("CORS_ALLOW_ALL", False):
-        CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=False)
-    else:
-        CORS(
-            app,
-            resources={r"/*": {"origins": app.config["CORS_ORIGINS"]}},
-            supports_credentials=True,
-            allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
-            methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        )
+    # CORS: Allow all origins including 192.168.137.1:5174, 192.168.137.135:5174, localhost
+    CORS(
+        app,
+        resources={r"/*": {"origins": "*"}},
+        supports_credentials=True,
+        allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin", "Access-Control-Request-Headers", "Access-Control-Request-Method"],
+        methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    )
+
+    @app.after_request
+    def add_cors_headers(response):
+        origin = request.headers.get("Origin")
+        if origin:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+        else:
+            response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Headers, Access-Control-Request-Method"
+        return response
     # Configure Database-per-Tenant URI defaults dynamically from MASTER_DATABASE_URI
     import re
     master_uri = app.config.get("MASTER_DATABASE_URI") or app.config.get("SQLALCHEMY_DATABASE_URI", "mysql+pymysql://smartgo1_salon_user:Arish%40123@localhost:3306/smartgo1_salon?charset=utf8mb4")

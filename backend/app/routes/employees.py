@@ -56,8 +56,12 @@ def get_employees():
             (User.email == emp.phone) | 
             (User.email.ilike(f"%{emp.first_name}%"))
         ).filter_by(is_deleted=False).first()
+        from app.models.branch import Branch
+        br_name = Branch.query.get(emp.branch_id).name if emp.branch_id else "Main Branch"
         data.append({
             "id": emp.id,
+            "branch_id": emp.branch_id,
+            "branch_name": br_name,
             "first_name": emp.first_name or "",
             "last_name": emp.last_name or "",
             "phone": emp.phone or "",

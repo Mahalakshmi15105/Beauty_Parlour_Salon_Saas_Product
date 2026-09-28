@@ -70,6 +70,12 @@ class MySQLMultiTenantSQLAlchemy(SQLAlchemy):
 
         if db_uri not in self._engine_cache:
             logger.info(f"Connecting to tenant DB with NullPool: {db_uri}")
+            try:
+                from app.db_bootstrap import ensure_database_exists
+                ensure_database_exists(db_uri)
+            except Exception as bootstrap_e:
+                logger.warning(f"Tenant database ensure_exists notice for {db_uri}: {bootstrap_e}")
+
             connect_args = {"charset": "utf8mb4"} if "mysql" in db_uri else {}
             engine = create_engine(
                 db_uri,
