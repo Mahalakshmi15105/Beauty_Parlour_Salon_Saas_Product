@@ -4,26 +4,21 @@ import API from "../services/api";
 
 const ThemeContext = createContext();
 
-// Helper to get tenant-specific localStorage keys
-const getTenantKey = (key) => {
+// Helper to get tenant & branch-specific localStorage keys
+const getTenantBranchKey = (key) => {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const tenantId = user.tenant_id || user.parlour_id || "default";
-  return `${key}_${tenantId}`;
+  const branchId = localStorage.getItem("active_branch_id") || user.branch_id || "main";
+  return `${key}_${tenantId}_${branchId}`;
 };
 
 export function ThemeProvider({ children }) {
   const [currentTheme, setCurrentTheme] = useState(() => {
-    // Initialize from tenant-specific localStorage or default
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    const tenantId = user.tenant_id || user.parlour_id || "default";
-    return localStorage.getItem(`selected_theme_${tenantId}`) || DEFAULT_THEME;
+    return localStorage.getItem(getTenantBranchKey("selected_theme")) || DEFAULT_THEME;
   });
 
   const [accentColor, setAccentColor] = useState(() => {
-    // Initialize accent color from tenant-specific localStorage or default
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    const tenantId = user.tenant_id || user.parlour_id || "default";
-    return localStorage.getItem(`accent_color_${tenantId}`) || '#EC4899';
+    return localStorage.getItem(getTenantBranchKey("accent_color")) || '#EC4899';
   });
 
   const [loading, setLoading] = useState(false);
@@ -72,6 +67,7 @@ export function ThemeProvider({ children }) {
   const changeTheme = (themeId) => {
     if (THEMES[themeId]) {
       setCurrentTheme(themeId);
+      localStorage.setItem(getTenantBranchKey("selected_theme"), themeId);
       applyTheme(themeId, accentColor);
       // Save to backend
       saveThemeToBackend(themeId, accentColor);
@@ -80,6 +76,7 @@ export function ThemeProvider({ children }) {
 
   const changeAccentColor = (color) => {
     setAccentColor(color);
+    localStorage.setItem(getTenantBranchKey("accent_color"), color);
     applyAccentColor(color);
     // Save to backend
     saveThemeToBackend(currentTheme, color);

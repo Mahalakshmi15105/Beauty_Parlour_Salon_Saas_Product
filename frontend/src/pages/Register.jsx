@@ -43,7 +43,7 @@ function Register({ onRegisterSuccess, onNavigateLogin, onNavigateHome }) {
   useFormKeyboardNavigation(formRef, handleSubmit);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-100/70 via-pink-50/40 to-white flex flex-col justify-center items-center p-6 font-sans">
+    <div className="min-h-screen bg-gradient-to-br from-pink-100/70 via-pink-50/40 to-white flex flex-col justify-center items-center p-6">
       <div className="max-w-md w-full bg-white/95 backdrop-blur-xl p-8 rounded-3xl shadow-2xl shadow-pink-500/15 border border-pink-100 space-y-7">
         <div className="text-center space-y-3">
           <button onClick={onNavigateHome} className="text-xs text-pink-600 font-extrabold hover:underline mb-3 block mx-auto transition-colors">

@@ -7,7 +7,7 @@ from app.models.employee import Employee
 from app.models.membership import CustomerMembership
 from app.models.attendance import Attendance
 from app.utils.responses import success_response, error_response
-from app.utils.auth import require_role, get_tenant_query
+from app.utils.auth import require_role, get_tenant_query, get_branch_query
 from sqlalchemy import func, cast, Date
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -49,8 +49,9 @@ def get_summary():
     month_bills = base_count_query.filter(Invoice.created_at >= month_first_day).scalar()
 
     # 3. Customer Metrics
-    total_customers = get_tenant_query(Customer).count()
-    new_customers = get_tenant_query(Customer).filter(Customer.created_at >= month_first_day).count()
+    cust_query = get_branch_query(Customer)
+    total_customers = cust_query.count()
+    new_customers = cust_query.filter(Customer.created_at >= month_first_day).count()
 
     # 4. Membership Metrics
     base_mem_query = db.session.query(func.count(CustomerMembership.id)).filter(
@@ -73,12 +74,10 @@ def get_summary():
     expiring_soon = base_exp_query.scalar()
 
     # 5. Low Stock Products Alert List
-    low_stock_query = get_tenant_query(Product).filter(
+    low_stock_query = get_branch_query(Product).filter(
         Product.stock_quantity <= Product.low_stock_threshold,
         Product.status == "active"
     )
-    if g.branch_id:
-        low_stock_query = low_stock_query.filter(Product.branch_id == g.branch_id)
     low_stock_items = low_stock_query.all()
 
     low_stock_data = [
@@ -103,9 +102,7 @@ def get_summary():
     off_cnt = len([a for a in today_atts if a.status in ["OFF", "DayOff", "L", "Leave"]])
 
     # 7. Top 3 Target Performers (Current Month)
-    emp_query = get_tenant_query(Employee).filter(Employee.status == "active")
-    if g.branch_id:
-        emp_query = emp_query.filter(Employee.branch_id == g.branch_id)
+    emp_query = get_branch_query(Employee).filter(Employee.status == "active")
     employees = emp_query.all()
     top_performers = []
 
@@ -282,8 +279,8 @@ def get_charts():
 @dashboard_bp.route("/dashboard/activities", methods=["GET"])
 @require_role(["ParlourAdmin", "BranchAdmin", "Employee"])
 def get_activities():
-    recent_invoices = get_tenant_query(Invoice).order_by(Invoice.created_at.desc()).limit(5).all()
-    recent_customers = get_tenant_query(Customer).order_by(Customer.created_at.desc()).limit(5).all()
+    recent_invoices = get_branch_query(Invoice).order_by(Invoice.created_at.desc()).limit(5).all()
+    recent_customers = get_branch_query(Customer).order_by(Customer.created_at.desc()).limit(5).all()
 
     invoice_data = [
         {

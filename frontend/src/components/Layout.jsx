@@ -238,7 +238,7 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
   });
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden font-sans">
+    <div className="flex h-screen bg-background overflow-hidden">
       {/* MOBILE OVERLAY BACKDROP */}
       {isMobileOpen && (
         <div
@@ -539,7 +539,7 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
 
               {/* Dropdown Menu */}
               {notifDropdownOpen && (
-                <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-2xl shadow-2xl z-[9999] overflow-hidden flex flex-col text-xs font-sans">
+                <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-2xl shadow-2xl z-[9999] overflow-hidden flex flex-col text-xs">
                   <div className="p-3.5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                     <div className="flex items-center space-x-2 font-extrabold text-slate-900">
                       <Bell className="w-4 h-4 text-primary" />

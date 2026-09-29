@@ -23,7 +23,7 @@ def get_customers():
     cursor = request.args.get("cursor")
     sort = request.args.get("sort", "-created_at")
 
-    # Start branch query (respects branch isolation for BranchAdmin)
+    # Start branch query (strictly isolated per branch)
     query = get_branch_query(Customer)
 
     # Search filter
@@ -169,6 +169,13 @@ def create_customer():
             target_branch_id = bid
         except ValueError:
             pass
+    elif getattr(g, "branch_id", None):
+        target_branch_id = g.branch_id
+    else:
+        from app.models.branch import Branch
+        main_b = Branch.query.filter_by(tenant_id=g.parlour_id, is_main_branch=True, is_deleted=False).first()
+        if main_b:
+            target_branch_id = main_b.id
 
     try:
         customer = Customer(
@@ -226,7 +233,7 @@ def update_customer(customer_id):
             status_code=400
         )
 
-    # Check duplicate phone for other records
+    # Check duplicate phone for other records in tenant context
     dup = get_tenant_query(Customer).filter(Customer.phone == phone, Customer.id != customer_id).first()
     if dup:
         return error_response(
@@ -326,7 +333,7 @@ def delete_customer(customer_id):
 def get_customer_memberships(customer_id):
     from app.models.membership import CustomerMembership, MembershipBenefit
     
-    # Verify customer exists in tenant/branch context
+    # Verify customer exists in branch context
     customer = get_branch_query(Customer).filter_by(id=customer_id).first()
     if not customer:
         return error_response(
@@ -375,7 +382,7 @@ def get_customer_history(customer_id):
     from collections import defaultdict
     from decimal import Decimal
 
-    # 1. Verify customer exists in tenant/branch context
+    # 1. Verify customer exists in branch context
     customer = get_branch_query(Customer).filter_by(id=customer_id).first()
     if not customer:
         return error_response(

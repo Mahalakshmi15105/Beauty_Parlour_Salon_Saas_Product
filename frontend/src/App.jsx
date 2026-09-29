@@ -213,7 +213,7 @@ function App() {
   // 3. LOGIN PAGE VIEW
   if (currentView === "login" || (!token && currentView === "app")) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-100/70 via-pink-50/40 to-white flex flex-col items-center justify-center p-6 font-sans">
+      <div className="min-h-screen bg-gradient-to-br from-pink-100/70 via-pink-50/40 to-white flex flex-col items-center justify-center p-6">
         <div className="max-w-md w-full bg-white/95 backdrop-blur-xl p-8 rounded-3xl shadow-2xl shadow-pink-500/15 border border-pink-100 space-y-7">
           <div className="text-center space-y-3">
             <button
@@ -320,7 +320,7 @@ function App() {
   // 4. SUPER ADMIN PORTAL ROUTE
   if (user?.role === "SuperAdmin") {
     return (
-      <div className="min-h-screen bg-background font-sans text-slate-800">
+      <div className="min-h-screen bg-background text-slate-800">
         <header className="h-16 bg-surface border-b border-border-soft px-8 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="h-9 w-9 bg-slate-900 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-sm">
