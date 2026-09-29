@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
-import { QrCode, MapPin, CheckCircle, AlertTriangle, ShieldAlert, Lock, ArrowRight, RefreshCw, UserCheck } from "lucide-react";
+import { QrCode, MapPin, CheckCircle, AlertTriangle, ShieldAlert, Lock, ArrowRight, RefreshCw, UserCheck, Wifi } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "/api/v1" : "https://salon-backend.smartgonext.com/api/v1");
 
@@ -418,20 +418,26 @@ export default function CheckInPage({ onNavigateHome }) {
               </div>
             )}
 
-            {/* E. ERROR SCREEN (Geofence Rejection / Already Checked-In / Out of Radius) */}
+            {/* E. ERROR SCREEN (Geofence Rejection / Wi-Fi Mismatch / Already Checked-In) */}
             {status === "error" && (
               <div className={`border-2 p-6 rounded-3xl text-center space-y-4 shadow-md ${
                 resultMessage?.includes("Already") || resultMessage?.includes("already")
                   ? "bg-amber-50 border-amber-300 text-amber-900"
+                  : resultMessage?.toLowerCase().includes("wi-fi") || resultMessage?.toLowerCase().includes("wifi")
+                  ? "bg-indigo-50 border-indigo-300 text-indigo-950"
                   : "bg-rose-50 border-rose-300 text-rose-900"
               }`}>
                 <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto ${
                   resultMessage?.includes("Already") || resultMessage?.includes("already")
                     ? "bg-amber-100 text-amber-600"
+                    : resultMessage?.toLowerCase().includes("wi-fi") || resultMessage?.toLowerCase().includes("wifi")
+                    ? "bg-indigo-100 text-indigo-600"
                     : "bg-rose-100 text-rose-600"
                 }`}>
                   {resultMessage?.includes("Already") || resultMessage?.includes("already") ? (
                     <UserCheck className="w-8 h-8 text-amber-600" />
+                  ) : resultMessage?.toLowerCase().includes("wi-fi") || resultMessage?.toLowerCase().includes("wifi") ? (
+                    <Wifi className="w-8 h-8 text-indigo-600 animate-pulse" />
                   ) : (
                     <ShieldAlert className="w-8 h-8 text-rose-600" />
                   )}
@@ -440,17 +446,31 @@ export default function CheckInPage({ onNavigateHome }) {
                   <h3 className="text-base font-black uppercase tracking-wide">
                     {resultMessage?.includes("Already") || resultMessage?.includes("already")
                       ? "Attendance Already Logged"
+                      : resultMessage?.toLowerCase().includes("wi-fi") || resultMessage?.toLowerCase().includes("wifi")
+                      ? "Salon Wi-Fi Connection Required"
                       : "Check-in Rejected"}
                   </h3>
                   <p className="text-xs font-extrabold mt-2 leading-relaxed">{resultMessage}</p>
                 </div>
+
+                {resultMessage?.toLowerCase().includes("wi-fi") || resultMessage?.toLowerCase().includes("wifi") ? (
+                  <div className="bg-white/90 border border-indigo-200 p-3 rounded-2xl text-[11px] font-semibold text-indigo-900 text-left space-y-1">
+                    <p className="font-bold flex items-center space-x-1 text-indigo-700">
+                      <Wifi className="w-3.5 h-3.5" />
+                      <span>How to connect:</span>
+                    </p>
+                    <p>1. Open your phone Wi-Fi settings.</p>
+                    <p>2. Connect to the Salon's reception Wi-Fi network.</p>
+                    <p>3. Tap 'Retry Verification' below once connected.</p>
+                  </div>
+                ) : null}
 
                 <button
                   onClick={autoDetectAndSubmit}
                   className="glowe-pink-gradient text-white px-6 py-3 rounded-full text-xs font-extrabold shadow-md flex items-center justify-center space-x-2 mx-auto mt-2"
                 >
                   <RefreshCw className="w-4 h-4" />
-                  <span>Re-verify Geofence & Location</span>
+                  <span>Retry Verification</span>
                 </button>
               </div>
             )}

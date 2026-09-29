@@ -31,6 +31,14 @@ from app.utils.auth import require_role, get_branch_query
 
 attendance_bp = Blueprint("attendance", __name__, url_prefix="/api/v1/attendance")
 
+def get_client_ip():
+    """Retrieve real client public IP address from request headers or remote_addr."""
+    if request.headers.get("X-Forwarded-For"):
+        return request.headers.get("X-Forwarded-For").split(",")[0].strip()
+    if request.headers.get("X-Real-IP"):
+        return request.headers.get("X-Real-IP").strip()
+    return (request.remote_addr or "").strip()
+
 def haversine(lat1, lon1, lat2, lon2):
     """Calculate the great circle distance in meters between two points on the earth."""
     if lat1 is None or lon1 is None or lat2 is None or lon2 is None:
@@ -264,8 +272,24 @@ def employee_auto_scan():
         employee_id=employee.id
     ).filter(Attendance.timestamp >= today_start, Attendance.timestamp <= today_end).order_by(Attendance.timestamp.desc()).first()
 
-    # Calculate geofence distance
+    # Calculate geofence distance & check Wi-Fi network verification
     test_mode = data.get("test_mode", False)
+
+    # 0. Check Salon Wi-Fi Network Attendance Verification
+    if branch.enforce_wifi and branch.wifi_public_ip and not test_mode:
+        client_ip = get_client_ip()
+        branch_ip = branch.wifi_public_ip.strip()
+        is_ip_match = (client_ip == branch_ip) or (client_ip in ("127.0.0.1", "localhost", "::1") and branch_ip in ("127.0.0.1", "localhost", "::1"))
+        if not is_ip_match:
+            wifi_name = branch.wifi_ssid or "Parlour Wi-Fi"
+            return jsonify({
+                "status": "error",
+                "error_code": "WIFI_MISMATCH",
+                "message": f"❌ Attendance Rejected: You must be connected to the Salon Wi-Fi ('{wifi_name}') to record attendance.",
+                "detected_ip": client_ip,
+                "required_wifi": wifi_name
+            }), 400
+
     distance_meters = 0.0 if test_mode else None
 
     if test_mode and branch.latitude is not None and branch.longitude is not None:
@@ -281,6 +305,27 @@ def employee_auto_scan():
             }), 400
 
         distance_meters = haversine(lat, lng, branch.latitude, branch.longitude)
+
+    # If previously marked on Leave / Day Off, allow checking in as Present today
+    if existing and existing.status in ["L", "OFF"]:
+        now = get_ist_now()
+        existing.status = "P"
+        existing.timestamp = now
+        existing.checkin_method = "Wi-Fi" if (branch.enforce_wifi and branch.wifi_public_ip) else "QR"
+        existing.branch_id = branch.id
+        db.session.commit()
+        cin_time = now.strftime("%I:%M %p")
+        return jsonify({
+            "status": "success",
+            "action": "checkin",
+            "message": f"✅ Check-in recorded at {branch.name} at {cin_time}. Attendance status updated to Present (Full Day).",
+            "data": {
+                "id": existing.id,
+                "checkin_time": cin_time,
+                "branch_name": branch.name,
+                "status": "P"
+            }
+        }), 200
 
     # 1. ALREADY CHECKED IN AND CHECKED OUT TODAY -> SHOW COMPLETED STATUS NOTICE
     if existing and existing.check_out_time:
@@ -532,6 +577,21 @@ def employee_checkout():
             "message": f"You have already checked out today at {attendance.check_out_time.strftime('%I:%M %p')}."
         }), 400
 
+    # Wi-Fi network verification
+    if branch.enforce_wifi and branch.wifi_public_ip:
+        client_ip = get_client_ip()
+        branch_ip = branch.wifi_public_ip.strip()
+        is_ip_match = (client_ip == branch_ip) or (client_ip in ("127.0.0.1", "localhost", "::1") and branch_ip in ("127.0.0.1", "localhost", "::1"))
+        if not is_ip_match:
+            wifi_name = branch.wifi_ssid or "Parlour Wi-Fi"
+            return jsonify({
+                "status": "error",
+                "error_code": "WIFI_MISMATCH",
+                "message": f"❌ Check-out Rejected: You must be connected to the Salon Wi-Fi ('{wifi_name}') to check out.",
+                "detected_ip": client_ip,
+                "required_wifi": wifi_name
+            }), 400
+
     # Strict Geofence Validation
     distance_meters = None
     if branch.latitude is not None and branch.longitude is not None:
@@ -706,11 +766,34 @@ def manual_attendance_checkin():
 
     if action_type == "checkin":
         if existing:
-            cin_time = existing.timestamp.strftime("%I:%M %p")
+            # If same status already recorded (and already Present/Half Day), inform user
+            if existing.status == status_type and existing.status in ["P", "HP"]:
+                cin_time = existing.timestamp.strftime("%I:%M %p")
+                return jsonify({
+                    "status": "error",
+                    "message": f"This employee is already marked as Present today at {cin_time}."
+                }), 400
+
+            # Override/update existing status (e.g. from Leave/Off to Present, or from HP to Present)
+            existing.status = status_type if status_type in ["P", "HP", "OFF", "L"] else "P"
+            existing.branch_id = target_branch_id
+            existing.checkin_method = "Manual"
+            existing.timestamp = now
+            db.session.commit()
+
+            cin_time = now.strftime("%I:%M %p")
+            status_label = "Present" if existing.status == "P" else ("Half Day" if existing.status == "HP" else ("Leave" if existing.status == "L" else "Day Off"))
             return jsonify({
-                "status": "error",
-                "message": f"This employee already checked in today at {cin_time}."
-            }), 400
+                "status": "success",
+                "action": "checkin",
+                "message": f"✅ Attendance updated to {status_label} for {employee.first_name} {employee.last_name or ''} at {cin_time} ({branch_name}).",
+                "data": {
+                    "id": existing.id,
+                    "employee_name": f"{employee.first_name} {employee.last_name or ''}".strip(),
+                    "checkin_time": cin_time,
+                    "status": existing.status
+                }
+            }), 200
 
         # Create new Manual Check-in
         attendance = Attendance(
@@ -727,10 +810,11 @@ def manual_attendance_checkin():
         db.session.commit()
 
         cin_time = now.strftime("%I:%M %p")
+        status_label = "Present" if attendance.status == "P" else ("Half Day" if attendance.status == "HP" else ("Leave" if attendance.status == "L" else "Day Off"))
         return jsonify({
             "status": "success",
             "action": "checkin",
-            "message": f"✅ Manual check-in submitted for {employee.first_name} {employee.last_name or ''} at {cin_time} ({branch_name}). Audit Reason: {reason}",
+            "message": f"✅ Manual check-in ({status_label}) submitted for {employee.first_name} {employee.last_name or ''} at {cin_time} ({branch_name}). Audit Reason: {reason}",
             "data": {
                 "id": attendance.id,
                 "employee_name": f"{employee.first_name} {employee.last_name or ''}".strip(),

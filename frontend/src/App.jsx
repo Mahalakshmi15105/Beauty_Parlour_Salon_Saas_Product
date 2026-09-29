@@ -239,9 +239,9 @@ function App() {
 
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">Email Address</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">Email or Username</label>
               <input
-                type="email"
+                type="text"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -256,7 +256,7 @@ function App() {
                     if (passInput) passInput.focus();
                   }
                 }}
-                placeholder="admin@smartgonext.com"
+                placeholder="Enter your email, username, or phone"
                 className="w-full bg-white border border-slate-200 px-4 py-3 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 shadow-xs transition-all font-medium"
               />
             </div>

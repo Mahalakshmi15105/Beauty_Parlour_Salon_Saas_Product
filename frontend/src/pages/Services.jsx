@@ -289,10 +289,12 @@ function Services() {
   const handleServiceSubmit = (e) => {
     e.preventDefault();
     if (!serviceForm.name.trim()) {
+      showError("Please enter Service Name.");
       if (serviceNameInputRef.current) serviceNameInputRef.current.focus();
       return;
     }
     if (!serviceForm.price.toString().trim()) {
+      showError("Please enter Service Price.");
       if (servicePriceInputRef.current) servicePriceInputRef.current.focus();
       return;
     }

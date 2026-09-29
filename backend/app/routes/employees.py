@@ -54,6 +54,7 @@ def get_employees():
     for emp in employees:
         u_rec = User.query.filter(
             (User.email == emp.phone) | 
+            (User.email == emp.username) |
             (User.email.ilike(f"%{emp.first_name}%"))
         ).filter_by(is_deleted=False).first()
         from app.models.branch import Branch
@@ -65,8 +66,8 @@ def get_employees():
             "first_name": emp.first_name or "",
             "last_name": emp.last_name or "",
             "phone": emp.phone or "",
-            "email": u_rec.email if u_rec else (emp.phone + "@salon.com"),
-            "username": u_rec.email if u_rec else emp.phone,
+            "email": emp.email or (u_rec.email if u_rec else "") or emp.username or emp.phone,
+            "username": emp.username or (u_rec.email if u_rec else "") or emp.email or emp.phone,
             "password": getattr(emp, "password_plain", None) or emp.phone or "123456",
             "specialization": emp.specialization or "",
             "role": emp.role or "",
@@ -101,6 +102,7 @@ def get_employee(employee_id):
     from app.models.user import User
     u_rec = User.query.filter(
         (User.email == employee.phone) | 
+        (User.email == employee.username) |
         (User.email.ilike(f"%{employee.first_name}%"))
     ).filter_by(is_deleted=False).first()
     return success_response({
@@ -108,8 +110,8 @@ def get_employee(employee_id):
         "first_name": employee.first_name or "",
         "last_name": employee.last_name or "",
         "phone": employee.phone or "",
-        "email": u_rec.email if u_rec else (employee.phone + "@salon.com"),
-        "username": u_rec.email if u_rec else employee.phone,
+        "email": employee.email or (u_rec.email if u_rec else "") or employee.username or employee.phone,
+        "username": employee.username or (u_rec.email if u_rec else "") or employee.email or employee.phone,
         "password": getattr(employee, "password_plain", None) or employee.phone or "123456",
         "specialization": employee.specialization or "",
         "role": employee.role or "",
@@ -136,10 +138,31 @@ def create_employee():
     level = data.get("level", "L1")
     commission = data.get("commission_percentage")
 
-    if not first_name or not phone:
+    username = (data.get("username") or "").strip().lower()
+    password = (data.get("password") or "").strip()
+
+    if not first_name:
         return error_response(
             error_code="VALIDATION_FAILED",
-            message="First name and phone number are required.",
+            message="First name is required.",
+            status_code=400
+        )
+    if not phone:
+        return error_response(
+            error_code="VALIDATION_FAILED",
+            message="Phone number is required.",
+            status_code=400
+        )
+    if not username:
+        return error_response(
+            error_code="VALIDATION_FAILED",
+            message="Login Username / Email is required for employee account.",
+            status_code=400
+        )
+    if not password:
+        return error_response(
+            error_code="VALIDATION_FAILED",
+            message="Login Password is required for employee account.",
             status_code=400
         )
 
@@ -223,6 +246,8 @@ def create_employee():
             first_name=first_name,
             last_name=data.get("last_name"),
             phone=phone,
+            username=username,
+            email=data.get("email") or username,
             specialization=data.get("specialization"),
             role=data.get("role"),
             salary=salary_val,
@@ -238,15 +263,13 @@ def create_employee():
             employee.joining_date = joining_date
 
         password = data.get("password", "").strip()
-        if password:
-            employee.password_plain = password
+        effective_password = password if password else phone
+        employee.password_plain = effective_password
 
         db.session.add(employee)
         db.session.commit()
 
         # Provision/Link User account with role 'Employee' for authentication
-        username = (data.get("username") or data.get("phone") or phone).strip().lower()
-
         if username:
             from app.models.user import User
             user_rec = User.query.filter_by(email=username, is_deleted=False).first()
@@ -258,13 +281,13 @@ def create_employee():
                     role="Employee",
                     status="active"
                 )
+                user_rec.set_password(effective_password)
             else:
                 user_rec.role = "Employee"
                 user_rec.branch_id = target_branch_id
                 user_rec.status = "active"
-
-            if password:
-                user_rec.set_password(password)
+                if password:
+                    user_rec.set_password(password)
 
             db.session.add(user_rec)
             db.session.commit()
@@ -285,7 +308,7 @@ def create_employee():
         logger.error(f"Error creating employee: {str(e)}")
         return error_response(
             error_code="DATABASE_ERROR",
-            message="Failed to create employee record.",
+            message=f"Failed to create employee: {str(e)}",
             status_code=500
         )
 
@@ -394,10 +417,16 @@ def update_employee(employee_id):
             except ValueError:
                 pass
 
+    old_phone = employee.phone
+    old_username = employee.username or employee.email or old_phone
+    username = (data.get("username") or phone).strip().lower()
+
     try:
         employee.first_name = first_name
         employee.last_name = data.get("last_name")
         employee.phone = phone
+        employee.username = username
+        employee.email = data.get("email") or username
         employee.specialization = data.get("specialization")
         employee.role = data.get("role")
         employee.salary = salary_val
@@ -418,12 +447,14 @@ def update_employee(employee_id):
         db.session.commit()
 
         # Update associated User account if username or password provided
-        username = (data.get("username") or data.get("phone") or phone).strip().lower()
-        password = data.get("password", "").strip()
-
         if username:
             from app.models.user import User
-            user_rec = User.query.filter((User.email == username) | (User.email == employee.phone)).first()
+            user_rec = User.query.filter(
+                (User.email == old_username) | 
+                (User.email == old_phone) |
+                (User.email == username) | 
+                (User.email == phone)
+            ).first()
             if not user_rec:
                 user_rec = User(
                     tenant_id=g.parlour_id,
@@ -432,22 +463,35 @@ def update_employee(employee_id):
                     role="Employee",
                     status="active"
                 )
+                user_rec.set_password(password or phone)
             else:
+                user_rec.email = username
                 user_rec.role = "Employee"
                 user_rec.branch_id = employee.branch_id
                 user_rec.status = "active"
-
-            if password:
-                user_rec.set_password(password)
+                if password:
+                    user_rec.set_password(password)
 
             db.session.add(user_rec)
             db.session.commit()
+
+            # Sync TenantLookup in Master DB
+            try:
+                with db.get_master_engine().connect() as conn:
+                    from sqlalchemy import text
+                    conn.execute(
+                        text("INSERT INTO tenant_lookups (email, tenant_id, created_at, updated_at) VALUES (:e, :t, NOW(), NOW()) ON DUPLICATE KEY UPDATE tenant_id = :t, updated_at = NOW()"),
+                        {"e": username, "t": g.parlour_id}
+                    )
+                    conn.commit()
+            except Exception as lookup_err:
+                logger.warning(f"TenantLookup sync notice: {lookup_err}")
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error updating employee: {str(e)}")
         return error_response(
             error_code="DATABASE_ERROR",
-            message="Failed to update employee record.",
+            message=f"Failed to update employee: {str(e)}",
             status_code=500
         )
 
@@ -466,15 +510,50 @@ def delete_employee(employee_id):
         )
 
     try:
-        employee.soft_delete()
+        emp_phone = (employee.phone or "").strip().lower()
+        emp_name = (employee.first_name or "").strip().lower()
+
+        # 1. Clean up attendance records for this employee
+        from app.models.attendance import Attendance
+        Attendance.query.filter_by(employee_id=employee.id).delete()
+
+        # 2. Update appointments & line items referencing this employee
+        from app.models.appointment import Appointment, AppointmentItem
+        from app.models.billing import InvoiceLineItem
+        try:
+            AppointmentItem.query.filter_by(employee_id=employee.id).update({"employee_id": None})
+            Appointment.query.filter_by(employee_id=employee.id).update({"employee_id": None})
+            InvoiceLineItem.query.filter_by(employee_id=employee.id).update({"employee_id": None})
+        except Exception:
+            pass
+
+        # 3. Clean up associated User login account in tenant DB and Master DB TenantLookup
+        from app.models.user import User
+        associated_users = User.query.filter(
+            (User.email == emp_phone) | 
+            (User.email == emp_name) | 
+            (User.email == f"{emp_name}@{emp_name}.com")
+        ).all()
+        for u in associated_users:
+            u_email = u.email
+            db.session.delete(u)
+            try:
+                from sqlalchemy import text
+                with db.get_master_engine().begin() as m_conn:
+                    m_conn.execute(text("DELETE FROM tenant_lookups WHERE email = :email"), {"email": u_email})
+            except Exception:
+                pass
+
+        # 4. Permanently delete Employee record from tenant database
+        db.session.delete(employee)
         db.session.commit()
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Error deleting employee: {str(e)}")
+        logger.error(f"Error permanently deleting employee: {str(e)}")
         return error_response(
             error_code="DATABASE_ERROR",
             message="Failed to delete employee record.",
             status_code=500
         )
 
-    return success_response({"message": "Employee soft-deleted successfully."})
+    return success_response({"message": "Employee permanently deleted from database."})

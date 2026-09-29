@@ -2169,7 +2169,7 @@ function Billing() {
                   <label className="block text-xs font-bold text-slate-700">Select Customer *</label>
                   {selectedCustomerId && selectedCustomerId !== "walkin" && (
                     <div className="flex items-center space-x-2">
-                      {selectedCustomerId && newlyCreatedCustomerId && String(selectedCustomerId) === String(newlyCreatedCustomerId) && (
+                      {(!activeMembership || (newlyCreatedCustomerId && String(selectedCustomerId) === String(newlyCreatedCustomerId))) && (
                         <button
                           type="button"
                           onClick={() => openAssignMembershipModal()}

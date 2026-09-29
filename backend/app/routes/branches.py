@@ -11,6 +11,14 @@ import logging
 logger = logging.getLogger(__name__)
 branches_bp = Blueprint("branches", __name__)
 
+def get_client_ip():
+    """Retrieve real client public IP address from request headers or remote_addr."""
+    if request.headers.get("X-Forwarded-For"):
+        return request.headers.get("X-Forwarded-For").split(",")[0].strip()
+    if request.headers.get("X-Real-IP"):
+        return request.headers.get("X-Real-IP").strip()
+    return (request.remote_addr or "").strip()
+
 @branches_bp.route("/branches", methods=["GET"])
 @require_role(["ParlourAdmin", "BranchAdmin", "Employee", "Receptionist"])
 def get_branches():
@@ -30,6 +38,7 @@ def get_branches():
         db.session.commit()
         branches = [default_b]
 
+    current_ip = get_client_ip()
     data = []
     for b in branches:
         is_main = bool(b.is_main_branch)
@@ -46,6 +55,10 @@ def get_branches():
             "latitude": float(b.latitude) if b.latitude is not None else None,
             "longitude": float(b.longitude) if b.longitude is not None else None,
             "geofence_radius_meters": b.geofence_radius_meters or 100,
+            "wifi_ssid": b.wifi_ssid,
+            "wifi_public_ip": b.wifi_public_ip,
+            "enforce_wifi": bool(b.enforce_wifi),
+            "client_detected_ip": current_ip,
             "created_at": b.created_at.isoformat() if b.created_at else ""
         })
     return success_response(data)
@@ -129,6 +142,9 @@ def create_branch():
         lat = data.get("latitude")
         lng = data.get("longitude")
         radius = data.get("geofence_radius_meters")
+        wifi_ssid = data.get("wifi_ssid", "").strip() if data.get("wifi_ssid") else None
+        wifi_public_ip = data.get("wifi_public_ip", "").strip() if data.get("wifi_public_ip") else None
+        enforce_wifi = bool(data.get("enforce_wifi", False))
 
         # Create branch
         logger.info(f"Creating branch with tenant_id={g.parlour_id}, name={name}")
@@ -143,7 +159,10 @@ def create_branch():
             status="active",
             latitude=float(lat) if lat not in (None, "") else None,
             longitude=float(lng) if lng not in (None, "") else None,
-            geofence_radius_meters=int(radius) if radius not in (None, "") else 100
+            geofence_radius_meters=int(radius) if radius not in (None, "") else 100,
+            wifi_ssid=wifi_ssid,
+            wifi_public_ip=wifi_public_ip,
+            enforce_wifi=enforce_wifi
         )
         db.session.add(branch)
         logger.info("Branch added to session, flushing...")
@@ -264,6 +283,12 @@ def update_branch(branch_id):
                 branch.geofence_radius_meters = int(data["geofence_radius_meters"])
             except (TypeError, ValueError):
                 pass
+        if "wifi_ssid" in data:
+            branch.wifi_ssid = data["wifi_ssid"].strip() if data["wifi_ssid"] else None
+        if "wifi_public_ip" in data:
+            branch.wifi_public_ip = data["wifi_public_ip"].strip() if data["wifi_public_ip"] else None
+        if "enforce_wifi" in data:
+            branch.enforce_wifi = bool(data["enforce_wifi"])
 
         db.session.commit()
         return success_response({"message": "Branch updated successfully."})
@@ -297,6 +322,7 @@ def get_branch(branch_id):
             status_code=404
         )
 
+    current_ip = get_client_ip()
     return success_response({
         "id": branch.id,
         "name": branch.name,
@@ -309,6 +335,10 @@ def get_branch(branch_id):
         "latitude": float(branch.latitude) if branch.latitude is not None else None,
         "longitude": float(branch.longitude) if branch.longitude is not None else None,
         "geofence_radius_meters": branch.geofence_radius_meters or 100,
+        "wifi_ssid": branch.wifi_ssid,
+        "wifi_public_ip": branch.wifi_public_ip,
+        "enforce_wifi": bool(branch.enforce_wifi),
+        "client_detected_ip": current_ip,
         "created_at": branch.created_at.isoformat() if branch.created_at else ""
     })
 

@@ -4,6 +4,7 @@ import { useModalFocusTrap, useFormKeyboardNavigation, focusAndOpenSelect } from
 import { UserRoundX, X, MessageSquare, Phone, AlertTriangle, Calendar, Settings as SettingsIcon, Printer, FileSpreadsheet, FileText, Upload, Eye } from "lucide-react";
 import { exportToCSV, printDataList, exportToPDF, exportToExcel } from "../utils/exportUtils";
 import BulkUploadModal from "../components/BulkUploadModal";
+import DeleteConfirmModal from "../components/DeleteConfirmModal";
 import { useToast } from "../context/ToastContext";
 
 function Customers() {
@@ -37,6 +38,8 @@ function Customers() {
   const [viewCustomer, setViewCustomer] = useState(null);
   const [editId, setEditId] = useState(null);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
@@ -205,10 +208,12 @@ function Customers() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.first_name.trim()) {
+      showError("Please enter First Name.");
       if (firstNameInputRef.current) firstNameInputRef.current.focus();
       return;
     }
     if (!formData.phone.trim()) {
+      showError("Please enter Phone Number.");
       if (phoneInputRef.current) phoneInputRef.current.focus();
       return;
     }
@@ -226,13 +231,25 @@ function Customers() {
       });
   };
 
-  const handleDelete = (id) => {
-    API.delete(`/customers/${id}`)
+  const handleDeleteClick = (c) => {
+    setDeleteTarget({
+      id: c.id,
+      name: c.name || `${c.first_name || ""} ${c.last_name || ""}`.trim() || c.phone || "Customer",
+    });
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    API.delete(`/customers/${deleteTarget.id}`)
       .then(() => {
-        showSuccess("Customer record deleted.");
+        showSuccess(`Customer "${deleteTarget.name}" permanently deleted.`);
+        setDeleteTarget(null);
+        setIsDeleting(false);
         fetchCustomers(cursor);
       })
       .catch((err) => {
+        setIsDeleting(false);
         showError(err.response?.data?.message || err.message || "Failed to delete customer.");
       });
   };
@@ -385,7 +402,10 @@ function Customers() {
                       <button onClick={() => openEditModal(c)} className="text-primary hover:underline">
                         Edit
                       </button>
-                      <button onClick={() => handleDelete(c.id)} className="text-danger hover:underline">
+                      <button
+                        onClick={() => handleDeleteClick(c)}
+                        className="text-danger hover:underline font-semibold"
+                      >
                         Delete
                       </button>
                     </td>
@@ -767,6 +787,17 @@ function Customers() {
           onSuccess={fetchCustomers}
         />
       )}
+
+      {/* Modern In-App Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={Boolean(deleteTarget)}
+        title="Delete Customer?"
+        itemName={deleteTarget?.name}
+        itemType="customer"
+        loading={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onClose={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

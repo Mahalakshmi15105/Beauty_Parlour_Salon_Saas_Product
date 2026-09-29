@@ -5,6 +5,7 @@ import { X, Printer, FileSpreadsheet, FileText, Upload, DollarSign, Eye, EyeOff,
 import { exportToCSV, printDataList, exportToPDF, exportToExcel } from "../utils/exportUtils";
 import BulkUploadModal from "../components/BulkUploadModal";
 import AddPayrollAdjustmentModal from "../components/AddPayrollAdjustmentModal";
+import DeleteConfirmModal from "../components/DeleteConfirmModal";
 import { useToast } from "../context/ToastContext";
 
 function Employees() {
@@ -13,6 +14,8 @@ function Employees() {
   const formRef = useRef(null);
   const firstNameInputRef = useRef(null);
   const phoneInputRef = useRef(null);
+  const usernameInputRef = useRef(null);
+  const passwordInputRef = useRef(null);
   const roleSelectRef = useRef(null);
 
   const [employees, setEmployees] = useState([]);
@@ -36,6 +39,8 @@ function Employees() {
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [showPayrollModal, setShowPayrollModal] = useState(false);
   const [selectedPayrollEmpId, setSelectedPayrollEmpId] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
@@ -218,11 +223,23 @@ function Employees() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.first_name.trim()) {
+      showError("Please enter First Name.");
       if (firstNameInputRef.current) firstNameInputRef.current.focus();
       return;
     }
     if (!formData.phone.trim()) {
+      showError("Please enter Phone Number.");
       if (phoneInputRef.current) phoneInputRef.current.focus();
+      return;
+    }
+    if (!formData.username.trim()) {
+      showError("Please enter Login Username / Email for the employee.");
+      if (usernameInputRef.current) usernameInputRef.current.focus();
+      return;
+    }
+    if (!editId && !formData.password.trim()) {
+      showError("Please set a Login Password for the employee.");
+      if (passwordInputRef.current) passwordInputRef.current.focus();
       return;
     }
 
@@ -262,14 +279,26 @@ function Employees() {
       });
   };
 
-  const handleDelete = (id) => {
-    API.delete(`/employees/${id}`)
+  const handleDeleteClick = (emp) => {
+    setDeleteTarget({
+      id: emp.id,
+      name: `${emp.first_name || ""} ${emp.last_name || ""}`.trim() || emp.phone || "Employee",
+    });
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    API.delete(`/employees/${deleteTarget.id}`)
       .then(() => {
-        showSuccess("Employee removed successfully.");
+        showSuccess(`Employee "${deleteTarget.name}" permanently deleted.`);
+        setDeleteTarget(null);
+        setIsDeleting(false);
         fetchEmployees(cursor);
       })
       .catch((err) => {
-        showError(err.message || "Failed to delete employee.");
+        setIsDeleting(false);
+        showError(err.response?.data?.message || err.message || "Failed to delete employee.");
       });
   };
 
@@ -387,7 +416,7 @@ function Employees() {
               <tbody className="divide-y divide-border-soft">
                 {employees.map((emp) => {
                   const showPass = !!visiblePasswords[emp.id];
-                  const displayEmail = emp.email || emp.username || (emp.phone ? `${emp.phone}@salon.com` : "-");
+                  const displayEmail = emp.username || emp.email || emp.phone || "-";
                   const displayPass = emp.password || emp.phone || "123456";
 
                   return (
@@ -446,7 +475,10 @@ function Employees() {
                         <button onClick={() => openEditModal(emp)} className="text-primary hover:underline font-bold">
                           Edit
                         </button>
-                        <button onClick={() => handleDelete(emp.id)} className="text-danger hover:underline">
+                        <button
+                          onClick={() => handleDeleteClick(emp)}
+                          className="text-danger hover:underline font-semibold"
+                        >
                           Delete
                         </button>
                       </td>
@@ -537,23 +569,31 @@ function Employees() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">Login Username / Email</label>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">
+                    Login Username / Email <span className="text-red-500">*</span>
+                  </label>
                   <input
+                    ref={usernameInputRef}
                     type="text"
+                    required
                     placeholder="Enter login username or email"
                     value={formData.username}
                     onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">Login Password</label>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">
+                    Login Password {!editId && <span className="text-red-500">*</span>}
+                  </label>
                   <input
+                    ref={passwordInputRef}
                     type="password"
+                    required={!editId}
                     placeholder={editId ? "Leave blank to keep current" : "Set employee password"}
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                   />
                 </div>
               </div>
@@ -831,6 +871,17 @@ function Employees() {
           </div>
         </div>
       )}
+
+      {/* Modern In-App Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={Boolean(deleteTarget)}
+        title="Delete Employee?"
+        itemName={deleteTarget?.name}
+        itemType="employee"
+        loading={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onClose={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
-import { Building2, Plus, Edit, Trash2, AlertTriangle, Check, X, Clock, Phone, Mail, MapPin } from "lucide-react";
+import { Building2, Plus, Edit, Trash2, AlertTriangle, Check, X, Clock, Phone, Mail, MapPin, Wifi } from "lucide-react";
 import { useModalFocusTrap, useFormKeyboardNavigation } from "../utils/keyboardNavigation";
 
 function BranchManagement() {
@@ -12,6 +12,7 @@ function BranchManagement() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [clientDetectedIp, setClientDetectedIp] = useState("127.0.0.1");
 
   // Modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -31,6 +32,9 @@ function BranchManagement() {
     latitude: "",
     longitude: "",
     geofence_radius_meters: 100,
+    wifi_ssid: "",
+    wifi_public_ip: "",
+    enforce_wifi: false,
   });
   const [detectingLoc, setDetectingLoc] = useState(false);
 
@@ -45,6 +49,10 @@ function BranchManagement() {
           ? branchesRes
           : (branchesRes?.data?.data || branchesRes?.data || branchesRes?.items || []);
         const limitData = limitRes?.data || limitRes || { max_branches: 3, current_branch_count: 0, can_create_more: true, remaining_branches: 3 };
+
+        if (branchList.length > 0 && branchList[0].client_detected_ip) {
+          setClientDetectedIp(branchList[0].client_detected_ip);
+        }
 
         setBranches(branchList);
         setBranchLimit(limitData);
@@ -107,6 +115,9 @@ function BranchManagement() {
           latitude: "",
           longitude: "",
           geofence_radius_meters: 100,
+          wifi_ssid: "",
+          wifi_public_ip: "",
+          enforce_wifi: false,
         });
         setSuccess("Branch created successfully!");
         setTimeout(() => setSuccess(null), 3000);
@@ -160,6 +171,9 @@ function BranchManagement() {
       latitude: branch.latitude !== null && branch.latitude !== undefined ? String(branch.latitude) : "",
       longitude: branch.longitude !== null && branch.longitude !== undefined ? String(branch.longitude) : "",
       geofence_radius_meters: branch.geofence_radius_meters || 100,
+      wifi_ssid: branch.wifi_ssid || "",
+      wifi_public_ip: branch.wifi_public_ip || "",
+      enforce_wifi: Boolean(branch.enforce_wifi),
       status: branch.status || "active",
     });
     setShowEditModal(true);
@@ -182,6 +196,9 @@ function BranchManagement() {
       latitude: "",
       longitude: "",
       geofence_radius_meters: 100,
+      wifi_ssid: "",
+      wifi_public_ip: "",
+      enforce_wifi: false,
     });
     setShowCreateModal(true);
   };
@@ -325,12 +342,19 @@ function BranchManagement() {
                   <Clock className="w-3.5 h-3.5" />
                   <span>{branch.opening_time} - {branch.closing_time}</span>
                 </div>
-                {/* Geofence Status Badge */}
-                <div className="pt-2 border-t border-border-soft">
+                {/* Geofence & Wi-Fi Status Badges */}
+                <div className="pt-2 border-t border-border-soft space-y-1.5">
+                  {branch.enforce_wifi && branch.wifi_public_ip ? (
+                    <div className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-md flex items-center space-x-1.5">
+                      <Wifi className="w-3 h-3 text-indigo-600 shrink-0" />
+                      <span>Wi-Fi Enforced: {branch.wifi_ssid || "Salon Network"} ({branch.wifi_public_ip})</span>
+                    </div>
+                  ) : null}
+
                   {branch.latitude && branch.longitude ? (
                     <div className="text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-md flex items-center space-x-1.5">
                       <MapPin className="w-3 h-3 text-emerald-600 shrink-0" />
-                      <span>GPS Configured ({Number(branch.latitude).toFixed(4)}, {Number(branch.longitude).toFixed(4)}) — Radius: {branch.geofence_radius_meters || 100}m</span>
+                      <span>GPS Configured ({Number(branch.latitude).toFixed(4)}, {Number(branch.longitude).toFixed(4)}) — {branch.geofence_radius_meters || 100}m</span>
                     </div>
                   ) : (
                     <div className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-md flex items-center space-x-1.5">
@@ -347,15 +371,15 @@ function BranchManagement() {
 
       {/* Create Branch Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div ref={modalRef} className="bg-surface max-w-md w-full rounded-lg shadow-lg border border-border-soft overflow-hidden">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
+          <div ref={modalRef} className="bg-surface max-w-lg w-full rounded-2xl shadow-xl border border-border-soft overflow-hidden my-8">
             <div className="px-6 py-4 border-b border-border-soft flex justify-between items-center">
-              <h3 className="text-md font-semibold text-text-primary">Create New Branch</h3>
+              <h3 className="text-md font-bold text-text-primary">Create New Branch</h3>
               <button onClick={() => setShowCreateModal(false)} className="text-text-secondary hover:text-text-primary">
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <form ref={formRef} onSubmit={handleCreateBranch} className="p-6 space-y-4">
+            <form ref={formRef} onSubmit={handleCreateBranch} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
               <div>
                 <label className="block text-xs font-semibold text-text-secondary mb-1">Branch Name *</label>
                 <input
@@ -423,6 +447,95 @@ function BranchManagement() {
                 </div>
               </div>
 
+              {/* Geofence GPS Coordinates */}
+              <div className="border-t border-border-soft pt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-text-primary">GPS Geofence Location</p>
+                  <button
+                    type="button"
+                    onClick={handleGetCurrentLocation}
+                    disabled={detectingLoc}
+                    className="text-[11px] text-primary font-bold hover:underline flex items-center space-x-1"
+                  >
+                    <MapPin className="w-3 h-3" />
+                    <span>{detectingLoc ? "Detecting..." : "Detect Current Location"}</span>
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="Latitude"
+                    value={formData.latitude}
+                    onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-2.5 py-1.5 rounded-lg text-xs"
+                  />
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="Longitude"
+                    value={formData.longitude}
+                    onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-2.5 py-1.5 rounded-lg text-xs"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Radius (m)"
+                    value={formData.geofence_radius_meters}
+                    onChange={(e) => setFormData({ ...formData, geofence_radius_meters: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-2.5 py-1.5 rounded-lg text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Wi-Fi Verification Setup */}
+              <div className="border-t border-border-soft pt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-1.5">
+                    <Wifi className="w-4 h-4 text-primary" />
+                    <span className="text-xs font-bold text-text-primary">Branch Wi-Fi Verification</span>
+                  </div>
+                  <label className="flex items-center space-x-1.5 cursor-pointer text-xs font-semibold">
+                    <input
+                      type="checkbox"
+                      checked={formData.enforce_wifi}
+                      onChange={(e) => setFormData({ ...formData, enforce_wifi: e.target.checked })}
+                      className="rounded text-primary focus:ring-primary h-3.5 w-3.5"
+                    />
+                    <span>Enforce Wi-Fi</span>
+                  </label>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    type="text"
+                    placeholder="Wi-Fi SSID (e.g. Branch_5G)"
+                    value={formData.wifi_ssid}
+                    onChange={(e) => setFormData({ ...formData, wifi_ssid: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-xs"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Router Public IP"
+                    value={formData.wifi_public_ip}
+                    onChange={(e) => setFormData({ ...formData, wifi_public_ip: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-xs font-mono"
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData({ ...formData, wifi_public_ip: clientDetectedIp });
+                      setSuccess(`Filled current IP: ${clientDetectedIp}`);
+                      setTimeout(() => setSuccess(null), 3000);
+                    }}
+                    className="text-[11px] text-primary font-bold hover:underline"
+                  >
+                    Use Current IP ({clientDetectedIp})
+                  </button>
+                </div>
+              </div>
+
               <div className="border-t border-border-soft pt-4">
                 <p className="text-xs font-semibold text-text-secondary mb-2">Branch Admin (Optional)</p>
                 <div className="space-y-3">
@@ -471,15 +584,15 @@ function BranchManagement() {
 
       {/* Edit Branch Modal */}
       {showEditModal && editingBranch && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div ref={modalRef} className="bg-surface max-w-md w-full rounded-lg shadow-lg border border-border-soft overflow-hidden">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
+          <div ref={modalRef} className="bg-surface max-w-lg w-full rounded-2xl shadow-xl border border-border-soft overflow-hidden my-8">
             <div className="px-6 py-4 border-b border-border-soft flex justify-between items-center">
-              <h3 className="text-md font-semibold text-text-primary">Edit Branch</h3>
+              <h3 className="text-md font-bold text-text-primary">Edit Branch</h3>
               <button onClick={() => setShowEditModal(false)} className="text-text-secondary hover:text-text-primary">
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <form ref={formRef} onSubmit={handleUpdateBranch} className="p-6 space-y-4">
+            <form ref={formRef} onSubmit={handleUpdateBranch} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
               <div>
                 <label className="block text-xs font-semibold text-text-secondary mb-1">Branch Name *</label>
                 <input
@@ -543,8 +656,96 @@ function BranchManagement() {
                 </div>
               </div>
 
+              {/* Geofence GPS Coordinates */}
+              <div className="border-t border-border-soft pt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-text-primary">GPS Geofence Location</p>
+                  <button
+                    type="button"
+                    onClick={handleGetCurrentLocation}
+                    disabled={detectingLoc}
+                    className="text-[11px] text-primary font-bold hover:underline flex items-center space-x-1"
+                  >
+                    <MapPin className="w-3 h-3" />
+                    <span>{detectingLoc ? "Detecting..." : "Detect Current Location"}</span>
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="Latitude"
+                    value={formData.latitude}
+                    onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-2.5 py-1.5 rounded-lg text-xs"
+                  />
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="Longitude"
+                    value={formData.longitude}
+                    onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-2.5 py-1.5 rounded-lg text-xs"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Radius (m)"
+                    value={formData.geofence_radius_meters}
+                    onChange={(e) => setFormData({ ...formData, geofence_radius_meters: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-2.5 py-1.5 rounded-lg text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Wi-Fi Verification Setup */}
+              <div className="border-t border-border-soft pt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-1.5">
+                    <Wifi className="w-4 h-4 text-primary" />
+                    <span className="text-xs font-bold text-text-primary">Branch Wi-Fi Verification</span>
+                  </div>
+                  <label className="flex items-center space-x-1.5 cursor-pointer text-xs font-semibold">
+                    <input
+                      type="checkbox"
+                      checked={formData.enforce_wifi}
+                      onChange={(e) => setFormData({ ...formData, enforce_wifi: e.target.checked })}
+                      className="rounded text-primary focus:ring-primary h-3.5 w-3.5"
+                    />
+                    <span>Enforce Wi-Fi</span>
+                  </label>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    type="text"
+                    placeholder="Wi-Fi SSID (e.g. Branch_5G)"
+                    value={formData.wifi_ssid}
+                    onChange={(e) => setFormData({ ...formData, wifi_ssid: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-xs"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Router Public IP"
+                    value={formData.wifi_public_ip}
+                    onChange={(e) => setFormData({ ...formData, wifi_public_ip: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-xs font-mono"
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData({ ...formData, wifi_public_ip: clientDetectedIp });
+                      setSuccess(`Filled current IP: ${clientDetectedIp}`);
+                      setTimeout(() => setSuccess(null), 3000);
+                    }}
+                    className="text-[11px] text-primary font-bold hover:underline"
+                  >
+                    Use Current IP ({clientDetectedIp})
+                  </button>
+                </div>
+              </div>
+
               <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1">Status</label>
                 <label className="block text-xs font-semibold text-text-secondary mb-1">Status</label>
                 <select
                   value={formData.status}

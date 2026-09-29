@@ -314,18 +314,50 @@ def delete_customer(customer_id):
         )
 
     try:
-        customer.soft_delete()
+        # 1. Clean up customer feedback, reminders, memberships
+        from app.models.customer import CustomerFeedback, Reminder
+        from app.models.membership import CustomerMembership, MembershipBenefit
+        from app.models.appointment import Appointment, AppointmentItem
+        from app.models.billing import Invoice
+
+        try:
+            CustomerFeedback.query.filter_by(customer_id=customer.id).delete()
+        except Exception:
+            pass
+
+        try:
+            Reminder.query.filter_by(customer_id=customer.id).delete()
+        except Exception:
+            pass
+
+        try:
+            memberships = CustomerMembership.query.filter_by(customer_id=customer.id).all()
+            for m in memberships:
+                MembershipBenefit.query.filter_by(customer_membership_id=m.id).delete()
+                db.session.delete(m)
+        except Exception:
+            pass
+
+        try:
+            AppointmentItem.query.filter_by(customer_id=customer.id).update({"customer_id": None})
+            Appointment.query.filter_by(customer_id=customer.id).update({"customer_id": None})
+            Invoice.query.filter_by(customer_id=customer.id).update({"customer_id": None})
+        except Exception:
+            pass
+
+        # 2. Permanently delete Customer record from tenant database
+        db.session.delete(customer)
         db.session.commit()
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Error deleting customer: {str(e)}")
+        logger.error(f"Error permanently deleting customer: {str(e)}")
         return error_response(
             error_code="DATABASE_ERROR",
             message="Failed to delete customer record.",
             status_code=500
         )
 
-    return success_response({"message": "Customer soft-deleted successfully."})
+    return success_response({"message": "Customer permanently deleted from database."})
 
 
 @customers_bp.route("/customers/<int:customer_id>/memberships", methods=["GET"])

@@ -382,8 +382,8 @@ export default function TouchModeBilling({
             )}
           </div>
 
-          {/* Add Membership Button (Shown ONLY when a new customer was added in this billing session) */}
-          {selectedCustomerId && newlyCreatedCustomerId && String(selectedCustomerId) === String(newlyCreatedCustomerId) && (
+          {/* Add Membership Button (Shown when customer has no active membership plan or is newly added) */}
+          {selectedCustomerId && selectedCustomerId !== "walkin" && (!activeMembership || (newlyCreatedCustomerId && String(selectedCustomerId) === String(newlyCreatedCustomerId))) && (
             <div className="pt-1">
               <button
                 type="button"

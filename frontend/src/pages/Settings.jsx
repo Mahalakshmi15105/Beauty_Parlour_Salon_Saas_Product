@@ -34,6 +34,7 @@ import {
   Sliders,
   Network,
   Award,
+  Wifi,
 } from "lucide-react";
 import WhatsAppIntegration from "./WhatsAppIntegration";
 import BranchManagement from "./BranchManagement";
@@ -110,6 +111,10 @@ function Settings() {
       latitude: "",
       longitude: "",
       geofence_radius_meters: 100,
+      wifi_ssid: "",
+      wifi_public_ip: "",
+      enforce_wifi: false,
+      client_detected_ip: "",
       shop_name_typography: { ...DEFAULT_TYPOGRAPHY },
     },
     invoice_settings: {
@@ -1211,6 +1216,115 @@ function Settings() {
                   >
                     Save Geofence Location
                   </button>
+                </div>
+              </div>
+
+              {/* SALON WI-FI NETWORK ATTENDANCE VERIFICATION */}
+              <div className="p-6 bg-background/50 border border-border-soft rounded-2xl space-y-4">
+                <div className="flex items-center justify-between border-b border-border-soft pb-3">
+                  <div className="flex items-center space-x-2">
+                    <Wifi className="w-5 h-5 text-primary" />
+                    <div>
+                      <h3 className="text-sm font-bold text-text-primary">Salon Wi-Fi Network Attendance Verification</h3>
+                      <p className="text-[11px] text-text-secondary">
+                        Enforce attendance recording strictly when employees are connected to your parlour's Wi-Fi router / front-desk network.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Enable / Disable Wi-Fi Enforcement Toggle */}
+                  <label className="flex items-center space-x-2 cursor-pointer bg-surface px-3 py-1.5 rounded-lg border border-border-soft select-none">
+                    <span className="text-xs font-bold text-text-primary">Enforce Wi-Fi Check-in</span>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(settingsData.business_profile.enforce_wifi)}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setSettingsData((prev) => ({
+                          ...prev,
+                          business_profile: {
+                            ...prev.business_profile,
+                            enforce_wifi: checked,
+                          },
+                        }));
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary relative"></div>
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-text-secondary mb-1">SALON WI-FI NAME (SSID)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Negha_Parlour_5G or Reception_WiFi"
+                      value={settingsData.business_profile.wifi_ssid || ""}
+                      onChange={(e) =>
+                        setSettingsData({
+                          ...settingsData,
+                          business_profile: { ...settingsData.business_profile, wifi_ssid: e.target.value },
+                        })
+                      }
+                      className="w-full bg-surface border border-border-soft px-3 py-2 rounded-xl text-xs focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-text-secondary mb-1">
+                      SALON ROUTER PUBLIC IP ADDRESS
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 103.120.45.12"
+                      value={settingsData.business_profile.wifi_public_ip || ""}
+                      onChange={(e) =>
+                        setSettingsData({
+                          ...settingsData,
+                          business_profile: { ...settingsData.business_profile, wifi_public_ip: e.target.value },
+                        })
+                      }
+                      className="w-full bg-surface border border-border-soft px-3 py-2 rounded-xl text-xs focus:outline-none focus:border-primary font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                  <div className="flex items-center space-x-2 text-xs text-text-secondary">
+                    <span>Current Detected IP:</span>
+                    <span className="font-mono font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
+                      {settingsData.business_profile.client_detected_ip || "127.0.0.1"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center space-x-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const ipToUse = settingsData.business_profile.client_detected_ip || "127.0.0.1";
+                        setSettingsData((prev) => ({
+                          ...prev,
+                          business_profile: {
+                            ...prev.business_profile,
+                            wifi_public_ip: ipToUse,
+                          },
+                        }));
+                        showSuccess(`Registered current IP (${ipToUse}) as salon Wi-Fi router IP!`);
+                      }}
+                      className="px-4 py-2 border border-primary text-primary hover:bg-primary/10 rounded-xl text-xs font-bold transition flex items-center space-x-1.5"
+                    >
+                      <Wifi className="w-3.5 h-3.5" />
+                      <span>Register Current Wi-Fi IP</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleSave}
+                      className="px-5 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-bold shadow-xs transition"
+                    >
+                      Save Wi-Fi Settings
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

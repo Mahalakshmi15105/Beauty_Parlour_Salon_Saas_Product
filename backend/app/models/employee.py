@@ -11,6 +11,8 @@ class Employee(db.Model, TimestampMixin, SoftDeleteMixin):
     branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     first_name = db.Column(db.String(100), nullable=False)
     last_name = db.Column(db.String(100), nullable=True)
+    email = db.Column(db.String(120), nullable=True)
+    username = db.Column(db.String(100), nullable=True)
     phone = db.Column(db.String(30), nullable=False, index=True)
     specialization = db.Column(db.String(100), nullable=True)
     role = db.Column(db.String(100), nullable=True)

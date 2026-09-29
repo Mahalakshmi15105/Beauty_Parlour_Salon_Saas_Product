@@ -29,6 +29,11 @@ class Branch(db.Model, TimestampMixin, SoftDeleteMixin):
     geofence_radius_meters = db.Column(db.Integer, nullable=False, default=100)
     initial_opening_balance = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
 
+    # Branch Wi-Fi Network Attendance Verification
+    wifi_ssid = db.Column(db.String(100), nullable=True)
+    wifi_public_ip = db.Column(db.String(100), nullable=True)
+    enforce_wifi = db.Column(db.Boolean, nullable=False, default=False)
+
     # Relationships
     users = db.relationship("User", back_populates="branch")
 

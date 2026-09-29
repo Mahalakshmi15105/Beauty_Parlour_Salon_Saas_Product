@@ -13,6 +13,14 @@ import io
 logger = logging.getLogger(__name__)
 settings_bp = Blueprint("settings", __name__)
 
+def get_client_ip():
+    """Retrieve real client public IP address from request headers or remote_addr."""
+    if request.headers.get("X-Forwarded-For"):
+        return request.headers.get("X-Forwarded-For").split(",")[0].strip()
+    if request.headers.get("X-Real-IP"):
+        return request.headers.get("X-Real-IP").strip()
+    return (request.remote_addr or "").strip()
+
 @settings_bp.route("/settings", methods=["GET"])
 @require_role(["ParlourAdmin", "BranchAdmin", "Receptionist", "Employee"])
 def get_settings():
@@ -74,6 +82,10 @@ def get_settings():
     main_lat = float(main_branch.latitude) if main_branch and main_branch.latitude is not None else None
     main_lng = float(main_branch.longitude) if main_branch and main_branch.longitude is not None else None
     main_radius = main_branch.geofence_radius_meters if main_branch and main_branch.geofence_radius_meters else 100
+    main_wifi_ssid = main_branch.wifi_ssid if main_branch else None
+    main_wifi_ip = main_branch.wifi_public_ip if main_branch else None
+    main_enforce_wifi = bool(main_branch.enforce_wifi) if main_branch else False
+    client_ip = get_client_ip()
 
     return success_response({
         "business_profile": {
@@ -94,6 +106,10 @@ def get_settings():
             "latitude": main_lat,
             "longitude": main_lng,
             "geofence_radius_meters": main_radius,
+            "wifi_ssid": main_wifi_ssid,
+            "wifi_public_ip": main_wifi_ip,
+            "enforce_wifi": main_enforce_wifi,
+            "client_detected_ip": client_ip,
             "shop_name_typography": {
                 "enabled": bool(_get("shop_name_font_enabled", False)),
                 "font_family": _get("shop_name_font", "Outfit") or "Outfit",
@@ -181,8 +197,8 @@ def update_settings():
     mkt = data.get("marketing_settings", {})
 
     try:
-        # Update Main Branch Geofence Coordinates if provided in Business Profile
-        if g.role == "ParlourAdmin" and ("latitude" in biz or "longitude" in biz or "geofence_radius_meters" in biz):
+        # Update Main Branch Geofence Coordinates & Wi-Fi Network Verification
+        if g.role == "ParlourAdmin" and ("latitude" in biz or "longitude" in biz or "geofence_radius_meters" in biz or "wifi_ssid" in biz or "wifi_public_ip" in biz or "enforce_wifi" in biz):
             mb = Branch.query.filter_by(tenant_id=g.parlour_id, is_main_branch=True, is_deleted=False).first()
             if not mb:
                 mb = Branch.query.filter_by(tenant_id=g.parlour_id, is_deleted=False).order_by(Branch.id.asc()).first()
@@ -202,6 +218,12 @@ def update_settings():
                         mb.geofence_radius_meters = int(biz["geofence_radius_meters"]) if biz["geofence_radius_meters"] not in (None, "", "null") else 100
                     except (TypeError, ValueError):
                         pass
+                if "wifi_ssid" in biz:
+                    mb.wifi_ssid = biz["wifi_ssid"].strip() if biz["wifi_ssid"] else None
+                if "wifi_public_ip" in biz:
+                    mb.wifi_public_ip = biz["wifi_public_ip"].strip() if biz["wifi_public_ip"] else None
+                if "enforce_wifi" in biz:
+                    mb.enforce_wifi = bool(biz["enforce_wifi"])
 
         # Update Business Profile across tenant setting rows
         for setting in settings_list:

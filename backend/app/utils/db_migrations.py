@@ -86,12 +86,42 @@ def run_auto_migrations():
         except Exception:
             db.session.rollback()
 
-        # 4. Add geofencing & main branch columns to branches table if missing
-        for col_name, col_def in [("is_main_branch", "TINYINT(1) NOT NULL DEFAULT 0"), ("latitude", "DECIMAL(10, 8) NULL"), ("longitude", "DECIMAL(11, 8) NULL"), ("geofence_radius_meters", "INT NOT NULL DEFAULT 100")]:
+        # 4. Add geofencing & Wi-Fi columns to branches table if missing
+        BRANCH_COLS = [
+            ("is_main_branch", "TINYINT(1) NOT NULL DEFAULT 0"),
+            ("latitude", "DECIMAL(10, 8) NULL"),
+            ("longitude", "DECIMAL(11, 8) NULL"),
+            ("geofence_radius_meters", "INT NOT NULL DEFAULT 100"),
+            ("wifi_ssid", "VARCHAR(100) NULL"),
+            ("wifi_public_ip", "VARCHAR(100) NULL"),
+            ("enforce_wifi", "TINYINT(1) NOT NULL DEFAULT 0")
+        ]
+        for col_name, col_def in BRANCH_COLS:
             try:
                 db.session.execute(text(f"ALTER TABLE `branches` ADD COLUMN `{col_name}` {col_def};"))
                 db.session.commit()
                 logger.info(f"AUTO-MIGRATION: Added '{col_name}' column to table 'branches'.")
+            except Exception:
+                db.session.rollback()
+
+        # 5. Add employee extra columns if missing
+        EMPLOYEE_COLS = [
+            ("email", "VARCHAR(120) NULL"),
+            ("username", "VARCHAR(100) NULL"),
+            ("shift_start_time", "VARCHAR(10) NULL DEFAULT '09:00'"),
+            ("shift_end_time", "VARCHAR(10) NULL DEFAULT '18:00'"),
+            ("monthly_offs", "INT NOT NULL DEFAULT 4"),
+            ("password_plain", "VARCHAR(100) NULL"),
+            ("level", "VARCHAR(50) NOT NULL DEFAULT 'L1'"),
+            ("target", "DECIMAL(10, 2) NOT NULL DEFAULT 0.00"),
+            ("commission_percentage", "DECIMAL(5, 2) NOT NULL DEFAULT 0.00"),
+            ("status", "VARCHAR(50) NOT NULL DEFAULT 'active'")
+        ]
+        for col_name, col_def in EMPLOYEE_COLS:
+            try:
+                db.session.execute(text(f"ALTER TABLE `employees` ADD COLUMN `{col_name}` {col_def};"))
+                db.session.commit()
+                logger.info(f"AUTO-MIGRATION: Added '{col_name}' column to table 'employees'.")
             except Exception:
                 db.session.rollback()
 
