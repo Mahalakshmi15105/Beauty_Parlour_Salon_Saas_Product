@@ -140,6 +140,46 @@ def login():
                 db.session.rollback()
                 user = User.query.filter_by(email=clean_ident, is_deleted=False).first()
 
+    if not user and lookup and lookup.email.lower() == clean_ident.lower():
+        try:
+            current_app.logger.info(f"[Login] Auto-provisioning missing ParlourAdmin for '{clean_ident}' in tenant {tenant.id}...")
+            user = User(
+                tenant_id=tenant.id,
+                email=clean_ident,
+                role="ParlourAdmin",
+                status="active"
+            )
+            user.set_password(password)
+            db.session.add(user)
+
+            from app.models.branch import Branch
+            if not Branch.query.filter_by(tenant_id=tenant.id).first():
+                main_b = Branch(
+                    tenant_id=tenant.id,
+                    name=f"{tenant.name} (Main Branch)",
+                    is_main_branch=True,
+                    status="active"
+                )
+                db.session.add(main_b)
+
+            from app.models.user import TenantSetting
+            if not TenantSetting.query.first():
+                setting = TenantSetting(
+                    tenant_id=tenant.id,
+                    tax_name="GST",
+                    tax_rate=18.00,
+                    currency="INR",
+                    currency_symbol="₹"
+                )
+                db.session.add(setting)
+
+            db.session.commit()
+            current_app.logger.info(f"[Login] Successfully self-healed ParlourAdmin and Branch for '{clean_ident}'")
+        except Exception as seed_err:
+            db.session.rollback()
+            current_app.logger.warning(f"[Login] Could not auto-seed ParlourAdmin: {seed_err}")
+            user = User.query.filter_by(email=clean_ident, is_deleted=False).first()
+
     if not user:
         current_app.logger.warning(f"[Login] User '{clean_ident}' not found in tenant DB '{tenant_db_uri}'")
         return error_response(

@@ -615,6 +615,79 @@ def get_tenant_details(tenant_id):
     })
 
 
+@super_admin_bp.route("/super-admin/tenants/<int:tenant_id>/sync-schema", methods=["POST"])
+@require_role(["SuperAdmin"])
+def sync_tenant_schema(tenant_id):
+    """Synchronizes tenant database schema, ensures privileges, and heals missing admin/branch records."""
+    g.use_master_db = True
+    tenant = Tenant.query.filter_by(id=tenant_id).first()
+    if not tenant:
+        return error_response(
+            error_code="TENANT_NOT_FOUND",
+            message="Tenant not found.",
+            status_code=404
+        )
+
+    if not tenant.db_connection_uri:
+        return error_response(
+            error_code="DB_URI_MISSING",
+            message="Tenant has no database connection configured.",
+            status_code=400
+        )
+
+    import re
+    master_uri = current_app.config.get("MASTER_DATABASE_URI") or current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    from app.db_bootstrap import sanitize_tenant_uri, ensure_database_exists, sync_metadata_columns
+    from app.database import tenant_metadata
+    from app.services.cpanel_service import cpanel_service
+
+    clean_uri = sanitize_tenant_uri(tenant.db_connection_uri, master_uri)
+    m = re.search(r"/([^/?]+)(\?.*)?$", clean_uri)
+    dbname = m.group(1) if m else tenant.db_name
+    m_user = re.search(r"//([^:@]+)", master_uri)
+    db_user = m_user.group(1) if m_user else "smartgo1_salon_user"
+
+    # 1. Ensure cPanel permissions
+    if cpanel_service.is_configured():
+        cpanel_service.create_database(dbname, db_user)
+
+    # 2. Ensure DB exists
+    ensure_database_exists(clean_uri)
+
+    # 3. Create tables and sync columns
+    t_engine = db.get_tenant_engine(clean_uri)
+    tenant_metadata.create_all(bind=t_engine)
+    sync_metadata_columns(t_engine, tenant_metadata)
+
+    # 4. Self-heal ParlourAdmin and main branch if missing
+    lookup = TenantLookup.query.filter_by(tenant_id=tenant.id).first()
+    admin_email = lookup.email if lookup else f"admin_{tenant.id}@salon.com"
+    try:
+        with t_engine.connect() as conn:
+            res_u = conn.execute(text("SELECT id FROM users WHERE email = :email LIMIT 1;"), {"email": admin_email}).first()
+            if not res_u:
+                from werkzeug.security import generate_password_hash
+                default_hash = generate_password_hash("Admin123!")
+                conn.execute(
+                    text("INSERT INTO users (tenant_id, email, password_hash, role, status, is_deleted) VALUES (:t_id, :email, :pwd, 'ParlourAdmin', 'active', 0)"),
+                    {"t_id": tenant.id, "email": admin_email, "pwd": default_hash}
+                )
+            res_b = conn.execute(text("SELECT id FROM branches WHERE tenant_id = :t_id LIMIT 1;"), {"t_id": tenant.id}).first()
+            if not res_b:
+                conn.execute(
+                    text("INSERT INTO branches (tenant_id, name, is_main_branch, status, is_deleted) VALUES (:t_id, :name, 1, 'active', 0)"),
+                    {"t_id": tenant.id, "name": f"{tenant.name} (Main Branch)"}
+                )
+            conn.commit()
+    except Exception as heal_err:
+        logger.warning(f"Notice during tenant {tenant.id} self-heal: {heal_err}")
+
+    return success_response({
+        "message": f"Successfully synchronized schema for tenant {tenant.id} ({tenant.name}).",
+        "tenant_id": tenant.id
+    })
+
+
 @super_admin_bp.route("/super-admin/subscription-plans", methods=["POST"])
 @require_role(["SuperAdmin"])
 def create_subscription_plan():

@@ -207,7 +207,9 @@ def require_role(roles):
                             {"id": parlour_id}
                         ).fetchone()
                         if row and row[0]:
-                            tenant_db_uri = row[0]
+                            from app.db_bootstrap import sanitize_tenant_uri
+                            master_uri = current_app.config.get("MASTER_DATABASE_URI") or current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
+                            tenant_db_uri = sanitize_tenant_uri(row[0], master_uri)
                 except Exception as e:
                     logger.error(f"Failed to fetch tenant DB URI in auth: {e}")
 

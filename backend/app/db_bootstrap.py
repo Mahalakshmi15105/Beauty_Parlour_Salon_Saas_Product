@@ -97,12 +97,24 @@ def ensure_database_exists(database_uri: str):
     # Build an admin URI that connects without selecting the target DB
     if dialect.startswith("mysql"):
         # First attempt via cPanel API if configured (required on shared cPanel hosting)
+        cpanel_handled = False
         try:
             from app.services.cpanel_service import cpanel_service
             if cpanel_service.is_configured():
-                cpanel_service.create_database(dbname, user)
+                cpanel_handled = cpanel_service.create_database(dbname, user)
         except Exception as cp_err:
             logger.warning(f"[cPanel API] Pre-create attempt notice: {cp_err}")
+
+        # If cPanel is active and successfully provisioned, verify direct connection
+        if cpanel_handled:
+            try:
+                test_engine = create_engine(database_uri, pool_pre_ping=True)
+                with test_engine.connect() as test_conn:
+                    logger.info(f"SUCCESS: Database '{dbname}' is ready via cPanel UAPI.")
+                test_engine.dispose()
+                return
+            except Exception as test_err:
+                logger.info(f"Direct connection to '{dbname}' after cPanel creation notice: {test_err}")
 
         admin_uri = f"mysql+pymysql://{user}:{password}@{host}:{port}/"
         create_sql = f"CREATE DATABASE IF NOT EXISTS `{dbname}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"

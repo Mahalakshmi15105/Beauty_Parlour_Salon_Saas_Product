@@ -81,16 +81,24 @@ class CPanelService:
             target_user = "smartgo1_salon_user"
         full_user_name = target_user if target_user.startswith(prefix) else f"{prefix}{target_user}"
 
+        # cPanel UAPI requires a comma-separated list of individual privileges.
+        # Passing 'ALL PRIVILEGES' is treated as an unrecognized privilege and ignored.
+        all_privileges = (
+            "ALTER,ALTER ROUTINE,CREATE,CREATE ROUTINE,CREATE TEMPORARY TABLES,"
+            "CREATE VIEW,DELETE,DROP,EVENT,EXECUTE,INDEX,INSERT,LOCK TABLES,"
+            "REFERENCES,SELECT,SHOW VIEW,TRIGGER,UPDATE"
+        )
+
         priv_url = f"{self.base_url}/Mysql/set_privileges_on_database"
         try:
-            logger.info(f"[cPanel API] Setting ALL PRIVILEGES on '{full_db_name}' for user '{full_user_name}'...")
+            logger.info(f"[cPanel API] Setting privileges on '{full_db_name}' for user '{full_user_name}'...")
             res_priv = requests.post(
                 priv_url,
                 headers=headers,
                 data={
                     "user": full_user_name,
                     "database": full_db_name,
-                    "privileges": "ALL PRIVILEGES"
+                    "privileges": all_privileges
                 },
                 verify=False,
                 timeout=20
