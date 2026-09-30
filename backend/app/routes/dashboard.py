@@ -19,11 +19,11 @@ dashboard_bp = Blueprint("dashboard", __name__)
 @dashboard_bp.route("/dashboard/summary", methods=["GET"])
 @require_role(["ParlourAdmin", "BranchAdmin", "Employee"])
 def get_summary():
-    now = datetime.now(timezone.utc)
-    today_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    today_start = datetime(now.year, now.month, now.day)
     week_start = now - timedelta(days=7)
     month_start = now - timedelta(days=30)
-    month_first_day = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
+    month_first_day = datetime(now.year, now.month, 1)
 
     # 1. Total & Period Revenue Calculations (Excluding Voided Invoices)
     base_inv_query = db.session.query(func.coalesce(func.sum(Invoice.total), Decimal("0.00"))).filter(
@@ -184,7 +184,7 @@ def get_charts():
     except ValueError:
         range_days = 7
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     start_date = now - timedelta(days=range_days)
 
     # 1. Daily Revenue Trend

@@ -1059,8 +1059,8 @@ function SuperAdmin() {
                   type="number"
                   required
                   placeholder="30"
-                  value={planForm.duration_days}
-                  onChange={(e) => setPlanForm({ ...planForm, duration_days: parseInt(e.target.value) })}
+                  value={planForm.duration_days ?? ""}
+                  onChange={(e) => setPlanForm({ ...planForm, duration_days: e.target.value === "" ? "" : (parseInt(e.target.value) || 0) })}
                   className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
                 />
               </div>
@@ -1070,8 +1070,8 @@ function SuperAdmin() {
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Max Employees</label>
                   <input
                     type="number"
-                    value={planForm.max_employees}
-                    onChange={(e) => setPlanForm({ ...planForm, max_employees: parseInt(e.target.value) })}
+                    value={planForm.max_employees ?? ""}
+                    onChange={(e) => setPlanForm({ ...planForm, max_employees: e.target.value === "" ? "" : (parseInt(e.target.value) || 0) })}
                     className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
                   />
                 </div>
@@ -1079,8 +1079,8 @@ function SuperAdmin() {
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Max Services</label>
                   <input
                     type="number"
-                    value={planForm.max_services}
-                    onChange={(e) => setPlanForm({ ...planForm, max_services: parseInt(e.target.value) })}
+                    value={planForm.max_services ?? ""}
+                    onChange={(e) => setPlanForm({ ...planForm, max_services: e.target.value === "" ? "" : (parseInt(e.target.value) || 0) })}
                     className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
                   />
                 </div>
@@ -1088,8 +1088,8 @@ function SuperAdmin() {
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Max Customers</label>
                   <input
                     type="number"
-                    value={planForm.max_customers}
-                    onChange={(e) => setPlanForm({ ...planForm, max_customers: parseInt(e.target.value) })}
+                    value={planForm.max_customers ?? ""}
+                    onChange={(e) => setPlanForm({ ...planForm, max_customers: e.target.value === "" ? "" : (parseInt(e.target.value) || 0) })}
                     className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
                   />
                 </div>
@@ -1097,8 +1097,8 @@ function SuperAdmin() {
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Max Branches</label>
                   <input
                     type="number"
-                    value={planForm.max_branches}
-                    onChange={(e) => setPlanForm({ ...planForm, max_branches: parseInt(e.target.value) })}
+                    value={planForm.max_branches ?? ""}
+                    onChange={(e) => setPlanForm({ ...planForm, max_branches: e.target.value === "" ? "" : (parseInt(e.target.value) || 0) })}
                     className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
                   />
                 </div>

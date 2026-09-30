@@ -23,23 +23,28 @@ def get_tenant_query_with_deleted(model):
 def get_branch_query(model):
     """
     Returns a query object for the model filtered strictly by branch_id within the active tenant database.
+    - If SuperAdmin: returns query unfiltered across platform.
     - If user is BranchAdmin/Receptionist/Employee: strictly filters by model.branch_id == g.branch_id.
-    - If user is ParlourAdmin/SuperAdmin:
+    - If user is ParlourAdmin:
         - branch_id="all": returns all records across parlour.
         - explicit branch_id or default: filters by that branch. For Main Branch, includes records where branch_id IS NULL.
     """
     query = model.query.filter_by(is_deleted=False) if hasattr(model, "is_deleted") else model.query
     
+    role = getattr(g, "role", None)
+    if role == "SuperAdmin":
+        return query
+
     if hasattr(model, "branch_id"):
-        role = getattr(g, "role", None)
         target_bid = getattr(g, "branch_id", None)
+        parlour_id = getattr(g, "parlour_id", None)
         
         from flask import request
         hdr_b = request.headers.get("X-Branch-Id") if request else None
         param_b = request.args.get("branch_id") if request else None
         b_param = hdr_b or param_b
 
-        if role in ["ParlourAdmin", "SuperAdmin"]:
+        if role == "ParlourAdmin":
             if b_param == "all":
                 return query
             if b_param and str(b_param).strip() not in ("all", "main", "null", "0", "None"):
@@ -48,19 +53,28 @@ def get_branch_query(model):
                 except (ValueError, TypeError):
                     pass
             
-            from app.models.branch import Branch
-            main_b = Branch.query.filter_by(tenant_id=getattr(g, "parlour_id", None), is_main_branch=True, is_deleted=False).first()
-            if not main_b:
-                main_b = Branch.query.filter_by(tenant_id=getattr(g, "parlour_id", None), is_deleted=False).order_by(Branch.id.asc()).first()
-            main_bid = main_b.id if main_b else 1
+            if parlour_id:
+                try:
+                    from app.models.branch import Branch
+                    main_b = Branch.query.filter_by(tenant_id=parlour_id, is_main_branch=True, is_deleted=False).first()
+                    if not main_b:
+                        main_b = Branch.query.filter_by(tenant_id=parlour_id, is_deleted=False).order_by(Branch.id.asc()).first()
+                    main_bid = main_b.id if main_b else 1
 
-            if target_bid:
-                if target_bid == main_bid:
-                    return query.filter((model.branch_id == target_bid) | (model.branch_id.is_(None)))
-                else:
-                    return query.filter(model.branch_id == target_bid)
-            else:
-                return query.filter((model.branch_id == main_bid) | (model.branch_id.is_(None)))
+                    if target_bid:
+                        if target_bid == main_bid:
+                            return query.filter((model.branch_id == target_bid) | (model.branch_id.is_(None)))
+                        else:
+                            return query.filter(model.branch_id == target_bid)
+                    else:
+                        return query.filter((model.branch_id == main_bid) | (model.branch_id.is_(None)))
+                except Exception as b_err:
+                    logger.warning(f"Branch query isolation fallback: {b_err}")
+                    if target_bid:
+                        return query.filter(model.branch_id == target_bid)
+                    return query
+            elif target_bid:
+                return query.filter(model.branch_id == target_bid)
 
         # BranchAdmin or branch staff - STRICT ISOLATION
         if target_bid:
@@ -74,16 +88,20 @@ def get_branch_query_with_deleted(model):
     """
     query = model.query
     
+    role = getattr(g, "role", None)
+    if role == "SuperAdmin":
+        return query
+
     if hasattr(model, "branch_id"):
-        role = getattr(g, "role", None)
         target_bid = getattr(g, "branch_id", None)
+        parlour_id = getattr(g, "parlour_id", None)
         
         from flask import request
         hdr_b = request.headers.get("X-Branch-Id") if request else None
         param_b = request.args.get("branch_id") if request else None
         b_param = hdr_b or param_b
 
-        if role in ["ParlourAdmin", "SuperAdmin"]:
+        if role == "ParlourAdmin":
             if b_param == "all":
                 return query
             if b_param and str(b_param).strip() not in ("all", "main", "null", "0", "None"):
@@ -92,19 +110,28 @@ def get_branch_query_with_deleted(model):
                 except (ValueError, TypeError):
                     pass
             
-            from app.models.branch import Branch
-            main_b = Branch.query.filter_by(tenant_id=getattr(g, "parlour_id", None), is_main_branch=True, is_deleted=False).first()
-            if not main_b:
-                main_b = Branch.query.filter_by(tenant_id=getattr(g, "parlour_id", None), is_deleted=False).order_by(Branch.id.asc()).first()
-            main_bid = main_b.id if main_b else 1
+            if parlour_id:
+                try:
+                    from app.models.branch import Branch
+                    main_b = Branch.query.filter_by(tenant_id=parlour_id, is_main_branch=True, is_deleted=False).first()
+                    if not main_b:
+                        main_b = Branch.query.filter_by(tenant_id=parlour_id, is_deleted=False).order_by(Branch.id.asc()).first()
+                    main_bid = main_b.id if main_b else 1
 
-            if target_bid:
-                if target_bid == main_bid:
-                    return query.filter((model.branch_id == target_bid) | (model.branch_id.is_(None)))
-                else:
-                    return query.filter(model.branch_id == target_bid)
-            else:
-                return query.filter((model.branch_id == main_bid) | (model.branch_id.is_(None)))
+                    if target_bid:
+                        if target_bid == main_bid:
+                            return query.filter((model.branch_id == target_bid) | (model.branch_id.is_(None)))
+                        else:
+                            return query.filter(model.branch_id == target_bid)
+                    else:
+                        return query.filter((model.branch_id == main_bid) | (model.branch_id.is_(None)))
+                except Exception as b_err:
+                    logger.warning(f"Branch query with deleted fallback: {b_err}")
+                    if target_bid:
+                        return query.filter(model.branch_id == target_bid)
+                    return query
+            elif target_bid:
+                return query.filter(model.branch_id == target_bid)
 
         if target_bid:
             query = query.filter(model.branch_id == target_bid)
@@ -191,7 +218,7 @@ def require_role(roles):
             g.role = role
             g.use_master_db = False
 
-            if role in ["ParlourAdmin", "SuperAdmin"]:
+            if role == "ParlourAdmin":
                 from flask import request
                 hdr_b = request.headers.get("X-Branch-Id") if request else None
                 param_b = request.args.get("branch_id") if request else None

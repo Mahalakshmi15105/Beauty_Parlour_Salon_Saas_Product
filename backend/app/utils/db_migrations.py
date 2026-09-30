@@ -92,6 +92,7 @@ def run_auto_migrations():
             ("latitude", "DECIMAL(10, 8) NULL"),
             ("longitude", "DECIMAL(11, 8) NULL"),
             ("geofence_radius_meters", "INT NOT NULL DEFAULT 100"),
+            ("initial_opening_balance", "DECIMAL(10, 2) NOT NULL DEFAULT 0.00"),
             ("wifi_ssid", "VARCHAR(100) NULL"),
             ("wifi_public_ip", "VARCHAR(100) NULL"),
             ("enforce_wifi", "TINYINT(1) NOT NULL DEFAULT 0")

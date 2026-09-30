@@ -147,6 +147,10 @@ def ensure_database_exists(database_uri: str):
                     conn.execute(text("ALTER TABLE branches ADD COLUMN latitude DECIMAL(10,8) NULL;"))
                     conn.execute(text("ALTER TABLE branches ADD COLUMN longitude DECIMAL(11,8) NULL;"))
                     conn.execute(text("ALTER TABLE branches ADD COLUMN geofence_radius_meters INT NOT NULL DEFAULT 100;"))
+                    conn.execute(text("ALTER TABLE branches ADD COLUMN initial_opening_balance DECIMAL(10,2) NOT NULL DEFAULT 0.00;"))
+                    conn.execute(text("ALTER TABLE branches ADD COLUMN wifi_ssid VARCHAR(100) NULL;"))
+                    conn.execute(text("ALTER TABLE branches ADD COLUMN wifi_public_ip VARCHAR(100) NULL;"))
+                    conn.execute(text("ALTER TABLE branches ADD COLUMN enforce_wifi BOOLEAN NOT NULL DEFAULT FALSE;"))
                     conn.commit()
                 except Exception:
                     pass

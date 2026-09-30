@@ -23,11 +23,16 @@ def create_app(config_class=Config):
 
     # Initialize extensions
     # CORS: Allow all origins including 192.168.137.1:5174, 192.168.137.135:5174, localhost
+    CORS_ALLOWED_HEADERS = [
+        "Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin",
+        "Access-Control-Request-Headers", "Access-Control-Request-Method",
+        "X-Branch-Id", "X-Tenant-Domain"
+    ]
     CORS(
         app,
         resources={r"/*": {"origins": "*"}},
         supports_credentials=True,
-        allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin", "Access-Control-Request-Headers", "Access-Control-Request-Method"],
+        allow_headers=CORS_ALLOWED_HEADERS,
         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
     )
 
@@ -40,7 +45,7 @@ def create_app(config_class=Config):
         else:
             response.headers["Access-Control-Allow-Origin"] = "*"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Headers, Access-Control-Request-Method"
+        response.headers["Access-Control-Allow-Headers"] = ", ".join(CORS_ALLOWED_HEADERS)
         return response
     # Configure Database-per-Tenant URI defaults dynamically from MASTER_DATABASE_URI
     import re
@@ -70,7 +75,10 @@ def create_app(config_class=Config):
     # AUTO DATABASE CREATION
     # If the master database does not exist (fresh server), create it first.
     # ------------------------------------------------------------------
-    ensure_database_exists(app.config["MASTER_DATABASE_URI"])
+    try:
+        ensure_database_exists(app.config["MASTER_DATABASE_URI"])
+    except Exception as db_init_e:
+        app.logger.warning(f"Master database ensure_exists notice: {db_init_e}")
 
     with app.app_context():
         # ------------------------------------------------------------------
@@ -86,6 +94,8 @@ def create_app(config_class=Config):
             from app.db_bootstrap import sync_metadata_columns
             from app.database import master_metadata, tenant_metadata
             sync_metadata_columns(db.get_master_engine(), master_metadata)
+            # Sync tenant tables (e.g. branches) that may also reside in the master DB
+            sync_metadata_columns(db.get_master_engine(), tenant_metadata)
 
             # AUTO-SEED / TENANT AUTO-CHECK
             from app.models.global_models import Tenant

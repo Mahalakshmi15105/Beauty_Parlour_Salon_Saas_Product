@@ -26,7 +26,7 @@ super_admin_bp = Blueprint("super_admin", __name__)
 @require_role(["SuperAdmin"])
 def get_super_admin_dashboard():
     g.use_master_db = True
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     
     # 1. Tenant Metrics
     total_tenants = Tenant.query.count()
@@ -55,7 +55,7 @@ def get_super_admin_dashboard():
     for t in active_tenants_list:
         if t.db_connection_uri:
             try:
-                t_engine = create_engine(t.db_connection_uri)
+                t_engine = db.get_tenant_engine(t.db_connection_uri)
                 with t_engine.connect() as conn:
                     total_customers += (conn.execute(text("SELECT COUNT(*) FROM customers WHERE is_deleted = 0;")).scalar() or 0)
                     total_employees += (conn.execute(text("SELECT COUNT(*) FROM employees WHERE is_deleted = 0;")).scalar() or 0)
@@ -226,7 +226,7 @@ def create_tenant():
 
         ensure_database_exists(tenant_db_uri)
         from app.database import tenant_metadata
-        tenant_engine = create_engine(tenant_db_uri)
+        tenant_engine = db.get_tenant_engine(tenant_db_uri)
         tenant_metadata.create_all(bind=tenant_engine)
 
         # 3. Switch context to new Tenant DB & seed initial user + settings
@@ -356,7 +356,7 @@ def update_tenant(tenant_id):
             tenant_db_uri = sanitize_tenant_uri(tenant.db_connection_uri, master_uri)
             try:
                 from werkzeug.security import generate_password_hash
-                t_engine = create_engine(tenant_db_uri)
+                t_engine = db.get_tenant_engine(tenant_db_uri)
                 with t_engine.connect() as conn:
                     res_u = conn.execute(text("SELECT id FROM users WHERE role = 'ParlourAdmin' LIMIT 1;")).first()
                     if res_u:
@@ -442,7 +442,7 @@ def get_audit_logs():
         if not t.db_connection_uri:
             continue
         try:
-            t_engine = create_engine(t.db_connection_uri)
+            t_engine = db.get_tenant_engine(t.db_connection_uri)
             with t_engine.connect() as conn:
                 res = conn.execute(text("SELECT id, action, details, created_at FROM audit_logs ORDER BY id DESC LIMIT 5;"))
                 for row in res.fetchall():
@@ -471,7 +471,7 @@ def get_all_branches():
         if not t.db_connection_uri:
             continue
         try:
-            t_engine = create_engine(t.db_connection_uri)
+            t_engine = db.get_tenant_engine(t.db_connection_uri)
             with t_engine.connect() as conn:
                 res = conn.execute(text("SELECT id, name, address, phone, status, created_at FROM branches WHERE is_deleted = 0;"))
                 for row in res.fetchall():
@@ -533,7 +533,7 @@ def get_tenant_details(tenant_id):
         from app.db_bootstrap import sanitize_tenant_uri
         tenant_db_uri = sanitize_tenant_uri(tenant.db_connection_uri, master_uri)
         try:
-            t_engine = create_engine(tenant_db_uri)
+            t_engine = db.get_tenant_engine(tenant_db_uri)
             with t_engine.connect() as conn:
                 if not admin_email:
                     res_u = conn.execute(text("SELECT email FROM users WHERE role = 'ParlourAdmin' LIMIT 1;")).first()
@@ -573,6 +573,12 @@ def get_tenant_details(tenant_id):
         except Exception as e:
             logger.warning(f"Could not fetch details from tenant DB {tenant.id}: {e}")
 
+    exp_date = tenant.subscription_expires_at
+    if exp_date and hasattr(exp_date, "tzinfo") and exp_date.tzinfo is not None:
+        exp_date = exp_date.replace(tzinfo=None)
+    now_utc_naive = datetime.now(timezone.utc).replace(tzinfo=None)
+    is_sub_active = bool(exp_date and exp_date > now_utc_naive)
+
     return success_response({
         "parlour": {
             "id": tenant.id,
@@ -591,7 +597,7 @@ def get_tenant_details(tenant_id):
         },
         "subscription": {
             "plan_name": tenant.subscription_plan.name if tenant.subscription_plan else "Standard Business Plan",
-            "status": "active" if tenant.subscription_expires_at and tenant.subscription_expires_at > datetime.now(timezone.utc) else "active",
+            "status": "active" if is_sub_active else "expired",
             "start_date": tenant.created_at.isoformat() if tenant.created_at else None,
             "expiry_date": tenant.subscription_expires_at.isoformat() if tenant.subscription_expires_at else None,
             "max_branches": tenant.subscription_plan.max_branches if tenant.subscription_plan else 3,
@@ -782,7 +788,7 @@ def get_all_users():
 def get_platform_analytics():
     """Get detailed platform analytics"""
     g.use_master_db = True
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     thirty_days_ago = now - timedelta(days=30)
     
     new_parlours = Tenant.query.filter(Tenant.created_at >= thirty_days_ago).count()
@@ -802,7 +808,7 @@ def get_platform_analytics():
         if not t.db_connection_uri:
             continue
         try:
-            t_engine = create_engine(t.db_connection_uri)
+            t_engine = db.get_tenant_engine(t.db_connection_uri)
             with t_engine.connect() as conn:
                 b_cnt = conn.execute(text("SELECT COUNT(*) FROM branches WHERE is_deleted = 0;")).scalar() or 0
                 c_cnt = conn.execute(text("SELECT COUNT(*) FROM customers WHERE is_deleted = 0;")).scalar() or 0
