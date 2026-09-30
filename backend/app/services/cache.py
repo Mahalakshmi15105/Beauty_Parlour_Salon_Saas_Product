@@ -49,6 +49,8 @@ class CacheManager:
                 db=Config.REDIS_DB,
                 socket_timeout=2.0,
                 socket_connect_timeout=2.0,
+                retry_on_timeout=True,
+                health_check_interval=30,
                 decode_responses=True,
             )
             # Test connection

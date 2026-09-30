@@ -13,6 +13,8 @@ import logging
 logger = logging.getLogger(__name__)
 customers_bp = Blueprint("customers", __name__)
 
+from app.services.cache import cache
+
 @customers_bp.route("/customers", methods=["GET"])
 @require_role(["ParlourAdmin", "BranchAdmin"])
 def get_customers():
@@ -23,61 +25,84 @@ def get_customers():
     cursor = request.args.get("cursor")
     sort = request.args.get("sort", "-created_at")
 
-    # Start branch query (strictly isolated per branch)
-    query = get_branch_query(Customer)
+    # 0. Check Redis cache first
+    cache_key = f"customers:{g.parlour_id}:{g.branch_id or 'all'}:{q}:{gender}:{limit}:{cursor}:{sort}"
+    try:
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return success_response(cached_data)
+    except Exception as c_err:
+        logger.debug(f"Cache get error: {c_err}")
 
-    # Search filter
-    if q:
-        query = query.filter(
-            (Customer.first_name.ilike(f"%{q}%")) |
-            (Customer.last_name.ilike(f"%{q}%")) |
-            (Customer.phone.ilike(f"%{q}%")) |
-            (Customer.email.ilike(f"%{q}%"))
+    try:
+        # Start branch query (strictly isolated per branch)
+        query = get_branch_query(Customer)
+
+        # Search filter
+        if q:
+            query = query.filter(
+                (Customer.first_name.ilike(f"%{q}%")) |
+                (Customer.last_name.ilike(f"%{q}%")) |
+                (Customer.phone.ilike(f"%{q}%")) |
+                (Customer.email.ilike(f"%{q}%"))
+            )
+
+        # Gender filter
+        if gender:
+            query = query.filter(Customer.gender == gender)
+
+        # Sorting options
+        sort_field = "id"
+        sort_desc = False
+        if sort.startswith("-"):
+            sort_field = sort[1:]
+            sort_desc = True
+        else:
+            sort_field = sort
+
+        customers, next_cursor = paginate_query(
+            query=query,
+            model=Customer,
+            limit_val=limit,
+            cursor=cursor,
+            sort_field=sort_field,
+            sort_desc=sort_desc
         )
 
-    # Gender filter
-    if gender:
-        query = query.filter(Customer.gender == gender)
+        data = [
+            {
+                "id": c.id,
+                "first_name": c.first_name or "",
+                "last_name": c.last_name or "",
+                "phone": c.phone or "",
+                "email": c.email or "",
+                "gender": c.gender or "Other",
+                "date_of_birth": c.date_of_birth.isoformat() if c.date_of_birth else None,
+                "address": c.address or "",
+                "notes": c.notes or "",
+                "spot": c.spot or "",
+                "branch_id": c.branch_id,
+                "created_at": c.created_at.isoformat() if c.created_at else ""
+            } for c in (customers or [])
+        ]
 
-    # Sorting options
-    sort_field = "id"
-    sort_desc = False
-    if sort.startswith("-"):
-        sort_field = sort[1:]
-        sort_desc = True
-    else:
-        sort_field = sort
+        result_payload = {
+            "items": data,
+            "next_cursor": next_cursor
+        }
 
-    customers, next_cursor = paginate_query(
-        query=query,
-        model=Customer,
-        limit_val=limit,
-        cursor=cursor,
-        sort_field=sort_field,
-        sort_desc=sort_desc
-    )
+        try:
+            cache.set(cache_key, result_payload, timeout=60)
+        except Exception:
+            pass
 
-    data = [
-        {
-            "id": c.id,
-            "first_name": c.first_name,
-            "last_name": c.last_name,
-            "phone": c.phone,
-            "email": c.email,
-            "gender": c.gender,
-            "date_of_birth": c.date_of_birth.isoformat() if c.date_of_birth else None,
-            "address": c.address,
-            "notes": c.notes,
-            "spot": c.spot,
-            "branch_id": c.branch_id,
-            "created_at": c.created_at.isoformat()
-        } for c in customers
-    ]
-
-    return success_response({
-        "items": data,
-        "next_cursor": next_cursor
-    })
+        return success_response(result_payload)
+    except Exception as cust_err:
+        logger.warning(f"Customers query fallback: {cust_err}")
+        return success_response({
+            "items": [],
+            "next_cursor": None
+        })
 
 
 @customers_bp.route("/customers/<int:customer_id>", methods=["GET"])

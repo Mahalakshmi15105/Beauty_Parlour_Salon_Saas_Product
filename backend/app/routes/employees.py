@@ -10,6 +10,8 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 employees_bp = Blueprint("employees", __name__)
 
+from app.services.cache import cache
+
 @employees_bp.route("/employees", methods=["GET"])
 @require_role(["ParlourAdmin", "BranchAdmin", "Receptionist", "Employee"])
 def get_employees():
@@ -19,74 +21,110 @@ def get_employees():
     cursor = request.args.get("cursor")
     sort = request.args.get("sort", "first_name")
 
-    query = get_branch_query(Employee)
+    # 0. Check Redis cache first
+    cache_key = f"employees:{g.parlour_id}:{g.branch_id or 'all'}:{q}:{status}:{limit}:{cursor}:{sort}"
+    try:
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return success_response(cached_data)
+    except Exception as c_err:
+        logger.debug(f"Cache get error: {c_err}")
 
-    if q:
-        query = query.filter(
-            (Employee.first_name.ilike(f"%{q}%")) |
-            (Employee.last_name.ilike(f"%{q}%")) |
-            (Employee.phone.ilike(f"%{q}%")) |
-            (Employee.specialization.ilike(f"%{q}%"))
+    try:
+        query = get_branch_query(Employee)
+
+        if q:
+            query = query.filter(
+                (Employee.first_name.ilike(f"%{q}%")) |
+                (Employee.last_name.ilike(f"%{q}%")) |
+                (Employee.phone.ilike(f"%{q}%")) |
+                (Employee.specialization.ilike(f"%{q}%"))
+            )
+
+        if status:
+            query = query.filter(Employee.status == status)
+
+        sort_field = "id"
+        sort_desc = False
+        if sort.startswith("-"):
+            sort_field = sort[1:]
+            sort_desc = True
+        else:
+            sort_field = sort
+
+        employees, next_cursor = paginate_query(
+            query=query,
+            model=Employee,
+            limit_val=limit,
+            cursor=cursor,
+            sort_field=sort_field,
+            sort_desc=sort_desc
         )
 
-    if status:
-        query = query.filter(Employee.status == status)
-
-    sort_field = "id"
-    sort_desc = False
-    if sort.startswith("-"):
-        sort_field = sort[1:]
-        sort_desc = True
-    else:
-        sort_field = sort
-
-    employees, next_cursor = paginate_query(
-        query=query,
-        model=Employee,
-        limit_val=limit,
-        cursor=cursor,
-        sort_field=sort_field,
-        sort_desc=sort_desc
-    )
-
-    from app.models.user import User
-    data = []
-    for emp in employees:
-        u_rec = User.query.filter(
-            (User.email == emp.phone) | 
-            (User.email == emp.username) |
-            (User.email.ilike(f"%{emp.first_name}%"))
-        ).filter_by(is_deleted=False).first()
+        from app.models.user import User
         from app.models.branch import Branch
-        br_name = Branch.query.get(emp.branch_id).name if emp.branch_id else "Main Branch"
-        data.append({
-            "id": emp.id,
-            "branch_id": emp.branch_id,
-            "branch_name": br_name,
-            "first_name": emp.first_name or "",
-            "last_name": emp.last_name or "",
-            "phone": emp.phone or "",
-            "email": emp.email or (u_rec.email if u_rec else "") or emp.username or emp.phone,
-            "username": emp.username or (u_rec.email if u_rec else "") or emp.email or emp.phone,
-            "password": getattr(emp, "password_plain", None) or emp.phone or "123456",
-            "specialization": emp.specialization or "",
-            "role": emp.role or "",
-            "salary": float(emp.salary or 0.0),
-            "target": float(getattr(emp, "target", 0.0) or 0.0),
-            "level": getattr(emp, "level", "L1") or "L1",
-            "commission_percentage": float(emp.commission_percentage or 0.0),
-            "joining_date": emp.joining_date.isoformat() if emp.joining_date else None,
-            "shift_start_time": getattr(emp, "shift_start_time", "09:00") or "09:00",
-            "shift_end_time": getattr(emp, "shift_end_time", "18:00") or "18:00",
-            "monthly_offs": int(getattr(emp, "monthly_offs", 4) or 4),
-            "status": emp.status or "active",
-            "created_at": emp.created_at.isoformat() if emp.created_at else ""
-        })
+        data = []
+        for emp in (employees or []):
+            u_rec = None
+            try:
+                u_rec = User.query.filter(
+                    (User.email == emp.phone) | 
+                    (User.email == emp.username) |
+                    (User.email.ilike(f"%{emp.first_name}%"))
+                ).filter_by(is_deleted=False).first()
+            except Exception:
+                pass
 
-    return success_response({
-        "items": data,
-        "next_cursor": next_cursor
-    })
+            br_name = "Main Branch"
+            try:
+                if emp.branch_id:
+                    br_obj = Branch.query.get(emp.branch_id)
+                    if br_obj and br_obj.name:
+                        br_name = br_obj.name
+            except Exception:
+                pass
+
+            data.append({
+                "id": emp.id,
+                "branch_id": emp.branch_id,
+                "branch_name": br_name,
+                "first_name": emp.first_name or "",
+                "last_name": emp.last_name or "",
+                "phone": emp.phone or "",
+                "email": emp.email or (u_rec.email if u_rec else "") or emp.username or emp.phone,
+                "username": emp.username or (u_rec.email if u_rec else "") or emp.email or emp.phone,
+                "password": getattr(emp, "password_plain", None) or emp.phone or "123456",
+                "specialization": emp.specialization or "",
+                "role": emp.role or "",
+                "salary": float(emp.salary or 0.0),
+                "target": float(getattr(emp, "target", 0.0) or 0.0),
+                "level": getattr(emp, "level", "L1") or "L1",
+                "commission_percentage": float(emp.commission_percentage or 0.0),
+                "joining_date": emp.joining_date.isoformat() if emp.joining_date else None,
+                "shift_start_time": getattr(emp, "shift_start_time", "09:00") or "09:00",
+                "shift_end_time": getattr(emp, "shift_end_time", "18:00") or "18:00",
+                "monthly_offs": int(getattr(emp, "monthly_offs", 4) or 4),
+                "status": emp.status or "active",
+                "created_at": emp.created_at.isoformat() if emp.created_at else ""
+            })
+
+        result_payload = {
+            "items": data,
+            "next_cursor": next_cursor
+        }
+
+        try:
+            cache.set(cache_key, result_payload, timeout=60)
+        except Exception:
+            pass
+
+        return success_response(result_payload)
+    except Exception as emp_err:
+        logger.warning(f"Employees query fallback: {emp_err}")
+        return success_response({
+            "items": [],
+            "next_cursor": None
+        })
 
 
 @employees_bp.route("/employees/<int:employee_id>", methods=["GET"])

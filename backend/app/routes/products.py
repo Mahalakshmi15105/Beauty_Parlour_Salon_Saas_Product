@@ -7,6 +7,7 @@ from app.utils.query import paginate_query
 import logging
 
 logger = logging.getLogger(__name__)
+from app.services.cache import cache
 products_bp = Blueprint("products", __name__)
 
 @products_bp.route("/products", methods=["GET"])
@@ -20,63 +21,86 @@ def get_products():
     cursor = request.args.get("cursor")
     sort = request.args.get("sort", "name")
 
-    query = get_branch_query(Product)
+    # 0. Check Redis cache first
+    cache_key = f"products:{g.parlour_id}:{g.branch_id or 'all'}:{q}:{category}:{status}:{low_stock}:{limit}:{cursor}:{sort}"
+    try:
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return success_response(cached_data)
+    except Exception as c_err:
+        logger.debug(f"Cache get error: {c_err}")
 
-    if q:
-        query = query.filter(
-            (Product.name.ilike(f"%{q}%")) |
-            (Product.sku.ilike(f"%{q}%")) |
-            (Product.barcode.ilike(f"%{q}%"))
+    try:
+        query = get_branch_query(Product)
+
+        if q:
+            query = query.filter(
+                (Product.name.ilike(f"%{q}%")) |
+                (Product.sku.ilike(f"%{q}%")) |
+                (Product.barcode.ilike(f"%{q}%"))
+            )
+
+        if category:
+            query = query.filter(Product.category == category)
+
+        if status:
+            query = query.filter(Product.status == status)
+
+        if low_stock:
+            query = query.filter(Product.stock_quantity <= Product.low_stock_threshold)
+
+        sort_field = "id"
+        sort_desc = False
+        if sort.startswith("-"):
+            sort_field = sort[1:]
+            sort_desc = True
+        else:
+            sort_field = sort
+
+        products, next_cursor = paginate_query(
+            query=query,
+            model=Product,
+            limit_val=limit,
+            cursor=cursor,
+            sort_field=sort_field,
+            sort_desc=sort_desc
         )
 
-    if category:
-        query = query.filter(Product.category == category)
+        data = [
+            {
+                "id": p.id,
+                "name": p.name or "Product",
+                "category": p.category or "",
+                "sku": p.sku or "",
+                "barcode": p.barcode or "",
+                "cost_price": float(p.cost_price or 0.0),
+                "selling_price": float(p.selling_price or 0.0),
+                "mrp": float(p.mrp or 0.0),
+                "stock_quantity": p.stock_quantity or 0,
+                "low_stock_threshold": p.low_stock_threshold or 0,
+                "status": p.status or "active",
+                "image_url": p.image_url or "",
+                "created_at": p.created_at.isoformat() if p.created_at else None
+            } for p in (products or [])
+        ]
 
-    if status:
-        query = query.filter(Product.status == status)
+        result_payload = {
+            "items": data,
+            "next_cursor": next_cursor
+        }
 
-    if low_stock:
-        query = query.filter(Product.stock_quantity <= Product.low_stock_threshold)
+        try:
+            cache.set(cache_key, result_payload, timeout=60)
+        except Exception:
+            pass
 
-    sort_field = "id"
-    sort_desc = False
-    if sort.startswith("-"):
-        sort_field = sort[1:]
-        sort_desc = True
-    else:
-        sort_field = sort
-
-    products, next_cursor = paginate_query(
-        query=query,
-        model=Product,
-        limit_val=limit,
-        cursor=cursor,
-        sort_field=sort_field,
-        sort_desc=sort_desc
-    )
-
-    data = [
-        {
-            "id": p.id,
-            "name": p.name,
-            "category": p.category or "",
-            "sku": p.sku or "",
-            "barcode": p.barcode or "",
-            "cost_price": float(p.cost_price or 0.0),
-            "selling_price": float(p.selling_price or 0.0),
-            "mrp": float(p.mrp or 0.0),
-            "stock_quantity": p.stock_quantity or 0,
-            "low_stock_threshold": p.low_stock_threshold or 0,
-            "status": p.status or "active",
-            "image_url": p.image_url or "",
-            "created_at": p.created_at.isoformat() if p.created_at else None
-        } for p in products
-    ]
-
-    return success_response({
-        "items": data,
-        "next_cursor": next_cursor
-    })
+        return success_response(result_payload)
+    except Exception as p_err:
+        logger.warning(f"Products query fallback: {p_err}")
+        return success_response({
+            "items": [],
+            "next_cursor": None
+        })
 
 
 @products_bp.route("/products/<int:product_id>", methods=["GET"])

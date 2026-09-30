@@ -25,6 +25,8 @@ def safe_json_parse(val):
     except Exception:
         return []
 
+from app.services.cache import cache
+
 # --- MEMBERSHIP PLANS CRUD ---
 
 @memberships_bp.route("/membership-plans", methods=["GET"])
@@ -36,53 +38,83 @@ def get_plans():
     cursor = request.args.get("cursor")
     sort = request.args.get("sort", "name")
 
-    query = get_branch_query(MembershipPlan)
+    # 0. Check Redis cache first
+    cache_key = f"membershipplans:{g.parlour_id}:{q}:{status}:{limit}:{cursor}:{sort}"
+    try:
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return success_response(cached_data)
+    except Exception as c_err:
+        logger.debug(f"Cache get error: {c_err}")
 
-    if q:
-        query = query.filter(
-            (MembershipPlan.name.ilike(f"%{q}%")) |
-            (MembershipPlan.description.ilike(f"%{q}%"))
+    try:
+        query = get_branch_query(MembershipPlan)
+
+        if q:
+            query = query.filter(
+                (MembershipPlan.name.ilike(f"%{q}%")) |
+                (MembershipPlan.description.ilike(f"%{q}%"))
+            )
+
+        if status:
+            query = query.filter(MembershipPlan.status == status)
+
+        sort_field = "id"
+        sort_desc = False
+        if sort.startswith("-"):
+            sort_field = sort[1:]
+            sort_desc = True
+        else:
+            sort_field = sort
+
+        plans, next_cursor = paginate_query(
+            query=query,
+            model=MembershipPlan,
+            limit_val=limit,
+            cursor=cursor,
+            sort_field=sort_field,
+            sort_desc=sort_desc
         )
 
-    if status:
-        query = query.filter(MembershipPlan.status == status)
+        data = []
+        for p in (plans or []):
+            el_services = []
+            try:
+                if getattr(p, "eligible_services", None):
+                    el_services = [es.service_id for es in p.eligible_services if hasattr(es, "service_id")]
+            except Exception:
+                el_services = []
 
-    sort_field = "id"
-    sort_desc = False
-    if sort.startswith("-"):
-        sort_field = sort[1:]
-        sort_desc = True
-    else:
-        sort_field = sort
+            data.append({
+                "id": p.id,
+                "name": p.name or "",
+                "description": p.description or "",
+                "price": float(p.price or 0.0),
+                "duration_days": p.duration_days or 0,
+                "service_discount_percentage": float(p.service_discount_percentage or 0.0),
+                "status": p.status or "active",
+                "day_restrictions": safe_json_parse(p.day_restrictions),
+                "eligible_services": el_services,
+                "created_at": p.created_at.isoformat() if p.created_at else ""
+            })
 
-    plans, next_cursor = paginate_query(
-        query=query,
-        model=MembershipPlan,
-        limit_val=limit,
-        cursor=cursor,
-        sort_field=sort_field,
-        sort_desc=sort_desc
-    )
+        result_payload = {
+            "items": data,
+            "next_cursor": next_cursor
+        }
 
-    data = [
-        {
-            "id": p.id,
-            "name": p.name or "",
-            "description": p.description or "",
-            "price": float(p.price or 0.0),
-            "duration_days": p.duration_days or 0,
-            "service_discount_percentage": float(p.service_discount_percentage or 0.0),
-            "status": p.status or "active",
-            "day_restrictions": safe_json_parse(p.day_restrictions),
-            "eligible_services": [es.service_id for es in p.eligible_services] if p.eligible_services else [],
-            "created_at": p.created_at.isoformat() if p.created_at else ""
-        } for p in plans
-    ]
+        try:
+            cache.set(cache_key, result_payload, timeout=120)
+        except Exception:
+            pass
 
-    return success_response({
-        "items": data,
-        "next_cursor": next_cursor
-    })
+        return success_response(result_payload)
+    except Exception as plan_err:
+        logger.warning(f"Membership plans query fallback: {plan_err}")
+        return success_response({
+            "items": [],
+            "next_cursor": None
+        })
 
 
 @memberships_bp.route("/membership-plans/<int:plan_id>", methods=["GET"])

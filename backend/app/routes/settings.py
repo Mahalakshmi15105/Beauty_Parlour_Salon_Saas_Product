@@ -13,6 +13,8 @@ import io
 logger = logging.getLogger(__name__)
 settings_bp = Blueprint("settings", __name__)
 
+from app.services.cache import cache
+
 def get_client_ip():
     """Retrieve real client public IP address from request headers or remote_addr."""
     if request.headers.get("X-Forwarded-For"):
@@ -26,147 +28,205 @@ def get_client_ip():
 def get_settings():
     from app.models.branch import Branch
 
-    # Fetch main parlour settings (branch_id=None)
-    main_setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id, branch_id=None).first()
-    if not main_setting:
-        try:
-            main_setting = TenantSetting(tenant_id=g.parlour_id, branch_id=None)
-            db.session.add(main_setting)
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
-            main_setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id, branch_id=None).first()
-
-    branch = None
-    branch_setting = None
-    if g.role == "BranchAdmin" and g.branch_id:
-        branch = Branch.query.filter_by(id=g.branch_id, tenant_id=g.parlour_id).first()
-        branch_setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id, branch_id=g.branch_id).first()
-
-    setting = branch_setting if branch_setting else main_setting
-    tenant_name = "Beauty Parlour"
+    # 0. Check Redis cache first
+    cache_key = f"settings:{g.parlour_id}:{g.branch_id or 'main'}"
     try:
-        with db.get_master_engine().connect() as conn:
-            from sqlalchemy import text
-            res = conn.execute(text("SELECT name FROM tenants WHERE id = :id AND is_deleted = 0"), {"id": g.parlour_id}).fetchone()
-            if res and res[0]:
-                tenant_name = res[0]
-    except Exception as t_err:
-        logger.warning(f"Failed to fetch tenant name from master: {t_err}")
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return success_response(cached_data)
+    except Exception as c_err:
+        logger.debug(f"Cache get error: {c_err}")
 
-    def _get(attr, default=""):
-        val = getattr(setting, attr, None) if setting else None
-        if attr == "currency_symbol":
-            if not val or str(val).strip() in ["?", "\\u20b9", ""]:
-                return "₹"
-        return val if val is not None else default
+    try:
+        # Fetch main parlour settings (branch_id=None)
+        main_setting = None
+        try:
+            main_setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id, branch_id=None).first()
+            if not main_setting:
+                try:
+                    main_setting = TenantSetting(tenant_id=g.parlour_id, branch_id=None)
+                    db.session.add(main_setting)
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+                    main_setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id, branch_id=None).first()
+        except Exception as s_err:
+            logger.warning(f"Error fetching main setting: {s_err}")
 
-    # Use branch logo if branch has logo; otherwise fallback to main parlour logo
-    logo_url = ""
-    if branch and branch.logo_url:
-        logo_url = branch.logo_url
-    elif main_setting and main_setting.logo_url:
-        logo_url = main_setting.logo_url
+        branch = None
+        branch_setting = None
+        if g.role == "BranchAdmin" and g.branch_id:
+            branch = Branch.query.filter_by(id=g.branch_id, tenant_id=g.parlour_id).first()
+            branch_setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id, branch_id=g.branch_id).first()
 
-    # Resolve theme: Branch custom theme -> Main Parlour theme -> Default
-    theme_name = (branch.theme_name if branch and branch.theme_name else _get("theme_name", "light")) or "light"
-    primary_color = (branch.primary_color if branch and branch.primary_color else _get("primary_color", "#EC4899")) or "#EC4899"
-    secondary_color = (branch.secondary_color if branch and branch.secondary_color else _get("secondary_color", "#F472B6")) or "#F472B6"
-    accent_color = (branch.accent_color if branch and branch.accent_color else _get("accent_color", "#FDF2F8")) or "#FDF2F8"
+        setting = branch_setting if branch_setting else main_setting
+        tenant_name = "Beauty Parlour"
+        try:
+            with db.get_master_engine().connect() as conn:
+                from sqlalchemy import text
+                res = conn.execute(text("SELECT name FROM tenants WHERE id = :id AND is_deleted = 0"), {"id": g.parlour_id}).fetchone()
+                if res and res[0]:
+                    tenant_name = res[0]
+        except Exception as t_err:
+            logger.warning(f"Failed to fetch tenant name from master: {t_err}")
 
-    # Fetch main branch location details
-    main_branch = Branch.query.filter_by(tenant_id=g.parlour_id, is_main_branch=True, is_deleted=False).first()
-    if not main_branch:
-        main_branch = Branch.query.filter_by(tenant_id=g.parlour_id, is_deleted=False).order_by(Branch.id.asc()).first()
+        def _get(attr, default=""):
+            val = getattr(setting, attr, None) if setting else None
+            if attr == "currency_symbol":
+                if not val or str(val).strip() in ["?", "\\u20b9", ""]:
+                    return "₹"
+            return val if val is not None else default
 
-    main_lat = float(main_branch.latitude) if main_branch and main_branch.latitude is not None else None
-    main_lng = float(main_branch.longitude) if main_branch and main_branch.longitude is not None else None
-    main_radius = main_branch.geofence_radius_meters if main_branch and main_branch.geofence_radius_meters else 100
-    main_wifi_ssid = main_branch.wifi_ssid if main_branch else None
-    main_wifi_ip = main_branch.wifi_public_ip if main_branch else None
-    main_enforce_wifi = bool(main_branch.enforce_wifi) if main_branch else False
-    client_ip = get_client_ip()
+        # Use branch logo if branch has logo; otherwise fallback to main parlour logo
+        logo_url = ""
+        if branch and branch.logo_url:
+            logo_url = branch.logo_url
+        elif main_setting and main_setting.logo_url:
+            logo_url = main_setting.logo_url
 
-    return success_response({
-        "business_profile": {
-            "name": tenant_name,
-            "logo_url": logo_url,
-            "owner_name": _get("owner_name"),
-            "phone": _get("alternate_phone"),
-            "alternate_phone": _get("alternate_phone"),
-            "email": _get("website"),
-            "gst_number": _get("gst_number"),
-            "address": _get("address"),
-            "city": _get("city"),
-            "state": _get("state"),
-            "country": _get("country"),
-            "postal_code": _get("postal_code"),
-            "website": _get("website"),
-            "description": _get("description"),
-            "latitude": main_lat,
-            "longitude": main_lng,
-            "geofence_radius_meters": main_radius,
-            "wifi_ssid": main_wifi_ssid,
-            "wifi_public_ip": main_wifi_ip,
-            "enforce_wifi": main_enforce_wifi,
-            "client_detected_ip": client_ip,
-            "shop_name_typography": {
-                "enabled": bool(_get("shop_name_font_enabled", False)),
-                "font_family": _get("shop_name_font", "Outfit") or "Outfit",
-                "font_size": int(_get("shop_name_font_size", 32) or 32),
-                "font_weight": str(_get("shop_name_font_weight", "700") or "700"),
-                "letter_spacing": float(_get("shop_name_letter_spacing", 0.00) or 0.00)
+        # Resolve theme: Branch custom theme -> Main Parlour theme -> Default
+        theme_name = (branch.theme_name if branch and branch.theme_name else _get("theme_name", "light")) or "light"
+        primary_color = (branch.primary_color if branch and branch.primary_color else _get("primary_color", "#EC4899")) or "#EC4899"
+        secondary_color = (branch.secondary_color if branch and branch.secondary_color else _get("secondary_color", "#F472B6")) or "#F472B6"
+        accent_color = (branch.accent_color if branch and branch.accent_color else _get("accent_color", "#FDF2F8")) or "#FDF2F8"
+
+        # Fetch main branch location details
+        main_branch = Branch.query.filter_by(tenant_id=g.parlour_id, is_main_branch=True, is_deleted=False).first()
+        if not main_branch:
+            main_branch = Branch.query.filter_by(tenant_id=g.parlour_id, is_deleted=False).order_by(Branch.id.asc()).first()
+
+        main_lat = float(main_branch.latitude) if main_branch and main_branch.latitude is not None else None
+        main_lng = float(main_branch.longitude) if main_branch and main_branch.longitude is not None else None
+        main_radius = main_branch.geofence_radius_meters if main_branch and main_branch.geofence_radius_meters else 100
+        main_wifi_ssid = main_branch.wifi_ssid if main_branch else None
+        main_wifi_ip = main_branch.wifi_public_ip if main_branch else None
+        main_enforce_wifi = bool(main_branch.enforce_wifi) if main_branch else False
+        client_ip = get_client_ip()
+
+        settings_payload = {
+            "business_profile": {
+                "name": tenant_name,
+                "logo_url": logo_url,
+                "owner_name": _get("owner_name"),
+                "phone": _get("alternate_phone"),
+                "alternate_phone": _get("alternate_phone"),
+                "email": _get("website"),
+                "gst_number": _get("gst_number"),
+                "address": _get("address"),
+                "city": _get("city"),
+                "state": _get("state"),
+                "country": _get("country"),
+                "postal_code": _get("postal_code"),
+                "website": _get("website"),
+                "description": _get("description"),
+                "latitude": main_lat,
+                "longitude": main_lng,
+                "geofence_radius_meters": main_radius,
+                "wifi_ssid": main_wifi_ssid,
+                "wifi_public_ip": main_wifi_ip,
+                "enforce_wifi": main_enforce_wifi,
+                "client_detected_ip": client_ip,
+                "shop_name_typography": {
+                    "enabled": bool(_get("shop_name_font_enabled", False)),
+                    "font_family": _get("shop_name_font", "Outfit") or "Outfit",
+                    "font_size": int(_get("shop_name_font_size", 32) or 32),
+                    "font_weight": str(_get("shop_name_font_weight", "700") or "700"),
+                    "letter_spacing": float(_get("shop_name_letter_spacing", 0.00) or 0.00)
+                }
+            },
+            "invoice_settings": {
+                "invoice_prefix": _get("invoice_prefix", "INV"),
+                "tax_name": _get("tax_name", "GST"),
+                "tax_rate": float(_get("tax_rate", 18.00)),
+                "receipt_header": _get("receipt_header"),
+                "receipt_footer": _get("receipt_footer"),
+                "terms_and_conditions": _get("terms_and_conditions"),
+                "show_logo": bool(_get("show_logo", True))
+            },
+            "regional_settings": {
+                "currency": _get("currency_code", "INR") or _get("currency", "INR"),
+                "currency_code": _get("currency_code", "INR") or _get("currency", "INR"),
+                "currency_symbol": _get("currency_symbol", "₹"),
+                "language": _get("language", "English"),
+                "date_format": _get("date_format", "YYYY-MM-DD"),
+                "timezone": _get("timezone", "UTC")
+            },
+            "receipt_settings": {
+                "receipt_template": _get("receipt_template", "Classic") or "Classic",
+                "paper_size": _get("paper_size", "80mm") or "80mm",
+                "show_logo": bool(_get("show_logo", True)),
+                "show_gst": bool(_get("show_gst", True)),
+                "show_address": bool(_get("show_address", True)),
+                "show_phone": bool(_get("show_phone", True)),
+                "show_email": bool(_get("show_email", True)),
+                "show_website": bool(_get("show_website", True)),
+                "show_qr_code": bool(_get("show_qr_code", False)),
+                "show_qty": bool(_get("show_qty", True)),
+                "show_rate": bool(_get("show_rate", True)),
+                "show_mrp": bool(_get("show_mrp", True)),
+                "show_tax": bool(_get("show_tax", True)),
+                "auto_print": bool(_get("auto_print", False)),
+                "thank_you_message": _get("thank_you_message", "Thank you for visiting. Please visit again.") or "Thank you for visiting. Please visit again.",
+                "receipt_header": _get("receipt_header"),
+                "receipt_footer": _get("receipt_footer"),
+            },
+            "theme_settings": {
+                "theme_name": theme_name,
+                "primary_color": primary_color,
+                "secondary_color": secondary_color,
+                "accent_color": accent_color
+            },
+            "marketing_settings": {
+                "churn_days_threshold": int(_get("churn_days_threshold", 45) or 45)
+            },
+            "billing_settings": {
+                "billing_mode": _get("billing_mode", "normal") or "normal"
             }
-        },
-        "invoice_settings": {
-            "invoice_prefix": _get("invoice_prefix", "INV"),
-            "tax_name": _get("tax_name", "GST"),
-            "tax_rate": float(_get("tax_rate", 18.00)),
-            "receipt_header": _get("receipt_header"),
-            "receipt_footer": _get("receipt_footer"),
-            "terms_and_conditions": _get("terms_and_conditions"),
-            "show_logo": bool(_get("show_logo", True))
-        },
-        "regional_settings": {
-            "currency": _get("currency_code", "INR") or _get("currency", "INR"),
-            "currency_code": _get("currency_code", "INR") or _get("currency", "INR"),
-            "currency_symbol": _get("currency_symbol", "₹"),
-            "language": _get("language", "English"),
-            "date_format": _get("date_format", "YYYY-MM-DD"),
-            "timezone": _get("timezone", "UTC")
-        },
-        "receipt_settings": {
-            "receipt_template": _get("receipt_template", "Classic") or "Classic",
-            "paper_size": _get("paper_size", "80mm") or "80mm",
-            "show_logo": bool(_get("show_logo", True)),
-            "show_gst": bool(_get("show_gst", True)),
-            "show_address": bool(_get("show_address", True)),
-            "show_phone": bool(_get("show_phone", True)),
-            "show_email": bool(_get("show_email", True)),
-            "show_website": bool(_get("show_website", True)),
-            "show_qr_code": bool(_get("show_qr_code", False)),
-            "show_qty": bool(_get("show_qty", True)),
-            "show_rate": bool(_get("show_rate", True)),
-            "show_mrp": bool(_get("show_mrp", True)),
-            "show_tax": bool(_get("show_tax", True)),
-            "auto_print": bool(_get("auto_print", False)),
-            "thank_you_message": _get("thank_you_message", "Thank you for visiting. Please visit again.") or "Thank you for visiting. Please visit again.",
-            "receipt_header": _get("receipt_header"),
-            "receipt_footer": _get("receipt_footer"),
-        },
-        "theme_settings": {
-            "theme_name": theme_name,
-            "primary_color": primary_color,
-            "secondary_color": secondary_color,
-            "accent_color": accent_color
-        },
-        "marketing_settings": {
-            "churn_days_threshold": int(_get("churn_days_threshold", 45) or 45)
-        },
-        "billing_settings": {
-            "billing_mode": _get("billing_mode", "normal") or "normal"
         }
-    })
+
+        try:
+            cache.set(cache_key, settings_payload, timeout=300)
+        except Exception:
+            pass
+
+        return success_response(settings_payload)
+    except Exception as set_err:
+        logger.warning(f"Settings fetch fallback: {set_err}")
+        return success_response({
+            "business_profile": {
+                "name": "Beauty Parlour",
+                "logo_url": "",
+                "currency_symbol": "₹",
+                "currency_code": "INR"
+            },
+            "invoice_settings": {
+                "invoice_prefix": "INV",
+                "tax_name": "GST",
+                "tax_rate": 18.00,
+                "show_logo": True
+            },
+            "regional_settings": {
+                "currency": "INR",
+                "currency_code": "INR",
+                "currency_symbol": "₹",
+                "language": "English",
+                "date_format": "YYYY-MM-DD",
+                "timezone": "UTC"
+            },
+            "receipt_settings": {
+                "receipt_template": "Classic",
+                "paper_size": "80mm"
+            },
+            "theme_settings": {
+                "theme_name": "light",
+                "primary_color": "#EC4899",
+                "secondary_color": "#F472B6",
+                "accent_color": "#FDF2F8"
+            },
+            "billing_settings": {
+                "billing_mode": "normal"
+            }
+        })
 
 
 @settings_bp.route("/settings", methods=["PUT"])
@@ -373,6 +433,11 @@ def update_settings():
             message="Failed to update settings.",
             status_code=500
         )
+
+    try:
+        cache.delete_pattern(f"settings:{g.parlour_id}:*")
+    except Exception:
+        pass
 
     return success_response({"message": "Settings updated successfully."})
 
