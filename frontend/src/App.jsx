@@ -64,10 +64,24 @@ function App() {
 
   const bookingRouteInfo = getPublicBookingRouteInfo();
 
-  // Detect Meta OAuth callback redirect (?code=...) and route to WhatsApp integration page
-  const initialActiveTab = new URLSearchParams(window.location.search).get("code")
-    ? "whatsapp_integration"
-    : "dashboard";
+  // Detect OAuth callback redirects (?code=...) and route to the correct tab
+  const getInitialActiveTab = () => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    const tab = params.get("tab");
+    if (code) {
+      if (tab === "google_drive" || window.location.pathname.startsWith("/settings")) {
+        return "settings";
+      }
+      return "whatsapp_integration";
+    }
+    if (tab) {
+      return tab === "google_drive" ? "settings" : tab;
+    }
+    return "dashboard";
+  };
+
+  const initialActiveTab = getInitialActiveTab();
 
   const [currentView, setCurrentView] = useState(() => {
     if (window.location.pathname.startsWith("/attendance/checkin")) return "attendance_checkin";
@@ -76,6 +90,15 @@ function App() {
   });
 
   const [activeTab, setActiveTab] = useState(initialActiveTab);
+
+  useEffect(() => {
+    const handleTabNav = (e) => {
+      if (e.detail) setActiveTab(e.detail);
+    };
+    window.addEventListener("navigate_tab", handleTabNav);
+    return () => window.removeEventListener("navigate_tab", handleTabNav);
+  }, []);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);

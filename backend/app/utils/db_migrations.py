@@ -44,6 +44,18 @@ TENANT_SETTINGS_SCHEMA = [
     ("shop_name_font_weight", "VARCHAR(20) DEFAULT '700'"),
     ("shop_name_letter_spacing", "DECIMAL(4,2) DEFAULT 0.00"),
     ("churn_days_threshold", "INT DEFAULT 45"),
+    ("google_drive_enabled", "BOOLEAN NOT NULL DEFAULT 0"),
+    ("google_drive_email", "VARCHAR(150) NULL"),
+    ("google_drive_access_token", "TEXT NULL"),
+    ("google_drive_refresh_token", "TEXT NULL"),
+    ("google_drive_token_expiry", "DATETIME NULL"),
+    ("google_drive_root_folder_id", "VARCHAR(100) NULL"),
+    ("google_drive_services_folder_id", "VARCHAR(100) NULL"),
+    ("google_drive_products_folder_id", "VARCHAR(100) NULL"),
+    ("google_drive_logos_folder_id", "VARCHAR(100) NULL"),
+    ("google_drive_campaigns_folder_id", "VARCHAR(100) NULL"),
+    ("google_client_id", "VARCHAR(255) NULL"),
+    ("google_client_secret", "VARCHAR(255) NULL"),
 ]
 
 

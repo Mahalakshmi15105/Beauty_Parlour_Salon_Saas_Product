@@ -61,11 +61,17 @@ function Customers() {
     setDormantLoading(true);
     API.get(`/customers/dormant?days=${churnThreshold}`)
       .then((res) => {
-        setDormantCustomers(res.data || []);
+        const payload = res.data || res;
+        const items = Array.isArray(payload) ? payload : (payload?.items || []);
+        setDormantCustomers(Array.isArray(items) ? items : []);
+        if (payload?.threshold_days) {
+          setChurnThreshold(payload.threshold_days);
+        }
         setDormantLoading(false);
       })
       .catch((err) => {
         showError(err.message || "Failed to load dormant clients.");
+        setDormantCustomers([]);
         setDormantLoading(false);
       });
   };
@@ -493,7 +499,7 @@ function Customers() {
                     <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
                     <span>Scanning visit logs for slipping clients...</span>
                   </div>
-                ) : dormantCustomers.length === 0 ? (
+                ) : (!Array.isArray(dormantCustomers) || dormantCustomers.length === 0) ? (
                   <div className="p-16 text-center space-y-3">
                     <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
                       <UserRoundX className="w-6 h-6 text-emerald-600" />
@@ -514,7 +520,7 @@ function Customers() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border-soft">
-                      {dormantCustomers.map((c) => {
+                      {(Array.isArray(dormantCustomers) ? dormantCustomers : []).map((c) => {
                         const weeks = Math.floor(c.days_inactive / 7);
                         const customMessage = messageTemplate
                           .replace("[Name]", c.first_name)

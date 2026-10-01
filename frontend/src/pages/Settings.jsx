@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
+import StorageService from "../services/storageService";
 import { useToast } from "../context/ToastContext";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { useTheme } from "../context/ThemeContext";
@@ -35,10 +36,13 @@ import {
   Network,
   Award,
   Wifi,
+  HardDrive,
 } from "lucide-react";
 import WhatsAppIntegration from "./WhatsAppIntegration";
 import BranchManagement from "./BranchManagement";
 import VisitMembershipSettings from "../components/VisitMembershipSettings";
+import GoogleDriveSettings from "../components/GoogleDriveSettings";
+import GoogleDriveGuardModal from "../components/GoogleDriveGuardModal";
 import { CURATED_FONTS, DEFAULT_TYPOGRAPHY, getShopNameStyle, loadGoogleFont } from "../utils/fontLoader";
 
 function Settings() {
@@ -58,14 +62,24 @@ function Settings() {
 
   const { changeAccentColor, currentTheme } = useTheme();
 
-  const [activeTab, setActiveTab] = useState("business");
+  const initialTab = new URLSearchParams(window.location.search).get("tab") || "business";
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState(null);
+  const [showDriveGuard, setShowDriveGuard] = useState(false);
   
   // Get user from localStorage to check role
   const user = JSON.parse(localStorage.getItem("user") || "{}");
+
+  useEffect(() => {
+    const handleTabChange = (e) => {
+      if (e.detail) setActiveTab(e.detail);
+    };
+    window.addEventListener("settings_tab_changed", handleTabChange);
+    return () => window.removeEventListener("settings_tab_changed", handleTabChange);
+  }, []);
 
   // Logo Upload State
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -161,56 +175,71 @@ function Settings() {
     },
   });
 
-  const handleLogoSelected = (file) => {
+  const handleLogoSelected = async (file) => {
     if (!file) return;
     setUploadError(null);
 
-    const allowedExts = ["png", "jpg", "jpeg", "svg", "webp"];
+    const allowedExts = ["png", "jpg", "jpeg", "svg", "webp", "gif", "bmp"];
     const ext = file.name.split(".").pop()?.toLowerCase();
 
     if (!allowedExts.includes(ext)) {
-      setUploadError("Invalid image format. Allowed formats: PNG, JPG, JPEG, SVG, and WEBP.");
+      setUploadError("Invalid image format. Allowed formats: PNG, JPG, JPEG, WEBP, SVG.");
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError("File size exceeds maximum allowed limit of 5 MB.");
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadError("File size exceeds maximum allowed limit of 10 MB.");
       return;
     }
 
-    const formData = new FormData();
-    formData.append("logo", file);
-    setUploadingLogo(true);
-    setUploadProgress(20);
+    try {
+      // 1. Check Google Drive connection status
+      const driveStatus = await StorageService.getStatus();
+      if (!driveStatus.connected) {
+        setShowDriveGuard(true);
+        return;
+      }
 
-    const interval = setInterval(() => {
-      setUploadProgress((prev) => (prev < 90 ? prev + 25 : prev));
-    }, 100);
+      setUploadingLogo(true);
+      setUploadProgress(15);
 
-    API.post("/settings/upload-logo", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    })
-      .then((res) => {
-        clearInterval(interval);
-        setUploadProgress(100);
-        const newLogoUrl = res.data.data?.logo_url || res.data.logo_url;
-        setSettingsData((prev) => ({
-          ...prev,
-          business_profile: {
-            ...prev.business_profile,
-            logo_url: newLogoUrl,
-          },
-        }));
-        setUploadingLogo(false);
-        setSaveSuccess(true);
-        window.dispatchEvent(new CustomEvent("branding_updated"));
-        setTimeout(() => setSaveSuccess(false), 3000);
-      })
-      .catch((err) => {
-        clearInterval(interval);
-        setUploadingLogo(false);
-        setUploadError(err.response?.data?.message || err.message || "Failed to upload logo.");
+      // 2. Convert to WebP and Upload to Google Drive
+      const res = await StorageService.uploadImage(file, "logos", (prog) => {
+        setUploadProgress(prog);
       });
+
+      const newLogoUrl = res.image_url || res.direct_image_url;
+      setSettingsData((prev) => ({
+        ...prev,
+        business_profile: {
+          ...prev.business_profile,
+          logo_url: newLogoUrl,
+        },
+      }));
+
+      // Also persist to settings
+      await API.put("/settings", {
+        ...settingsData,
+        business_profile: {
+          ...settingsData.business_profile,
+          logo_url: newLogoUrl,
+        },
+      });
+
+      setUploadingLogo(false);
+      setSaveSuccess(true);
+      showSuccess(`Parlour logo converted to WebP (${res.savingsPercent || 0}% smaller) and saved to Google Drive!`);
+      window.dispatchEvent(new CustomEvent("branding_updated"));
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err) {
+      setUploadingLogo(false);
+      const errMsg = err.response?.data?.message || err.message || "Failed to upload logo.";
+      if (err.response?.data?.error_code === "GOOGLE_DRIVE_NOT_CONNECTED" || errMsg.includes("Google Drive")) {
+        setShowDriveGuard(true);
+      } else {
+        setUploadError(errMsg);
+      }
+    }
   };
 
   const handleRemoveLogo = () => {
@@ -414,6 +443,7 @@ function Settings() {
           {(() => {
             const tabs = [
               { id: "business", label: "Parlour Profile", icon: Building2 },
+              { id: "google_drive", label: "Google Drive Storage", icon: HardDrive },
               { id: "billing_mode", label: "Billing Type & Mode", icon: Sliders },
               { id: "membership", label: "Membership System", icon: Award },
               { id: "whatsapp", label: "WhatsApp Integration", icon: MessageSquare },
@@ -598,7 +628,18 @@ function Settings() {
                         handleLogoSelected(e.dataTransfer.files[0]);
                       }
                     }}
-                    onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                    onClick={async () => {
+                      try {
+                        const status = await StorageService.getStatus();
+                        if (!status.connected) {
+                          setShowDriveGuard(true);
+                          return;
+                        }
+                        fileInputRef.current && fileInputRef.current.click();
+                      } catch (err) {
+                        setShowDriveGuard(true);
+                      }
+                    }}
                     className={`flex-1 w-full p-6 border-2 border-dashed rounded-2xl text-center cursor-pointer transition flex flex-col items-center justify-center space-y-2 ${
                       isDragging
                         ? "border-primary bg-primary/10 scale-[1.01]"
@@ -1775,6 +1816,11 @@ function Settings() {
             </div>
           )}
 
+          {/* Google Drive Storage Tab */}
+          {activeTab === "google_drive" && (
+            <GoogleDriveSettings />
+          )}
+
           {/* Backup & Restore Tab */}
           {activeTab === "backup" && (
             <div className="space-y-4 text-xs text-text-secondary">
@@ -1791,8 +1837,19 @@ function Settings() {
           )}
         </div>
       </div>
+
+      {/* Google Drive Setup Guard Modal */}
+      <GoogleDriveGuardModal
+        isOpen={showDriveGuard}
+        onClose={() => setShowDriveGuard(false)}
+        onNavigateToSettings={() => {
+          setActiveTab("google_drive");
+          setShowDriveGuard(false);
+        }}
+      />
     </div>
   );
 }
 
 export default Settings;
+

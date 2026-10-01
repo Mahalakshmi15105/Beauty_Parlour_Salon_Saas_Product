@@ -2,9 +2,11 @@ import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { useModalFocusTrap, useFormKeyboardNavigation } from "../utils/keyboardNavigation";
-import { X, Printer, FileSpreadsheet, FileText, Upload } from "lucide-react";
+import { X, Printer, FileSpreadsheet, FileText, Upload, HardDrive } from "lucide-react";
 import { exportToCSV, printDataList, exportToPDF, exportToExcel } from "../utils/exportUtils";
 import BulkUploadModal from "../components/BulkUploadModal";
+import GoogleDriveGuardModal from "../components/GoogleDriveGuardModal";
+import StorageService from "../services/storageService";
 import { useToast } from "../context/ToastContext";
 
 function Services() {
@@ -53,7 +55,50 @@ function Services() {
     category_id: "",
     price: "",
     status: "active",
+    image_url: "",
   });
+
+  // Google Drive & WebP Upload State
+  const [showDriveGuard, setShowDriveGuard] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  const handleImageSelected = async (file) => {
+    if (!file) return;
+    try {
+      setUploadingImage(true);
+      setUploadProgress(10);
+      const res = await StorageService.uploadImage(file, "services", (prog) => setUploadProgress(prog));
+      setServiceForm((prev) => ({ ...prev, image_url: res.image_url || res.direct_image_url }));
+      showSuccess(`Service image converted to WebP (${res.savingsPercent || 0}% smaller) & saved to Google Drive!`);
+    } catch (err) {
+      const errMsg = err.response?.data?.message || err.message || "Failed to upload image.";
+      if (err.response?.data?.error_code === "GOOGLE_DRIVE_NOT_CONNECTED" || errMsg.includes("Google Drive")) {
+        setShowDriveGuard(true);
+      } else {
+        showError(errMsg);
+      }
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleTriggerImageUpload = async (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    try {
+      const status = await StorageService.getStatus();
+      if (!status.connected) {
+        setShowDriveGuard(true);
+        return;
+      }
+      document.getElementById("service-image-upload")?.click();
+    } catch (err) {
+      setShowDriveGuard(true);
+    }
+  };
 
   useModalFocusTrap(showServiceModal, serviceModalRef, () => setShowServiceModal(false));
   useModalFocusTrap(showCategoryModal, categoryModalRef, () => setShowCategoryModal(false));
@@ -618,7 +663,10 @@ function Services() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">Service Image (Optional)</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-text-secondary">Service Image (Stored in Google Drive)</label>
+                    <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">Auto-WebP</span>
+                  </div>
                   <div className="flex items-center space-x-3 bg-background border border-border-soft p-2.5 rounded-lg">
                     <input
                       type="file"
@@ -626,56 +674,31 @@ function Services() {
                       id="service-image-upload"
                       onChange={(e) => {
                         const file = e.target.files[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onload = (event) => {
-                            const img = new Image();
-                            img.onload = () => {
-                              const canvas = document.createElement("canvas");
-                              const MAX_WIDTH = 800;
-                              const MAX_HEIGHT = 800;
-                              let width = img.width;
-                              let height = img.height;
-
-                              if (width > height) {
-                                if (width > MAX_WIDTH) {
-                                  height *= MAX_WIDTH / width;
-                                  width = MAX_WIDTH;
-                                }
-                              } else {
-                                if (height > MAX_HEIGHT) {
-                                  width *= MAX_HEIGHT / height;
-                                  height = MAX_HEIGHT;
-                                }
-                              }
-                              canvas.width = width;
-                              canvas.height = height;
-                              const ctx = canvas.getContext("2d");
-                              ctx.drawImage(img, 0, 0, width, height);
-                              const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
-                              setServiceForm((prev) => ({ ...prev, image_url: compressedBase64 }));
-                            };
-                            img.src = event.target.result;
-                          };
-                          reader.readAsDataURL(file);
-                        }
+                        if (file) handleImageSelected(file);
                       }}
                       className="hidden"
                     />
                     <button
                       type="button"
                       tabIndex="0"
+                      disabled={uploadingImage}
                       data-image-upload-trigger="true"
                       data-target-input="service-image-upload"
-                      onClick={() => document.getElementById("service-image-upload")?.click()}
-                      className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 rounded-md text-xs font-semibold cursor-pointer transition flex items-center space-x-1.5 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      onClick={handleTriggerImageUpload}
+                      className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 rounded-md text-xs font-semibold cursor-pointer transition flex items-center space-x-1.5 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50"
                     >
                       <Upload className="w-3.5 h-3.5" />
-                      <span>Choose Image</span>
+                      <span>{uploadingImage ? `Uploading (${uploadProgress}%)...` : "Choose Image"}</span>
                     </button>
-                    {serviceForm.image_url ? (
+                    {uploadingImage && (
+                      <div className="flex items-center space-x-2 text-xs text-primary font-semibold animate-pulse">
+                        <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                        <span>Converting to WebP & saving to Drive...</span>
+                      </div>
+                    )}
+                    {!uploadingImage && serviceForm.image_url ? (
                       <div className="flex items-center space-x-2">
-                        <img src={serviceForm.image_url} alt="Preview" className="w-9 h-9 rounded-md object-cover border border-border-soft" />
+                        <img src={serviceForm.image_url} alt="Preview" className="w-9 h-9 rounded-md object-cover border border-border-soft shadow-2xs" />
                         <button
                           type="button"
                           data-skip-nav="true"
@@ -685,9 +708,9 @@ function Services() {
                           Remove
                         </button>
                       </div>
-                    ) : (
+                    ) : !uploadingImage ? (
                       <span className="text-xs text-text-secondary">No image chosen</span>
-                    )}
+                    ) : null}
                   </div>
                 </div>
 
@@ -1014,8 +1037,15 @@ function Services() {
           </div>
         </div>
       )}
+
+      {/* Google Drive Guard Modal */}
+      <GoogleDriveGuardModal
+        isOpen={showDriveGuard}
+        onClose={() => setShowDriveGuard(false)}
+      />
     </div>
   );
 }
 
 export default Services;
+

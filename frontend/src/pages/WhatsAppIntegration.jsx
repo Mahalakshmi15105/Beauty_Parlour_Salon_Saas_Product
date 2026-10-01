@@ -84,8 +84,10 @@ export default function WhatsAppIntegration() {
     // Check if we returned from Facebook OAuth redirect with a code param
     const urlParams = new URLSearchParams(window.location.search);
     const oauthCode = urlParams.get("code");
+    const tab = urlParams.get("tab");
     
-    if (oauthCode) {
+    // Only handle Meta OAuth callback, ignore Google Drive callbacks
+    if (oauthCode && tab !== "google_drive" && !window.location.pathname.startsWith("/settings")) {
       // Clear the URL params to avoid re-triggering
       window.history.replaceState({}, document.title, window.location.pathname);
       setConnecting(true);

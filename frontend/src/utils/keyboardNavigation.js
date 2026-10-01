@@ -17,18 +17,6 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
               // ignore if already open or restricted by browser
             }
           }
-        } else if (e.target.getAttribute("data-image-upload-trigger") === "true") {
-          const targetInputId = e.target.getAttribute("data-target-input");
-          if (targetInputId) {
-            const inputEl = document.getElementById(targetInputId);
-            if (inputEl) {
-              try {
-                inputEl.click();
-              } catch (err) {
-                // ignore
-              }
-            }
-          }
         }
       }
     },
@@ -140,17 +128,11 @@ export function useFormKeyboardNavigation(containerRef, onSubmit) {
 
         const currentIndex = focusables.indexOf(activeEl);
 
-        // If active element is an image upload trigger and Enter is pressed, trigger file picker
+        // If active element is an image upload trigger and Enter is pressed, trigger button click
         if (activeEl.getAttribute("data-image-upload-trigger") === "true" && e.key === "Enter") {
-          const targetInputId = activeEl.getAttribute("data-target-input");
-          if (targetInputId) {
-            const inputEl = document.getElementById(targetInputId);
-            if (inputEl) {
-              e.preventDefault();
-              try { inputEl.click(); } catch (err) {}
-              return;
-            }
-          }
+          e.preventDefault();
+          try { activeEl.click(); } catch (err) {}
+          return;
         }
 
         if (currentIndex !== -1 && currentIndex < focusables.length - 1) {

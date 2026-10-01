@@ -110,3 +110,8 @@ class Config:
     WHATSAPP_BUSINESS_ACCOUNT_ID = os.getenv("WHATSAPP_BUSINESS_ACCOUNT_ID", "")
     WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
     WHATSAPP_PERMANENT_ACCESS_TOKEN = os.getenv("WHATSAPP_PERMANENT_ACCESS_TOKEN", "")
+
+    # Google Drive Cloud Storage Credentials
+    GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+    GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+    GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:5173/settings?tab=google_drive")

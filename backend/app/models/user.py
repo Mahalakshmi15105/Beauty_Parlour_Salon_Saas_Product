@@ -114,6 +114,20 @@ class TenantSetting(db.Model, TimestampMixin):
     # Billing Settings
     billing_mode = db.Column(db.String(20), nullable=False, default="normal")  # normal, touch
 
+    # Google Drive Cloud Storage Settings
+    google_drive_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    google_drive_email = db.Column(db.String(150), nullable=True)
+    google_drive_access_token = db.Column(db.Text, nullable=True)
+    google_drive_refresh_token = db.Column(db.Text, nullable=True)
+    google_drive_token_expiry = db.Column(db.DateTime, nullable=True)
+    google_drive_root_folder_id = db.Column(db.String(100), nullable=True)
+    google_drive_services_folder_id = db.Column(db.String(100), nullable=True)
+    google_drive_products_folder_id = db.Column(db.String(100), nullable=True)
+    google_drive_logos_folder_id = db.Column(db.String(100), nullable=True)
+    google_drive_campaigns_folder_id = db.Column(db.String(100), nullable=True)
+    google_client_id = db.Column(db.String(255), nullable=True)
+    google_client_secret = db.Column(db.String(255), nullable=True)
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
