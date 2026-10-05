@@ -253,26 +253,78 @@ def send_direct_message():
 
 
 @whatsapp_bp.route("/whatsapp/webhook", methods=["GET", "POST"])
+@whatsapp_bp.route("/webhook", methods=["GET", "POST"])
 def whatsapp_webhook():
-    """Public Webhook endpoint for Meta Cloud API status receipts."""
+    """Public Webhook endpoint for Meta Cloud API verification and status/message receipts."""
+    from flask import Response
+    
+    # 1. Meta Webhook Verification (GET Request)
     if request.method == "GET":
         mode = request.args.get("hub.mode")
         token = request.args.get("hub.verify_token")
         challenge = request.args.get("hub.challenge")
 
-        expected_token = current_app.config.get("WHATSAPP_WEBHOOK_VERIFY_TOKEN") or os.getenv("WHATSAPP_WEBHOOK_VERIFY_TOKEN", "smartgonext_verify_token_2026")
+        expected_token = (
+            current_app.config.get("WHATSAPP_WEBHOOK_VERIFY_TOKEN")
+            or os.getenv("WHATSAPP_WEBHOOK_VERIFY_TOKEN")
+            or "smartgonext_verify_token_2026"
+        ).strip()
+
+        logger.info(f"Meta Webhook GET verification request: mode={mode}, token={token}, challenge={challenge}")
 
         if mode == "subscribe" and challenge:
-            if token == expected_token or not token:
-                from flask import Response
+            if token and token.strip() == expected_token:
+                logger.info("Meta Webhook verification SUCCEEDED.")
                 return Response(challenge, status=200, mimetype="text/plain")
             else:
-                return "Verification token mismatch", 403
-        from flask import Response
-        return Response("Webhook Verification Endpoint", status=200, mimetype="text/plain")
+                logger.warning(f"Meta Webhook verification FAILED: token '{token}' != expected '{expected_token}'")
+                return Response("Verification token mismatch", status=403, mimetype="text/plain")
+        
+        return Response("WhatsApp Webhook Endpoint Ready", status=200, mimetype="text/plain")
 
-    # POST Webhook status updates from Meta
-    payload = request.get_json() or {}
+    # 2. Meta Event Delivery (POST Request)
+    payload = request.get_json(silent=True) or {}
     logger.info(f"Received Meta Webhook Payload: {payload}")
-    return jsonify({"status": "received"}), 200
+
+    try:
+        entries = payload.get("entry", [])
+        for entry in entries:
+            changes = entry.get("changes", [])
+            for change in changes:
+                field = change.get("field")
+                value = change.get("value", {})
+
+                # A. Incoming Messages
+                if "messages" in value:
+                    for msg in value.get("messages", []):
+                        sender = msg.get("from")
+                        msg_type = msg.get("type")
+                        text_body = msg.get("text", {}).get("body", "") if msg_type == "text" else f"[{msg_type} message]"
+                        logger.info(f"Incoming WhatsApp message from {sender}: {text_body}")
+
+                # B. Message Delivery Statuses (SENT, DELIVERED, READ, FAILED)
+                if "statuses" in value:
+                    for st in value.get("statuses", []):
+                        meta_msg_id = st.get("id")
+                        msg_status = st.get("status")  # sent, delivered, read, failed
+                        recipient_id = st.get("recipient_id")
+                        logger.info(f"WhatsApp message status update for {meta_msg_id} ({recipient_id}): {msg_status}")
+
+                # C. Template Approval Updates
+                if field == "message_template_status_update":
+                    event = value.get("event")
+                    template_name = value.get("message_template_name")
+                    logger.info(f"WhatsApp Template '{template_name}' status update: {event}")
+
+                # D. Phone Number Health Updates
+                if field == "phone_number_quality_update":
+                    quality = value.get("current_limit")
+                    logger.info(f"WhatsApp Phone Quality update: {value}")
+
+    except Exception as e:
+        logger.error(f"Error processing webhook payload: {str(e)}", exc_info=True)
+
+    # Always return 200 OK to Meta
+    return Response("EVENT_RECEIVED", status=200, mimetype="text/plain")
+
 

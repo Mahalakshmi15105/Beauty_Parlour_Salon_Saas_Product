@@ -187,6 +187,11 @@ def create_app(config_class=Config):
     app.register_blueprint(payroll_adjustments_bp)
     app.register_blueprint(storage_bp, url_prefix="/api/v1")
 
+    # Top-level Webhook Route Aliases (Meta WhatsApp Webhook)
+    from app.routes.whatsapp import whatsapp_webhook
+    app.add_url_rule("/webhook", view_func=whatsapp_webhook, methods=["GET", "POST"])
+    app.add_url_rule("/whatsapp/webhook", view_func=whatsapp_webhook, methods=["GET", "POST"])
+
     from flask import send_from_directory
     import os
 
