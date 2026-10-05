@@ -19,6 +19,7 @@ function Employees() {
   const roleSelectRef = useRef(null);
 
   const [employees, setEmployees] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
@@ -65,7 +66,7 @@ function Employees() {
 
   const fetchEmployees = (currentCursor = null) => {
     setLoading(true);
-    let url = `/employees?limit=10`;
+    let url = `/employees?limit=50`;
     if (currentCursor) url += `&cursor=${currentCursor}`;
     if (search) url += `&q=${search}`;
     if (status) url += `&status=${status}`;
@@ -74,6 +75,7 @@ function Employees() {
       .then((res) => {
         setEmployees(res.data.items || []);
         setNextCursor(res.data.next_cursor || null);
+        if (res.data.total_count !== undefined) setTotalCount(res.data.total_count);
         if (res.data.parlour_name) setParlourName(res.data.parlour_name);
         setLoading(false);
       })
@@ -307,7 +309,14 @@ function Employees() {
       {/* Title Bar */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-xl font-semibold text-text-primary">Staff & Employee Roster</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-semibold text-text-primary">Staff & Employee Roster</h1>
+            {totalCount > 0 && (
+              <span className="text-xs font-bold bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 rounded-full">
+                {totalCount} Total Staff
+              </span>
+            )}
+          </div>
           <p className="text-xs text-text-secondary">Configure commissions, salaries, specializations, and access status.</p>
         </div>
         <div className="flex gap-2">
@@ -489,21 +498,27 @@ function Employees() {
             </table>
 
             {/* Pagination Controls */}
-            <div className="px-6 py-4 border-t border-border-soft flex justify-between items-center">
-              <button
-                disabled={cursorHistory.length === 0}
-                onClick={handlePrevPage}
-                className="px-4 py-2 border border-border-soft rounded-lg text-sm disabled:opacity-50 transition"
-              >
-                Previous
-              </button>
-              <button
-                disabled={!nextCursor}
-                onClick={handleNextPage}
-                className="px-4 py-2 border border-border-soft rounded-lg text-sm disabled:opacity-50 transition"
-              >
-                Next
-              </button>
+            <div className="px-6 py-4 border-t border-border-soft flex justify-between items-center bg-slate-50/50">
+              <span className="text-xs font-medium text-text-secondary">
+                Showing <span className="font-bold text-text-primary">{employees.length}</span> of{" "}
+                <span className="font-bold text-text-primary">{totalCount || employees.length}</span> employees
+              </span>
+              <div className="flex gap-2">
+                <button
+                  disabled={cursorHistory.length === 0}
+                  onClick={handlePrevPage}
+                  className="px-4 py-1.5 border border-border-soft rounded-lg text-xs font-semibold disabled:opacity-50 transition hover:bg-background"
+                >
+                  Previous
+                </button>
+                <button
+                  disabled={!nextCursor}
+                  onClick={handleNextPage}
+                  className="px-4 py-1.5 border border-border-soft rounded-lg text-xs font-semibold disabled:opacity-50 transition hover:bg-background"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           </>
         )}
@@ -534,9 +549,10 @@ function Employees() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">Last Name</label>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Last Name (Optional)</label>
                   <input
                     type="text"
+                    placeholder="Optional"
                     value={formData.last_name}
                     onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
                     className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
@@ -556,10 +572,10 @@ function Employees() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">Role / Job Title</label>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Role / Job Title (Optional)</label>
                   <input
                     type="text"
-                    placeholder="e.g. Stylist, Therapist"
+                    placeholder="e.g. Stylist, Therapist (Optional)"
                     value={formData.role}
                     onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                     className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
@@ -599,10 +615,10 @@ function Employees() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1">Specialization</label>
+                <label className="block text-xs font-semibold text-text-secondary mb-1">Specialization (Optional)</label>
                 <input
                   type="text"
-                  placeholder="e.g. Haircut, Skincare"
+                  placeholder="e.g. Haircut, Skincare (Optional)"
                   value={formData.specialization}
                   onChange={(e) => setFormData({ ...formData, specialization: e.target.value })}
                   className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"

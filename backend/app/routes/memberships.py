@@ -353,8 +353,9 @@ def assign_membership():
     data = request.get_json() or {}
     customer_id = data.get("customer_id")
     plan_id = data.get("plan_id")
-    payment_method = data.get("payment_method", "Cash").strip() if data.get("payment_method") else "Cash"
-    benefits_data = data.get("benefits", [])  # list of {service_id, quantity}
+    is_existing_plan = bool(data.get("is_existing_plan", False))
+    payment_method = data.get("payment_method", "Cash").strip() if data.get("payment_method") else ("Already Paid (Offline)" if is_existing_plan else "Cash")
+    benefits_data = data.get("benefits", [])  # list of {service_id, total_quantity / quantity, remaining_quantity}
 
     if not customer_id or not plan_id:
         return error_response(
@@ -374,17 +375,45 @@ def assign_membership():
             status_code=400
         )
 
-    # Auto calculate expiry date with safe fallback for duration_days
-    days = getattr(plan, 'duration_days', None)
-    if not days or days <= 0:
-        duration_cnt = getattr(plan, 'duration_count', 1) or 1
-        validity_p = getattr(plan, 'validity_plan', 'Yearly') or 'Yearly'
-        if str(validity_p).lower() == 'monthly':
-            days = duration_cnt * 30
-        else:
-            days = duration_cnt * 365
+    # Parse custom start date
+    custom_start_date_str = data.get("start_date")
+    start_date = datetime.now()
+    if custom_start_date_str:
+        try:
+            if "T" in str(custom_start_date_str):
+                start_date = datetime.fromisoformat(str(custom_start_date_str).replace("Z", "+00:00"))
+            else:
+                start_date = datetime.strptime(str(custom_start_date_str)[:10], "%Y-%m-%d")
+        except Exception:
+            start_date = datetime.now()
 
-    expiry_date = datetime.now() + timedelta(days=days)
+    # Parse custom expiry date or compute from duration
+    custom_expires_at_str = data.get("expires_at")
+    expiry_date = None
+    if custom_expires_at_str:
+        try:
+            if "T" in str(custom_expires_at_str):
+                expiry_date = datetime.fromisoformat(str(custom_expires_at_str).replace("Z", "+00:00"))
+            else:
+                expiry_date = datetime.strptime(str(custom_expires_at_str)[:10], "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+        except Exception:
+            expiry_date = None
+
+    if not expiry_date:
+        days = getattr(plan, 'duration_days', None)
+        if not days or days <= 0:
+            duration_cnt = getattr(plan, 'duration_count', 1) or 1
+            validity_p = getattr(plan, 'validity_plan', 'Yearly') or 'Yearly'
+            if str(validity_p).lower() == 'monthly':
+                days = duration_cnt * 30
+            else:
+                days = duration_cnt * 365
+        expiry_date = start_date + timedelta(days=days)
+
+    # Initial status depending on expiry date
+    initial_status = "active"
+    if expiry_date < datetime.now():
+        initial_status = "expired"
 
     # Calculate Invoice Prices & Tax
     target_branch_id = g.branch_id if hasattr(g, "branch_id") and g.branch_id else None
@@ -405,6 +434,7 @@ def assign_membership():
     try:
         # 1. Generate Invoice Number & Invoice Record
         invoice_number = generate_unique_invoice_number(g.parlour_id, target_branch_id)
+        membership_label = f"{plan.name} (Existing/Offline Plan)" if is_existing_plan else plan.name
 
         invoice = Invoice(
             tenant_id=g.parlour_id,
@@ -416,8 +446,9 @@ def assign_membership():
             tax=calculated_tax,
             total=grand_total,
             status="Paid",
-            membership_name=plan.name,
-            membership_discount=Decimal("0.00")
+            membership_name=membership_label,
+            membership_discount=Decimal("0.00"),
+            created_at=start_date
         )
         db.session.add(invoice)
         db.session.flush()
@@ -431,7 +462,8 @@ def assign_membership():
             unit_price=plan_price,
             discount_amount=Decimal("0.00"),
             tax_amount=calculated_tax,
-            line_total=grand_total
+            line_total=grand_total,
+            created_at=start_date
         )
         db.session.add(line_item)
 
@@ -440,17 +472,20 @@ def assign_membership():
             tenant_id=g.parlour_id,
             invoice_id=invoice.id,
             method=payment_method,
-            amount=grand_total
+            amount=grand_total,
+            created_at=start_date
         )
         db.session.add(payment)
 
         # 2. Create Membership linkage
         cm = CustomerMembership(
             tenant_id=g.parlour_id,
+            branch_id=target_branch_id,
             customer_id=customer_id,
             membership_plan_id=plan_id,
             expires_at=expiry_date,
-            status="active"
+            status=initial_status,
+            created_at=start_date
         )
         db.session.add(cm)
         db.session.flush()
@@ -458,8 +493,10 @@ def assign_membership():
         # Add benefits
         for b in benefits_data:
             svc_id = b.get("service_id")
-            qty = int(b.get("quantity", 1))
-            if not svc_id or qty <= 0:
+            total_qty = int(b.get("total_quantity") or b.get("quantity") or 1)
+            rem_qty_raw = b.get("remaining_quantity")
+            rem_qty = int(rem_qty_raw) if rem_qty_raw is not None else total_qty
+            if not svc_id or total_qty <= 0:
                 continue
             
             svc = Service.query.filter_by(id=svc_id, tenant_id=g.parlour_id).first()
@@ -468,10 +505,11 @@ def assign_membership():
 
             benefit = MembershipBenefit(
                 tenant_id=g.parlour_id,
+                branch_id=target_branch_id,
                 customer_membership_id=cm.id,
                 service_id=svc_id,
-                total_quantity=qty,
-                remaining_quantity=qty
+                total_quantity=total_qty,
+                remaining_quantity=max(0, min(rem_qty, total_qty))
             )
             db.session.add(benefit)
 
@@ -490,8 +528,53 @@ def assign_membership():
         "invoice_id": invoice.id,
         "expires_at": cm.expires_at.isoformat(),
         "invoice_number": invoice.invoice_number,
-        "total_amount": float(grand_total)
+        "total_amount": float(grand_total),
+        "is_existing_plan": is_existing_plan
     }, 201)
+
+
+@memberships_bp.route("/memberships/customer/<int:customer_id>", methods=["GET"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
+def get_customer_memberships_alias(customer_id):
+    customer = Customer.query.filter_by(id=customer_id, tenant_id=g.parlour_id, is_deleted=False).first()
+    if not customer:
+        return error_response(
+            error_code="CUSTOMER_NOT_FOUND",
+            message="Customer not found.",
+            status_code=404
+        )
+
+    memberships = CustomerMembership.query.filter_by(
+        customer_id=customer_id,
+        tenant_id=g.parlour_id
+    ).order_by(CustomerMembership.id.desc()).all()
+
+    data = []
+    for m in memberships:
+        benefits = []
+        for b in m.benefits:
+            benefits.append({
+                "id": b.id,
+                "service_id": b.service_id,
+                "service_name": b.service.name if b.service else None,
+                "total_quantity": b.total_quantity,
+                "remaining_quantity": b.remaining_quantity
+            })
+        
+        data.append({
+            "id": m.id,
+            "plan_id": m.membership_plan_id,
+            "plan_name": m.plan.name if m.plan else "Default Membership",
+            "price": float(m.plan.price) if m.plan and m.plan.price else 0.0,
+            "start_date": m.created_at.isoformat() if m.created_at else None,
+            "expires_at": m.expires_at.isoformat(),
+            "status": m.status,
+            "renew_count": getattr(m, 'renew_count', 0) or 0,
+            "benefits": benefits
+        })
+
+    return success_response(data)
+
 
 
 @memberships_bp.route("/memberships/<int:cm_id>/renew", methods=["POST"])
@@ -750,10 +833,10 @@ def get_all_memberships():
             })
             
         from app.models.billing import Invoice
-        inv = Invoice.query.filter_by(
-            customer_id=cm.customer_id, 
-            tenant_id=g.parlour_id, 
-            membership_name=cm.plan.name if cm.plan else None
+        inv = Invoice.query.filter(
+            Invoice.customer_id == cm.customer_id,
+            Invoice.tenant_id == g.parlour_id,
+            (Invoice.membership_name == cm.plan.name) | (Invoice.membership_name.ilike(f"%{cm.plan.name}%")) if cm.plan else False
         ).order_by(Invoice.id.desc()).first()
 
         results.append({
@@ -764,13 +847,15 @@ def get_all_memberships():
             "plan_id": cm.membership_plan_id,
             "plan_name": cm.plan.name if cm.plan else "Default Membership",
             "price": float(cm.plan.price) if cm.plan and cm.plan.price else 0.0,
+            "start_date": cm.created_at.isoformat() if cm.created_at else None,
+            "created_at": cm.created_at.isoformat() if cm.created_at else None,
             "expires_at": cm.expires_at.isoformat(),
             "status": cm.status,
             "renew_count": getattr(cm, "renew_count", 0) or 0,
             "invoice_id": inv.id if inv else None,
             "invoice_number": inv.invoice_number if inv else None,
             "invoice_total": float(inv.total) if inv else float(cm.plan.price) if cm.plan and cm.plan.price else 0.0,
-            "invoice_date": inv.created_at.isoformat() if inv else cm.created_at.isoformat(),
+            "invoice_date": inv.created_at.isoformat() if inv else (cm.created_at.isoformat() if cm.created_at else None),
             "benefits": benefits
         })
     return success_response(results)

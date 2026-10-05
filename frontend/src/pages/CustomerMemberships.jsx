@@ -3,7 +3,7 @@ import API from "../services/api";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { useToast } from "../context/ToastContext";
 import { useModalFocusTrap, useFormKeyboardNavigation, focusAndOpenSelect } from "../utils/keyboardNavigation";
-import { User, X, ChevronDown, Check, Printer, FileSpreadsheet, FileText, Download, MessageSquare, Send } from "lucide-react";
+import { User, X, ChevronDown, Check, Printer, FileSpreadsheet, FileText, Download, MessageSquare, Send, Calendar, Clock, Plus, Trash2, Sparkles, AlertCircle } from "lucide-react";
 import { exportToCSV, printDataList, exportToPDF, exportToExcel } from "../utils/exportUtils";
 import { ThermalReceipt, printThermalReceiptElement, downloadThermalReceiptPDF } from "../components/ThermalReceipt";
 
@@ -33,8 +33,11 @@ function CustomerMemberships() {
   const [assignForm, setAssignForm] = useState({
     customer_id: "",
     plan_id: "",
-    payment_method: "",
-    benefits: [], // array of { service_id, quantity }
+    is_existing_plan: false,
+    start_date: new Date().toISOString().split("T")[0],
+    expires_at: "",
+    payment_method: "Cash",
+    benefits: [], // array of { service_id, total_quantity, remaining_quantity }
   });
 
   // Combobox customer dropdown inside modal & Keyboard navigation index
@@ -204,15 +207,109 @@ function CustomerMemberships() {
       });
   };
 
+  const calculateExpiry = (startDateStr, durationDays) => {
+    if (!startDateStr) return "";
+    try {
+      const parts = startDateStr.split("-");
+      if (parts.length !== 3) return "";
+      const date = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      date.setDate(date.getDate() + (parseInt(durationDays, 10) || 365));
+      return date.toISOString().split("T")[0];
+    } catch {
+      return "";
+    }
+  };
+
+  const handlePlanSelection = (planId) => {
+    const selectedPlan = plans.find((p) => p.id.toString() === planId.toString());
+    const computedExpiry = selectedPlan
+      ? calculateExpiry(assignForm.start_date, selectedPlan.duration_days)
+      : "";
+
+    let defaultBenefits = [];
+    if (selectedPlan && selectedPlan.eligible_services && selectedPlan.eligible_services.length > 0) {
+      defaultBenefits = selectedPlan.eligible_services.map((sId) => ({
+        service_id: sId,
+        total_quantity: 1,
+        remaining_quantity: 1,
+      }));
+    }
+
+    setAssignForm((prev) => ({
+      ...prev,
+      plan_id: planId,
+      expires_at: computedExpiry || prev.expires_at,
+      benefits: defaultBenefits.length > 0 ? defaultBenefits : prev.benefits,
+    }));
+  };
+
+  const handleStartDateChange = (newStartDate) => {
+    const selectedPlan = plans.find((p) => p.id.toString() === assignForm.plan_id.toString());
+    const computedExpiry = selectedPlan
+      ? calculateExpiry(newStartDate, selectedPlan.duration_days)
+      : assignForm.expires_at;
+
+    setAssignForm((prev) => ({
+      ...prev,
+      start_date: newStartDate,
+      expires_at: computedExpiry,
+    }));
+  };
+
+  const handleToggleExistingPlan = (isExisting) => {
+    setAssignForm((prev) => {
+      const selectedPlan = plans.find((p) => p.id.toString() === prev.plan_id.toString());
+      const computedExpiry = selectedPlan
+        ? calculateExpiry(prev.start_date, selectedPlan.duration_days)
+        : prev.expires_at;
+
+      return {
+        ...prev,
+        is_existing_plan: isExisting,
+        payment_method: isExisting ? "Already Paid (Offline)" : (prev.payment_method === "Already Paid (Offline)" ? "Cash" : prev.payment_method || "Cash"),
+        expires_at: prev.expires_at || computedExpiry,
+      };
+    });
+  };
+
+  const handleAddAssignBenefitRow = () => {
+    const defaultSvc = services.length > 0 ? services[0].id : "";
+    setAssignForm((prev) => ({
+      ...prev,
+      benefits: [...prev.benefits, { service_id: defaultSvc, total_quantity: 1, remaining_quantity: 1 }],
+    }));
+  };
+
+  const handleAssignBenefitChange = (index, field, val) => {
+    const updated = [...assignForm.benefits];
+    if (field === "total_quantity") {
+      const numVal = Math.max(1, parseInt(val, 10) || 1);
+      updated[index].total_quantity = numVal;
+      if (!assignForm.is_existing_plan || (updated[index].remaining_quantity > numVal)) {
+        updated[index].remaining_quantity = numVal;
+      }
+    } else if (field === "remaining_quantity") {
+      const numVal = Math.max(0, parseInt(val, 10) || 0);
+      updated[index].remaining_quantity = Math.min(numVal, updated[index].total_quantity || 1);
+    } else {
+      updated[index][field] = val;
+    }
+    setAssignForm((prev) => ({ ...prev, benefits: updated }));
+  };
+
+  const handleRemoveAssignBenefitRow = (index) => {
+    setAssignForm((prev) => ({
+      ...prev,
+      benefits: prev.benefits.filter((_, i) => i !== index),
+    }));
+  };
+
   const handleAddBenefitRow = (isUpgrade = false) => {
     const defaultSvc = services.length > 0 ? services[0].id : "";
     if (isUpgrade) {
       setUpgradeBenefits([...upgradeBenefits, { service_id: defaultSvc, quantity: 1 }]);
     } else {
-      setAssignForm({
-        ...assignForm,
-        benefits: [...assignForm.benefits, { service_id: defaultSvc, quantity: 1 }],
-      });
+      handleAddAssignBenefitRow();
     }
   };
 
@@ -222,9 +319,7 @@ function CustomerMemberships() {
       updated[index][field] = field === "quantity" ? parseInt(val) || 1 : val;
       setUpgradeBenefits(updated);
     } else {
-      const updated = [...assignForm.benefits];
-      updated[index][field] = field === "quantity" ? parseInt(val) || 1 : val;
-      setAssignForm({ ...assignForm, benefits: updated });
+      handleAssignBenefitChange(index, field, val);
     }
   };
 
@@ -253,7 +348,10 @@ function CustomerMemberships() {
         setAssignForm({
           customer_id: "",
           plan_id: "",
-          payment_method: "",
+          is_existing_plan: false,
+          start_date: new Date().toISOString().split("T")[0],
+          expires_at: "",
+          payment_method: "Cash",
           benefits: [],
         });
         fetchAllMemberships();
@@ -261,11 +359,14 @@ function CustomerMemberships() {
         const invData = res.data?.data || res.data;
         const invNum = invData?.invoice_number;
         const invoiceId = invData?.invoice_id;
-        showSuccess(`Membership assigned successfully. Invoice generated: ${invNum || ''}`);
+        const msg = assignForm.is_existing_plan
+          ? `Existing membership recorded successfully! (Valid until ${new Date(invData?.expires_at).toLocaleDateString()})`
+          : `Membership assigned successfully. Invoice generated: ${invNum || ''}`;
+        showSuccess(msg);
         if (selectedCustomer && selectedCustomer.id === parseInt(assignForm.customer_id)) {
           fetchCustomerMemberships(selectedCustomer);
         }
-        if (invoiceId) {
+        if (invoiceId && !assignForm.is_existing_plan) {
           openBillPreviewModalForInvoice(invoiceId);
         }
       })
@@ -352,6 +453,25 @@ function CustomerMemberships() {
   // Datatable Filter State
   const [statusFilter, setStatusFilter] = useState("all"); // "all", "active", "cancelled"
 
+  const openAssignModal = (targetCust = null) => {
+    const cust = targetCust || selectedCustomer;
+    setAssignForm({
+      customer_id: cust ? cust.id.toString() : "",
+      plan_id: "",
+      is_existing_plan: false,
+      start_date: new Date().toISOString().split("T")[0],
+      expires_at: "",
+      payment_method: "Cash",
+      benefits: [],
+    });
+    if (cust) {
+      setComboboxSearch(`${cust.first_name} ${cust.last_name || ""} (${cust.phone || "No Phone"})`);
+    } else {
+      setComboboxSearch("");
+    }
+    setShowAssignModal(true);
+  };
+
   return (
     <div className="space-y-6">
       {/* Title Bar */}
@@ -361,20 +481,7 @@ function CustomerMemberships() {
           <p className="text-xs text-text-secondary">Assign membership packages, manage benefit balances, renewals, and upgrades.</p>
         </div>
         <button
-          onClick={() => {
-            setAssignForm({
-              customer_id: selectedCustomer ? selectedCustomer.id.toString() : "",
-              plan_id: "",
-              payment_method: "",
-              benefits: [],
-            });
-            if (selectedCustomer) {
-              setComboboxSearch(`${selectedCustomer.first_name} ${selectedCustomer.last_name || ""} (${selectedCustomer.phone || "No Phone"})`);
-            } else {
-              setComboboxSearch("");
-            }
-            setShowAssignModal(true);
-          }}
+          onClick={() => openAssignModal()}
           className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition"
         >
           + Assign Membership
@@ -442,16 +549,7 @@ function CustomerMemberships() {
             <div className="bg-surface border border-border-soft p-12 text-center rounded-lg">
               <p className="text-sm text-text-secondary mb-3">No membership package currently active for this customer.</p>
               <button
-                onClick={() => {
-                  setAssignForm({
-                    customer_id: selectedCustomer.id.toString(),
-                    plan_id: "",
-                    payment_method: "",
-                    benefits: [],
-                  });
-                  setComboboxSearch(`${selectedCustomer.first_name} ${selectedCustomer.last_name || ""} (${selectedCustomer.phone || "No Phone"})`);
-                  setShowAssignModal(true);
-                }}
+                onClick={() => openAssignModal(selectedCustomer)}
                 className="text-sm text-primary font-medium hover:underline"
               >
                 Assign Package Now
@@ -694,15 +792,69 @@ function CustomerMemberships() {
 
       {/* Assign Membership Modal */}
       {showAssignModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div ref={assignModalRef} className="bg-surface max-w-lg w-full rounded-lg shadow-lg border border-border-soft overflow-hidden">
-            <div className="px-6 py-4 border-b border-border-soft flex justify-between items-center">
-              <h3 className="text-md font-semibold text-text-primary">Assign Customer Membership</h3>
-              <button onClick={() => setShowAssignModal(false)} className="text-text-secondary hover:text-text-primary p-1">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
+          <div ref={assignModalRef} className="bg-surface max-w-xl w-full rounded-2xl shadow-2xl border border-border-soft overflow-hidden my-6">
+            <div className="px-6 py-4 border-b border-border-soft flex justify-between items-center bg-slate-50/50">
+              <div>
+                <h3 className="text-base font-bold text-text-primary">
+                  {assignForm.is_existing_plan ? "Record Existing / Ongoing Membership" : "Assign Customer Membership"}
+                </h3>
+                <p className="text-xs text-text-secondary">
+                  {assignForm.is_existing_plan
+                    ? "Add a previously purchased or ongoing active package with custom balance & expiry."
+                    : "Create a new membership sale and issue an official paid invoice."}
+                </p>
+              </div>
+              <button onClick={() => setShowAssignModal(false)} className="text-text-secondary hover:text-text-primary p-1 rounded-lg hover:bg-background">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form ref={assignFormRef} onSubmit={handleAssignSubmit} className="p-6 space-y-4">
+
+            <form ref={assignFormRef} onSubmit={handleAssignSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              {/* Mode Toggle: New Purchase vs Existing / Ongoing Plan */}
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary mb-1.5">Membership Type</label>
+                <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleExistingPlan(false)}
+                    className={`flex items-center justify-center space-x-2 py-2 px-3 rounded-lg text-xs font-bold transition ${
+                      !assignForm.is_existing_plan
+                        ? "bg-white text-primary shadow-sm border border-slate-200"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>New Purchase (Today)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleExistingPlan(true)}
+                    className={`flex items-center justify-center space-x-2 py-2 px-3 rounded-lg text-xs font-bold transition ${
+                      assignForm.is_existing_plan
+                        ? "bg-primary text-white shadow-sm"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>Existing / Ongoing Plan</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Informational banner for Existing Ongoing Plan */}
+              {assignForm.is_existing_plan && (
+                <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-xl flex items-start space-x-2.5 text-xs text-amber-900">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <span className="font-bold">Ongoing Membership Migration:</span>
+                    <p className="text-[11px] text-amber-800 leading-relaxed">
+                      Use this for customers who already purchased a plan in the past or offline. Set their original purchase date, custom expiry date, and remaining service perks left to use.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Single Searchable Combobox Dropdown */}
               <div className="relative" ref={comboboxRef}>
                 <label className="block text-xs font-semibold text-text-secondary mb-1">Customer *</label>
@@ -835,6 +987,7 @@ function CustomerMemberships() {
                 )}
               </div>
 
+              {/* Membership Plan Selector */}
               <div>
                 <label className="block text-xs font-semibold text-text-secondary mb-1">Select Membership Plan *</label>
                 <select
@@ -842,9 +995,7 @@ function CustomerMemberships() {
                   required
                   value={assignForm.plan_id}
                   onFocus={(e) => focusAndOpenSelect(e.target)}
-                  onChange={(e) => {
-                    setAssignForm({ ...assignForm, plan_id: e.target.value });
-                  }}
+                  onChange={(e) => handlePlanSelection(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === "ArrowRight") {
                       if (assignForm.plan_id) {
@@ -866,21 +1017,56 @@ function CustomerMemberships() {
                 </select>
               </div>
 
-              {assignForm.plan_id && (() => {
-                const selectedPlan = plans.find(p => p.id.toString() === assignForm.plan_id.toString());
-                return selectedPlan ? (
-                  <div className="bg-primary-light/50 border border-primary/20 p-3.5 rounded-lg space-y-1">
-                    <div className="flex justify-between items-center text-xs font-semibold text-text-primary">
-                      <span>Plan Price to Charge:</span>
-                      <span className="text-sm font-bold text-primary numeric">{formatCurrency(selectedPlan.price)}</span>
-                    </div>
-                    <div className="text-[11px] text-text-secondary">
-                      Valid for {selectedPlan.duration_days} days. An official paid invoice will be generated upon confirmation.
-                    </div>
+              {/* Date Pickers for Start & Expiry */}
+              {assignForm.is_existing_plan ? (
+                <div className="grid grid-cols-2 gap-3 bg-slate-50 border border-slate-200 p-3.5 rounded-xl">
+                  <div>
+                    <label className="block text-xs font-semibold text-text-secondary mb-1 flex items-center space-x-1">
+                      <Calendar className="w-3.5 h-3.5 text-primary" />
+                      <span>Start / Purchase Date *</span>
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={assignForm.start_date}
+                      onChange={(e) => handleStartDateChange(e.target.value)}
+                      className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-xs font-semibold focus:outline-none focus:border-primary"
+                    />
+                    <span className="text-[10px] text-text-secondary mt-0.5 block">When was it purchased?</span>
                   </div>
-                ) : null;
-              })()}
+                  <div>
+                    <label className="block text-xs font-semibold text-text-secondary mb-1 flex items-center space-x-1">
+                      <Clock className="w-3.5 h-3.5 text-primary" />
+                      <span>Expiry Date *</span>
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={assignForm.expires_at}
+                      onChange={(e) => setAssignForm({ ...assignForm, expires_at: e.target.value })}
+                      className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-xs font-semibold focus:outline-none focus:border-primary text-primary"
+                    />
+                    <span className="text-[10px] text-text-secondary mt-0.5 block">Auto-calculated or custom</span>
+                  </div>
+                </div>
+              ) : assignForm.plan_id ? (
+                (() => {
+                  const selectedPlan = plans.find((p) => p.id.toString() === assignForm.plan_id.toString());
+                  return selectedPlan ? (
+                    <div className="bg-primary-light/50 border border-primary/20 p-3.5 rounded-xl space-y-1">
+                      <div className="flex justify-between items-center text-xs font-semibold text-text-primary">
+                        <span>Plan Price:</span>
+                        <span className="text-sm font-bold text-primary numeric">{formatCurrency(selectedPlan.price)}</span>
+                      </div>
+                      <div className="text-[11px] text-text-secondary">
+                        Valid for {selectedPlan.duration_days} days (Expires: {assignForm.expires_at || calculateExpiry(assignForm.start_date, selectedPlan.duration_days)}). An official paid bill will be generated.
+                      </div>
+                    </div>
+                  ) : null;
+                })()
+              ) : null}
 
+              {/* Payment Method Selector */}
               <div>
                 <label className="block text-xs font-semibold text-text-secondary mb-1">Payment Method *</label>
                 <select
@@ -889,38 +1075,133 @@ function CustomerMemberships() {
                   value={assignForm.payment_method}
                   onFocus={(e) => focusAndOpenSelect(e.target)}
                   onChange={(e) => setAssignForm({ ...assignForm, payment_method: e.target.value })}
-                  onKeyDown={(e) => {
-                    if (e.key === "ArrowRight") {
-                      e.preventDefault();
-                      const submitBtn = assignModalRef.current?.querySelector('button[type="submit"]');
-                      if (submitBtn) submitBtn.focus();
-                    }
-                  }}
                   className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-primary font-medium"
                 >
-                  <option value="">[ Select Payment Method ]</option>
-                  <option value="Cash">Cash</option>
-                  <option value="Paytm">Paytm</option>
-                  <option value="PhonePe">PhonePe</option>
-                  <option value="GPay">GPay</option>
-                  <option value="Card">Card</option>
+                  {assignForm.is_existing_plan ? (
+                    <>
+                      <option value="Already Paid (Offline)">Already Paid (Offline / Past Purchase)</option>
+                      <option value="Cash">Cash</option>
+                      <option value="GPay">GPay</option>
+                      <option value="PhonePe">PhonePe</option>
+                      <option value="Paytm">Paytm</option>
+                      <option value="Card">Card</option>
+                      <option value="Bank Transfer">Bank Transfer / Other</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="Cash">Cash</option>
+                      <option value="Paytm">Paytm</option>
+                      <option value="PhonePe">PhonePe</option>
+                      <option value="GPay">GPay</option>
+                      <option value="Card">Card</option>
+                    </>
+                  )}
                 </select>
               </div>
 
+              {/* Service Benefits / Perks Section with Remaining Balance Support */}
+              <div className="space-y-2 border-t border-border-soft pt-3">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <label className="text-xs font-semibold text-text-primary">Included Service Perks</label>
+                    <p className="text-[10px] text-text-secondary">
+                      {assignForm.is_existing_plan
+                        ? "Set total service allowance and remaining balance left to use."
+                        : "Free services bundled with this membership."}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddAssignBenefitRow}
+                    className="text-xs text-primary font-bold hover:underline flex items-center space-x-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Service Perk</span>
+                  </button>
+                </div>
+
+                {assignForm.benefits.length === 0 ? (
+                  <div className="bg-background/60 border border-dashed border-border-soft rounded-lg p-3 text-center text-xs text-text-secondary">
+                    No service perks configured for this plan. Click "+ Add Service Perk" to add free services.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {assignForm.benefits.map((b, idx) => (
+                      <div key={idx} className="flex items-center space-x-2 bg-background p-2.5 rounded-lg border border-border-soft">
+                        <select
+                          value={b.service_id}
+                          onChange={(e) => handleAssignBenefitChange(idx, "service_id", e.target.value)}
+                          className="flex-1 bg-surface border border-border-soft px-2 py-1.5 rounded text-xs focus:outline-none"
+                        >
+                          {services.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name} ({formatCurrency(s.price)})
+                            </option>
+                          ))}
+                        </select>
+                        
+                        <div className="flex items-center space-x-1">
+                          <span className="text-[11px] text-text-secondary font-medium">Total:</span>
+                          <input
+                            type="number"
+                            min="1"
+                            value={b.total_quantity || 1}
+                            onChange={(e) => handleAssignBenefitChange(idx, "total_quantity", e.target.value)}
+                            className="w-14 bg-surface border border-border-soft px-2 py-1.5 rounded text-xs text-center font-bold focus:outline-none"
+                            title="Total Quantity"
+                          />
+                        </div>
+
+                        {assignForm.is_existing_plan && (
+                          <div className="flex items-center space-x-1">
+                            <span className="text-[11px] text-emerald-700 font-medium">Left:</span>
+                            <input
+                              type="number"
+                              min="0"
+                              max={b.total_quantity || 1}
+                              value={b.remaining_quantity !== undefined ? b.remaining_quantity : (b.total_quantity || 1)}
+                              onChange={(e) => handleAssignBenefitChange(idx, "remaining_quantity", e.target.value)}
+                              className="w-14 bg-emerald-50 border border-emerald-300 text-emerald-800 px-2 py-1.5 rounded text-xs text-center font-bold focus:outline-none"
+                              title="Remaining Quantity Left"
+                            />
+                          </div>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveAssignBenefitRow(idx)}
+                          className="text-text-secondary hover:text-danger p-1"
+                          title="Remove Perk"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Action Buttons */}
               <div className="pt-4 border-t border-border-soft flex justify-end space-x-3">
                 <button
                   type="button"
                   onClick={() => setShowAssignModal(false)}
-                  className="px-4 py-2 border border-border-soft rounded-md text-xs font-semibold text-text-secondary hover:bg-background"
+                  className="px-4 py-2 border border-border-soft rounded-lg text-xs font-semibold text-text-secondary hover:bg-background"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-md text-xs font-semibold disabled:opacity-50"
+                  className="px-5 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-lg text-xs font-bold shadow-md transition disabled:opacity-50 flex items-center space-x-1.5"
                 >
-                  {submitting ? "Processing..." : "Pay & Assign Membership"}
+                  {submitting ? (
+                    <span>Saving...</span>
+                  ) : assignForm.is_existing_plan ? (
+                    <span>Save & Record Active Membership</span>
+                  ) : (
+                    <span>Pay & Assign Membership</span>
+                  )}
                 </button>
               </div>
             </form>

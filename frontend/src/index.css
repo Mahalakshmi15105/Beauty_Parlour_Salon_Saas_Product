@@ -110,6 +110,21 @@
 .text-text-secondary { color: #4a4a4a !important; }
 
 @layer base {
+  /* Dual-font composite: Clean modern Arial for all numbers (0-9) & currency/date/symbol chars, Georgia for all letters/text */
+  @font-face {
+    font-family: 'AppNumberFont';
+    src: local('Arial Bold'), local('Arial-BoldMT'), local('Segoe UI Bold'), local('Arial'), local('Helvetica'), local('sans-serif');
+    font-weight: 600 900;
+    unicode-range: U+0030-0039, U+20B9, U+0023, U+0024, U+0025, U+002B, U+002D, U+002E, U+002F, U+003A, U+002C, U+0028, U+0029;
+  }
+
+  @font-face {
+    font-family: 'AppNumberFont';
+    src: local('Arial'), local('Segoe UI'), local('Helvetica'), local('sans-serif');
+    font-weight: 100 500;
+    unicode-range: U+0030-0039, U+20B9, U+0023, U+0024, U+0025, U+002B, U+002D, U+002E, U+002F, U+003A, U+002C, U+0028, U+0029;
+  }
+
   *:not(.numeric):not(.numeric *):not(.mono-nums):not(.mono-nums *):not(.num-val):not(.num-val *):not([data-numeric="true"]):not([data-numeric="true"] *):not(input):not(select):not(textarea):not(button) {
     transition: background-color 250ms ease-in-out, border-color 250ms ease-in-out, color 250ms ease-in-out, box-shadow 250ms ease-in-out;
   }
@@ -117,7 +132,7 @@
   body {
     background: #FFFFFF !important;
     color: #1f1f1f !important;
-    font-family: 'Georgia', 'Times New Roman', serif;
+    font-family: 'AppNumberFont', 'Georgia', 'Times New Roman', serif !important;
     font-weight: 700 !important;
     -webkit-font-smoothing: antialiased;
     margin: 0;
@@ -128,33 +143,33 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Georgia', 'Times New Roman', serif;
+    font-family: 'AppNumberFont', 'Georgia', 'Times New Roman', serif !important;
     font-weight: 700 !important;
     color: #1f1f1f;
   }
 
   label {
-    font-family: 'Georgia', 'Times New Roman', serif;
+    font-family: 'AppNumberFont', 'Georgia', 'Times New Roman', serif !important;
     font-weight: 700 !important;
     color: #1f1f1f !important;
   }
 
   /* Global Table & List Readability - minimum 14px for table cells, headers, and form controls */
   table {
-    font-family: 'Georgia', 'Times New Roman', serif;
+    font-family: 'AppNumberFont', 'Georgia', 'Times New Roman', serif !important;
     font-weight: 700 !important;
     font-size: 14px;
     border-collapse: collapse;
   }
   table th {
-    font-family: 'Georgia', 'Times New Roman', serif;
+    font-family: 'AppNumberFont', 'Georgia', 'Times New Roman', serif !important;
     font-weight: 700 !important;
     font-size: 14px;
     background-color: var(--accent-color) !important;
     color: #ffffff !important;
   }
-  table td:not(.numeric):not(.numeric *) {
-    font-family: 'Georgia', 'Times New Roman', serif !important;
+  table td {
+    font-family: 'AppNumberFont', 'Georgia', 'Times New Roman', serif !important;
     font-weight: 700 !important;
     font-size: 14px;
     color: #1f1f1f !important;
@@ -172,10 +187,10 @@
   .divide-pink-100\/60 > :not([hidden]) ~ :not([hidden]) {
     border-color: rgba(255, 117, 143, 0.15) !important;
   }
-  table input:not(.numeric),
-  table select:not(.numeric),
-  table textarea:not(.numeric) {
-    font-family: 'Georgia', 'Times New Roman', serif !important;
+  table input,
+  table select,
+  table textarea {
+    font-family: 'AppNumberFont', 'Georgia', 'Times New Roman', serif !important;
     font-weight: 700 !important;
     font-size: 14px;
   }
@@ -197,6 +212,7 @@
     border-radius: 0.75rem !important;
     color: #1f1f1f !important;
     background-color: #FFFFFF !important;
+    font-family: 'AppNumberFont', 'Georgia', 'Times New Roman', serif !important;
   }
 
   select option {
@@ -205,6 +221,7 @@
     font-weight: 700 !important;
     padding: 10px 14px !important;
     border-radius: 0.5rem !important;
+    font-family: 'AppNumberFont', 'Georgia', 'Times New Roman', serif !important;
   }
 
   select option:hover,
@@ -215,12 +232,22 @@
     border-color: var(--accent-color) !important;
     color: #1f1f1f !important;
     font-weight: 700 !important;
+    font-family: 'AppNumberFont', 'Georgia', 'Times New Roman', serif !important;
   }
 
   .fixed.inset-0 label,
   div[role="dialog"] label {
     color: #1f1f1f !important;
     font-weight: 700 !important;
+    font-family: 'AppNumberFont', 'Georgia', 'Times New Roman', serif !important;
+  }
+
+  /* Popups, Modals, Dropdowns & All Dialog Elements */
+  div[role="dialog"],
+  .modal-container,
+  .popup-overlay,
+  .dropdown-menu {
+    font-family: 'AppNumberFont', 'Georgia', 'Times New Roman', serif !important;
   }
 }
 
@@ -235,7 +262,6 @@ html body .numeric-input,
 html body .numeric-input *,
 html body [data-numeric="true"],
 html body [data-numeric="true"] *,
-/* Force all input fields, select boxes, date/time pickers, and numeric fields to clean sans-serif */
 input,
 select,
 textarea,
@@ -253,14 +279,13 @@ input.numeric-input,
 .num-val,
 .numeric-val,
 [data-numeric],
-div[role="dialog"] input,
-div[role="dialog"] select,
-div[role="dialog"] textarea,
 .price,
 .amount,
 .total,
-.currency {
-  font-family: 'Arial', 'Helvetica', 'Segoe UI', sans-serif !important;
+.currency,
+.stat-value,
+.badge-numeric {
+  font-family: 'AppNumberFont', 'Arial', 'Helvetica', 'Segoe UI', sans-serif !important;
   font-variant-numeric: tabular-nums !important;
   font-feature-settings: "tnum" 1 !important;
 }
@@ -357,28 +382,6 @@ div[role="dialog"] textarea,
   color: #FFFFFF !important;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
   transform: translateY(-1px) !important;
-}
-
-/* Global Tabular Sans-Serif Numeric Font Rule */
-input, 
-input[type="number"], 
-input[type="tel"], 
-.numeric, 
-.num-val, 
-.numeric-val,
-[data-numeric], 
-td.numeric-cell, 
-th.numeric-cell, 
-.price, 
-.amount, 
-.total, 
-.currency,
-.stat-value,
-.badge-numeric,
-td,
-th {
-  font-family: 'Arial', 'Helvetica', 'Segoe UI', sans-serif !important;
-  font-variant-numeric: tabular-nums !important;
 }
 
 

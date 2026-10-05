@@ -218,6 +218,10 @@ def create_customer():
         )
         db.session.add(customer)
         db.session.commit()
+        try:
+            cache.delete_pattern(f"customers:{g.parlour_id}:*")
+        except Exception:
+            pass
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error creating customer: {str(e)}")
@@ -303,6 +307,10 @@ def update_customer(customer_id):
                 except ValueError:
                     pass
         db.session.commit()
+        try:
+            cache.delete_pattern(f"customers:{g.parlour_id}:*")
+        except Exception:
+            pass
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error updating customer: {str(e)}")
@@ -373,6 +381,10 @@ def delete_customer(customer_id):
         # 2. Permanently delete Customer record from tenant database
         db.session.delete(customer)
         db.session.commit()
+        try:
+            cache.delete_pattern(f"customers:{g.parlour_id}:*")
+        except Exception:
+            pass
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error permanently deleting customer: {str(e)}")

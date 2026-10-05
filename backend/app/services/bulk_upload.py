@@ -10,29 +10,132 @@ from flask import g
 
 logger = logging.getLogger(__name__)
 
-# Field mapping configurations for each module
+# Canonical headers for downloadable Excel templates
+TEMPLATE_HEADERS = {
+    'customers': [
+        'First Name',
+        'Last Name',
+        'Phone Number',
+        'Gender',
+        'Date of Birth',
+        'Address',
+        'Spot'
+    ],
+    'employees': [
+        'First Name',
+        'Last Name',
+        'Phone Number',
+        'Role / Job Title',
+        'Login Username / Email',
+        'Login Password',
+        'Specialization',
+        'Salary',
+        'Target',
+        'Level',
+        'Status',
+        'Joining Date',
+        'Shift Start Time',
+        'Shift End Time',
+        'Monthly Paid Offs'
+    ],
+    'services': [
+        'Service Name',
+        'Category Name',
+        'Price',
+        'Duration (minutes)',
+        'Description',
+        'Status',
+        'Membership Plan Name',
+        'Membership Discount (%)',
+        'Membership Discount Amount'
+    ],
+    'products': [
+        'Product Name',
+        'Category',
+        'SKU',
+        'Barcode',
+        'Cost Price',
+        'Selling Price',
+        'MRP',
+        'Stock Quantity',
+        'Low Stock Threshold',
+        'Status'
+    ]
+}
+
+# Field mapping configurations for each module (including aliases for robust parsing)
 FIELD_MAPPINGS = {
     'customers': {
         'First Name': 'first_name',
         'Last Name': 'last_name',
         'Phone Number': 'phone',
-        'Email': 'email',
         'Gender': 'gender',
         'Date of Birth': 'date_of_birth',
         'Address': 'address',
+        'Spot': 'spot',
+        # Tolerant aliases so variant header names are never rejected
+        'Last Name (Optional)': 'last_name',
+        'Date of Birth (Optional)': 'date_of_birth',
+        'Address (Optional)': 'address',
+        'Gender (Optional)': 'gender',
+        'Email': 'email',
+        'Email Address': 'email',
         'Notes': 'notes',
-        'Spot': 'spot'
+        'Phone': 'phone',
+        'Mobile': 'phone',
+        'Mobile Number': 'phone',
+        'DOB': 'date_of_birth',
+        'Birth Date': 'date_of_birth',
+        'First Name *': 'first_name',
+        'Phone Number *': 'phone',
     },
     'employees': {
         'First Name': 'first_name',
         'Last Name': 'last_name',
         'Phone Number': 'phone',
-        'Specialization': 'specialization',
+        'Role / Job Title': 'role',
         'Role': 'role',
+        'Login Username / Email': 'username',
+        'Login Password': 'password',
+        'Specialization': 'specialization',
         'Salary': 'salary',
-        'Commission %': 'commission_percentage',
+        'Target': 'target',
+        'Level': 'level',
+        'Status': 'status',
         'Joining Date': 'joining_date',
-        'Status': 'status'
+        'Shift Start Time': 'shift_start_time',
+        'Shift End Time': 'shift_end_time',
+        'Monthly Paid Offs': 'monthly_offs',
+        # Tolerant header aliases
+        'Last Name (Optional)': 'last_name',
+        'Role / Job Title (Optional)': 'role',
+        'Role (Optional)': 'role',
+        'Job Title': 'role',
+        'Job Title (Optional)': 'role',
+        'Specialization (Optional)': 'specialization',
+        'Login Username': 'username',
+        'Login Email': 'username',
+        'Username / Email': 'username',
+        'Username': 'username',
+        'Email': 'username',
+        'Password': 'password',
+        'First Name *': 'first_name',
+        'Phone Number *': 'phone',
+        'Salary *': 'salary',
+        'Salary (₹)': 'salary',
+        'Target (₹)': 'target',
+        'Target *': 'target',
+        'Level (L1/L2/L3)': 'level',
+        'Monthly Offs': 'monthly_offs',
+        'Monthly Paid Offs': 'monthly_offs',
+        'Paid Offs': 'monthly_offs',
+        'Shift Start': 'shift_start_time',
+        'Shift End': 'shift_end_time',
+        'Phone': 'phone',
+        'Mobile': 'phone',
+        'Mobile Number': 'phone',
+        'Commission %': 'commission_percentage',
+        'Commission': 'commission_percentage',
     },
     'services': {
         'Service Name': 'name',
@@ -62,15 +165,15 @@ FIELD_MAPPINGS = {
 # Required fields for each module
 REQUIRED_FIELDS = {
     'customers': ['First Name', 'Phone Number'],
-    'employees': ['First Name', 'Phone Number', 'Salary'],
+    'employees': ['First Name', 'Phone Number'],
     'services': ['Service Name', 'Category Name', 'Price'],
     'products': ['Product Name', 'Cost Price', 'Selling Price', 'MRP', 'Stock Quantity']
 }
 
 # Optional fields for each module
 OPTIONAL_FIELDS = {
-    'customers': ['Last Name', 'Email', 'Gender', 'Date of Birth', 'Address', 'Notes', 'Spot'],
-    'employees': ['Last Name', 'Specialization', 'Role', 'Commission %', 'Joining Date', 'Status'],
+    'customers': ['Last Name', 'Gender', 'Date of Birth', 'Address', 'Spot', 'Email', 'Notes'],
+    'employees': ['Last Name', 'Role / Job Title', 'Role', 'Login Username / Email', 'Login Password', 'Specialization', 'Salary', 'Target', 'Level', 'Status', 'Joining Date', 'Shift Start Time', 'Shift End Time', 'Monthly Paid Offs', 'Commission %'],
     'services': ['Description', 'Status', 'Membership Plan Name', 'Membership Discount (%)', 'Membership Discount Amount'],
     'products': ['Category', 'SKU', 'Barcode', 'Low Stock Threshold', 'Status']
 }
@@ -109,6 +212,8 @@ def generate_excel_template(module_name, tenant_id=None, branch_id=None):
 
         if module_name == 'services' and mode not in ['paid_plan', 'discount_plan']:
             headers = ['Service Name', 'Category Name', 'Price', 'Duration (minutes)', 'Description', 'Status']
+        elif module_name in TEMPLATE_HEADERS:
+            headers = list(TEMPLATE_HEADERS[module_name])
         else:
             headers = list(field_mapping.keys())
         
@@ -227,11 +332,39 @@ def generate_excel_template(module_name, tenant_id=None, branch_id=None):
                 dv_gender.errorTitle = "Gender Selection"
                 dv_gender.error = "Please select Female, Male, or Other."
                 ws.add_data_validation(dv_gender)
-                dv_gender.add("E2:E500")
+                gender_idx = headers.index('Gender') + 1 if 'Gender' in headers else 4
+                gender_col = openpyxl.utils.get_column_letter(gender_idx) if hasattr(openpyxl.utils, 'get_column_letter') else 'D'
+                dv_gender.add(f"{gender_col}2:{gender_col}500")
             except Exception as e:
                 logger.error(f"Error adding customer gender dropdown: {e}")
 
-        elif module_name in ['employees', 'products']:
+        elif module_name == 'employees':
+            try:
+                # Status dropdown
+                dv_status = DataValidation(type="list", formula1='"active,inactive"', allow_blank=True)
+                dv_status.hide_drop_down = None
+                dv_status.showInputMessage = True
+                dv_status.promptTitle = "Status Selection"
+                dv_status.prompt = "Select 'active' or 'inactive'."
+                ws.add_data_validation(dv_status)
+                status_idx = headers.index('Status') + 1 if 'Status' in headers else len(headers)
+                status_col = openpyxl.utils.get_column_letter(status_idx) if hasattr(openpyxl.utils, 'get_column_letter') else chr(64 + status_idx)
+                dv_status.add(f"{status_col}2:{status_col}500")
+
+                # Level dropdown
+                dv_level = DataValidation(type="list", formula1='"L1,L2,L3"', allow_blank=True)
+                dv_level.hide_drop_down = None
+                dv_level.showInputMessage = True
+                dv_level.promptTitle = "Level Selection"
+                dv_level.prompt = "Select 'L1', 'L2', or 'L3'."
+                ws.add_data_validation(dv_level)
+                level_idx = headers.index('Level') + 1 if 'Level' in headers else 8
+                level_col = openpyxl.utils.get_column_letter(level_idx) if hasattr(openpyxl.utils, 'get_column_letter') else 'H'
+                dv_level.add(f"{level_col}2:{level_col}500")
+            except Exception as e:
+                logger.error(f"Error adding employee dropdowns: {e}")
+
+        elif module_name == 'products':
             try:
                 dv_status = DataValidation(type="list", formula1='"active,inactive"', allow_blank=True)
                 dv_status.hide_drop_down = None
@@ -267,11 +400,9 @@ def get_sample_data(module_name, membership_mode="paid_plan"):
                 'first_name': 'John',
                 'last_name': 'Doe',
                 'phone': '9876543210',
-                'email': 'john.doe@example.com',
                 'gender': 'Male',
                 'date_of_birth': '1990-01-15',
                 'address': '123 Main Street',
-                'notes': 'VIP Customer',
                 'spot': 'A1'
             }
         ]
@@ -281,12 +412,18 @@ def get_sample_data(module_name, membership_mode="paid_plan"):
                 'first_name': 'Jane',
                 'last_name': 'Smith',
                 'phone': '9876543211',
-                'specialization': 'Hair Stylist',
                 'role': 'Stylist',
+                'username': 'jane@salon.com',
+                'password': 'Password@123',
+                'specialization': 'Hair Stylist',
                 'salary': '25000',
-                'commission_percentage': '10',
-                'joining_date': '2023-01-01',
-                'status': 'active'
+                'target': '100000',
+                'level': 'L1',
+                'status': 'active',
+                'joining_date': '2026-01-01',
+                'shift_start_time': '09:00',
+                'shift_end_time': '18:00',
+                'monthly_offs': '4'
             }
         ]
     elif module_name == 'services':
@@ -327,30 +464,44 @@ def parse_excel_file(file_data, module_name):
     """
     try:
         import openpyxl
-        wb = openpyxl.load_workbook(BytesIO(file_data))
+        wb = openpyxl.load_workbook(BytesIO(file_data), data_only=True)
         ws = wb.active
         
         # Get headers from first row
-        headers = []
+        raw_headers = []
         for cell in ws[1]:
-            if cell.value:
-                headers.append(str(cell.value).strip())
+            if cell.value is not None and str(cell.value).strip():
+                raw_headers.append(str(cell.value).strip())
         
-        # Validate headers
+        if not raw_headers:
+            return False, [], "The uploaded Excel sheet is empty or missing a header row."
+
         field_mapping = FIELD_MAPPINGS.get(module_name, {})
         required = REQUIRED_FIELDS.get(module_name, [])
-        
-        # Check for missing required headers
-        missing_headers = [h for h in required if h not in headers]
-        if missing_headers:
-            return False, [], f"Missing required columns: {', '.join(missing_headers)}"
-        
-        # Check for invalid headers
-        valid_headers = set(field_mapping.keys())
-        invalid_headers = [h for h in headers if h not in valid_headers]
-        if invalid_headers:
-            return False, [], f"Invalid columns found: {', '.join(invalid_headers)}"
-        
+
+        def normalize_header(h):
+            return str(h).lower().replace('*', '').replace('(optional)', '').replace('_', ' ').replace('-', ' ').strip()
+
+        lookup_map = {}
+        for k, v in field_mapping.items():
+            lookup_map[normalize_header(k)] = (k, v)
+
+        # Map actual header columns to target field names
+        header_to_field = {}
+        for h in raw_headers:
+            norm = normalize_header(h)
+            if norm in lookup_map:
+                header_to_field[h] = lookup_map[norm][1]
+            else:
+                logger.info(f"Header '{h}' in {module_name} upload not in standard mapping, skipping safely.")
+
+        # Check for missing required columns
+        for req in required:
+            norm_req = normalize_header(req)
+            req_field = lookup_map.get(norm_req, (req, req.lower()))[1]
+            if req_field not in header_to_field.values():
+                return False, [], f"Missing required column: {req}"
+
         # Parse data rows
         data = []
         errors = []
@@ -359,18 +510,24 @@ def parse_excel_file(file_data, module_name):
             row_data = {}
             row_errors = []
             
-            for col_num, header in enumerate(headers, 1):
+            # Check if row is completely empty
+            row_cells = [cell.value for cell in row[:len(raw_headers)]]
+            if all(v is None or str(v).strip() == "" for v in row_cells):
+                continue
+
+            for col_num, header in enumerate(raw_headers, 1):
+                field_name = header_to_field.get(header)
+                if not field_name:
+                    continue
                 cell_value = ws.cell(row=row_num, column=col_num).value
-                field_name = field_mapping[header]
-                
-                # Convert cell value to appropriate type
                 row_data[field_name] = convert_cell_value(cell_value, field_name)
             
             # Validate required fields
-            for required_header in required:
-                field_name = field_mapping[required_header]
-                if not row_data.get(field_name):
-                    row_errors.append(f"{required_header} is required")
+            for req in required:
+                norm_req = normalize_header(req)
+                req_field = lookup_map.get(norm_req, (req, req.lower()))[1]
+                if not row_data.get(req_field):
+                    row_errors.append(f"{req} is required")
             
             if row_errors:
                 errors.append({
@@ -392,23 +549,35 @@ def convert_cell_value(value, field_name):
     if value is None:
         return None
     
-    # Handle different field types
+    # Handle numeric and monetary fields
     if field_name in ['salary', 'price', 'cost_price', 'selling_price', 'mrp', 'commission_percentage', 'membership_discount_percentage', 'membership_discount_amount']:
         try:
-            return float(str(value))
+            val_str = str(value).strip().replace(',', '')
+            return float(val_str) if val_str else 0.0
         except (ValueError, TypeError):
             return 0.0
     elif field_name in ['duration_minutes', 'stock_quantity', 'low_stock_threshold']:
         try:
-            return int(str(value))
+            val_str = str(value).strip().replace(',', '')
+            return int(float(val_str)) if val_str else 0
         except (ValueError, TypeError):
             return 0
     elif field_name in ['date_of_birth', 'joining_date']:
         if isinstance(value, datetime):
             return value.strftime('%Y-%m-%d')
-        return str(value)
+        val_str = str(value).strip()
+        if not val_str or val_str.lower() in ['none', 'null', 'nan', 'na', '']:
+            return None
+        # Try parsing various common date formats
+        for fmt in ('%Y-%m-%d', '%d-%m-%Y', '%d/%m/%Y', '%m/%d/%Y', '%Y/%m/%d', '%d.%m.%Y', '%Y.%m.%d'):
+            try:
+                return datetime.strptime(val_str, fmt).strftime('%Y-%m-%d')
+            except ValueError:
+                pass
+        return val_str
     else:
-        return str(value).strip() if value else None
+        val_str = str(value).strip() if value is not None else ""
+        return val_str if val_str and val_str.lower() not in ['none', 'null', 'nan'] else None
 
 def validate_customer_data(row_data, tenant_id, branch_id=None):
     """Validate customer data according to existing rules"""
@@ -425,31 +594,35 @@ def validate_customer_data(row_data, tenant_id, branch_id=None):
         errors.append("Phone Number is required")
     
     # Validate phone format
-    phone = row_data.get('phone', '')
+    phone = str(row_data.get('phone', '') or '').strip()
     if phone and len(phone) < 10:
         errors.append("Phone Number must be at least 10 digits")
     
-    # Validate email format if provided
+    # Validate email format if provided (optional)
     email = row_data.get('email')
-    if email and '@' not in email:
+    if email and '@' not in str(email):
         errors.append("Invalid Email format")
     
-    # Validate date format if provided
+    # Validate date format if provided (optional)
     dob = row_data.get('date_of_birth')
     if dob:
         try:
-            datetime.strptime(dob, '%Y-%m-%d')
+            datetime.strptime(str(dob), '%Y-%m-%d')
         except ValueError:
-            errors.append("Date of Birth must be in YYYY-MM-DD format")
+            errors.append("Date of Birth must be in YYYY-MM-DD or DD-MM-YYYY format")
     
     # Check for duplicate phone in tenant context
     if phone:
-        query = Customer.query.filter_by(tenant_id=tenant_id, phone=phone)
-        if branch_id:
-            query = query.filter_by(branch_id=branch_id)
-        existing = query.first()
-        if existing:
-            errors.append(f"Customer with phone {phone} already exists")
+        from app.utils.auth import get_tenant_query
+        try:
+            query = get_tenant_query(Customer).filter_by(phone=phone)
+            if branch_id:
+                query = query.filter_by(branch_id=branch_id)
+            existing = query.first()
+            if existing:
+                errors.append(f"Customer with phone {phone} already exists")
+        except Exception as e:
+            logger.warning(f"Customer duplicate check notice: {e}")
     
     return errors
 
@@ -465,48 +638,67 @@ def validate_employee_data(row_data, tenant_id, branch_id=None):
         errors.append("First Name is required")
     if not row_data.get('phone'):
         errors.append("Phone Number is required")
-    if row_data.get('salary') is None:
-        errors.append("Salary is required")
     
     # Validate phone format
-    phone = row_data.get('phone', '')
+    phone = str(row_data.get('phone', '') or '').strip()
     if phone and len(phone) < 10:
         errors.append("Phone Number must be at least 10 digits")
     
-    # Validate salary
+    # Validate salary if provided
     salary = row_data.get('salary', 0)
-    try:
-        salary_val = float(salary)
-        if salary_val < 0:
-            errors.append("Salary must be >= 0")
-    except (ValueError, TypeError):
-        errors.append("Invalid Salary value")
+    if salary is not None and str(salary).strip() != "":
+        try:
+            salary_val = float(salary)
+            if salary_val < 0:
+                errors.append("Salary must be >= 0")
+        except (ValueError, TypeError):
+            errors.append("Invalid Salary value")
     
-    # Validate commission percentage
-    commission = row_data.get('commission_percentage', 0)
-    try:
-        comm_val = float(commission)
-        if comm_val < 0 or comm_val > 100:
-            errors.append("Commission % must be between 0 and 100")
-    except (ValueError, TypeError):
-        errors.append("Invalid Commission % value")
+    # Validate target if provided
+    target = row_data.get('target')
+    if target is not None and str(target).strip() != "":
+        try:
+            target_val = float(target)
+            if target_val < 0:
+                errors.append("Target must be >= 0")
+        except (ValueError, TypeError):
+            errors.append("Invalid Target value")
+    
+    # Validate level if provided
+    level = row_data.get('level')
+    if level and str(level).strip().upper() not in ['L1', 'L2', 'L3']:
+        errors.append("Level must be 'L1', 'L2', or 'L3'")
+    
+    # Validate monthly offs if provided
+    monthly_offs = row_data.get('monthly_offs')
+    if monthly_offs is not None and str(monthly_offs).strip() != "":
+        try:
+            offs_val = int(monthly_offs)
+            if offs_val < 0 or offs_val > 31:
+                errors.append("Monthly Paid Offs must be between 0 and 31")
+        except (ValueError, TypeError):
+            errors.append("Invalid Monthly Paid Offs value")
     
     # Validate joining date if provided
     joining_date = row_data.get('joining_date')
     if joining_date:
         try:
-            datetime.strptime(joining_date, '%Y-%m-%d')
+            datetime.strptime(str(joining_date)[:10], '%Y-%m-%d')
         except ValueError:
             errors.append("Joining Date must be in YYYY-MM-DD format")
     
-    # Check for duplicate phone in branch context
+    # Check for duplicate phone in tenant/branch context
     if phone:
-        query = Employee.query.filter_by(tenant_id=tenant_id, phone=phone)
-        if branch_id:
-            query = query.filter_by(branch_id=branch_id)
-        existing = query.first()
-        if existing:
-            errors.append(f"Employee with phone {phone} already exists")
+        from app.utils.auth import get_tenant_query
+        try:
+            query = get_tenant_query(Employee).filter_by(phone=phone)
+            if branch_id:
+                query = query.filter_by(branch_id=branch_id)
+            existing = query.first()
+            if existing:
+                errors.append(f"Employee with phone {phone} already exists")
+        except Exception as e:
+            logger.warning(f"Employee duplicate check notice: {e}")
     
     return errors
 

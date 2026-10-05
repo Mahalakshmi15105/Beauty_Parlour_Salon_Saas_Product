@@ -108,9 +108,11 @@ def get_employees():
                 "created_at": emp.created_at.isoformat() if emp.created_at else ""
             })
 
+        total_count = query.count()
         result_payload = {
             "items": data,
-            "next_cursor": next_cursor
+            "next_cursor": next_cursor,
+            "total_count": total_count
         }
 
         try:
@@ -341,6 +343,12 @@ def create_employee():
                     conn.commit()
             except Exception as lookup_err:
                 logger.warning(f"TenantLookup notice: {lookup_err}")
+
+        # Invalidate employees cache immediately
+        try:
+            cache.delete_pattern(f"employees:{g.parlour_id}:*")
+        except Exception:
+            pass
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error creating employee: {str(e)}")
@@ -524,6 +532,12 @@ def update_employee(employee_id):
                     conn.commit()
             except Exception as lookup_err:
                 logger.warning(f"TenantLookup sync notice: {lookup_err}")
+
+        # Invalidate employees cache immediately
+        try:
+            cache.delete_pattern(f"employees:{g.parlour_id}:*")
+        except Exception:
+            pass
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error updating employee: {str(e)}")
@@ -585,6 +599,12 @@ def delete_employee(employee_id):
         # 4. Permanently delete Employee record from tenant database
         db.session.delete(employee)
         db.session.commit()
+
+        # Invalidate employees cache immediately
+        try:
+            cache.delete_pattern(f"employees:{g.parlour_id}:*")
+        except Exception:
+            pass
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error permanently deleting employee: {str(e)}")

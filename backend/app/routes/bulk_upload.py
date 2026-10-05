@@ -17,6 +17,7 @@ from app.models.employee import Employee
 from app.models.catalog import Service, Product
 from datetime import datetime
 import logging
+from app.services.cache import cache
 
 logger = logging.getLogger(__name__)
 bulk_upload_bp = Blueprint("bulk_upload", __name__)
@@ -175,6 +176,10 @@ def bulk_upload_customers():
         
         try:
             db.session.commit()
+            try:
+                cache.delete_pattern(f"customers:{g.parlour_id}:*")
+            except Exception:
+                pass
         except Exception as e:
             db.session.rollback()
             logger.error(f"Error committing customers: {str(e)}")
@@ -291,26 +296,61 @@ def bulk_upload_employees():
                 joining_date = None
                 if employee_data.get('joining_date'):
                     try:
-                        joining_date = datetime.strptime(employee_data['joining_date'], '%Y-%m-%d').date()
+                        joining_date = datetime.strptime(str(employee_data['joining_date'])[:10], '%Y-%m-%d').date()
                     except ValueError:
                         pass
                 
+                target_val = float(employee_data.get('target', 0) or 0)
+                level_val = str(employee_data.get('level', 'L1') or 'L1').strip()
+                shift_start = str(employee_data.get('shift_start_time', '09:00') or '09:00').strip()
+                shift_end = str(employee_data.get('shift_end_time', '18:00') or '18:00').strip()
+                offs_val = int(employee_data.get('monthly_offs', 4) or 4)
+
+                raw_user = str(employee_data.get('username') or '').strip().lower()
+                raw_pass = str(employee_data.get('password') or '').strip()
+                effective_username = raw_user if raw_user else f"{employee_data['phone']}@salon.com"
+                effective_password = raw_pass if raw_pass else str(employee_data['phone'])
+
                 employee = Employee(
                     tenant_id=g.parlour_id,
                     branch_id=g.branch_id if g.role == "BranchAdmin" else None,
                     first_name=employee_data['first_name'],
                     last_name=employee_data.get('last_name'),
                     phone=employee_data['phone'],
+                    username=effective_username,
+                    email=effective_username,
+                    password_plain=effective_password,
                     specialization=employee_data.get('specialization'),
                     role=employee_data.get('role'),
-                    salary=float(employee_data.get('salary', 0)),
-                    commission_percentage=float(employee_data.get('commission_percentage', 0)),
-                    status=employee_data.get('status', 'active')
+                    salary=float(employee_data.get('salary', 0) or 0),
+                    target=target_val,
+                    level=level_val,
+                    commission_percentage=float(employee_data.get('commission_percentage', 0) or 0),
+                    shift_start_time=shift_start,
+                    shift_end_time=shift_end,
+                    monthly_offs=offs_val,
+                    status=employee_data.get('status', 'active') or 'active'
                 )
                 if joining_date:
                     employee.joining_date = joining_date
                 
                 db.session.add(employee)
+
+                # Provision / link staff login account
+                if effective_username:
+                    from app.models.user import User
+                    user_rec = User.query.filter_by(email=effective_username, is_deleted=False).first()
+                    if not user_rec:
+                        user_rec = User(
+                            tenant_id=g.parlour_id,
+                            branch_id=g.branch_id if g.role == "BranchAdmin" else None,
+                            email=effective_username,
+                            role="Employee",
+                            status="active"
+                        )
+                        user_rec.set_password(effective_password)
+                        db.session.add(user_rec)
+
                 successful_count += 1
             except Exception as e:
                 logger.error(f"Error inserting employee: {str(e)}")
@@ -323,6 +363,10 @@ def bulk_upload_employees():
         
         try:
             db.session.commit()
+            try:
+                cache.delete_pattern(f"employees:{g.parlour_id}:*")
+            except Exception:
+                pass
         except Exception as e:
             db.session.rollback()
             logger.error(f"Error committing employees: {str(e)}")

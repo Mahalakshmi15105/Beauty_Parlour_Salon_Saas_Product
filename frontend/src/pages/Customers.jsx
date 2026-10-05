@@ -602,12 +602,13 @@ function Customers() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">Last Name</label>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Last Name (Optional)</label>
                   <input
                     type="text"
                     value={formData.last_name}
                     onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
                     className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                    placeholder="Optional"
                   />
                 </div>
               </div>
@@ -623,16 +624,6 @@ function Customers() {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1">Email Address</label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
-                />
-              </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Gender</label>
@@ -641,14 +632,14 @@ function Customers() {
                     onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
                     className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
                   >
-                    <option value="">Select</option>
+                    <option value="">Select (Optional)</option>
                     <option value="Female">Female</option>
                     <option value="Male">Male</option>
                     <option value="Other">Other</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">Date of Birth</label>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Date of Birth (Optional)</label>
                   <input
                     type="date"
                     value={formData.date_of_birth}
@@ -659,22 +650,13 @@ function Customers() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1">Address</label>
+                <label className="block text-xs font-semibold text-text-secondary mb-1">Address (Optional)</label>
                 <textarea
                   rows="2"
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
-                ></textarea>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1">Notes</label>
-                <textarea
-                  rows="2"
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                  placeholder="Street, City, Area (Optional)"
                 ></textarea>
               </div>
 
