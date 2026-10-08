@@ -382,8 +382,8 @@ export default function TouchModeBilling({
             )}
           </div>
 
-          {/* Add Membership Button (Shown when customer has no active membership plan or is newly added) */}
-          {selectedCustomerId && selectedCustomerId !== "walkin" && (!activeMembership || (newlyCreatedCustomerId && String(selectedCustomerId) === String(newlyCreatedCustomerId))) && (
+          {/* Add Membership Button (Shown when customer has no active membership plan or is newly added - only in paid_plan mode) */}
+          {selectedCustomerId && selectedCustomerId !== "walkin" && visitMembershipStatus?.membership_mode !== "visit_based" && visitMembershipStatus?.membership_mode !== "points_based" && (!activeMembership || (newlyCreatedCustomerId && String(selectedCustomerId) === String(newlyCreatedCustomerId))) && (
             <div className="pt-1">
               <button
                 type="button"
@@ -396,8 +396,8 @@ export default function TouchModeBilling({
             </div>
           )}
 
-          {/* Active Membership Status Banner (Type A % Discount - Only when mode is not visit_based/disabled) */}
-          {activeMembership && visitMembershipStatus?.membership_mode !== "visit_based" && visitMembershipStatus?.membership_mode !== "disabled" && (
+          {/* Active Membership Status Banner (Type A % Discount - Only when mode is not visit_based/points_based/disabled) */}
+          {activeMembership && visitMembershipStatus?.membership_mode !== "visit_based" && visitMembershipStatus?.membership_mode !== "points_based" && visitMembershipStatus?.membership_mode !== "disabled" && (
             <div className="bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-300/60 rounded-xl p-2 flex items-center justify-between text-xs">
               <div className="flex items-center space-x-1.5">
                 <Crown className="w-4 h-4 text-amber-600" />
@@ -414,6 +414,54 @@ export default function TouchModeBilling({
                 />
                 <span className="text-[10px] font-bold text-amber-900">Use</span>
               </label>
+            </div>
+          )}
+
+          {/* Points-Based Loyalty Membership Banner (Type C - Loyalty Progress) */}
+          {visitMembershipStatus && visitMembershipStatus.membership_mode === "points_based" && (
+            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-300/80 rounded-2xl p-2.5 space-y-1.5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-1.5">
+                  <div className="p-1 bg-indigo-600 text-white rounded-lg shadow-2xs">
+                    <Sparkles className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <span className="font-black text-indigo-950 text-xs block leading-tight">
+                      Points Loyalty: {Math.floor(visitMembershipStatus.current_points || 0)} / {Math.floor(visitMembershipStatus.points_target || 100)} Pts
+                    </span>
+                    <span className="text-[10px] text-indigo-700 font-semibold">
+                      {visitMembershipStatus.is_points_eligible
+                        ? `${visitMembershipStatus.points_discount_percentage || 5}% Discount Unlocked!`
+                        : `Need ${Math.max(0, Math.floor((visitMembershipStatus.points_target || 100) - (visitMembershipStatus.current_points || 0)))} more pts for ${visitMembershipStatus.points_discount_percentage || 5}% off`}
+                    </span>
+                  </div>
+                </div>
+                {visitMembershipStatus.is_points_eligible ? (
+                  <label className="flex items-center space-x-1 cursor-pointer bg-emerald-600 text-white px-2 py-0.5 rounded-lg text-[10px] font-bold shadow-xs">
+                    <input
+                      type="checkbox"
+                      checked={useMembership}
+                      onChange={(e) => setUseMembership(e.target.checked)}
+                      className="rounded text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <span>{useMembership ? "Applied" : "Use"}</span>
+                  </label>
+                ) : (
+                  <span className="bg-indigo-100 text-indigo-800 border border-indigo-300 text-[10px] px-2 py-0.5 rounded-full font-extrabold">
+                    {Math.min(100, Math.round(((visitMembershipStatus.current_points || 0) / (visitMembershipStatus.points_target || 100)) * 100))}%
+                  </span>
+                )}
+              </div>
+
+              {/* Progress Bar */}
+              <div className="w-full bg-indigo-200/70 rounded-full h-1.5 overflow-hidden">
+                <div
+                  className="bg-indigo-600 h-1.5 rounded-full transition-all duration-300"
+                  style={{
+                    width: `${Math.min(100, ((visitMembershipStatus.current_points || 0) / (visitMembershipStatus.points_target || 100)) * 100)}%`
+                  }}
+                />
+              </div>
             </div>
           )}
 

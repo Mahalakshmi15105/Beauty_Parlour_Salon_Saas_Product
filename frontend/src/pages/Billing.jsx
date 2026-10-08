@@ -43,7 +43,8 @@ import {
   Award,
   Gift,
   LayoutGrid,
-  ListFilter
+  ListFilter,
+  Sparkles
 } from "lucide-react";
 
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
@@ -1184,6 +1185,12 @@ function Billing() {
   // Helper to determine discount percentage for a service given active customer membership
   const getMembershipDiscountForService = (serviceObj, activeMem) => {
     if (visitMembershipStatus?.membership_mode === "visit_based" || visitMembershipStatus?.membership_mode === "disabled") return 0;
+    if (visitMembershipStatus?.membership_mode === "points_based") {
+      if (useMembership && visitMembershipStatus?.is_points_eligible) {
+        return parseFloat(visitMembershipStatus.points_discount_percentage || 5);
+      }
+      return 0;
+    }
     if (!useMembership || !activeMem || activeMem.isDayRestricted) return 0;
     const planId = activeMem.membership_plan_id || activeMem.plan_id;
     const targetServiceId = parseInt(serviceObj.id || serviceObj.item_id);
@@ -1243,6 +1250,12 @@ function Billing() {
 
   const getMembershipDiscountForProduct = (productObj, activeMem) => {
     if (visitMembershipStatus?.membership_mode === "visit_based" || visitMembershipStatus?.membership_mode === "disabled") return 0;
+    if (visitMembershipStatus?.membership_mode === "points_based") {
+      if (useMembership && visitMembershipStatus?.is_points_eligible) {
+        return parseFloat(visitMembershipStatus.points_discount_percentage || 5);
+      }
+      return 0;
+    }
     if (!useMembership || !activeMem || activeMem.isDayRestricted) return 0;
     if (activeMem.product_discount_percentage !== undefined && activeMem.product_discount_percentage !== null) {
       return parseFloat(activeMem.product_discount_percentage) || 0;
@@ -1257,6 +1270,12 @@ function Billing() {
         let calcDiscount = 0;
         if (visitMembershipStatus?.membership_mode === "visit_based" || visitMembershipStatus?.membership_mode === "disabled") {
           calcDiscount = item.discount_percent || 0;
+        } else if (visitMembershipStatus?.membership_mode === "points_based") {
+          if (useMembership && visitMembershipStatus?.is_points_eligible) {
+            calcDiscount = parseFloat(visitMembershipStatus.points_discount_percentage || 5);
+          } else {
+            calcDiscount = 0;
+          }
         } else if (item.type === "service") {
           const serviceList = allServices.length > 0 ? allServices : services;
           const svcObj = serviceList.find((s) => s.id === parseInt(item.item_id || item.id));
@@ -1281,10 +1300,10 @@ function Billing() {
     const serviceObj = serviceList.find((s) => s.id === parseInt(targetId));
     if (!serviceObj) return;
 
-    const isVisitBasedOrDisabled = visitMembershipStatus?.membership_mode === "visit_based" || visitMembershipStatus?.membership_mode === "disabled";
-    const initialDiscount = isVisitBasedOrDisabled ? 0 : getMembershipDiscountForService(serviceObj, activeMembership);
+    const isNonPlanMode = visitMembershipStatus?.membership_mode === "visit_based" || visitMembershipStatus?.membership_mode === "points_based" || visitMembershipStatus?.membership_mode === "disabled";
+    const initialDiscount = isNonPlanMode ? (visitMembershipStatus?.membership_mode === "points_based" && useMembership && visitMembershipStatus?.is_points_eligible ? parseFloat(visitMembershipStatus.points_discount_percentage || 5) : 0) : getMembershipDiscountForService(serviceObj, activeMembership);
 
-    if (!isVisitBasedOrDisabled && useMembership && activeMembership && initialDiscount === 0) {
+    if (!isNonPlanMode && useMembership && activeMembership && initialDiscount === 0) {
       const custName = customerSearchQuery && customerSearchQuery !== "Walk-in Customer" ? customerSearchQuery.split("(")[0].trim() : "Customer";
       const planName = activeMembership.plan_name || activeMembership.name || "Membership";
       showError(`"${serviceObj.name}" is not included in ${custName}'s ${planName} plan.`);
@@ -1504,6 +1523,12 @@ function Billing() {
   // Computations
   const getEffectiveDiscountPercent = (item) => {
     if (visitMembershipStatus?.membership_mode === "visit_based" || visitMembershipStatus?.membership_mode === "disabled") {
+      return item.discount_percent || 0;
+    }
+    if (visitMembershipStatus?.membership_mode === "points_based") {
+      if (useMembership && visitMembershipStatus?.is_points_eligible) {
+        return parseFloat(visitMembershipStatus.points_discount_percentage || 5);
+      }
       return item.discount_percent || 0;
     }
     if (useMembership && activeMembership && !activeMembership.isDayRestricted) {
@@ -1733,8 +1758,12 @@ function Billing() {
           amount: parseFloat(val) || 0,
         }))
         .filter((p) => p.amount > 0),
-      membership_name: useMembership && activeMembership && !activeMembership.isDayRestricted ? activeMembership.plan_name : null,
-      membership_discount: useMembership && activeMembership && !activeMembership.isDayRestricted ? totalDiscount : 0,
+      membership_name: visitMembershipStatus?.membership_mode === "points_based"
+        ? (useMembership && visitMembershipStatus?.is_points_eligible ? `Points Loyalty Reward (${visitMembershipStatus.points_discount_percentage || 5}% Off)` : null)
+        : (useMembership && activeMembership && !activeMembership.isDayRestricted ? activeMembership.plan_name : null),
+      membership_discount: ((visitMembershipStatus?.membership_mode === "points_based" && useMembership && visitMembershipStatus?.is_points_eligible) || (useMembership && activeMembership && !activeMembership.isDayRestricted)) ? totalDiscount : 0,
+      use_points_discount: Boolean(useMembership && visitMembershipStatus?.membership_mode === "points_based" && visitMembershipStatus?.is_points_eligible),
+      use_membership: Boolean(useMembership),
     };
 
     setLoading(true);
@@ -1748,6 +1777,9 @@ function Billing() {
         setCart([]);
         setLoading(false);
         fetchBillingHistory();
+        if (selectedCustomerId && selectedCustomerId !== "walkin") {
+          fetchCustomerMemberships(selectedCustomerId);
+        }
 
         if (receiptSettings.auto_print) {
           setTimeout(() => {
@@ -2220,7 +2252,7 @@ function Billing() {
                   <label className="block text-xs font-bold text-slate-700">Select Customer *</label>
                   {selectedCustomerId && selectedCustomerId !== "walkin" && (
                     <div className="flex items-center space-x-2">
-                      {(!activeMembership || (newlyCreatedCustomerId && String(selectedCustomerId) === String(newlyCreatedCustomerId))) && (
+                      {visitMembershipStatus?.membership_mode !== "points_based" && visitMembershipStatus?.membership_mode !== "visit_based" && visitMembershipStatus?.membership_mode !== "disabled" && (!activeMembership || (newlyCreatedCustomerId && String(selectedCustomerId) === String(newlyCreatedCustomerId))) && (
                         <button
                           type="button"
                           onClick={() => openAssignMembershipModal()}
@@ -2448,8 +2480,8 @@ function Billing() {
               </div>
             </div>
 
-            {/* Membership Info & Decision Section (Type A % Discount Plan - Only when mode is not visit_based/disabled) */}
-            {activeMembership && visitMembershipStatus?.membership_mode !== "visit_based" && visitMembershipStatus?.membership_mode !== "disabled" && (
+            {/* Membership Info & Decision Section (Type A % Discount Plan - Only when mode is not visit_based/points_based/disabled) */}
+            {activeMembership && visitMembershipStatus?.membership_mode !== "visit_based" && visitMembershipStatus?.membership_mode !== "points_based" && visitMembershipStatus?.membership_mode !== "disabled" && (
               <div className="mt-4 border-t border-border-soft/60 pt-4 flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-50/50 p-4 rounded-xl border border-slate-100 space-y-3 md:space-y-0">
                 <div className="flex items-center space-x-3">
                   <div className="p-2 bg-pink-100 text-pink-700 rounded-lg">
@@ -2503,6 +2535,76 @@ function Billing() {
                     >
                       Don't Use
                     </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Points-Based Loyalty Membership Banner (Type C - Branch Scoped) */}
+            {visitMembershipStatus && visitMembershipStatus.membership_mode === "points_based" && (
+              <div className="mt-4 border-t border-border-soft/60 pt-4 flex flex-col md:flex-row justify-between items-start md:items-center bg-indigo-50/70 p-4 rounded-xl border border-indigo-200 space-y-3 md:space-y-0 animate-fade-in shadow-xs">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-xs">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                      <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wide">
+                        Points Loyalty Status:
+                      </h4>
+                      <span className="bg-indigo-100 text-indigo-800 border border-indigo-300 text-[10px] px-2.5 py-0.5 rounded-full font-bold">
+                        {Math.floor(visitMembershipStatus.current_points || 0)} / {Math.floor(visitMembershipStatus.points_target || 100)} Points
+                      </span>
+                      {visitMembershipStatus.total_redemptions > 0 && (
+                        <span className="bg-purple-100 text-purple-800 border border-purple-200 text-[10px] px-2.5 py-0.5 rounded-full font-bold">
+                          Claimed {visitMembershipStatus.total_redemptions} time{visitMembershipStatus.total_redemptions > 1 ? "s" : ""}
+                        </span>
+                      )}
+                      {visitMembershipStatus.is_points_eligible && (
+                        <span className="bg-emerald-500 text-white text-[10px] px-2.5 py-0.5 rounded-full font-extrabold shadow-xs animate-pulse flex items-center space-x-1">
+                          <span>🎉 Target Achieved! {visitMembershipStatus.points_discount_percentage || 5}% Discount Unlocked</span>
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-600 font-medium mt-1">
+                      {visitMembershipStatus.is_points_eligible
+                        ? `Customer has reached ${Math.floor(visitMembershipStatus.current_points || 0)} points! Click "Use Points Membership" to apply ${visitMembershipStatus.points_discount_percentage || 5}% discount on this bill.`
+                        : `Rule: Earn ${visitMembershipStatus.points_per_unit || 5} pts per ₹${visitMembershipStatus.points_spend_amount || 100}. Customer needs ${Math.max(0, Math.floor((visitMembershipStatus.points_target || 100) - (visitMembershipStatus.current_points || 0)))} more points for ${visitMembershipStatus.points_discount_percentage || 5}% discount.`}
+                    </p>
+                  </div>
+                </div>
+
+                {visitMembershipStatus.is_points_eligible ? (
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => setUseMembership(true)}
+                      className={`px-3.5 py-1.5 text-xs font-extrabold rounded-lg shadow-xs transition flex items-center space-x-1.5 ${
+                        useMembership
+                          ? "bg-emerald-600 text-white ring-2 ring-emerald-400"
+                          : "bg-white text-slate-700 border border-border-soft hover:bg-slate-50"
+                      }`}
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Use Points ({visitMembershipStatus.points_discount_percentage || 5}% Off)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUseMembership(false)}
+                      className={`px-3.5 py-1.5 text-xs font-extrabold rounded-lg shadow-xs transition ${
+                        !useMembership
+                          ? "bg-slate-700 text-white shadow-xs"
+                          : "bg-white text-slate-600 border border-border-soft hover:bg-slate-50"
+                      }`}
+                    >
+                      Don't Use
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-right">
+                    <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200 inline-block">
+                      Progress: {Math.min(100, Math.round(((visitMembershipStatus.current_points || 0) / (visitMembershipStatus.points_target || 100)) * 100))}%
+                    </span>
                   </div>
                 )}
               </div>

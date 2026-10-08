@@ -1,15 +1,23 @@
 import React, { useState, useEffect } from "react";
 import API from "../services/api";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
-import { Award, Gift, Check, Sparkles, AlertCircle, Save, Layers } from "lucide-react";
+import { Award, Gift, Check, Sparkles, AlertCircle, Save, Coins, Percent, Target, CircleDollarSign } from "lucide-react";
 
 export default function VisitMembershipSettings() {
   const { formatCurrency } = useLanguageCurrency();
   const [membershipMode, setMembershipMode] = useState("paid_plan");
+  
+  // Type B State
   const [requiredVisits, setRequiredVisits] = useState(6);
   const [qualifyingServiceIds, setQualifyingServiceIds] = useState([]);
   const [freeServiceIds, setFreeServiceIds] = useState([]);
   
+  // Type C State (Points-Based Discount Mode)
+  const [pointsSpendAmount, setPointsSpendAmount] = useState(100);
+  const [pointsPerUnit, setPointsPerUnit] = useState(5);
+  const [pointsTarget, setPointsTarget] = useState(100);
+  const [pointsDiscountPercentage, setPointsDiscountPercentage] = useState(5);
+
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -49,7 +57,6 @@ export default function VisitMembershipSettings() {
     setLoading(true);
     if (typeof setErrorMsg === "function") setErrorMsg(null);
 
-    // Safeguard: 10-second max loading timeout
     const timeoutId = setTimeout(() => {
       setLoading((prevLoading) => {
         if (prevLoading) {
@@ -84,8 +91,13 @@ export default function VisitMembershipSettings() {
       setRequiredVisits(data.required_visits || 6);
       setQualifyingServiceIds(data.qualifying_service_ids || []);
       setFreeServiceIds(data.free_service_ids || []);
+      
+      setPointsSpendAmount(data.points_spend_amount || 100);
+      setPointsPerUnit(data.points_per_unit || 5);
+      setPointsTarget(data.points_target || 100);
+      setPointsDiscountPercentage(data.points_discount_percentage || 5);
     } catch (err) {
-      console.error("Failed to load visit membership settings:", err);
+      console.error("Failed to load membership settings:", err);
       if (typeof setErrorMsg === "function") {
         setErrorMsg(err.message || "Failed to load membership settings.");
       }
@@ -124,6 +136,10 @@ export default function VisitMembershipSettings() {
         required_visits: parseInt(requiredVisits) || 6,
         qualifying_service_ids: qualifyingServiceIds,
         free_service_ids: freeServiceIds,
+        points_spend_amount: parseFloat(pointsSpendAmount) || 100,
+        points_per_unit: parseFloat(pointsPerUnit) || 5,
+        points_target: parseFloat(pointsTarget) || 100,
+        points_discount_percentage: parseFloat(pointsDiscountPercentage) || 5,
       };
 
       const res = await API.post("/visit-membership/settings", payload);
@@ -145,33 +161,37 @@ export default function VisitMembershipSettings() {
     );
   }
 
+  // Example simulation for Points-Based calculation
+  const sampleSpend = 1500;
+  const samplePointsEarned = pointsSpendAmount > 0 ? Math.floor(sampleSpend / pointsSpendAmount) * pointsPerUnit : 0;
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center border-b border-border-soft pb-3">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-border-soft pb-3">
         <div>
           <h3 className="text-sm font-bold text-slate-900 flex items-center space-x-2">
-            <Award className="w-5 h-5 text-primary" />
+            <Award className="w-5 h-5 text-primary shrink-0" />
             <span>Membership & Customer Loyalty System</span>
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
             Configure how membership rewards and customer discounts operate for your location.
           </p>
         </div>
-        <span className="text-[11px] font-bold text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
+        <span className="text-[11px] font-bold text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/20 shrink-0">
           Branch Scoped
         </span>
       </div>
 
       {successMsg && (
         <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-bold flex items-center space-x-2 animate-fade-in">
-          <Check className="w-4 h-4 text-emerald-600" />
+          <Check className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>{successMsg}</span>
         </div>
       )}
 
       {errorMsg && (
         <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-bold flex items-center space-x-2">
-          <AlertCircle className="w-4 h-4 text-rose-600" />
+          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
           <span>{errorMsg}</span>
         </div>
       )}
@@ -182,7 +202,7 @@ export default function VisitMembershipSettings() {
           <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
             1. Select Active Membership Method for Location
           </label>
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Type A: Paid Discount Plan */}
             <div
               onClick={() => handleRequestModeChange("paid_plan")}
@@ -194,12 +214,12 @@ export default function VisitMembershipSettings() {
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center space-x-3">
-                  <div className="p-2.5 bg-primary/10 text-primary rounded-xl">
+                  <div className="p-2.5 bg-primary/10 text-primary rounded-xl shrink-0">
                     <Sparkles className="w-5 h-5" />
                   </div>
                   <div>
                     <h4 className="text-xs font-extrabold text-slate-900">Paid Discount Plan (Type A)</h4>
-                    <p className="text-[11px] text-slate-500 font-medium">Original % Discount Membership</p>
+                    <p className="text-[11px] text-slate-500 font-medium">Subscription Tiers</p>
                   </div>
                 </div>
                 <input
@@ -211,7 +231,7 @@ export default function VisitMembershipSettings() {
                 />
               </div>
               <p className="text-[11px] text-slate-600 leading-relaxed">
-                Customers purchase a membership plan (e.g. ₹1,500/year) and receive mapped % discounts on eligible services & products during checkout.
+                Customers purchase a paid membership plan (e.g. ₹1,500/yr) to receive mapped % discounts on services and products during billing checkout.
               </p>
             </div>
 
@@ -226,12 +246,12 @@ export default function VisitMembershipSettings() {
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center space-x-3">
-                  <div className="p-2.5 bg-emerald-500/10 text-emerald-600 rounded-xl">
+                  <div className="p-2.5 bg-emerald-500/10 text-emerald-600 rounded-xl shrink-0">
                     <Gift className="w-5 h-5" />
                   </div>
                   <div>
                     <h4 className="text-xs font-extrabold text-slate-900">Visit-Based Free Service (Type B)</h4>
-                    <p className="text-[11px] text-slate-500 font-medium">Loyalty Visit Counter</p>
+                    <p className="text-[11px] text-slate-500 font-medium">Visit Counter Loyalty</p>
                   </div>
                 </div>
                 <input
@@ -243,15 +263,149 @@ export default function VisitMembershipSettings() {
                 />
               </div>
               <p className="text-[11px] text-slate-600 leading-relaxed">
-                Customers automatically accumulate visit count per visit. After completed N visits (e.g. 6), their next visit gets a 100% FREE eligible service.
+                Customers automatically build visit count on each salon appointment. Reaching N completed visits (e.g. 6) unlocks 1 free reward service.
+              </p>
+            </div>
+
+            {/* Type C: Points-Based Discount Mode */}
+            <div
+              onClick={() => handleRequestModeChange("points_based")}
+              className={`p-5 rounded-2xl border-2 cursor-pointer transition flex flex-col justify-between space-y-3 ${
+                membershipMode === "points_based"
+                  ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                  : "border-border-soft bg-surface hover:border-slate-300"
+              }`}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2.5 bg-amber-500/10 text-amber-600 rounded-xl shrink-0">
+                    <Coins className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-extrabold text-slate-900">Points-Based Discount (Type C)</h4>
+                    <p className="text-[11px] text-slate-500 font-medium">Target Points Discount</p>
+                  </div>
+                </div>
+                <input
+                  type="radio"
+                  name="membership_mode"
+                  checked={membershipMode === "points_based"}
+                  onChange={() => handleRequestModeChange("points_based")}
+                  className="mt-1 text-primary focus:ring-primary"
+                />
+              </div>
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                Spend earns points (e.g. ₹100 = 5 pts). Upon reaching the target points (e.g. 100 pts), customers unlock a flat % discount (e.g. 5%) on billing.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Step 2: Visit-Based Configuration (Only visible when Visit-Based is selected) */}
+        {/* Step 2: Points-Based Configuration (Type C) */}
+        {membershipMode === "points_based" && (
+          <div className="p-4 sm:p-6 bg-background border border-border-soft rounded-2xl space-y-6 animate-fade-in">
+            <div className="flex items-center space-x-2 text-xs font-extrabold text-slate-800 border-b border-border-soft pb-3">
+              <Coins className="w-4 h-4 text-amber-600" />
+              <span>Points-Based Discount Program Configuration</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* 1. Spend Amount per Unit */}
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-slate-700 flex items-center space-x-1">
+                  <CircleDollarSign className="w-3.5 h-3.5 text-primary" />
+                  <span>Spend Amount (₹) *</span>
+                </label>
+                <p className="text-[10px] text-slate-500">Amount spent to earn unit points</p>
+                <input
+                  type="number"
+                  min="1"
+                  step="any"
+                  value={pointsSpendAmount}
+                  onChange={(e) => setPointsSpendAmount(e.target.value)}
+                  className="w-full bg-white border border-border-soft px-3 py-2 rounded-xl text-xs font-extrabold text-slate-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-pink-500/20"
+                  required
+                />
+              </div>
+
+              {/* 2. Points Earned per Unit */}
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-slate-700 flex items-center space-x-1">
+                  <Coins className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Points Earned (Pts) *</span>
+                </label>
+                <p className="text-[10px] text-slate-500">Points awarded per spend unit</p>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="any"
+                  value={pointsPerUnit}
+                  onChange={(e) => setPointsPerUnit(e.target.value)}
+                  className="w-full bg-white border border-border-soft px-3 py-2 rounded-xl text-xs font-extrabold text-slate-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-pink-500/20"
+                  required
+                />
+              </div>
+
+              {/* 3. Target Points Required */}
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-slate-700 flex items-center space-x-1">
+                  <Target className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Target Points *</span>
+                </label>
+                <p className="text-[10px] text-slate-500">Points needed to unlock discount</p>
+                <input
+                  type="number"
+                  min="1"
+                  step="any"
+                  value={pointsTarget}
+                  onChange={(e) => setPointsTarget(e.target.value)}
+                  className="w-full bg-white border border-border-soft px-3 py-2 rounded-xl text-xs font-extrabold text-slate-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-pink-500/20"
+                  required
+                />
+              </div>
+
+              {/* 4. Percentage Discount on Target Reached */}
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-slate-700 flex items-center space-x-1">
+                  <Percent className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Discount Percentage (%) *</span>
+                </label>
+                <p className="text-[10px] text-slate-500">Discount unlocked upon target</p>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="any"
+                  value={pointsDiscountPercentage}
+                  onChange={(e) => setPointsDiscountPercentage(e.target.value)}
+                  className="w-full bg-white border border-border-soft px-3 py-2 rounded-xl text-xs font-extrabold text-slate-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-pink-500/20"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Live Example Calculation Card */}
+            <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-xl space-y-2">
+              <div className="flex items-center space-x-2 text-xs font-extrabold text-amber-900">
+                <Sparkles className="w-4 h-4 text-amber-600" />
+                <span>Program Rule Live Preview:</span>
+              </div>
+              <p className="text-xs text-amber-800 leading-relaxed">
+                Every <span className="font-bold">₹{pointsSpendAmount}</span> spent earns <span className="font-bold text-amber-700">{pointsPerUnit} points</span>. Once a customer reaches <span className="font-bold text-emerald-700">{pointsTarget} points</span>, they unlock a <span className="font-bold text-rose-600">{pointsDiscountPercentage}% discount</span> on their bill!
+              </p>
+              <div className="text-[11px] text-amber-900 bg-white/80 p-2.5 rounded-lg border border-amber-200 flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span>💡 Example: ₹{sampleSpend} service bill</span>
+                <span>→ <strong className="text-amber-700">+{samplePointsEarned} points</strong> earned</span>
+                <span>→ Customer reaches {pointsTarget} pts</span>
+                <span>→ <strong className="text-rose-600">Use Membership ({pointsDiscountPercentage}% Off)</strong> is enabled on POS!</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Visit-Based Configuration (Type B) */}
         {membershipMode === "visit_based" && (
-          <div className="p-6 bg-background border border-border-soft rounded-2xl space-y-6 animate-fade-in">
+          <div className="p-4 sm:p-6 bg-background border border-border-soft rounded-2xl space-y-6 animate-fade-in">
             <div className="flex items-center space-x-2 text-xs font-extrabold text-slate-800 border-b border-border-soft pb-3">
               <Gift className="w-4 h-4 text-emerald-600" />
               <span>Visit-Based Free Service Program Configuration</span>
@@ -276,8 +430,6 @@ export default function VisitMembershipSettings() {
               />
             </div>
 
-
-
             {/* Free Reward Services Checkboxes */}
             <div className="space-y-2">
               <label className="block text-xs font-bold text-slate-700">
@@ -286,7 +438,7 @@ export default function VisitMembershipSettings() {
               <p className="text-[11px] text-slate-500">
                 Check which services the customer can claim for 100% FREE on their qualifying visit.
               </p>
-              <div className="max-h-48 overflow-y-auto border border-border-soft bg-white rounded-xl p-3 grid grid-cols-2 gap-2">
+              <div className="max-h-48 overflow-y-auto border border-border-soft bg-white rounded-xl p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {services.map((svc) => {
                   const isChecked = freeServiceIds.includes(svc.id);
                   return (
@@ -312,14 +464,14 @@ export default function VisitMembershipSettings() {
         )}
 
         {/* Submit Save Button */}
-        <div className="pt-3 border-t border-border-soft flex items-center justify-between">
+        <div className="pt-3 border-t border-border-soft flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <p className="text-[11px] text-slate-500 font-medium italic">
-            🛡️ Data Safeguard: Switching modes changes active billing rules only. All existing membership plans and customer visit counters remain 100% intact in the database.
+            🛡️ Data Safeguard: Switching modes changes active billing rules only. All existing membership plans, points records, and customer visit counters remain 100% intact in the database.
           </p>
           <button
             type="submit"
             disabled={saving}
-            className="px-6 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-extrabold shadow-md shadow-pink-500/20 transition flex items-center space-x-2 disabled:opacity-50"
+            className="w-full sm:w-auto justify-center px-6 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-extrabold shadow-md shadow-pink-500/20 transition flex items-center space-x-2 disabled:opacity-50 shrink-0"
           >
             <Save className="w-4 h-4" />
             <span>{saving ? "Saving Configuration..." : "Save Membership Settings"}</span>
@@ -342,12 +494,12 @@ export default function VisitMembershipSettings() {
             </div>
 
             <p className="text-xs text-slate-700 font-medium leading-relaxed">
-              Are you sure you want to switch membership methods? This will change how memberships work for this location.
+              Are you sure you want to switch membership methods? This will change how memberships operate for this location.
             </p>
 
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-600 space-y-1">
               <p className="font-bold text-slate-800">✅ Data Safety Confirmation:</p>
-              <p>No customer memberships or visit history will be lost. You can switch back at any time without losing any data.</p>
+              <p>No customer memberships, points, or visit history will be lost. You can switch back at any time without losing any data.</p>
             </div>
 
             <div className="flex justify-end space-x-3 pt-2 border-t border-slate-100">

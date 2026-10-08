@@ -3,6 +3,7 @@ import API from "../services/api";
 import MembershipPlans from "./MembershipPlans";
 import CustomerMemberships from "./CustomerMemberships";
 import VisitMembershipRecords from "../components/VisitMembershipRecords";
+import PointsMembershipRecords from "../components/PointsMembershipRecords";
 import { Award, CreditCard } from "lucide-react";
 
 function MembershipManagement() {
@@ -42,6 +43,11 @@ function MembershipManagement() {
     );
   }
 
+  // Type C: Points-Based Discount Mode View
+  if (membershipMode === "points_based") {
+    return <PointsMembershipRecords />;
+  }
+
   // Type B: Visit-Based Free Service Loyalty View
   if (membershipMode === "visit_based") {
     return <VisitMembershipRecords />;
@@ -51,10 +57,10 @@ function MembershipManagement() {
   return (
     <div className="space-y-6">
       {/* Top Segmented Tab Switcher */}
-      <div className="flex space-x-2 bg-surface border border-border-soft p-3 rounded-2xl shadow-xs">
+      <div className="flex flex-wrap gap-2 bg-surface border border-border-soft p-2.5 sm:p-3 rounded-2xl shadow-xs">
         <button
           onClick={() => setActiveTab("plans")}
-          className={`px-5 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center space-x-2 ${
+          className={`px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs font-extrabold transition flex items-center space-x-2 ${
             activeTab === "plans"
               ? "bg-primary text-white shadow-md"
               : "bg-background text-slate-700 border border-border-soft hover:bg-slate-100"
@@ -66,7 +72,7 @@ function MembershipManagement() {
 
         <button
           onClick={() => setActiveTab("customer_memberships")}
-          className={`px-5 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center space-x-2 ${
+          className={`px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs font-extrabold transition flex items-center space-x-2 ${
             activeTab === "customer_memberships"
               ? "bg-primary text-white shadow-md"
               : "bg-background text-slate-700 border border-border-soft hover:bg-slate-100"

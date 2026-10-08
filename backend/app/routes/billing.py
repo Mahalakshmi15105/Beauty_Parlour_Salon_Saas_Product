@@ -325,10 +325,11 @@ def checkout():
         for pay in payments_to_save:
             pay.invoice_id = invoice.id
             db.session.add(pay)
-        # 7. Visit-Based Membership Counter Logic (Branch Scoped)
+        # 7. Visit-Based and Points-Based Membership Counter Logic (Branch Scoped)
         if customer_id and str(customer_id) not in ["walkin", "0"]:
-            from app.models.visit_membership import VisitMembershipSetting, CustomerVisitCounter
+            from app.models.visit_membership import VisitMembershipSetting, CustomerVisitCounter, CustomerPointsCounter
             from datetime import datetime, timezone
+            import math
 
             v_setting = VisitMembershipSetting.query.filter_by(
                 tenant_id=g.parlour_id,
@@ -383,6 +384,56 @@ def checkout():
                         logger.info(f"Visit Membership: Incremented visit count for customer {customer_id} at Branch {target_branch_id} to {v_counter.current_visit_count}.")
                     
                     invoice.membership_name = f"Visit Loyalty (Visit {v_counter.current_visit_count} of {v_setting.required_visits})"
+
+            elif v_setting and v_setting.membership_mode == "points_based":
+                p_spend = float(v_setting.points_spend_amount or 100.0)
+                p_unit = float(v_setting.points_per_unit or 5.0)
+                p_target = float(v_setting.points_target or 100.0)
+                p_pct = float(v_setting.points_discount_percentage or 5.0)
+
+                p_counter = CustomerPointsCounter.query.filter_by(
+                    tenant_id=g.parlour_id,
+                    branch_id=target_branch_id,
+                    customer_id=customer_id
+                ).first()
+
+                if not p_counter:
+                    p_counter = CustomerPointsCounter(
+                        tenant_id=g.parlour_id,
+                        branch_id=target_branch_id,
+                        customer_id=customer_id,
+                        current_points=0.0,
+                        total_points_earned=0.0
+                    )
+                    db.session.add(p_counter)
+
+                use_points = bool(data.get("use_points_discount") or data.get("use_membership"))
+
+                if use_points and p_counter.current_points >= p_target:
+                    # Customer redeemed target points for percentage discount
+                    p_counter.current_points = max(0.0, p_counter.current_points - p_target)
+                    p_counter.total_points_redeemed = (p_counter.total_points_redeemed or 0.0) + p_target
+                    p_counter.total_redemptions = (p_counter.total_redemptions or 0) + 1
+                    p_counter.total_discount_amount_claimed = Decimal(str(p_counter.total_discount_amount_claimed or Decimal("0.00"))) + invoice.discount
+                    p_counter.last_transaction_date = datetime.now(timezone.utc)
+
+                    invoice.membership_name = f"Points Loyalty Reward ({p_pct}% Discount - {int(p_target)} Points Redeemed)"
+                    invoice.membership_discount = invoice.discount
+                    logger.info(f"Points Membership: Redeemed {p_target} points for {p_pct}% discount on customer {customer_id}. Remaining points: {p_counter.current_points}")
+                else:
+                    # Normal visit: Calculate and add earned points
+                    if p_spend > 0 and p_unit > 0:
+                        earned_points = math.floor(float(subtotal) / p_spend) * p_unit
+                    else:
+                        earned_points = 0.0
+
+                    if earned_points > 0:
+                        p_counter.current_points = (p_counter.current_points or 0.0) + earned_points
+                        p_counter.total_points_earned = (p_counter.total_points_earned or 0.0) + earned_points
+                    
+                    p_counter.last_transaction_date = datetime.now(timezone.utc)
+                    invoice.membership_name = f"Points Loyalty (+{int(earned_points)} Pts Earned | Balance: {int(p_counter.current_points)}/{int(p_target)} Pts)"
+                    logger.info(f"Points Membership: Earned {earned_points} points on ₹{subtotal} spend for customer {customer_id}. Total: {p_counter.current_points}")
 
         # Commit everything atomically
         db.session.commit()
