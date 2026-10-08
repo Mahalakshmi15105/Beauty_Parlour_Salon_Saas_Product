@@ -560,24 +560,24 @@ function Products() {
   return (
     <div className="space-y-6">
       {/* Title Bar */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-xl font-semibold text-text-primary">Inventory & Supplier Module</h1>
           <p className="text-xs text-text-secondary">Track retail stock levels, purchase history ledger, and coordinate supplier order transactions.</p>
         </div>
-        <div className="flex space-x-3">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           {activeTab === "suppliers" ? (
             <>
               <button
                 onClick={() => setShowBulkUpload(true)}
-                className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2"
+                className="flex-1 sm:flex-none justify-center bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition flex items-center gap-1.5"
               >
                 <Upload className="w-4 h-4" />
-                Bulk Upload
+                <span>Bulk Upload</span>
               </button>
               <button
                 onClick={openAddSupplierModal}
-                className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-1.5"
+                className="flex-1 sm:flex-none justify-center bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition flex items-center space-x-1.5 shadow-xs"
               >
                 <Plus className="w-4 h-4" />
                 <span>Add Supplier</span>
@@ -587,21 +587,21 @@ function Products() {
             <>
               <button
                 onClick={() => setShowCategoryModal(true)}
-                className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2"
+                className="flex-1 sm:flex-none justify-center bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition flex items-center gap-1.5"
               >
                 <ClipboardList className="w-4 h-4" />
-                Manage Categories
+                <span>Categories</span>
               </button>
               <button
                 onClick={() => setShowBulkUpload(true)}
-                className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2"
+                className="flex-1 sm:flex-none justify-center bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition flex items-center gap-1.5"
               >
                 <Upload className="w-4 h-4" />
-                Bulk Upload
+                <span>Bulk Upload</span>
               </button>
               <button
                 onClick={openAddModal}
-                className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-1.5"
+                className="flex-1 sm:flex-none justify-center bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition flex items-center space-x-1.5 shadow-xs"
               >
                 <Plus className="w-4 h-4" />
                 <span>Add Product</span>
@@ -612,13 +612,13 @@ function Products() {
       </div>
 
       {/* Top Segmented Tab Switcher */}
-      <div className="flex space-x-2 bg-surface border border-border-soft p-3 rounded-2xl shadow-xs">
+      <div className="flex flex-wrap sm:flex-nowrap gap-2 bg-surface border border-border-soft p-2 sm:p-3 rounded-2xl shadow-xs">
         <button
           onClick={() => {
             setActiveTab("catalog");
             setShowLowStockOnly(false);
           }}
-          className={`px-5 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center space-x-2 ${
+          className={`flex-1 sm:flex-none justify-center px-4 sm:px-5 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center space-x-2 ${
             activeTab === "catalog"
               ? "bg-primary text-white shadow-md shadow-pink-500/20"
               : "bg-background text-slate-700 border border-border-soft hover:bg-slate-100"
@@ -633,7 +633,7 @@ function Products() {
             setActiveTab("reorders");
             setShowLowStockOnly(false);
           }}
-          className={`px-5 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center space-x-2 ${
+          className={`flex-1 sm:flex-none justify-center px-4 sm:px-5 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center space-x-2 ${
             activeTab === "reorders"
               ? "bg-primary text-white shadow-md shadow-pink-500/20"
               : "bg-background text-slate-700 border border-border-soft hover:bg-slate-100"
@@ -645,7 +645,7 @@ function Products() {
 
         <button
           onClick={() => setActiveTab("suppliers")}
-          className={`px-5 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center space-x-2 ${
+          className={`flex-1 sm:flex-none justify-center px-4 sm:px-5 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center space-x-2 ${
             activeTab === "suppliers"
               ? "bg-primary text-white shadow-md shadow-pink-500/20"
               : "bg-background text-slate-700 border border-border-soft hover:bg-slate-100"
@@ -659,26 +659,26 @@ function Products() {
       {activeTab === "suppliers" ? (
         // Suppliers Directory Tab
         <>
-          <div className="bg-surface border border-border-soft p-4 rounded-lg flex justify-between items-center">
+          <div className="bg-surface border border-border-soft p-3 sm:p-4 rounded-xl sm:rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <span className="text-sm font-semibold text-text-primary">Suppliers List ({suppliers.length})</span>
-            <div className="flex space-x-2">
+            <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto">
               <button
                 onClick={handlePrintSuppliers}
-                className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-slate-200"
+                className="flex-1 sm:flex-none justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition border border-slate-200"
               >
                 <Printer className="w-3.5 h-3.5" />
                 <span>Print</span>
               </button>
               <button
                 onClick={handleExportExcelSuppliers}
-                className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-emerald-200"
+                className="flex-1 sm:flex-none justify-center bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition border border-emerald-200"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5" />
                 <span>Excel</span>
               </button>
               <button
                 onClick={handleExportPDFSuppliers}
-                className="bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-rose-200"
+                className="flex-1 sm:flex-none justify-center bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition border border-rose-200"
               >
                 <FileText className="w-3.5 h-3.5" />
                 <span>PDF</span>
@@ -686,7 +686,7 @@ function Products() {
             </div>
           </div>
 
-          <div className="bg-surface border border-border-soft rounded-lg overflow-hidden">
+          <div className="bg-surface border border-border-soft rounded-2xl overflow-hidden shadow-xs">
             {suppliersLoading ? (
               <div className="p-8 space-y-4">
                 <div className="h-6 bg-border-soft rounded animate-pulse w-1/4"></div>
@@ -697,37 +697,39 @@ function Products() {
                 No active suppliers found in directory. Click "+ Add Supplier" to create one.
               </div>
             ) : (
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-primary-light border-b border-border-soft">
-                    <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Supplier Name</th>
-                    <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Contact Name</th>
-                    <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Phone/WhatsApp</th>
-                    <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Email</th>
-                    <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Address</th>
-                    <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-soft">
-                  {suppliers.map((s) => (
-                    <tr key={s.id} className="hover:bg-background/50 transition">
-                      <td className="px-6 py-4 text-sm font-semibold text-text-primary">{s.name}</td>
-                      <td className="px-6 py-4 text-sm text-text-secondary">{s.contact_name || "—"}</td>
-                      <td className="px-6 py-4 text-sm text-text-secondary">{s.phone}</td>
-                      <td className="px-6 py-4 text-sm text-text-secondary">{s.email || "—"}</td>
-                      <td className="px-6 py-4 text-sm text-text-secondary truncate max-w-xs">{s.address || "—"}</td>
-                      <td className="px-6 py-4 text-sm space-x-3 text-right">
-                        <button onClick={() => openEditSupplierModal(s)} className="text-primary hover:underline">
-                          <Edit className="w-4 h-4 inline" />
-                        </button>
-                        <button onClick={() => handleSupplierDelete(s.id)} className="text-danger hover:underline">
-                          <Trash2 className="w-4 h-4 inline" />
-                        </button>
-                      </td>
+              <div className="overflow-x-auto w-full">
+                <table className="w-full text-left border-collapse min-w-[650px]">
+                  <thead>
+                    <tr className="bg-primary-light border-b border-border-soft">
+                      <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Supplier Name</th>
+                      <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Contact Name</th>
+                      <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Phone/WhatsApp</th>
+                      <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Email</th>
+                      <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Address</th>
+                      <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase text-right">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-border-soft">
+                    {suppliers.map((s) => (
+                      <tr key={s.id} className="hover:bg-background/50 transition">
+                        <td className="px-6 py-4 text-sm font-semibold text-text-primary">{s.name}</td>
+                        <td className="px-6 py-4 text-sm text-text-secondary">{s.contact_name || "—"}</td>
+                        <td className="px-6 py-4 text-sm text-text-secondary">{s.phone}</td>
+                        <td className="px-6 py-4 text-sm text-text-secondary">{s.email || "—"}</td>
+                        <td className="px-6 py-4 text-sm text-text-secondary truncate max-w-xs">{s.address || "—"}</td>
+                        <td className="px-6 py-4 text-sm space-x-3 text-right">
+                          <button onClick={() => openEditSupplierModal(s)} className="text-primary hover:underline">
+                            <Edit className="w-4 h-4 inline" />
+                          </button>
+                          <button onClick={() => handleSupplierDelete(s.id)} className="text-danger hover:underline">
+                            <Trash2 className="w-4 h-4 inline" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </>
@@ -735,18 +737,18 @@ function Products() {
         // Inventory Catalog or Stock Alerts & Reorders Tab
         <>
           {/* Filter / Search Bar */}
-          <div className="bg-surface border border-border-soft p-4 rounded-lg flex space-x-4 items-center">
+          <div className="bg-surface border border-border-soft p-3 sm:p-4 rounded-xl sm:rounded-2xl flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
             <input
               type="text"
               placeholder="Search products by name, SKU, or barcode..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 bg-background border border-border-soft px-4 py-2 rounded-lg text-sm focus:outline-none focus:border-primary"
+              className="w-full lg:flex-1 bg-background border border-border-soft px-3.5 py-2 rounded-xl text-sm focus:outline-none focus:border-primary"
             />
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="bg-background border border-border-soft px-4 py-2 rounded-lg text-sm text-text-secondary focus:outline-none"
+              className="w-full lg:w-auto bg-background border border-border-soft px-3.5 py-2 rounded-xl text-sm text-text-secondary focus:outline-none"
             >
               <option value="">All Categories</option>
               {categories.map((cat) => (
@@ -754,7 +756,7 @@ function Products() {
               ))}
             </select>
             
-            <label className="flex items-center space-x-2 bg-background border border-border-soft px-4 py-2 rounded-lg text-sm text-text-secondary cursor-pointer select-none">
+            <label className="flex items-center justify-center space-x-2 bg-background border border-border-soft px-3.5 py-2 rounded-xl text-sm text-text-secondary cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={showLowStockOnly}
@@ -767,10 +769,10 @@ function Products() {
               </span>
             </label>
 
-            <div className="flex space-x-2 border-l border-border-soft pl-4">
+            <div className="flex items-center gap-2 border-t lg:border-t-0 lg:border-l border-border-soft pt-2 lg:pt-0 lg:pl-3 overflow-x-auto">
               <button
                 onClick={handlePrint}
-                className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-slate-200"
+                className="flex-1 lg:flex-none justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition border border-slate-200"
                 title="Print List"
               >
                 <Printer className="w-3.5 h-3.5" />
@@ -778,7 +780,7 @@ function Products() {
               </button>
               <button
                 onClick={handleExportExcel}
-                className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-emerald-200"
+                className="flex-1 lg:flex-none justify-center bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-2 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition border border-emerald-200"
                 title="Export to Excel"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5" />
@@ -786,7 +788,7 @@ function Products() {
               </button>
               <button
                 onClick={handleExportPDF}
-                className="bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-rose-200"
+                className="flex-1 lg:flex-none justify-center bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-2 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition border border-rose-200"
                 title="Export to PDF"
               >
                 <FileText className="w-3.5 h-3.5" />
@@ -796,7 +798,7 @@ function Products() {
           </div>
 
           {/* Data Table */}
-          <div className="bg-surface border border-border-soft rounded-lg overflow-hidden">
+          <div className="bg-surface border border-border-soft rounded-2xl overflow-hidden shadow-xs">
             {loading ? (
               <div className="p-8 space-y-4">
                 <div className="h-6 bg-border-soft rounded animate-pulse w-1/4"></div>
@@ -827,7 +829,8 @@ function Products() {
               )
             ) : (
               <>
-                <table className="w-full text-left border-collapse">
+                <div className="overflow-x-auto w-full">
+                  <table className="w-full text-left border-collapse min-w-[700px]">
                   <thead>
                     <tr className="bg-primary-light border-b border-border-soft">
                       <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Product Details</th>
@@ -899,62 +902,64 @@ function Products() {
                     })}
                   </tbody>
                 </table>
-
-                {/* Pagination Controls */}
-                <div className="px-6 py-4 border-t border-border-soft flex justify-between items-center">
-                  <button
-                    disabled={cursorHistory.length === 0}
-                    onClick={handlePrevPage}
-                    className="px-4 py-2 border border-border-soft rounded-lg text-sm disabled:opacity-50 transition"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    disabled={!nextCursor}
-                    onClick={handleNextPage}
-                    className="px-4 py-2 border border-border-soft rounded-lg text-sm disabled:opacity-50 transition"
-                  >
-                    Next
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Reorders history ledger table (only show in the reorders tab) */}
-          {activeTab === "reorders" && (
-            <div className="bg-surface border border-border-soft rounded-lg overflow-hidden mt-8 shadow-xs">
-              <div className="px-6 py-4 border-b border-border-soft flex justify-between items-center bg-slate-50/50">
-                <div>
-                  <h3 className="text-sm font-bold text-text-primary">Procurement & Restock Transaction History Ledger</h3>
-                  <p className="text-[11px] text-text-secondary">Audit history logs of stock entries, WhatsApp purchase orders, and warehouse shipments.</p>
-                </div>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={handlePrintReorderHistory}
-                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-slate-200"
-                  >
-                    <Printer className="w-3.5 h-3.5" />
-                    <span>Print Ledger</span>
-                  </button>
-                  <button
-                    onClick={handleExportExcelReorderHistory}
-                    className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-emerald-200"
-                  >
-                    <FileSpreadsheet className="w-3.5 h-3.5" />
-                    <span>Excel Ledger</span>
-                  </button>
-                </div>
               </div>
-              
-              {reorderLogsLoading ? (
-                <div className="p-8 text-center text-xs text-text-secondary">Loading history logs...</div>
-              ) : reorderLogs.length === 0 ? (
-                <div className="p-12 text-center text-xs text-text-secondary">
-                  No restock transactions have been recorded yet. Click the "Restock" button above on any product to register one.
-                </div>
-              ) : (
-                <table className="w-full text-left border-collapse">
+
+              {/* Pagination Controls */}
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-border-soft flex justify-between items-center text-xs sm:text-sm">
+                <button
+                  disabled={cursorHistory.length === 0}
+                  onClick={handlePrevPage}
+                  className="px-3.5 sm:px-4 py-2 border border-border-soft rounded-xl text-xs sm:text-sm font-semibold disabled:opacity-50 transition hover:bg-background"
+                >
+                  Previous
+                </button>
+                <button
+                  disabled={!nextCursor}
+                  onClick={handleNextPage}
+                  className="px-3.5 sm:px-4 py-2 border border-border-soft rounded-xl text-xs sm:text-sm font-semibold disabled:opacity-50 transition hover:bg-background"
+                >
+                  Next
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Reorders history ledger table (only show in the reorders tab) */}
+        {activeTab === "reorders" && (
+          <div className="bg-surface border border-border-soft rounded-2xl overflow-hidden mt-8 shadow-xs">
+            <div className="px-4 sm:px-6 py-4 border-b border-border-soft flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-50/50">
+              <div>
+                <h3 className="text-sm font-bold text-text-primary">Procurement & Restock Transaction History Ledger</h3>
+                <p className="text-[11px] text-text-secondary">Audit history logs of stock entries, WhatsApp purchase orders, and warehouse shipments.</p>
+              </div>
+              <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto">
+                <button
+                  onClick={handlePrintReorderHistory}
+                  className="flex-1 sm:flex-none justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition border border-slate-200"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Print</span>
+                </button>
+                <button
+                  onClick={handleExportExcelReorderHistory}
+                  className="flex-1 sm:flex-none justify-center bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition border border-emerald-200"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span>Excel</span>
+                </button>
+              </div>
+            </div>
+            
+            {reorderLogsLoading ? (
+              <div className="p-8 text-center text-xs text-text-secondary">Loading history logs...</div>
+            ) : reorderLogs.length === 0 ? (
+              <div className="p-12 text-center text-xs text-text-secondary">
+                No restock transactions have been recorded yet. Click the "Restock" button above on any product to register one.
+              </div>
+            ) : (
+              <div className="overflow-x-auto w-full">
+                <table className="w-full text-left border-collapse min-w-[700px]">
                   <thead>
                     <tr className="bg-slate-100 border-b border-border-soft">
                       <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Date & Time</th>
@@ -990,24 +995,25 @@ function Products() {
                     ))}
                   </tbody>
                 </table>
-              )}
-            </div>
-          )}
-        </>
-      )}
+              </div>
+            )}
+          </div>
+        )}
+      </>
+    )}
 
       {/* Category Management Modal */}
       {showCategoryModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in">
           <div ref={categoryModalRef} className="glowe-glass-card max-w-md w-full rounded-3xl shadow-2xl border border-white/70 overflow-hidden">
-            <div className="px-6 py-4 border-b border-pink-100/60 flex justify-between items-center bg-white/50 backdrop-blur-md">
-              <h3 className="text-md font-bold text-text-primary">Manage Product Categories</h3>
+            <div className="px-5 sm:px-6 py-4 border-b border-pink-100/60 flex justify-between items-center bg-white/50 backdrop-blur-md">
+              <h3 className="text-sm sm:text-md font-bold text-text-primary">Manage Product Categories</h3>
               <button onClick={() => setShowCategoryModal(false)} className="text-text-secondary hover:text-text-primary p-1">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-6 space-y-6">
-              <form ref={categoryFormRef} onSubmit={handleCategorySubmit} className="flex space-x-3">
+            <div className="p-4 sm:p-6 space-y-6">
+              <form ref={categoryFormRef} onSubmit={handleCategorySubmit} className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                 <input
                   ref={categoryNameInputRef}
                   type="text"
@@ -1094,18 +1100,18 @@ function Products() {
 
       {/* Product Add/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div ref={modalRef} className="glowe-glass-card max-w-lg w-full rounded-3xl shadow-2xl border border-white/70 overflow-hidden">
-            <div className="px-6 py-4 border-b border-pink-100/60 flex justify-between items-center bg-white/50 backdrop-blur-md">
-              <h3 className="text-md font-bold text-slate-900">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in">
+          <div ref={modalRef} className="glowe-glass-card max-w-lg w-full rounded-3xl shadow-2xl border border-white/70 overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="px-5 sm:px-6 py-4 border-b border-pink-100/60 flex justify-between items-center bg-white/50 backdrop-blur-md shrink-0">
+              <h3 className="text-sm sm:text-md font-bold text-slate-900">
                 {editId ? "Edit Product Details" : "Create New Product"}
               </h3>
               <button onClick={() => setShowModal(false)} className="text-text-secondary hover:text-text-primary p-1">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form ref={formRef} onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+            <form ref={formRef} onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Product Name *</label>
                   <input
@@ -1113,7 +1119,7 @@ function Products() {
                     required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-sm focus:outline-none"
                   />
                 </div>
                 <div>
@@ -1127,7 +1133,7 @@ function Products() {
                         try { e.target.showPicker(); } catch (err) {}
                       }
                     }}
-                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-sm focus:outline-none"
                   >
                     <option value="">Select Category</option>
                     {categories.map((cat) => (
@@ -1137,14 +1143,14 @@ function Products() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Barcode</label>
                   <input
                     type="text"
                     value={formData.barcode}
                     onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-sm focus:outline-none"
                   />
                 </div>
                 <div>
@@ -1157,7 +1163,7 @@ function Products() {
                         try { e.target.showPicker(); } catch (err) {}
                       }
                     }}
-                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-sm focus:outline-none"
                   >
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
@@ -1165,7 +1171,7 @@ function Products() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Purchase Price ({currencySymbol}) *</label>
                   <input
@@ -1174,7 +1180,7 @@ function Products() {
                     required
                     value={formData.cost_price}
                     onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
-                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none numeric-input"
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-sm focus:outline-none numeric-input"
                   />
                 </div>
                 <div>
@@ -1185,7 +1191,7 @@ function Products() {
                     required
                     value={formData.mrp}
                     onChange={(e) => setFormData({ ...formData, mrp: e.target.value })}
-                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none numeric-input"
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-sm focus:outline-none numeric-input"
                   />
                 </div>
                 <div>
@@ -1196,12 +1202,12 @@ function Products() {
                     required
                     value={formData.selling_price}
                     onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
-                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none numeric-input"
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-sm focus:outline-none numeric-input"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Stock Quantity *</label>
                   <input
@@ -1209,7 +1215,7 @@ function Products() {
                     required
                     value={formData.stock_quantity}
                     onChange={(e) => setFormData({ ...formData, stock_quantity: e.target.value })}
-                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-sm focus:outline-none"
                   />
                 </div>
                 <div>
@@ -1219,75 +1225,75 @@ function Products() {
                     required
                     value={formData.low_stock_threshold}
                     onChange={(e) => setFormData({ ...formData, low_stock_threshold: e.target.value })}
-                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-sm focus:outline-none"
                   />
                 </div>
               </div>
 
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-semibold text-text-secondary">Product Image (Stored in Google Drive)</label>
-                    <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">Auto-WebP</span>
-                  </div>
-                  <div className="flex items-center space-x-3 bg-background border border-border-soft p-2.5 rounded-lg">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      id="product-image-upload"
-                      onChange={(e) => {
-                        const file = e.target.files[0];
-                        if (file) handleImageSelected(file);
-                      }}
-                      className="hidden"
-                    />
-                    <button
-                      type="button"
-                      tabIndex="0"
-                      disabled={uploadingImage}
-                      data-image-upload-trigger="true"
-                      data-target-input="product-image-upload"
-                      onClick={handleTriggerImageUpload}
-                      className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 rounded-md text-xs font-semibold cursor-pointer transition flex items-center space-x-1.5 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50"
-                    >
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>{uploadingImage ? `Uploading (${uploadProgress}%)...` : "Choose Image"}</span>
-                    </button>
-                    {uploadingImage && (
-                      <div className="flex items-center space-x-2 text-xs text-primary font-semibold animate-pulse">
-                        <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-                        <span>Converting to WebP & saving to Drive...</span>
-                      </div>
-                    )}
-                    {!uploadingImage && formData.image_url ? (
-                      <div className="flex items-center space-x-2">
-                        <img src={formData.image_url} alt="Preview" className="w-9 h-9 rounded-md object-cover border border-border-soft shadow-2xs" />
-                        <button
-                          type="button"
-                          data-skip-nav="true"
-                          onClick={() => setFormData((prev) => ({ ...prev, image_url: "" }))}
-                          className="text-xs text-rose-500 hover:underline font-semibold"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ) : !uploadingImage ? (
-                      <span className="text-xs text-text-secondary">No image chosen</span>
-                    ) : null}
-                  </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-text-secondary">Product Image (Stored in Google Drive)</label>
+                  <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">Auto-WebP</span>
                 </div>
+                <div className="flex flex-wrap items-center gap-3 bg-background border border-border-soft p-2.5 rounded-xl">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    id="product-image-upload"
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      if (file) handleImageSelected(file);
+                    }}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    tabIndex="0"
+                    disabled={uploadingImage}
+                    data-image-upload-trigger="true"
+                    data-target-input="product-image-upload"
+                    onClick={handleTriggerImageUpload}
+                    className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 rounded-lg text-xs font-semibold cursor-pointer transition flex items-center space-x-1.5 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>{uploadingImage ? `Uploading (${uploadProgress}%)...` : "Choose Image"}</span>
+                  </button>
+                  {uploadingImage && (
+                    <div className="flex items-center space-x-2 text-xs text-primary font-semibold animate-pulse">
+                      <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                      <span>Converting to WebP & saving to Drive...</span>
+                    </div>
+                  )}
+                  {!uploadingImage && formData.image_url ? (
+                    <div className="flex items-center space-x-2">
+                      <img src={formData.image_url} alt="Preview" className="w-9 h-9 rounded-lg object-cover border border-border-soft shadow-2xs" />
+                      <button
+                        type="button"
+                        data-skip-nav="true"
+                        onClick={() => setFormData((prev) => ({ ...prev, image_url: "" }))}
+                        className="text-xs text-rose-500 hover:underline font-semibold"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : !uploadingImage ? (
+                    <span className="text-xs text-text-secondary">No image chosen</span>
+                  ) : null}
+                </div>
+              </div>
 
               <div className="pt-4 border-t border-border-soft flex justify-end space-x-3">
                 <button
                   type="button"
                   data-skip-nav="true"
                   onClick={() => setShowModal(false)}
-                  className="cancel-btn px-4 py-2 border border-border-soft rounded-lg text-sm text-text-secondary hover:bg-background"
+                  className="cancel-btn px-4 py-2 border border-border-soft rounded-xl text-xs sm:text-sm font-semibold text-text-secondary hover:bg-background"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-sm font-medium"
+                  className="px-5 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs sm:text-sm font-bold shadow-xs"
                 >
                   Save Product
                 </button>
@@ -1299,17 +1305,17 @@ function Products() {
 
       {/* Supplier Add/Edit Modal */}
       {showSupplierModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div ref={supplierModalRef} className="glowe-glass-card max-w-lg w-full rounded-3xl shadow-2xl border border-white/70 overflow-hidden">
-            <div className="px-6 py-4 border-b border-pink-100/60 flex justify-between items-center bg-white/50 backdrop-blur-md">
-              <h3 className="text-md font-bold text-slate-900">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in">
+          <div ref={supplierModalRef} className="glowe-glass-card max-w-lg w-full rounded-3xl shadow-2xl border border-white/70 overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="px-5 sm:px-6 py-4 border-b border-pink-100/60 flex justify-between items-center bg-white/50 backdrop-blur-md shrink-0">
+              <h3 className="text-sm sm:text-md font-bold text-slate-900">
                 {editSupplierId ? "Edit Supplier Settings" : "Register New Supplier"}
               </h3>
               <button onClick={() => setShowSupplierModal(false)} className="text-slate-500 hover:text-pink-600 p-1">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form ref={supplierFormRef} onSubmit={handleSupplierSubmit} className="p-6 space-y-4">
+            <form ref={supplierFormRef} onSubmit={handleSupplierSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto">
               <div>
                 <label className="block text-xs font-semibold text-text-secondary mb-1">Supplier / Company Name *</label>
                 <input
@@ -1318,11 +1324,11 @@ function Products() {
                   placeholder="e.g. Loreal India Pvt Ltd"
                   value={supplierFormData.name}
                   onChange={(e) => setSupplierFormData({ ...supplierFormData, name: e.target.value })}
-                  className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                  className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-sm focus:outline-none"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Contact Person Name</label>
                   <input
@@ -1330,7 +1336,7 @@ function Products() {
                     placeholder="e.g. Rajesh Kumar"
                     value={supplierFormData.contact_name}
                     onChange={(e) => setSupplierFormData({ ...supplierFormData, contact_name: e.target.value })}
-                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-sm focus:outline-none"
                   />
                 </div>
                 <div>
@@ -1341,12 +1347,12 @@ function Products() {
                     placeholder="e.g. 919876543210"
                     value={supplierFormData.phone}
                     onChange={(e) => setSupplierFormData({ ...supplierFormData, phone: e.target.value })}
-                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-sm focus:outline-none"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Email Address</label>
                   <input
@@ -1354,7 +1360,7 @@ function Products() {
                     placeholder="e.g. sales@loreal.in"
                     value={supplierFormData.email}
                     onChange={(e) => setSupplierFormData({ ...supplierFormData, email: e.target.value })}
-                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-sm focus:outline-none"
                   />
                 </div>
                 <div>
@@ -1362,7 +1368,7 @@ function Products() {
                   <select
                     value={supplierFormData.status}
                     onChange={(e) => setSupplierFormData({ ...supplierFormData, status: e.target.value })}
-                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-sm focus:outline-none"
                   >
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
@@ -1377,7 +1383,7 @@ function Products() {
                   placeholder="Street details, City, Pin Code"
                   value={supplierFormData.address}
                   onChange={(e) => setSupplierFormData({ ...supplierFormData, address: e.target.value })}
-                  className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                  className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-sm focus:outline-none"
                 />
               </div>
 
@@ -1385,13 +1391,13 @@ function Products() {
                 <button
                   type="button"
                   onClick={() => setShowSupplierModal(false)}
-                  className="px-4 py-2 border border-border-soft rounded-lg text-sm text-text-secondary hover:bg-background"
+                  className="px-4 py-2 border border-border-soft rounded-xl text-xs sm:text-sm font-semibold text-text-secondary hover:bg-background"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-sm font-medium"
+                  className="px-5 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs sm:text-sm font-bold shadow-xs"
                 >
                   Save Supplier
                 </button>
@@ -1403,10 +1409,10 @@ function Products() {
 
       {/* Restock/Reorder Modal */}
       {showReorderModal && reorderProduct && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div ref={reorderModalRef} className="glowe-glass-card max-w-md w-full rounded-3xl shadow-2xl border border-white/70 overflow-hidden">
-            <div className="px-6 py-4 border-b border-pink-100/60 flex justify-between items-center bg-white/50 backdrop-blur-md">
-              <h3 className="text-md font-semibold text-text-primary flex items-center space-x-2">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in">
+          <div ref={reorderModalRef} className="glowe-glass-card max-w-md w-full rounded-3xl shadow-2xl border border-white/70 overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="px-5 sm:px-6 py-4 border-b border-pink-100/60 flex justify-between items-center bg-white/50 backdrop-blur-md shrink-0">
+              <h3 className="text-sm sm:text-md font-semibold text-text-primary flex items-center space-x-2">
                 <AlertTriangle className="w-5 h-5 text-amber-500" />
                 <span>Procurement Purchase Order</span>
               </h3>
@@ -1414,7 +1420,7 @@ function Products() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-4 sm:p-6 space-y-4 overflow-y-auto">
               <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg text-xs space-y-1">
                 <p className="font-bold text-amber-900">Product: {reorderProduct.name}</p>
                 <p className="text-amber-800">Current Stock: <span className="font-bold text-rose-600">{reorderProduct.stock_quantity}</span> (Threshold: {reorderProduct.low_stock_threshold})</p>

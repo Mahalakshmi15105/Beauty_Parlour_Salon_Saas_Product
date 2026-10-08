@@ -430,28 +430,28 @@ function Services() {
   return (
     <div className="space-y-6">
       {/* Title Bar */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-xl font-semibold text-text-primary">Services & Treatments Catalog</h1>
           <p className="text-xs text-text-secondary">Manage service offerings, category partitions, and pricing.</p>
         </div>
-        <div className="space-x-3">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <button
             onClick={() => setShowBulkUpload(true)}
-            className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2"
+            className="flex-1 sm:flex-none justify-center bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition flex items-center gap-1.5"
           >
             <Upload className="w-4 h-4" />
-            Bulk Upload
+            <span>Bulk Upload</span>
           </button>
           <button
             onClick={() => setShowCategoryModal(true)}
-            className="border border-border-soft hover:bg-background text-text-primary px-4 py-2 rounded-lg text-sm font-medium transition"
+            className="flex-1 sm:flex-none justify-center border border-border-soft hover:bg-background text-text-primary px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition"
           >
-            Manage Categories
+            Categories
           </button>
           <button
             onClick={openAddServiceModal}
-            className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition"
+            className="flex-1 sm:flex-none justify-center bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition shadow-xs"
           >
             + Add Service
           </button>
@@ -459,18 +459,18 @@ function Services() {
       </div>
 
       {/* Filter / Search Bar */}
-      <div className="bg-surface border border-border-soft p-4 rounded-lg flex space-x-4 items-center">
+      <div className="bg-surface border border-border-soft p-3 sm:p-4 rounded-xl sm:rounded-2xl flex flex-col md:flex-row gap-3 items-stretch md:items-center">
         <input
           type="text"
           placeholder="Search services by name..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 bg-background border border-border-soft px-4 py-2 rounded-lg text-sm focus:outline-none focus:border-primary"
+          className="w-full md:flex-1 bg-background border border-border-soft px-3.5 py-2 rounded-xl text-sm focus:outline-none focus:border-primary"
         />
         <select
           value={categoryId}
           onChange={(e) => setCategoryId(e.target.value)}
-          className="bg-background border border-border-soft px-4 py-2 rounded-lg text-sm text-text-secondary focus:outline-none"
+          className="w-full md:w-auto bg-background border border-border-soft px-3.5 py-2 rounded-xl text-sm text-text-secondary focus:outline-none"
         >
           <option value="">All Categories</option>
           {categories.map((c) => (
@@ -478,10 +478,10 @@ function Services() {
           ))}
         </select>
 
-        <div className="flex space-x-2 border-l border-border-soft pl-4">
+        <div className="flex items-center gap-2 border-t md:border-t-0 md:border-l border-border-soft pt-2 md:pt-0 md:pl-3 overflow-x-auto">
           <button
             onClick={handlePrint}
-            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-slate-200"
+            className="flex-1 md:flex-none justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition border border-slate-200"
             title="Print List"
           >
             <Printer className="w-3.5 h-3.5" />
@@ -489,7 +489,7 @@ function Services() {
           </button>
           <button
             onClick={handleExportExcel}
-            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-emerald-200"
+            className="flex-1 md:flex-none justify-center bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-2 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition border border-emerald-200"
             title="Export to Excel"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
@@ -497,7 +497,7 @@ function Services() {
           </button>
           <button
             onClick={handleExportPDF}
-            className="bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-rose-200"
+            className="flex-1 md:flex-none justify-center bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-2 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition border border-rose-200"
             title="Export to PDF"
           >
             <FileText className="w-3.5 h-3.5" />
@@ -507,7 +507,7 @@ function Services() {
       </div>
 
       {/* Data Table */}
-      <div className="bg-surface border border-border-soft rounded-lg overflow-hidden">
+      <div className="bg-surface border border-border-soft rounded-2xl overflow-hidden shadow-xs">
         {loading ? (
           <div className="p-8 space-y-4">
             <div className="h-6 bg-border-soft rounded animate-pulse w-1/4"></div>
@@ -524,7 +524,8 @@ function Services() {
           </div>
         ) : (
           <>
-            <table className="w-full text-left border-collapse">
+            <div className="overflow-x-auto w-full">
+              <table className="w-full text-left border-collapse min-w-[650px]">
               <thead>
                 <tr className="bg-primary-light border-b border-border-soft">
                   <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Service Name</th>
@@ -584,41 +585,42 @@ function Services() {
                 ))}
               </tbody>
             </table>
+          </div>
 
-            {/* Pagination Controls */}
-            <div className="px-6 py-4 border-t border-border-soft flex justify-between items-center">
-              <button
-                disabled={cursorHistory.length === 0}
-                onClick={handlePrevPage}
-                className="px-4 py-2 border border-border-soft rounded-lg text-sm disabled:opacity-50 transition"
-              >
-                Previous
-              </button>
-              <button
-                disabled={!nextCursor}
-                onClick={handleNextPage}
-                className="px-4 py-2 border border-border-soft rounded-lg text-sm disabled:opacity-50 transition"
-              >
-                Next
-              </button>
-            </div>
-          </>
-        )}
-      </div>
+          {/* Pagination Controls */}
+          <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-border-soft flex justify-between items-center text-xs sm:text-sm">
+            <button
+              disabled={cursorHistory.length === 0}
+              onClick={handlePrevPage}
+              className="px-3.5 sm:px-4 py-2 border border-border-soft rounded-xl text-xs sm:text-sm font-semibold disabled:opacity-50 transition hover:bg-background"
+            >
+              Previous
+            </button>
+            <button
+              disabled={!nextCursor}
+              onClick={handleNextPage}
+              className="px-3.5 sm:px-4 py-2 border border-border-soft rounded-xl text-xs sm:text-sm font-semibold disabled:opacity-50 transition hover:bg-background"
+            >
+              Next
+            </button>
+          </div>
+        </>
+      )}
+    </div>
 
-      {/* Service Modal (Glowing First Field, Duration & Description removed, Auto-Calculated Multi-Membership Discounts) */}
+      {/* Service Modal */}
       {showServiceModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div ref={serviceModalRef} className="glowe-glass-card max-w-xl w-full rounded-3xl shadow-2xl border border-white/70 overflow-hidden">
-            <div className="px-6 py-4 border-b border-border-soft flex justify-between items-center">
-              <h3 className="text-md font-bold text-text-primary">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in">
+          <div ref={serviceModalRef} className="glowe-glass-card max-w-xl w-full rounded-3xl shadow-2xl border border-white/70 overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="px-5 sm:px-6 py-4 border-b border-border-soft flex justify-between items-center bg-white/50 backdrop-blur-md shrink-0">
+              <h3 className="text-sm sm:text-md font-bold text-text-primary">
                 {editId ? "Edit Service" : "Add New Service"}
               </h3>
               <button onClick={() => setShowServiceModal(false)} className="text-text-secondary hover:text-text-primary p-1">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form ref={serviceFormRef} onSubmit={handleServiceSubmit} className="p-6 space-y-4 max-h-[85vh] overflow-y-auto">
+            <form ref={serviceFormRef} onSubmit={handleServiceSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto">
               {/* First Field with Focus Glow */}
               <div>
                 <label className="block text-xs font-semibold text-text-secondary mb-1">Service Name *</label>
@@ -628,19 +630,19 @@ function Services() {
                   autoFocus
                   value={serviceForm.name}
                   onChange={(e) => setServiceForm({ ...serviceForm, name: e.target.value })}
-                  className="w-full bg-background border border-primary ring-2 ring-pink-500/20 shadow-md shadow-pink-500/20 px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-primary"
+                  className="w-full bg-background border border-primary ring-2 ring-pink-500/20 shadow-md shadow-pink-500/20 px-3.5 py-2 rounded-xl text-sm focus:outline-none focus:border-primary font-medium"
                   placeholder="Enter service name..."
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Category *</label>
                   <select
                     required
                     value={serviceForm.category_id}
                     onChange={(e) => setServiceForm({ ...serviceForm, category_id: e.target.value })}
-                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-sm focus:outline-none"
                   >
                     <option value="">Select Category</option>
                     {categories.map((c) => (
@@ -657,17 +659,17 @@ function Services() {
                     required
                     value={serviceForm.price}
                     onChange={(e) => handleServicePriceChange(e.target.value)}
-                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none numeric-input"
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-sm focus:outline-none numeric-input"
                     placeholder="0.00"
                   />
                 </div>
 
-                <div>
+                <div className="sm:col-span-2">
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-xs font-semibold text-text-secondary">Service Image (Stored in Google Drive)</label>
                     <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">Auto-WebP</span>
                   </div>
-                  <div className="flex items-center space-x-3 bg-background border border-border-soft p-2.5 rounded-lg">
+                  <div className="flex flex-wrap items-center gap-3 bg-background border border-border-soft p-2.5 rounded-xl">
                     <input
                       type="file"
                       accept="image/*"
@@ -685,7 +687,7 @@ function Services() {
                       data-image-upload-trigger="true"
                       data-target-input="service-image-upload"
                       onClick={handleTriggerImageUpload}
-                      className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 rounded-md text-xs font-semibold cursor-pointer transition flex items-center space-x-1.5 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50"
+                      className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 rounded-lg text-xs font-semibold cursor-pointer transition flex items-center space-x-1.5 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50"
                     >
                       <Upload className="w-3.5 h-3.5" />
                       <span>{uploadingImage ? `Uploading (${uploadProgress}%)...` : "Choose Image"}</span>
@@ -698,7 +700,7 @@ function Services() {
                     )}
                     {!uploadingImage && serviceForm.image_url ? (
                       <div className="flex items-center space-x-2">
-                        <img src={serviceForm.image_url} alt="Preview" className="w-9 h-9 rounded-md object-cover border border-border-soft shadow-2xs" />
+                        <img src={serviceForm.image_url} alt="Preview" className="w-9 h-9 rounded-lg object-cover border border-border-soft shadow-2xs" />
                         <button
                           type="button"
                           data-skip-nav="true"
@@ -719,7 +721,7 @@ function Services() {
                   <select
                     value={serviceForm.status}
                     onChange={(e) => setServiceForm({ ...serviceForm, status: e.target.value })}
-                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none"
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-sm focus:outline-none"
                   >
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
@@ -745,9 +747,9 @@ function Services() {
 
                 <div className="space-y-2">
                   {membershipDiscounts.map((row, idx) => (
-                    <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-background/60 p-2.5 rounded-xl border border-border-soft/60">
+                    <div key={idx} className="flex flex-col sm:grid sm:grid-cols-12 gap-2 items-stretch sm:items-center bg-background/60 p-2.5 rounded-xl border border-border-soft/60">
                       {/* Field 1: Membership Plan Dropdown */}
-                      <div className="col-span-5">
+                      <div className="sm:col-span-5">
                         <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Membership Plan</label>
                         <select
                           value={row.plan_id}
@@ -763,37 +765,38 @@ function Services() {
                         </select>
                       </div>
 
-                      {/* Field 2: Percentage Field */}
-                      <div className="col-span-3">
-                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Discount (%)</label>
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.01"
-                          placeholder="%"
-                          value={row.percentage}
-                          onChange={(e) => handleDiscountPercentageChange(idx, e.target.value)}
-                          className="w-full bg-surface border border-border-soft px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:border-primary text-center numeric-input"
-                        />
-                      </div>
+                      {/* Field 2 & 3: Percentage & Amount Fields */}
+                      <div className="grid grid-cols-2 sm:contents gap-2">
+                        <div className="sm:col-span-3">
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Discount (%)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            placeholder="%"
+                            value={row.percentage}
+                            onChange={(e) => handleDiscountPercentageChange(idx, e.target.value)}
+                            className="w-full bg-surface border border-border-soft px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:border-primary text-center numeric-input"
+                          />
+                        </div>
 
-                      {/* Field 3: Amount Field */}
-                      <div className="col-span-3">
-                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Amount ({currencySymbol})</label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="₹ Amount"
-                          value={row.amount}
-                          onChange={(e) => handleDiscountAmountChange(idx, e.target.value)}
-                          className="w-full bg-surface border border-border-soft px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:border-primary text-center numeric-input"
-                        />
+                        <div className="sm:col-span-3">
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Amount ({currencySymbol})</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="₹ Amount"
+                            value={row.amount}
+                            onChange={(e) => handleDiscountAmountChange(idx, e.target.value)}
+                            className="w-full bg-surface border border-border-soft px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:border-primary text-center numeric-input"
+                          />
+                        </div>
                       </div>
 
                       {/* Remove Row Action */}
-                      <div className="col-span-1 flex justify-center pt-3">
+                      <div className="sm:col-span-1 flex justify-end sm:justify-center pt-1 sm:pt-3">
                         <button
                           type="button"
                           data-skip-nav="true"
@@ -814,13 +817,13 @@ function Services() {
                   type="button"
                   data-skip-nav="true"
                   onClick={() => setShowServiceModal(false)}
-                  className="cancel-btn px-4 py-2 border border-border-soft rounded-lg text-sm text-text-secondary hover:bg-background"
+                  className="cancel-btn px-4 py-2 border border-border-soft rounded-xl text-xs sm:text-sm font-semibold text-text-secondary hover:bg-background"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-sm font-medium"
+                  className="px-5 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs sm:text-sm font-bold shadow-xs"
                 >
                   Save Service
                 </button>

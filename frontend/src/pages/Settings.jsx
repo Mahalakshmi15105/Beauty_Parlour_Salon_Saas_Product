@@ -402,7 +402,7 @@ function Settings() {
   return (
     <div className="space-y-6 pb-12">
       {/* Header Bar */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-xl font-extrabold text-text-primary tracking-tight">
             {t("settings")}
@@ -415,7 +415,7 @@ function Settings() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="bg-primary hover:bg-primary-hover text-white px-5 py-2 rounded-lg text-sm font-semibold transition flex items-center space-x-2 shadow-sm disabled:opacity-50"
+            className="w-full sm:w-auto justify-center bg-primary hover:bg-primary-hover text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition flex items-center space-x-2 shadow-sm disabled:opacity-50 shrink-0"
           >
             {saving ? <span>Saving Changes...</span> : <span>{t("save_settings")}</span>}
           </button>
@@ -437,9 +437,9 @@ function Settings() {
       )}
 
       {/* Tab Selector & Main Settings Grid */}
-      <div className="grid grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Navigation Tabs */}
-        <div className="col-span-3 space-y-1 bg-surface border border-border-soft p-3 rounded-lg h-fit">
+        <div className="col-span-1 lg:col-span-3 flex lg:flex-col overflow-x-auto lg:overflow-visible gap-1.5 bg-surface border border-border-soft p-2 sm:p-3 rounded-xl h-fit scrollbar-none">
           {(() => {
             const tabs = [
               { id: "business", label: "Parlour Profile", icon: Building2 },
@@ -466,7 +466,7 @@ function Settings() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`w-full text-left px-4 py-2.5 rounded-lg text-xs font-semibold flex items-center space-x-3 transition ${
+                  className={`shrink-0 lg:shrink w-auto lg:w-full text-left px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs font-semibold flex items-center space-x-2.5 sm:space-x-3 whitespace-nowrap transition ${
                     activeTab === tab.id
                       ? "bg-primary text-white shadow-sm"
                       : "text-text-secondary hover:text-text-primary hover:bg-background"
@@ -481,7 +481,7 @@ function Settings() {
         </div>
 
         {/* Settings Form Panel */}
-        <div ref={formRef} className="col-span-9 bg-surface border border-border-soft p-8 rounded-lg space-y-6">
+        <div ref={formRef} className="col-span-1 lg:col-span-9 bg-surface border border-border-soft p-4 sm:p-6 lg:p-8 rounded-xl space-y-6 overflow-hidden">
           {/* Billing Type & Mode Tab */}
           {activeTab === "billing_mode" && (
             <div className="space-y-6">
@@ -490,7 +490,7 @@ function Settings() {
                 <p className="text-[11px] text-text-secondary">Choose the default billing interface for your parlour billing staff. This setting is saved per tenant & branch.</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[
                   {
                     id: "normal",
@@ -567,7 +567,7 @@ function Settings() {
           {/* Business Profile Tab */}
           {activeTab === "business" && (
             <div className="space-y-6">
-              <div className="flex justify-between items-center border-b border-border-soft pb-3">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-border-soft pb-3">
                 <h3 className="text-sm font-semibold text-text-primary">Parlour Branding & Identity</h3>
                 <span className="text-[11px] font-bold text-primary bg-primary-light px-2.5 py-0.5 rounded-full border border-primary/20">
                   Multi-Tenant Isolated
@@ -575,7 +575,7 @@ function Settings() {
               </div>
 
               {/* Logo Upload Dropzone & Live Preview */}
-              <div className="p-6 bg-background/50 border border-border-soft rounded-2xl space-y-4">
+              <div className="p-4 sm:p-6 bg-background/50 border border-border-soft rounded-2xl space-y-4">
                 <div className="flex items-center space-x-2 text-xs font-extrabold text-slate-800">
                   <ImageIcon className="w-4 h-4 text-primary" />
                   <span>Parlour Logo Upload & Branding</span>
@@ -590,9 +590,9 @@ function Settings() {
                   </div>
                 )}
 
-                <div className="flex flex-col sm:flex-row items-center gap-6">
+                <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
                   {/* Logo Preview Container */}
-                  <div className="relative w-28 h-28 bg-surface rounded-2xl border-2 border-dashed border-border-soft flex items-center justify-center overflow-hidden shrink-0 shadow-xs group">
+                  <div className="relative w-24 h-24 sm:w-28 sm:h-28 bg-surface rounded-2xl border-2 border-dashed border-border-soft flex items-center justify-center overflow-hidden shrink-0 shadow-xs group">
                     {settingsData.business_profile.logo_url ? (
                       <img
                         src={getFullImageUrl(settingsData.business_profile.logo_url)}
@@ -605,7 +605,7 @@ function Settings() {
                       />
                     ) : (
                       <div className="flex flex-col items-center justify-center space-y-1 text-slate-400">
-                        <Building2 className="w-10 h-10 text-slate-300" />
+                        <Building2 className="w-8 h-8 sm:w-10 sm:h-10 text-slate-300" />
                         <span className="text-[10px] font-bold">No Logo</span>
                       </div>
                     )}
@@ -640,7 +640,7 @@ function Settings() {
                         setShowDriveGuard(true);
                       }
                     }}
-                    className={`flex-1 w-full p-6 border-2 border-dashed rounded-2xl text-center cursor-pointer transition flex flex-col items-center justify-center space-y-2 ${
+                    className={`flex-1 w-full p-4 sm:p-6 border-2 border-dashed rounded-2xl text-center cursor-pointer transition flex flex-col items-center justify-center space-y-2 ${
                       isDragging
                         ? "border-primary bg-primary/10 scale-[1.01]"
                         : "border-border-soft hover:border-primary/50 bg-surface"
@@ -658,8 +658,8 @@ function Settings() {
                       className="hidden"
                     />
 
-                    <div className="p-3 bg-primary/10 text-primary rounded-full">
-                      <Upload className="w-5 h-5" />
+                    <div className="p-2.5 sm:p-3 bg-primary/10 text-primary rounded-full">
+                      <Upload className="w-4 h-4 sm:w-5 sm:h-5" />
                     </div>
 
                     <div>
@@ -701,7 +701,7 @@ function Settings() {
               </div>
 
               {/* Form Input Fields */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Parlour Name *</label>
                   <input
@@ -734,16 +734,16 @@ function Settings() {
 
               {/* SHOP NAME FONT STYLE & TYPOGRAPHY SECTION */}
               <div className="p-4 bg-background/50 border border-border-soft rounded-xl space-y-4">
-                <div className="flex items-center justify-between border-b border-border-soft pb-3">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-border-soft pb-3">
                   <div className="flex items-center space-x-2">
-                    <Type className="w-5 h-5 text-primary" />
+                    <Type className="w-5 h-5 text-primary shrink-0" />
                     <div>
                       <h3 className="text-sm font-bold text-text-primary">Shop Name Font Style</h3>
                       <p className="text-[11px] text-text-secondary">Customize typography specifically for your parlour shop name</p>
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-3">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
                       onClick={() => {
@@ -867,7 +867,7 @@ function Settings() {
                     </div>
 
                     {/* Controls Grid: Size, Weight, Letter Spacing */}
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       {/* Font Size Slider & Box */}
                       <div>
                         <div className="flex justify-between items-center mb-1">
@@ -987,7 +987,7 @@ function Settings() {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Mobile Number</label>
                   <input
@@ -1018,7 +1018,7 @@ function Settings() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Email Address</label>
                   <input
@@ -1064,7 +1064,7 @@ function Settings() {
                 ></textarea>
               </div>
 
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">City</label>
                   <input
@@ -1123,7 +1123,7 @@ function Settings() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Website URL</label>
                   <input
@@ -1155,10 +1155,10 @@ function Settings() {
               </div>
 
               {/* GEOFENCE & LOCATION SETUP (MAIN PARLOUR GPS) */}
-              <div className="p-6 bg-background/50 border border-border-soft rounded-2xl space-y-4">
+              <div className="p-4 sm:p-6 bg-background/50 border border-border-soft rounded-2xl space-y-4">
                 <div className="flex items-center justify-between border-b border-border-soft pb-3">
                   <div className="flex items-center space-x-2">
-                    <Building2 className="w-5 h-5 text-primary" />
+                    <Building2 className="w-5 h-5 text-primary shrink-0" />
                     <div>
                       <h3 className="text-sm font-bold text-text-primary">Geofence & Location Setup</h3>
                       <p className="text-[11px] text-text-secondary">
@@ -1168,7 +1168,7 @@ function Settings() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-text-secondary mb-1">LATITUDE</label>
                     <input
@@ -1218,7 +1218,7 @@ function Settings() {
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-3 pt-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
                   <button
                     type="button"
                     onClick={() => {
@@ -1244,7 +1244,7 @@ function Settings() {
                         { enableHighAccuracy: true, timeout: 10000 }
                       );
                     }}
-                    className="px-4 py-2 border border-primary text-primary hover:bg-primary/10 rounded-xl text-xs font-bold transition flex items-center space-x-1.5"
+                    className="justify-center px-4 py-2 border border-primary text-primary hover:bg-primary/10 rounded-xl text-xs font-bold transition flex items-center space-x-1.5"
                   >
                     <MapPin className="w-3.5 h-3.5" />
                     <span>Detect My Current Location</span>
@@ -1253,7 +1253,7 @@ function Settings() {
                   <button
                     type="button"
                     onClick={handleSave}
-                    className="px-5 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-bold shadow-xs transition"
+                    className="justify-center px-5 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-bold shadow-xs transition"
                   >
                     Save Geofence Location
                   </button>
@@ -1261,10 +1261,10 @@ function Settings() {
               </div>
 
               {/* SALON WI-FI NETWORK ATTENDANCE VERIFICATION */}
-              <div className="p-6 bg-background/50 border border-border-soft rounded-2xl space-y-4">
-                <div className="flex items-center justify-between border-b border-border-soft pb-3">
+              <div className="p-4 sm:p-6 bg-background/50 border border-border-soft rounded-2xl space-y-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-border-soft pb-3">
                   <div className="flex items-center space-x-2">
-                    <Wifi className="w-5 h-5 text-primary" />
+                    <Wifi className="w-5 h-5 text-primary shrink-0" />
                     <div>
                       <h3 className="text-sm font-bold text-text-primary">Salon Wi-Fi Network Attendance Verification</h3>
                       <p className="text-[11px] text-text-secondary">
@@ -1274,7 +1274,7 @@ function Settings() {
                   </div>
 
                   {/* Enable / Disable Wi-Fi Enforcement Toggle */}
-                  <label className="flex items-center space-x-2 cursor-pointer bg-surface px-3 py-1.5 rounded-lg border border-border-soft select-none">
+                  <label className="flex items-center space-x-2 cursor-pointer bg-surface px-3 py-1.5 rounded-lg border border-border-soft select-none shrink-0">
                     <span className="text-xs font-bold text-text-primary">Enforce Wi-Fi Check-in</span>
                     <input
                       type="checkbox"
@@ -1295,7 +1295,7 @@ function Settings() {
                   </label>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-text-secondary mb-1">SALON WI-FI NAME (SSID)</label>
                     <input
@@ -1330,7 +1330,7 @@ function Settings() {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-3 pt-2">
                   <div className="flex items-center space-x-2 text-xs text-text-secondary">
                     <span>Current Detected IP:</span>
                     <span className="font-mono font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
@@ -1338,7 +1338,7 @@ function Settings() {
                     </span>
                   </div>
 
-                  <div className="flex items-center space-x-3">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
                     <button
                       type="button"
                       onClick={() => {
@@ -1352,7 +1352,7 @@ function Settings() {
                         }));
                         showSuccess(`Registered current IP (${ipToUse}) as salon Wi-Fi router IP!`);
                       }}
-                      className="px-4 py-2 border border-primary text-primary hover:bg-primary/10 rounded-xl text-xs font-bold transition flex items-center space-x-1.5"
+                      className="justify-center px-4 py-2 border border-primary text-primary hover:bg-primary/10 rounded-xl text-xs font-bold transition flex items-center space-x-1.5"
                     >
                       <Wifi className="w-3.5 h-3.5" />
                       <span>Register Current Wi-Fi IP</span>
@@ -1361,7 +1361,7 @@ function Settings() {
                     <button
                       type="button"
                       onClick={handleSave}
-                      className="px-5 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-bold shadow-xs transition"
+                      className="justify-center px-5 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-bold shadow-xs transition"
                     >
                       Save Wi-Fi Settings
                     </button>
@@ -1374,26 +1374,26 @@ function Settings() {
           {/* Receipt & Thermal Printing Tab */}
           {activeTab === "receipt" && (
             <div className="space-y-6">
-              <div className="flex justify-between items-center border-b border-border-soft pb-3">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-border-soft pb-3">
                 <div>
                   <h3 className="text-sm font-semibold text-text-primary">Thermal Receipt & Printing Configurations</h3>
                   <p className="text-[11px] text-text-secondary">Customize thermal paper templates, auto-print preferences, and toggle visible sections.</p>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <span className="text-[11px] font-bold text-primary bg-primary-light px-2.5 py-0.5 rounded-full border border-primary/20 flex items-center space-x-1">
+                  <span className="text-[11px] font-bold text-primary bg-primary-light px-2.5 py-0.5 rounded-full border border-primary/20 flex items-center space-x-1 shrink-0">
                     <Printer className="w-3 h-3" />
                     <span>58mm & 80mm Compatible</span>
                   </span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-12 gap-6">
+              <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
                 {/* Left Side: Settings Form Controls */}
-                <div className="col-span-7 space-y-6">
+                <div className="col-span-1 xl:col-span-7 space-y-6">
                   {/* Template Style Selection */}
                   <div className="p-4 bg-background/50 border border-border-soft rounded-xl space-y-3">
                     <label className="block text-xs font-bold text-slate-800">Receipt Template Style</label>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       {[
                         { id: "Classic", title: "Classic", desc: "Clean monospaced dashed layout" },
                         { id: "Modern", title: "Modern", desc: "Accent header & bold highlights" },
@@ -1424,7 +1424,7 @@ function Settings() {
                   {/* Thermal Paper Size Selector */}
                   <div className="p-4 bg-background/50 border border-border-soft rounded-xl space-y-3">
                     <label className="block text-xs font-bold text-slate-800">Thermal Printer Paper Width</label>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {[
                         { id: "80mm", title: "80mm (3 Inch Standard)", desc: "Full detailed receipt width (300px)" },
                         { id: "58mm", title: "58mm (2 Inch Compact)", desc: "Ultra-compact mobile printer (220px)" },
@@ -1454,7 +1454,7 @@ function Settings() {
                   {/* Section Display Toggles */}
                   <div className="p-4 bg-background/50 border border-border-soft rounded-xl space-y-3">
                     <label className="block text-xs font-bold text-slate-800">Invoice Display Settings</label>
-                    <div className="grid grid-cols-2 gap-3 text-xs font-semibold text-slate-700">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-semibold text-slate-700">
                       {[
                         { key: "show_qty", label: "Show QTY" },
                         { key: "show_rate", label: "Show RATE" },
@@ -1510,7 +1510,7 @@ function Settings() {
                 </div>
 
                 {/* Right Side: Live Interactive Receipt Preview Pane */}
-                <div className="col-span-5 flex flex-col items-center space-y-3 bg-slate-900/5 p-4 rounded-2xl border border-border-soft">
+                <div className="col-span-1 xl:col-span-5 flex flex-col items-center space-y-3 bg-slate-900/5 p-4 rounded-2xl border border-border-soft">
                   <div className="flex items-center space-x-2 text-xs font-extrabold text-slate-700">
                     <Eye className="w-4 h-4 text-primary" />
                     <span>Live Thermal Receipt Preview</span>
@@ -1566,7 +1566,7 @@ function Settings() {
           {activeTab === "invoice" && (
             <div className="space-y-6">
               <h3 className="text-sm font-semibold text-text-primary border-b border-border-soft pb-3">Invoice & Tax Configurations</h3>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Invoice Prefix</label>
                   <input

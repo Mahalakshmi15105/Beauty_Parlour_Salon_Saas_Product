@@ -9,10 +9,10 @@ function ServicesAndProducts() {
   return (
     <div className="space-y-6">
       {/* Top Segmented Tab Switcher */}
-      <div className="flex space-x-2 bg-surface border border-border-soft p-3 rounded-2xl shadow-xs">
+      <div className="flex flex-wrap sm:flex-nowrap gap-2 bg-surface border border-border-soft p-2 sm:p-3 rounded-2xl shadow-xs">
         <button
           onClick={() => setActiveTab("services")}
-          className={`px-5 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center space-x-2 ${
+          className={`flex-1 sm:flex-none justify-center px-4 sm:px-5 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center space-x-2 ${
             activeTab === "services"
               ? "bg-primary text-white shadow-md shadow-pink-500/20"
               : "bg-background text-slate-700 border border-border-soft hover:bg-slate-100"
@@ -24,7 +24,7 @@ function ServicesAndProducts() {
 
         <button
           onClick={() => setActiveTab("products")}
-          className={`px-5 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center space-x-2 ${
+          className={`flex-1 sm:flex-none justify-center px-4 sm:px-5 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center space-x-2 ${
             activeTab === "products"
               ? "bg-primary text-white shadow-md shadow-pink-500/20"
               : "bg-background text-slate-700 border border-border-soft hover:bg-slate-100"
