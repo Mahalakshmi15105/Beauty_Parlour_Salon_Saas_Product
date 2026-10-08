@@ -221,15 +221,16 @@ function MembershipPlans() {
       });
   };
 
-  const handleDelete = (id) => {
-    // Confirmed action
-    if (true) {
+  const handleDelete = (id, planName = "this plan") => {
+    if (window.confirm(`Are you sure you want to delete "${planName}"?`)) {
       API.delete(`/membership-plans/${id}`)
         .then(() => {
+          showSuccess("Membership plan deleted successfully!");
           fetchPlans(cursor);
         })
         .catch((err) => {
-          showError(err.message || "Failed to delete.");
+          const errMsg = err.response?.data?.message || err.message || "Failed to delete.";
+          showError(errMsg);
         });
     }
   };
@@ -344,7 +345,7 @@ function MembershipPlans() {
                       <button onClick={() => openEditModal(p)} className="text-primary hover:underline">
                         Edit
                       </button>
-                      <button onClick={() => handleDelete(p.id)} className="text-danger hover:underline">
+                      <button onClick={() => handleDelete(p.id, p.name)} className="text-danger hover:underline">
                         Delete
                       </button>
                     </td>

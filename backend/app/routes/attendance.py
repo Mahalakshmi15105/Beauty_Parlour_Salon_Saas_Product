@@ -92,11 +92,11 @@ def get_branch_qr_image():
 
     # Build check-in URL dynamically using client origin if provided or request host
     client_origin = request.args.get("origin")
-    if client_origin:
+    if client_origin and not ("localhost" in client_origin or "127.0.0.1" in client_origin):
         origin = client_origin.rstrip("/")
     else:
         req_origin = request.headers.get("Origin") or request.headers.get("Referer")
-        if req_origin:
+        if req_origin and not ("localhost" in req_origin or "127.0.0.1" in req_origin):
             import urllib.parse
             parsed = urllib.parse.urlparse(req_origin)
             origin = f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
@@ -220,7 +220,7 @@ def employee_auto_scan():
         db.session.add(branch)
         db.session.commit()
 
-    # Find corresponding Employee record for user strictly matching email or phone
+    # Find corresponding Employee record for user matching username, email, phone, or name
     user = User.query.get(user_id) if user_id else None
     employee = None
     if user and user.email:
@@ -228,40 +228,38 @@ def employee_auto_scan():
         u_prefix = u_email.split("@")[0] if "@" in u_email else u_email
         all_emps = Employee.query.filter_by(is_deleted=False).all()
         
-        # 1. Exact match by email/phone or exact name
+        # 1. Exact match by username, email, or phone
         for e in all_emps:
+            e_uname = (getattr(e, "username", None) or "").strip().lower()
+            e_email = (getattr(e, "email", None) or "").strip().lower()
             e_phone = (e.phone or "").strip().lower()
-            e_fn = (e.first_name or "").strip().lower()
-            e_full = f"{e.first_name or ''} {e.last_name or ''}".strip().lower()
-            if u_email == e_phone or u_prefix == e_fn or u_prefix == e_full:
+            if u_email in (e_uname, e_email, e_phone) or (u_prefix and u_prefix in (e_uname, e_email, e_phone)):
                 employee = e
                 break
 
-        # 2. Substring match fallback
+        # 2. Match by first_name or full_name
         if not employee:
             for e in all_emps:
-                e_phone = (e.phone or "").strip().lower()
                 e_fn = (e.first_name or "").strip().lower()
-                if (e_phone and e_phone in u_email) or (e_fn and e_fn in u_prefix):
+                e_full = f"{e.first_name or ''} {e.last_name or ''}".strip().lower()
+                if u_prefix in (e_fn, e_full) or u_email in (e_fn, e_full):
                     employee = e
                     break
 
-    # If no existing employee matched for user, auto-create a dedicated Employee record for this user
-    if not employee and user:
-        emp_name = user.email.split("@")[0].title() if user.email else "Staff"
-        employee = Employee(
-            tenant_id=tenant_id or 1,
-            branch_id=branch.id,
-            first_name=emp_name,
-            phone=user.email or "9999999999",
-            role=user.role or "Employee",
-            status="active"
-        )
-        db.session.add(employee)
-        db.session.commit()
+        # 3. Substring / prefix match fallback
+        if not employee:
+            for e in all_emps:
+                e_fn = (e.first_name or "").strip().lower()
+                e_uname = (getattr(e, "username", None) or "").strip().lower()
+                if (u_prefix and (u_prefix in e_fn or e_fn in u_prefix)) or (u_prefix and u_prefix in e_uname):
+                    employee = e
+                    break
 
     if not employee:
-        return jsonify({"status": "error", "message": "No active Employee profile found for your account."}), 400
+        return jsonify({
+            "status": "error",
+            "message": "No active Employee profile linked to your user account. Please contact your parlour admin."
+        }), 400
 
     # Locate today's attendance record for this employee (across ANY branch for today)
     today_curr = get_ist_today()

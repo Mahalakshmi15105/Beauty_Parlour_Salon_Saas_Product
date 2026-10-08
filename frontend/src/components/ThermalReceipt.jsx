@@ -1,4 +1,3 @@
-import { useToast } from "../context/ToastContext";
 import React from "react";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { getFullImageUrl } from "../utils/imageUrl";
@@ -6,105 +5,37 @@ import { getShopNameStyle } from "../utils/fontLoader";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
-export async function downloadThermalReceiptPDF(elementOrRef, invoiceNumber = "INV-0001", paperSize = "80mm") {
-  const { showSuccess, showError } = useToast();
-  let targetEl = null;
-  if (elementOrRef && elementOrRef.current) {
-    targetEl = elementOrRef.current;
-  } else if (typeof elementOrRef === "string") {
-    targetEl = document.getElementById(elementOrRef);
-  } else if (elementOrRef instanceof HTMLElement) {
-    targetEl = elementOrRef;
-  }
+export function buildThermalReceiptHtml(targetEl, paperSize = "80mm") {
+  // Clone and ensure image URLs are fully resolved
+  const tempDiv = document.createElement("div");
+  tempDiv.innerHTML = targetEl.innerHTML;
+  const targetImgs = targetEl.querySelectorAll("img");
+  const clonedImgs = tempDiv.querySelectorAll("img");
+  targetImgs.forEach((orig, idx) => {
+    if (clonedImgs[idx]) {
+      const fullSrc = orig.currentSrc || orig.src;
+      if (fullSrc) clonedImgs[idx].src = fullSrc;
+    }
+  });
 
-  if (!targetEl) {
-    targetEl = document.getElementById("thermal-receipt-printable");
-  }
-
-  if (!targetEl) {
-    showError("Thermal receipt content is not available for PDF export.");
-    return;
-  }
-
-  try {
-    // Clone element temporarily into visible off-screen container for 100% reliable canvas capture
-    const clone = targetEl.cloneNode(true);
-    clone.style.position = "fixed";
-    clone.style.left = "0";
-    clone.style.top = "0";
-    clone.style.opacity = "1";
-    clone.style.zIndex = "99999";
-    clone.style.background = "#ffffff";
-    clone.style.color = "#000000";
-    clone.style.width = paperSize === "58mm" ? "219px" : "302px";
-    document.body.appendChild(clone);
-
-    const canvas = await html2canvas(clone, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: "#ffffff",
-      logging: false,
-    });
-
-    document.body.removeChild(clone);
-
-    const imgData = canvas.toDataURL("image/png");
-    const imgWidth = paperSize === "58mm" ? 58 : 80;
-    const pageHeight = Math.max(80, (canvas.height * imgWidth) / canvas.width);
-
-    const pdf = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: [imgWidth, pageHeight],
-    });
-
-    pdf.addImage(imgData, "PNG", 0, 0, imgWidth, pageHeight);
-    const cleanInvNumber = (invoiceNumber || "Receipt").replace(/[^a-zA-Z0-9_-]/g, "_");
-    pdf.save(`Invoice_${cleanInvNumber}.pdf`);
-  } catch (err) {
-    console.error("PDF Export Error:", err);
-    showError("Failed to download PDF receipt.");
-  }
-}
-
-export function printThermalReceiptElement(elementOrRef, paperSize = "80mm") {
-  let targetEl = null;
-  if (elementOrRef && elementOrRef.current) {
-    targetEl = elementOrRef.current;
-  } else if (typeof elementOrRef === "string") {
-    targetEl = document.getElementById(elementOrRef);
-  } else if (elementOrRef instanceof HTMLElement) {
-    targetEl = elementOrRef;
-  }
-
-  if (!targetEl) {
-    targetEl = document.getElementById("thermal-receipt-printable");
-  }
-
-  if (!targetEl || !targetEl.innerHTML || targetEl.innerHTML.trim() === "") {
-    showError("Thermal Receipt content is empty or not rendered. Please try again.");
-    return;
-  }
-
-  const receiptHtml = targetEl.innerHTML;
+  const receiptHtml = tempDiv.innerHTML;
   const is58mm = paperSize === "58mm";
-  const paperWidth = is58mm ? "58mm" : "80mm";
-  const pixelWidth = is58mm ? "260px" : "340px";
+  const pixelWidth = is58mm ? "240px" : "310px";
+  const logoSize = is58mm ? "46px" : "54px";
 
-  const htmlDocument = `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8" />
     <title>Thermal Receipt</title>
     <style>
       @page {
-        size: ${paperWidth} portrait;
+        size: auto;
         margin: 0mm !important;
       }
       @media print {
         @page {
-          size: ${paperWidth} portrait;
+          size: auto;
           margin: 0mm !important;
         }
         html, body {
@@ -113,15 +44,23 @@ export function printThermalReceiptElement(elementOrRef, paperSize = "80mm") {
           margin: 0 !important;
           padding: 0 !important;
           background: #ffffff !important;
+          min-height: 0 !important;
+          height: auto !important;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
         }
         .receipt {
           width: 100% !important;
-          max-width: 100% !important;
-          min-width: 100% !important;
-          margin: 0 !important;
-          padding: 2mm 3mm !important;
+          max-width: ${is58mm ? "54mm" : "76mm"} !important;
+          min-width: 0 !important;
+          margin: 0 auto !important;
+          padding: 1mm 1mm 3mm 1mm !important;
           border: none !important;
           box-shadow: none !important;
+          border-radius: 0 !important;
+          page-break-after: avoid !important;
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
         }
       }
       *, *:before, *:after {
@@ -131,29 +70,23 @@ export function printThermalReceiptElement(elementOrRef, paperSize = "80mm") {
         margin: 0 !important;
         padding: 0 !important;
         width: 100% !important;
-        min-height: 100vh !important;
-        display: flex !important;
-        justify-content: center !important;
-        align-items: flex-start !important;
-        background: #f1f5f9 !important;
+        background: #ffffff !important;
         color: #000000 !important;
         font-family: 'Courier New', Courier, monospace, sans-serif !important;
-        font-size: 13px !important;
-        line-height: 1.3 !important;
+        font-size: 11.5px !important;
+        line-height: 1.25 !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
       .receipt {
         width: ${pixelWidth} !important;
         max-width: ${pixelWidth} !important;
-        min-width: ${pixelWidth} !important;
-        margin: 15px auto !important;
-        padding: 14px 12px !important;
+        margin: 0 auto !important;
+        padding: 8px 6px !important;
         box-sizing: border-box !important;
         background: #ffffff !important;
-        border: 1px solid #cbd5e1 !important;
-        border-radius: 6px !important;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 4px !important;
         color: #000000 !important;
       }
       .receipt * {
@@ -161,7 +94,20 @@ export function printThermalReceiptElement(elementOrRef, paperSize = "80mm") {
         background: transparent !important;
         text-shadow: none !important;
       }
-      /* Layout & Utility Mappings for Thermal Printing */
+      .receipt-logo, img.receipt-logo, img {
+        width: ${logoSize} !important;
+        height: ${logoSize} !important;
+        max-width: ${logoSize} !important;
+        max-height: ${logoSize} !important;
+        border-radius: 50% !important;
+        object-fit: cover !important;
+        display: block !important;
+        margin: 0 auto 4px auto !important;
+        border: 1px solid #e2e8f0 !important;
+      }
+      .rounded-full { border-radius: 50% !important; }
+      .object-cover { object-fit: cover !important; }
+      .mx-auto { margin-left: auto !important; margin-right: auto !important; }
       .flex { display: flex !important; }
       .justify-between { justify-content: space-between !important; }
       .justify-center { justify-content: center !important; }
@@ -178,33 +124,46 @@ export function printThermalReceiptElement(elementOrRef, paperSize = "80mm") {
       .w-1\\/2, .w-2\\/3 { width: 66% !important; }
       .w-1\\/3 { width: 33% !important; }
       .w-1\\/4 { width: 25% !important; }
-      .border-b { border-bottom: 1px solid #cccccc !important; }
-      .border-t { border-top: 1px solid #cccccc !important; }
-      .border-dashed { border-style: dashed !important; border-color: #cccccc !important; }
-      .border-black { border-color: #bbbbbb !important; }
-      .border-slate-300 { border-color: #cccccc !important; }
-      .my-1 { margin-top: 4px !important; margin-bottom: 4px !important; }
-      .py-1 { padding-top: 4px !important; padding-bottom: 4px !important; }
-      .p-1 { padding: 4px !important; }
-      .p-2 { padding: 6px !important; }
-      .space-y-0\\.5 > * + * { margin-top: 3px !important; }
-      .space-y-1 > * + * { margin-top: 5px !important; }
+      .border-b, .border-t, .border-y {
+        border-color: #cbd5e1 !important;
+        border-width: 1px !important;
+      }
+      .border-b { border-bottom: 1px solid #cbd5e1 !important; }
+      .border-t { border-top: 1px solid #cbd5e1 !important; }
+      .border-dashed, .border-dotted {
+        border-style: solid !important;
+        border-color: #cbd5e1 !important;
+        border-bottom: 1px solid #cbd5e1 !important;
+      }
+      .border-slate-300, .border-slate-200 { border-color: #cbd5e1 !important; }
+      .my-1 { margin-top: 2px !important; margin-bottom: 2px !important; }
+      .my-1\\.5 { margin-top: 3px !important; margin-bottom: 3px !important; }
+      .py-1 { padding-top: 2px !important; padding-bottom: 2px !important; }
+      .p-1 { padding: 2px !important; }
+      .p-1\\.5 { padding: 3px !important; }
+      .p-2 { padding: 4px !important; }
+      .space-y-0\\.5 > * + * { margin-top: 2px !important; }
+      .space-y-1 > * + * { margin-top: 2px !important; }
+      .space-y-1\\.5 > * + * { margin-top: 3px !important; }
+      .space-y-2 > * + * { margin-top: 4px !important; }
       .truncate { overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
       .break-words { overflow-wrap: break-word !important; }
       table { width: 100%; border-collapse: collapse; }
-      th, td { font-size: 12px; padding: 3px 0; color: #000000; }
+      th, td { font-size: 11px; padding: 2px 0; color: #000000; }
       .dashed-line {
-        border-bottom: 1px dashed #cccccc !important;
-        margin: 6px 0 !important;
+        border-bottom: 1px solid #cbd5e1 !important;
+        margin: 3px 0 !important;
+        width: 100% !important;
       }
       .net-payable-box {
-        border: 1px solid #cccccc !important;
+        border-top: 1px solid #cbd5e1 !important;
+        border-bottom: 1px solid #cbd5e1 !important;
         background: #ffffff !important;
-        padding: 6px !important;
+        padding: 3px 0 !important;
         font-weight: bold !important;
-        margin-top: 6px !important;
+        margin-top: 3px !important;
+        margin-bottom: 3px !important;
       }
-      img { max-width: 100% !important; height: auto !important; display: block !important; margin: 0 auto !important; }
     </style>
   </head>
   <body>
@@ -213,52 +172,173 @@ export function printThermalReceiptElement(elementOrRef, paperSize = "80mm") {
     </div>
   </body>
 </html>`;
+}
 
-  // 1. Try Blob URL Window
+export async function downloadThermalReceiptPDF(elementOrRef, invoiceNumber = "INV-0001", paperSize = "80mm") {
+  let targetEl = null;
+  let invNum = invoiceNumber;
+
+  if (elementOrRef && elementOrRef.current) {
+    targetEl = elementOrRef.current;
+  } else if (typeof elementOrRef === "string") {
+    targetEl = document.getElementById(elementOrRef);
+  } else if (elementOrRef instanceof HTMLElement) {
+    targetEl = elementOrRef;
+  } else if (elementOrRef && typeof elementOrRef === "object" && !elementOrRef.tagName) {
+    invNum = elementOrRef.invoice_number || elementOrRef.id || invNum;
+  }
+
+  if (!targetEl) {
+    targetEl = document.getElementById("thermal-receipt-printable") || document.querySelector(".thermal-receipt-print-area");
+  }
+
+  if (!targetEl) {
+    if (window.__showError) window.__showError("Thermal receipt content is not available for PDF export.");
+    return;
+  }
+
+  const is58mm = paperSize === "58mm";
+  const htmlDoc = buildThermalReceiptHtml(targetEl, paperSize);
+
+  let iframe = null;
+  try {
+    // Isolate rendering inside iframe to avoid Tailwind v4 oklch() color parse errors
+    iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.left = "-9999px";
+    iframe.style.top = "0";
+    iframe.style.width = is58mm ? "240px" : "320px";
+    iframe.style.height = "1200px";
+    iframe.style.border = "none";
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentDocument || iframe.contentWindow.document;
+    doc.open();
+    doc.write(htmlDoc);
+    doc.close();
+
+    // Small delay for DOM layout in isolated document
+    await new Promise((resolve) => setTimeout(resolve, 120));
+
+    const receiptEl = doc.querySelector(".receipt") || doc.body;
+
+    const canvas = await html2canvas(receiptEl, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: false,
+      backgroundColor: "#ffffff",
+      logging: false,
+    });
+
+    const imgData = canvas.toDataURL("image/png");
+    const imgWidth = is58mm ? 58 : 80;
+    const pageHeight = Math.max(80, (canvas.height * imgWidth) / canvas.width);
+
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: [imgWidth, pageHeight],
+    });
+
+    pdf.addImage(imgData, "PNG", 0, 0, imgWidth, pageHeight);
+    const cleanInvNumber = (invNum || invoiceNumber || "Receipt").replace(/[^a-zA-Z0-9_-]/g, "_");
+    pdf.save(`Invoice_${cleanInvNumber}.pdf`);
+    if (window.__showSuccess) {
+      window.__showSuccess("PDF invoice downloaded successfully!");
+    }
+  } catch (err) {
+    console.error("PDF Export Error:", err);
+    if (window.__showError) {
+      window.__showError("Failed to download PDF receipt: " + (err?.message || "Render error"));
+    }
+  } finally {
+    if (iframe && iframe.parentNode) {
+      iframe.parentNode.removeChild(iframe);
+    }
+  }
+}
+
+export function printThermalReceiptElement(elementOrRef, paperSize = "80mm") {
+  let targetEl = null;
+  if (elementOrRef && elementOrRef.current) {
+    targetEl = elementOrRef.current;
+  } else if (typeof elementOrRef === "string") {
+    targetEl = document.getElementById(elementOrRef);
+  } else if (elementOrRef instanceof HTMLElement) {
+    targetEl = elementOrRef;
+  }
+
+  if (!targetEl) {
+    targetEl = document.getElementById("thermal-receipt-printable") || document.querySelector(".thermal-receipt-print-area");
+  }
+
+  if (!targetEl || !targetEl.innerHTML || targetEl.innerHTML.trim() === "") {
+    if (window.__showError) {
+      window.__showError("Thermal Receipt content is empty or not rendered. Please try again.");
+    }
+    return;
+  }
+
+  const htmlDocument = buildThermalReceiptHtml(targetEl, paperSize);
+
+  const triggerWindowPrint = (targetWindow, blobUrlToRevoke = null) => {
+    try {
+      targetWindow.focus();
+      const doPrint = () => {
+        try {
+          targetWindow.print();
+          if (blobUrlToRevoke) {
+            setTimeout(() => URL.revokeObjectURL(blobUrlToRevoke), 10000);
+          }
+        } catch (err) {
+          console.error("Print execution failed:", err);
+        }
+      };
+
+      const images = targetWindow.document.images;
+      if (images && images.length > 0) {
+        let loaded = 0;
+        const checkDone = () => {
+          loaded++;
+          if (loaded >= images.length) {
+            setTimeout(doPrint, 150);
+          }
+        };
+        for (let i = 0; i < images.length; i++) {
+          const img = images[i];
+          if (img.complete) {
+            loaded++;
+          } else {
+            img.onload = checkDone;
+            img.onerror = () => {
+              img.style.display = "none";
+              checkDone();
+            };
+          }
+        }
+        if (loaded >= images.length) {
+          setTimeout(doPrint, 150);
+        } else {
+          setTimeout(doPrint, 1000);
+        }
+      } else {
+        setTimeout(doPrint, 150);
+      }
+    } catch (e) {
+      console.error("Trigger window print error:", e);
+    }
+  };
+
   try {
     const blob = new Blob([htmlDocument], { type: "text/html;charset=utf-8" });
     const blobUrl = URL.createObjectURL(blob);
     const printWin = window.open(blobUrl, "_blank", "width=380,height=600,top=100,left=100");
 
     if (printWin) {
-      console.log("=== STEP 2: PRINT WINDOW CREATED (BLOB URL) ===");
-      console.log("Window Object:", printWin);
-
-      const triggerPrint = () => {
-        try {
-          const receiptEl = printWin.document.querySelector(".receipt");
-          console.log("=== VERIFY LAYOUT BEFORE PRINTING ===");
-          console.log("document.body.offsetWidth:", printWin.document.body ? printWin.document.body.offsetWidth : 0);
-          console.log("receipt.offsetWidth:", receiptEl ? receiptEl.offsetWidth : "NULL");
-          console.log("receipt.getBoundingClientRect():", receiptEl ? receiptEl.getBoundingClientRect() : "NULL");
-          console.log("document.body.innerHTML snippet:", printWin.document.body ? printWin.document.body.innerHTML.substring(0, 300) : "EMPTY");
-
-          const bodyHtml = printWin.document.body ? printWin.document.body.innerHTML : "";
-          if (!bodyHtml || bodyHtml.length === 0) {
-            console.error("CRITICAL ERROR: printWindow document body is EMPTY (0 length)! Aborting print.");
-            showError("Print window failed to load receipt content.");
-            return;
-          }
-
-          console.log("=== STEP 7: EXECUTING WINDOW PRINT ===");
-          printWin.focus();
-          printWin.print();
-
-          setTimeout(() => {
-            try {
-              printWin.close();
-              URL.revokeObjectURL(blobUrl);
-            } catch (e) {}
-          }, 1000);
-        } catch (err) {
-          console.error("Print execution exception:", err);
-        }
-      };
-
       if (printWin.document.readyState === "complete") {
-        setTimeout(triggerPrint, 350);
+        setTimeout(() => triggerWindowPrint(printWin, blobUrl), 200);
       } else {
-        printWin.onload = () => setTimeout(triggerPrint, 350);
+        printWin.onload = () => triggerWindowPrint(printWin, blobUrl);
       }
       return;
     }
@@ -266,25 +346,12 @@ export function printThermalReceiptElement(elementOrRef, paperSize = "80mm") {
     console.warn("Blob URL window popup failed, falling back to direct write:", e);
   }
 
-  // 2. Direct Write Fallback
   const printWin = window.open("", "_blank", "width=380,height=600,top=100,left=100");
   if (printWin) {
     printWin.document.open();
     printWin.document.write(htmlDocument);
     printWin.document.close();
-
-    const receiptEl = printWin.document.querySelector(".receipt");
-    console.log("=== DIRECT WRITE LAYOUT VERIFICATION ===");
-    console.log("document.body.offsetWidth:", printWin.document.body ? printWin.document.body.offsetWidth : 0);
-    console.log("receipt.offsetWidth:", receiptEl ? receiptEl.offsetWidth : "NULL");
-
-    setTimeout(() => {
-      printWin.focus();
-      printWin.print();
-      setTimeout(() => {
-        try { printWin.close(); } catch (e) {}
-      }, 800);
-    }, 350);
+    setTimeout(() => triggerWindowPrint(printWin), 250);
   }
 }
 
@@ -317,7 +384,6 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
   const showRate = settings.show_rate !== false;
   const showMrp = settings.show_mrp !== false;
   const showTax = settings.show_tax !== false;
-  const thankYouMsg = "Thank you for visiting. Please visit again.";
 
   const customerName = invoice.customer_name || (invoice.customer ? `${invoice.customer.first_name || ''} ${invoice.customer.last_name || ''}`.trim() : "Walk-in Customer") || "Walk-in Customer";
 
@@ -351,18 +417,20 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
     >
       <style>{`
         @page {
-          size: ${is58mm ? "58mm" : "80mm"} auto;
+          size: auto;
           margin: 0mm !important;
         }
         @media print {
           @page {
-            size: ${is58mm ? "58mm" : "80mm"} auto;
+            size: auto;
             margin: 0mm !important;
           }
           html, body {
             margin: 0 !important;
             padding: 0 !important;
             width: 100% !important;
+            min-height: 0 !important;
+            height: auto !important;
             background: #ffffff !important;
             color: #000000 !important;
             -webkit-print-color-adjust: exact !important;
@@ -385,9 +453,9 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
             top: auto !important;
             opacity: 1 !important;
             margin: 0 auto !important;
-            padding: 4px 6px !important;
+            padding: 2mm 2mm 4mm 2mm !important;
             width: 100% !important;
-            max-width: 100% !important;
+            max-width: ${is58mm ? "54mm" : "76mm"} !important;
             box-shadow: none !important;
             border: none !important;
             border-radius: 0 !important;
@@ -396,18 +464,30 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
             font-family: 'Courier New', Courier, monospace, sans-serif !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
+            page-break-after: avoid !important;
           }
         }
       `}</style>
 
-      {/* 1. LOGO & BRANDING HEADER (Logo -> Parlour Name -> Address -> Phone) */}
+      {/* 1. LOGO & BRANDING HEADER (Circular Logo -> Parlour Name -> Address -> Phone) */}
       <div className="text-center space-y-1">
         {showLogo && (
           <div className="flex justify-center pb-1">
             <img
               src={formattedLogoUrl}
               alt="Logo"
-              className={`${is58mm ? "w-12 h-12" : "w-14 h-14"} object-cover mx-auto`}
+              className="receipt-logo rounded-full object-cover mx-auto"
+              style={{
+                width: is58mm ? "46px" : "54px",
+                height: is58mm ? "46px" : "54px",
+                maxWidth: is58mm ? "46px" : "54px",
+                maxHeight: is58mm ? "46px" : "54px",
+                borderRadius: "50%",
+                objectFit: "cover",
+                display: "block",
+                margin: "0 auto 4px auto",
+                border: "1px solid #cbd5e1"
+              }}
               onError={(e) => {
                 e.target.onerror = null;
                 e.target.style.display = "none";
@@ -441,7 +521,7 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
       </div>
 
       {/* SEPARATOR 1 */}
-      <div className="border-b border-dashed border-slate-300 my-1.5" />
+      <div className="border-b border-slate-200 my-1 w-full" />
 
       {/* 2. INVOICE METADATA (Bill No -> Client -> Date -> Loyalty Visit Status) */}
       <div className="text-xs space-y-0.5 text-black">
@@ -458,7 +538,7 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
           <span className="numeric">{formattedDate}</span>
         </div>
         {!hideLoyaltyStatus && invoice.membership_name && (
-          <div className="flex justify-between font-bold text-black border-t border-dotted border-slate-300 pt-1 mt-1">
+          <div className="flex justify-between font-bold text-black border-t border-slate-200 pt-0.5 mt-0.5">
             <span>Loyalty Status:</span>
             <span className="font-extrabold text-right">{invoice.membership_name}</span>
           </div>
@@ -466,7 +546,7 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
       </div>
 
       {/* SEPARATOR 2 (only show if line items section is visible) */}
-      {!hideLineItems && <div className="border-b border-dashed border-slate-300 my-1.5" />}
+      {!hideLineItems && <div className="border-b border-slate-200 my-1 w-full" />}
 
       {/* 3. ITEM TABLE HEADER */}
       {!hideLineItems && (
@@ -478,10 +558,10 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
             const membershipItems = lineItems.filter(item => item.type === "membership" || (!item.service_id && !item.product_id && item.item_name && item.item_name.startsWith("Membership:")));
 
             return (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {/* MEMBERSHIPS SECTION */}
                 {membershipItems.length > 0 && (
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     {membershipItems.map((item, idx) => {
                       const itemName = (item.item_name || item.name || `Membership`).toUpperCase();
                       const amount = item.line_total || item.total || item.unit_price || 0;
@@ -501,11 +581,11 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
                 {/* SERVICES SECTION */}
                 {serviceItems.length > 0 && (
                   <div>
-                    <div className="font-bold uppercase border-b border-dashed border-slate-300 pb-0.5 mb-1 text-black flex justify-between">
+                    <div className="font-bold uppercase border-b border-slate-200 pb-0.5 mb-1 text-black flex justify-between">
                       <span className="w-2/3">SERVICES</span>
                       <span className="w-1/3 text-right">AMT</span>
                     </div>
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       {serviceItems.map((item, idx) => {
                         const isFreeReward = item.is_free_reward || item.is_free_visit_reward || (item.discount > 0 && item.line_total === 0);
                         const itemName = (item.item_name || item.name || item.service_name || `Service #${idx + 1}`).toUpperCase();
@@ -551,11 +631,11 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
                 {/* PRODUCTS SECTION */}
                 {productItems.length > 0 && (
                   <div>
-                    <div className="font-bold uppercase border-b border-dashed border-slate-300 pb-0.5 mb-1 text-black flex justify-between">
+                    <div className="font-bold uppercase border-b border-slate-200 pb-0.5 mb-1 text-black flex justify-between">
                       <span className="w-2/3 text-left">PRODUCTS</span>
                       <span className="w-1/3 text-right">AMT</span>
                     </div>
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       {productItems.map((item, idx) => {
                         const itemName = (item.item_name || item.name || item.product_name || `Product #${idx + 1}`).toUpperCase();
                         const qty = item.quantity || item.qty || 1;
@@ -594,7 +674,7 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
       )}
 
       {/* SEPARATOR 3 */}
-      <div className="border-b border-dashed border-slate-300 my-1.5" />
+      <div className="border-b border-slate-200 my-1 w-full" />
 
       {/* 4. FINANCIAL SUMMARY */}
       <div className="text-xs space-y-0.5 text-black">
@@ -611,7 +691,7 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
         )}
 
         {invoice.membership_name && (
-          <div className="flex justify-between font-bold text-black border-t border-dashed border-slate-300 pt-0.5">
+          <div className="flex justify-between font-bold text-black border-t border-slate-200 pt-0.5">
             <span>Membership ({invoice.membership_name}):</span>
             <span className="numeric">-{formatCurrency(invoice.membership_discount || 0)}</span>
           </div>
@@ -624,15 +704,12 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
           </div>
         )}
 
-        {/* HIGHLIGHTED NET PAYABLE BOX */}
-        <div className="flex justify-between items-center text-sm font-bold text-black border border-slate-300 p-1.5 my-1.5">
+        {/* HIGHLIGHTED NET PAYABLE WITH THIN FULL-WIDTH BORDER */}
+        <div className="flex justify-between items-center text-sm font-bold text-black border-y border-slate-300 py-1 my-1 w-full">
           <span>NET PAYABLE:</span>
           <span className="text-base font-black numeric">{formatCurrency(invoice.total || invoice.net_payable || 0)}</span>
         </div>
       </div>
-
-      {/* SEPARATOR 4 */}
-      <div className="border-b border-dashed border-slate-300 my-1.5" />
 
       {/* 5. PAYMENT METHOD(S) */}
       <div className="text-xs space-y-0.5 text-black">
@@ -652,7 +729,7 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
         )}
 
         {invoice.change_returned > 0 && (
-          <div className="flex justify-between font-bold border-t border-dotted border-slate-300 pt-0.5 mt-0.5">
+          <div className="flex justify-between font-bold border-t border-slate-200 pt-0.5 mt-0.5">
             <span>Change Returned:</span>
             <span className="numeric">{formatCurrency(invoice.change_returned)}</span>
           </div>
@@ -660,15 +737,18 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
       </div>
 
       {/* SEPARATOR 5 */}
-      <div className="border-b border-dashed border-slate-300 my-1.5" />
+      <div className="border-b border-slate-200 my-1 w-full" />
 
       {/* 6. THANK YOU & FOOTER */}
-      <div className="text-center space-y-1 text-xs text-black pt-1">
-        <p className="font-bold">Thank you for visiting. Please visit again.</p>
-        <p className="text-[10px] text-slate-400 font-semibold pt-1">Powered By SmartGoNext</p>
+      <div className="text-center space-y-0.5 text-xs text-black pt-1">
+        <p className="font-bold">{settings.thank_you_message || "Thank you. Please visit again."}</p>
+        {businessProfile.phone && (
+          <p className="text-[11px] font-semibold text-black">For appointments, Please call on {businessProfile.phone}</p>
+        )}
+        <p className="text-[9px] text-slate-400 font-semibold pt-1">Powered By SmartGoNext</p>
       </div>
 
-      {/* 8. NOTES */}
+      {/* 7. NOTES */}
       {invoice.notes && (
         <div className="text-xs text-black space-y-0.5 pt-0.5">
           <span className="font-bold block">Notes:</span>

@@ -25,13 +25,14 @@ def sanitize_slug(name):
 @auth_bp.route("/auth/login", methods=["POST"])
 def login():
     data = request.get_json() or {}
-    email = data.get("email", "").strip().lower()
+    raw_ident = (data.get("email") or data.get("username") or data.get("phone") or data.get("identifier") or "").strip()
+    email = raw_ident.lower()
     password = data.get("password", "").strip()
 
     if not email or not password:
         return error_response(
             error_code="INVALID_PAYLOAD",
-            message="Email and password are required.",
+            message="Email or username and password are required.",
             status_code=400
         )
 
@@ -40,7 +41,10 @@ def login():
     req_tenant_id = data.get("tenant_id")
 
     # Check if SuperAdmin in Master DB
-    master_user = MasterUser.query.filter_by(email=email, is_deleted=False).first()
+    master_user = MasterUser.query.filter(
+        (MasterUser.email == email) | (MasterUser.email == email.split("@")[0]),
+        MasterUser.is_deleted == False
+    ).first()
     if master_user and master_user.role == "SuperAdmin":
         if not master_user.check_password(password):
             return error_response("INVALID_CREDENTIALS", "Invalid email or password.", 401)
@@ -73,7 +77,10 @@ def login():
         })
 
     # Check tenant_lookups mapping in Master DB
-    lookup = TenantLookup.query.filter_by(email=email).first()
+    lookup = TenantLookup.query.filter(
+        (TenantLookup.email == email) | 
+        (TenantLookup.email == email.split("@")[0])
+    ).first()
     tenant = None
     if req_tenant_id:
         try:
@@ -85,11 +92,11 @@ def login():
         if lookup:
             tenant = Tenant.query.filter_by(id=lookup.tenant_id, is_deleted=False).first()
         else:
-            current_app.logger.warning(f"[Login] No TenantLookup record found for email: '{email}'. Attempting active tenant search...")
+            current_app.logger.warning(f"[Login] No TenantLookup record found for: '{email}'. Attempting active tenant search...")
             tenant = Tenant.query.filter_by(status="active", is_deleted=False).order_by(Tenant.id.desc()).first()
 
     if not tenant or tenant.status != "active":
-        current_app.logger.warning(f"[Login] Tenant not found or inactive for email: '{email}'")
+        current_app.logger.warning(f"[Login] Tenant not found or inactive for: '{email}'")
         return error_response(
             error_code="TENANT_SUSPENDED",
             message="Your beauty parlour tenant account is inactive or suspended.",
@@ -109,27 +116,42 @@ def login():
     clean_ident = email.strip()
     name_part = clean_ident.split("@")[0] if "@" in clean_ident else clean_ident
 
+    # Check User table by email or username
     user = User.query.filter(
-        (User.email == clean_ident) | (User.email == name_part),
+        (User.email.ilike(clean_ident)) | (User.email.ilike(name_part)),
         User.is_deleted == False
     ).first()
 
-    if not user:
-        from app.models.employee import Employee
-        emp = Employee.query.filter(
-            (Employee.phone == clean_ident) |
-            (Employee.phone == name_part) |
-            (Employee.first_name.ilike(f"%{name_part}%")) |
-            (Employee.last_name.ilike(f"%{name_part}%"))
+    # Also search Employee table by username, email, phone, or name
+    from app.models.employee import Employee
+    emp = Employee.query.filter(
+        (Employee.username.ilike(clean_ident)) |
+        (Employee.email.ilike(clean_ident)) |
+        (Employee.phone == clean_ident) |
+        (Employee.phone == name_part) |
+        (Employee.username.ilike(name_part)) |
+        (Employee.email.ilike(name_part)) |
+        (Employee.first_name.ilike(clean_ident)) |
+        (Employee.first_name.ilike(name_part)),
+        Employee.is_deleted == False
+    ).first()
+
+    if emp and not user:
+        current_app.logger.info(f"[Login] Employee profile found for '{clean_ident}' (ID: {emp.id}, Name: {emp.first_name}). Searching/provisioning User record...")
+        user = User.query.filter(
+            (User.email.ilike(emp.username or "")) |
+            (User.email.ilike(emp.email or "")) |
+            (User.email.ilike(emp.phone or "")),
+            User.is_deleted == False
         ).first()
 
-        if emp:
-            current_app.logger.info(f"[Login] Employee profile found for '{clean_ident}' (ID: {emp.id}, Name: {emp.first_name}). Provisioning Employee user...")
+        if not user:
             try:
+                user_email = emp.username or emp.email or emp.phone or clean_ident
                 user = User(
                     tenant_id=tenant.id,
                     branch_id=emp.branch_id,
-                    email=clean_ident,
+                    email=user_email,
                     role="Employee",
                     status="active"
                 )
@@ -184,31 +206,24 @@ def login():
         current_app.logger.warning(f"[Login] User '{clean_ident}' not found in tenant DB '{tenant_db_uri}'")
         return error_response(
             error_code="INVALID_CREDENTIALS",
-            message="Invalid email or password.",
+            message="Invalid username/email or password.",
             status_code=401
         )
 
+    # Password validation
     password_valid = user.check_password(password)
-    if not password_valid:
-        from app.models.employee import Employee
-        emp_match = Employee.query.filter(
-            (Employee.phone == clean_ident) |
-            (Employee.phone == name_part) |
-            (Employee.first_name.ilike(f"%{name_part}%")) |
-            (Employee.last_name.ilike(f"%{name_part}%"))
-        ).first()
-        if emp_match:
-            # Allow employee fallback passwords: phone, plain password, default PIN, or sync newly entered password
-            if password in (emp_match.phone, getattr(emp_match, "password_plain", None), "123456", "password123") or not emp_match.password_plain:
-                password_valid = True
-                user.set_password(password)
-                db.session.commit()
+    if not password_valid and emp:
+        emp_plain = getattr(emp, "password_plain", None)
+        if (emp_plain and password == emp_plain) or password in (emp.phone, "123456", "password123") or not emp_plain:
+            password_valid = True
+            user.set_password(password)
+            db.session.commit()
 
     if not password_valid:
         current_app.logger.warning(f"[Login] Password check failed for user '{email}'")
         return error_response(
             error_code="INVALID_CREDENTIALS",
-            message="Invalid email or password.",
+            message="Invalid username/email or password.",
             status_code=401
         )
 

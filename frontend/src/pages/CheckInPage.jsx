@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
-import { QrCode, MapPin, CheckCircle, AlertTriangle, ShieldAlert, Lock, ArrowRight, RefreshCw, UserCheck, Wifi } from "lucide-react";
+import { QrCode, MapPin, CheckCircle, AlertTriangle, ShieldAlert, Lock, ArrowRight, RefreshCw, UserCheck, Wifi, Eye, EyeOff } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "/api/v1" : "https://salon-backend.smartgonext.com/api/v1");
 
@@ -14,6 +14,7 @@ export default function CheckInPage({ onNavigateHome }) {
   // Login form state
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState(null);
 
@@ -255,44 +256,55 @@ export default function CheckInPage({ onNavigateHome }) {
           <div className="space-y-4 pt-2">
             <div className="bg-pink-50/80 border border-pink-100 p-3.5 rounded-2xl flex items-center space-x-3 text-xs font-semibold text-pink-700">
               <Lock className="w-4 h-4 shrink-0 text-pink-600" />
-              <span>Please sign in with your Salon Employee credentials to check in / check out.</span>
+              <span>Please sign in with your employee credentials to check in / check out.</span>
             </div>
 
             {loginError && (
-              <div className="bg-rose-50 border border-rose-200 text-rose-600 px-4 py-3 rounded-xl text-xs font-semibold text-center">
+              <div className="bg-rose-50 border border-rose-200 text-rose-600 px-4 py-3 rounded-xl text-xs font-semibold text-center shadow-xs">
                 {loginError}
               </div>
             )}
 
-            <form onSubmit={handleEmployeeLogin} className="space-y-3">
+            <form onSubmit={handleEmployeeLogin} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Employee Email / Phone</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Employee Email / Username</label>
                 <input
                   type="text"
                   required
-                  placeholder="Enter employee username or phone"
+                  placeholder="Enter employee username, email, or phone"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-white/90 border border-pink-100 px-4 py-3 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-pink-500"
+                  className="w-full bg-white border border-slate-200 px-4 py-3 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 shadow-xs transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Password</label>
-                <input
-                  type="password"
-                  required
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-white/90 border border-pink-100 px-4 py-3 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-pink-500"
-                />
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Password</label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-white border border-slate-200 px-4 py-3 pr-10 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 shadow-xs transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-md transition"
+                    tabIndex={-1}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
               <button
                 type="submit"
                 disabled={loginLoading}
-                className="w-full glowe-pink-gradient text-white py-3.5 rounded-full text-xs font-extrabold transition disabled:opacity-50 flex items-center justify-center space-x-2 shadow-md"
+                className="w-full bg-gradient-to-r from-pink-500 via-rose-500 to-pink-600 hover:from-pink-600 hover:to-rose-600 text-white py-3.5 rounded-full text-xs font-extrabold shadow-lg shadow-pink-500/30 hover:shadow-xl hover:shadow-pink-500/40 transition-all active:scale-[0.99] disabled:opacity-50 flex items-center justify-center space-x-2 mt-2"
               >
                 <span>{loginLoading ? "Authenticating..." : "Sign In & Continue"}</span>
                 <ArrowRight className="w-4 h-4" />

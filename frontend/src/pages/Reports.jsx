@@ -62,7 +62,8 @@ function Reports() {
 
     API.get(url)
       .then((res) => {
-        setReportData(res.data || null);
+        const payload = res?.data !== undefined ? res.data : res;
+        setReportData(payload || null);
         setLoading(false);
       })
       .catch((err) => {
@@ -559,9 +560,59 @@ function Reports() {
 
       XLSX.utils.book_append_sheet(wb, ws, "Attendance & Salary");
       XLSX.writeFile(wb, `Attendance_Salary_Report_${d.month_year || "report"}.xlsx`);
+    } else if (reportType === "sales") {
+      const d = reportData || {};
+      const items = d.items || [];
+      if (items.length === 0) return showError("No sales transactions found to export.");
+      const columns = [
+        { header: "INVOICE NO", accessor: "invoice_number" },
+        { header: "DATE", accessor: "date" },
+        { header: "CUSTOMER", accessor: "customer_name" },
+        { header: "SUBTOTAL", accessor: "subtotal" },
+        { header: "DISCOUNT", accessor: "discount" },
+        { header: "TAX (GST)", accessor: "tax" },
+        { header: "TOTAL", accessor: "total" },
+        { header: "STATUS", accessor: "status" },
+      ];
+      exportToExcel("FINANCIAL LEDGER REPORT", items, columns, "financial_ledger_report", d.parlour_name || "Salon");
+    } else if (reportType === "tax") {
+      const d = reportData || {};
+      const logs = d.daily_tax_logs || [];
+      if (logs.length === 0) return showError("No tax records found to export.");
+      const columns = [
+        { header: "DATE", accessor: "date" },
+        { header: "GROSS SUBTOTAL", accessor: "gross_subtotal" },
+        { header: "DISCOUNT", accessor: "discount" },
+        { header: "TAX COLLECTED (GST)", accessor: "tax_collected" },
+        { header: "NET TOTAL", accessor: "net_total" },
+      ];
+      exportToExcel("TAX RECONCILIATION REPORT", logs, columns, "tax_reconciliation_report", d.parlour_name || "Salon");
+    } else if (reportType === "employees") {
+      const items = Array.isArray(reportData) ? reportData : [];
+      if (items.length === 0) return showError("No staff commission data to export.");
+      const columns = [
+        { header: "STAFF NAME", accessor: "name" },
+        { header: "SERVICES RENDERED", accessor: "services_rendered" },
+        { header: "COMMISSION %", accessor: "commission_percentage" },
+        { header: "TOTAL REVENUE", accessor: "total_revenue" },
+        { header: "ESTIMATED COMMISSION", accessor: "estimated_commission" },
+      ];
+      exportToExcel("STAFF COMMISSIONS REPORT", items, columns, "staff_commissions_report", "Salon");
+    } else if (reportType === "products") {
+      const items = Array.isArray(reportData) ? reportData : [];
+      if (items.length === 0) return showError("No product performance data to export.");
+      const columns = [
+        { header: "PRODUCT NAME", accessor: "name" },
+        { header: "SKU", accessor: "sku" },
+        { header: "SELLING PRICE", accessor: "selling_price" },
+        { header: "IN STOCK", accessor: "stock_quantity" },
+        { header: "UNITS SOLD", accessor: "units_sold" },
+        { header: "TOTAL SALES", accessor: "total_sales" },
+      ];
+      exportToExcel("PRODUCT PERFORMANCE REPORT", items, columns, "product_performance_report", "Salon");
     } else {
       // Standard reports fallback
-      const dataArr = Array.isArray(reportData) ? reportData : (reportData.items || []);
+      const dataArr = Array.isArray(reportData) ? reportData : (reportData.items || reportData.daily_tax_logs || []);
       if (dataArr.length === 0) return showError("No records available to export.");
 
       const sample = dataArr[0] || {};
@@ -1083,10 +1134,338 @@ function Reports() {
               </div>
             )}
 
-            {/* Standard Reports Fallback */}
-            {["sales", "tax", "employees", "products"].includes(reportType) && (
-              <div className="p-6">
-                <p className="text-xs font-semibold text-slate-500">Standard ledger report active for preset: {preset}. Click Excel Export above to download full dataset.</p>
+            {/* 4. FINANCIAL LEDGER REPORT */}
+            {reportType === "sales" && (
+              <div className="p-6 space-y-6">
+                {/* Summary Metric Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl space-y-1">
+                    <p className="text-[11px] font-bold text-emerald-800 uppercase tracking-wide">Total Sales Revenue</p>
+                    <p className="text-xl font-black text-emerald-700 numeric">₹{(reportData.summary?.total_sales || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
+                    <p className="text-[10px] text-emerald-600 font-semibold">{reportData.summary?.total_orders || 0} Invoices Generated</p>
+                  </div>
+                  <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl space-y-1">
+                    <p className="text-[11px] font-bold text-amber-800 uppercase tracking-wide">Total Tax (GST)</p>
+                    <p className="text-xl font-black text-amber-700 numeric">₹{(reportData.summary?.total_tax || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
+                    <p className="text-[10px] text-amber-600 font-semibold">Collected on Invoices</p>
+                  </div>
+                  <div className="bg-rose-50 border border-rose-200 p-4 rounded-2xl space-y-1">
+                    <p className="text-[11px] font-bold text-rose-800 uppercase tracking-wide">Total Discounts Given</p>
+                    <p className="text-xl font-black text-rose-700 numeric">₹{(reportData.summary?.total_discount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
+                    <p className="text-[10px] text-rose-600 font-semibold">Promotional & Custom</p>
+                  </div>
+                  <div className="bg-blue-50 border border-blue-200 p-4 rounded-2xl space-y-1">
+                    <p className="text-[11px] font-bold text-blue-800 uppercase tracking-wide">Total Invoices</p>
+                    <p className="text-xl font-black text-blue-700 numeric">{reportData.summary?.total_orders || 0}</p>
+                    <p className="text-[10px] text-blue-600 font-semibold">Completed Billings</p>
+                  </div>
+                </div>
+
+                {/* Ledger Transactions Table */}
+                <div className="border border-slate-200 rounded-2xl overflow-x-auto">
+                  <div className="bg-pink-600 text-white py-2.5 px-4 flex justify-between items-center text-xs font-black tracking-wider uppercase">
+                    <span>FINANCIAL LEDGER TRANSACTIONS</span>
+                    <span>PERIOD: {preset.toUpperCase()}</span>
+                  </div>
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100 font-bold text-slate-700 border-b border-slate-200">
+                        <th className="p-3 text-center">S.NO</th>
+                        <th className="p-3">INVOICE NO</th>
+                        <th className="p-3">DATE & TIME</th>
+                        <th className="p-3">CUSTOMER</th>
+                        <th className="p-3 text-right">SUBTOTAL</th>
+                        <th className="p-3 text-right">DISCOUNT</th>
+                        <th className="p-3 text-right">TAX (GST)</th>
+                        <th className="p-3 text-right font-black">TOTAL</th>
+                        <th className="p-3 text-center">STATUS</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-semibold text-slate-800">
+                      {(reportData.items || []).length === 0 ? (
+                        <tr><td colSpan="9" className="p-8 text-center text-slate-400 font-bold">No sales records found for this period.</td></tr>
+                      ) : (
+                        (reportData.items || []).map((row, idx) => (
+                          <tr key={row.id || idx} className="hover:bg-slate-50 transition-colors">
+                            <td className="p-3 text-center text-slate-400 numeric">{idx + 1}</td>
+                            <td className="p-3 font-bold text-pink-600">{row.invoice_number}</td>
+                            <td className="p-3 text-slate-600">{row.date}</td>
+                            <td className="p-3 font-bold text-slate-900">{row.customer_name}</td>
+                            <td className="p-3 text-right numeric">₹{(row.subtotal || 0).toFixed(2)}</td>
+                            <td className="p-3 text-right text-rose-600 numeric">₹{(row.discount || 0).toFixed(2)}</td>
+                            <td className="p-3 text-right text-amber-700 numeric">₹{(row.tax || 0).toFixed(2)}</td>
+                            <td className="p-3 text-right font-black text-emerald-700 numeric">₹{(row.total || 0).toFixed(2)}</td>
+                            <td className="p-3 text-center">
+                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold ${
+                                row.status === "Paid"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : row.status === "Pending"
+                                  ? "bg-amber-100 text-amber-800"
+                                  : "bg-rose-100 text-rose-800"
+                              }`}>
+                                {row.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                    <tfoot className="bg-amber-300 text-slate-900 font-black uppercase">
+                      <tr>
+                        <td colSpan="4" className="p-3">TOTAL SUMMARY</td>
+                        <td className="p-3 text-right numeric">
+                          ₹{(reportData.items || []).reduce((acc, r) => acc + (r.subtotal || 0), 0).toFixed(2)}
+                        </td>
+                        <td className="p-3 text-right text-rose-700 numeric">
+                          ₹{(reportData.summary?.total_discount || 0).toFixed(2)}
+                        </td>
+                        <td className="p-3 text-right text-slate-900 numeric">
+                          ₹{(reportData.summary?.total_tax || 0).toFixed(2)}
+                        </td>
+                        <td className="p-3 text-right text-emerald-900 numeric">
+                          ₹{(reportData.summary?.total_sales || 0).toFixed(2)}
+                        </td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* 5. TAX RECONCILIATION REPORT */}
+            {reportType === "tax" && (
+              <div className="p-6 space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl space-y-1">
+                    <p className="text-[11px] font-bold text-amber-800 uppercase tracking-wide">Total GST Collected</p>
+                    <p className="text-xl font-black text-amber-700 numeric">₹{(reportData.total_tax_collected || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
+                    <p className="text-[10px] text-amber-600 font-semibold">Government Tax Liability</p>
+                  </div>
+                  <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl space-y-1">
+                    <p className="text-[11px] font-bold text-emerald-800 uppercase tracking-wide">Gross Taxable Revenue</p>
+                    <p className="text-xl font-black text-emerald-700 numeric">
+                      ₹{(reportData.daily_tax_logs || []).reduce((acc, r) => acc + (r.gross_subtotal || 0), 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-[10px] text-emerald-600 font-semibold">Pre-Tax Turnover</p>
+                  </div>
+                  <div className="bg-blue-50 border border-blue-200 p-4 rounded-2xl space-y-1">
+                    <p className="text-[11px] font-bold text-blue-800 uppercase tracking-wide">Net Invoiced Total</p>
+                    <p className="text-xl font-black text-blue-700 numeric">
+                      ₹{(reportData.daily_tax_logs || []).reduce((acc, r) => acc + (r.net_total || 0), 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-[10px] text-blue-600 font-semibold">Net Realized Value</p>
+                  </div>
+                </div>
+
+                <div className="border border-slate-200 rounded-2xl overflow-x-auto">
+                  <div className="bg-amber-500 text-slate-900 py-2.5 px-4 flex justify-between items-center text-xs font-black tracking-wider uppercase">
+                    <span>DAILY TAX (GST) AUDIT LOG</span>
+                    <span>PERIOD: {preset.toUpperCase()}</span>
+                  </div>
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100 font-bold text-slate-700 border-b border-slate-200">
+                        <th className="p-3 text-center">S.NO</th>
+                        <th className="p-3">DATE</th>
+                        <th className="p-3 text-right">GROSS SUBTOTAL</th>
+                        <th className="p-3 text-right">DISCOUNT</th>
+                        <th className="p-3 text-right font-bold text-amber-800">TAX (GST) COLLECTED</th>
+                        <th className="p-3 text-right font-black">NET TOTAL</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-semibold text-slate-800">
+                      {(reportData.daily_tax_logs || []).length === 0 ? (
+                        <tr><td colSpan="6" className="p-8 text-center text-slate-400 font-bold">No tax logs found for this period.</td></tr>
+                      ) : (
+                        (reportData.daily_tax_logs || []).map((row, idx) => (
+                          <tr key={row.date || idx} className="hover:bg-slate-50 transition-colors">
+                            <td className="p-3 text-center text-slate-400 numeric">{idx + 1}</td>
+                            <td className="p-3 font-bold text-slate-900">{row.date}</td>
+                            <td className="p-3 text-right numeric">₹{(row.gross_subtotal || 0).toFixed(2)}</td>
+                            <td className="p-3 text-right text-rose-600 numeric">₹{(row.discount || 0).toFixed(2)}</td>
+                            <td className="p-3 text-right font-bold text-amber-700 numeric">₹{(row.tax_collected || 0).toFixed(2)}</td>
+                            <td className="p-3 text-right font-black text-emerald-700 numeric">₹{(row.net_total || 0).toFixed(2)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                    <tfoot className="bg-amber-300 text-slate-900 font-black uppercase">
+                      <tr>
+                        <td colSpan="2" className="p-3">TOTAL</td>
+                        <td className="p-3 text-right numeric">
+                          ₹{(reportData.daily_tax_logs || []).reduce((acc, r) => acc + (r.gross_subtotal || 0), 0).toFixed(2)}
+                        </td>
+                        <td className="p-3 text-right text-rose-700 numeric">
+                          ₹{(reportData.daily_tax_logs || []).reduce((acc, r) => acc + (r.discount || 0), 0).toFixed(2)}
+                        </td>
+                        <td className="p-3 text-right text-amber-900 numeric">
+                          ₹{(reportData.total_tax_collected || 0).toFixed(2)}
+                        </td>
+                        <td className="p-3 text-right text-emerald-900 numeric">
+                          ₹{(reportData.daily_tax_logs || []).reduce((acc, r) => acc + (r.net_total || 0), 0).toFixed(2)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* 6. STAFF COMMISSIONS REPORT */}
+            {reportType === "employees" && (
+              <div className="p-6 space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="bg-indigo-50 border border-indigo-200 p-4 rounded-2xl space-y-1">
+                    <p className="text-[11px] font-bold text-indigo-800 uppercase tracking-wide">Total Staff Revenue</p>
+                    <p className="text-xl font-black text-indigo-700 numeric">
+                      ₹{(Array.isArray(reportData) ? reportData : []).reduce((acc, r) => acc + (r.total_revenue || 0), 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-[10px] text-indigo-600 font-semibold">Service Value Delivered</p>
+                  </div>
+                  <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl space-y-1">
+                    <p className="text-[11px] font-bold text-emerald-800 uppercase tracking-wide">Total Commission Payout</p>
+                    <p className="text-xl font-black text-emerald-700 numeric">
+                      ₹{(Array.isArray(reportData) ? reportData : []).reduce((acc, r) => acc + (r.estimated_commission || 0), 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-[10px] text-emerald-600 font-semibold">Estimated Staff Commission</p>
+                  </div>
+                  <div className="bg-pink-50 border border-pink-200 p-4 rounded-2xl space-y-1">
+                    <p className="text-[11px] font-bold text-pink-800 uppercase tracking-wide">Total Services Rendered</p>
+                    <p className="text-xl font-black text-pink-700 numeric">
+                      {(Array.isArray(reportData) ? reportData : []).reduce((acc, r) => acc + (r.services_rendered || 0), 0)}
+                    </p>
+                    <p className="text-[10px] text-pink-600 font-semibold">Completed Service Count</p>
+                  </div>
+                </div>
+
+                <div className="border border-slate-200 rounded-2xl overflow-x-auto">
+                  <div className="bg-indigo-600 text-white py-2.5 px-4 flex justify-between items-center text-xs font-black tracking-wider uppercase">
+                    <span>STAFF PERFORMANCE & COMMISSIONS</span>
+                    <span>PERIOD: {preset.toUpperCase()}</span>
+                  </div>
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100 font-bold text-slate-700 border-b border-slate-200">
+                        <th className="p-3 text-center">S.NO</th>
+                        <th className="p-3">STAFF NAME</th>
+                        <th className="p-3 text-center">SERVICES RENDERED</th>
+                        <th className="p-3 text-center">COMMISSION %</th>
+                        <th className="p-3 text-right">TOTAL REVENUE</th>
+                        <th className="p-3 text-right font-black text-emerald-700">ESTIMATED COMMISSION</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-semibold text-slate-800">
+                      {(Array.isArray(reportData) ? reportData : []).length === 0 ? (
+                        <tr><td colSpan="6" className="p-8 text-center text-slate-400 font-bold">No staff commission records for this period.</td></tr>
+                      ) : (
+                        (Array.isArray(reportData) ? reportData : []).map((row, idx) => (
+                          <tr key={row.employee_id || idx} className="hover:bg-slate-50 transition-colors">
+                            <td className="p-3 text-center text-slate-400 numeric">{idx + 1}</td>
+                            <td className="p-3 font-bold text-slate-900">{row.name}</td>
+                            <td className="p-3 text-center font-bold text-blue-600 numeric">{row.services_rendered}</td>
+                            <td className="p-3 text-center font-extrabold text-amber-600 numeric">{row.commission_percentage}%</td>
+                            <td className="p-3 text-right numeric">₹{(row.total_revenue || 0).toFixed(2)}</td>
+                            <td className="p-3 text-right font-black text-emerald-600 numeric">₹{(row.estimated_commission || 0).toFixed(2)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                    <tfoot className="bg-amber-300 text-slate-900 font-black uppercase">
+                      <tr>
+                        <td colSpan="2" className="p-3">TOTAL</td>
+                        <td className="p-3 text-center numeric">
+                          {(Array.isArray(reportData) ? reportData : []).reduce((acc, r) => acc + (r.services_rendered || 0), 0)}
+                        </td>
+                        <td></td>
+                        <td className="p-3 text-right numeric">
+                          ₹{(Array.isArray(reportData) ? reportData : []).reduce((acc, r) => acc + (r.total_revenue || 0), 0).toFixed(2)}
+                        </td>
+                        <td className="p-3 text-right text-emerald-900 numeric">
+                          ₹{(Array.isArray(reportData) ? reportData : []).reduce((acc, r) => acc + (r.estimated_commission || 0), 0).toFixed(2)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* 7. PRODUCT PERFORMANCE REPORT */}
+            {reportType === "products" && (
+              <div className="p-6 space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="bg-rose-50 border border-rose-200 p-4 rounded-2xl space-y-1">
+                    <p className="text-[11px] font-bold text-rose-800 uppercase tracking-wide">Total Retail Sales</p>
+                    <p className="text-xl font-black text-rose-700 numeric">
+                      ₹{(Array.isArray(reportData) ? reportData : []).reduce((acc, r) => acc + (r.total_sales || 0), 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-[10px] text-rose-600 font-semibold">Retail Turnover</p>
+                  </div>
+                  <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl space-y-1">
+                    <p className="text-[11px] font-bold text-amber-800 uppercase tracking-wide">Total Units Sold</p>
+                    <p className="text-xl font-black text-amber-700 numeric">
+                      {(Array.isArray(reportData) ? reportData : []).reduce((acc, r) => acc + (r.units_sold || 0), 0)}
+                    </p>
+                    <p className="text-[10px] text-amber-600 font-semibold">Products Sold</p>
+                  </div>
+                  <div className="bg-blue-50 border border-blue-200 p-4 rounded-2xl space-y-1">
+                    <p className="text-[11px] font-bold text-blue-800 uppercase tracking-wide">Products In Catalog</p>
+                    <p className="text-xl font-black text-blue-700 numeric">
+                      {(Array.isArray(reportData) ? reportData : []).length}
+                    </p>
+                    <p className="text-[10px] text-blue-600 font-semibold">Active Inventory Lines</p>
+                  </div>
+                </div>
+
+                <div className="border border-slate-200 rounded-2xl overflow-x-auto">
+                  <div className="bg-rose-600 text-white py-2.5 px-4 flex justify-between items-center text-xs font-black tracking-wider uppercase">
+                    <span>PRODUCT PERFORMANCE & SALES LEDGER</span>
+                    <span>PERIOD: {preset.toUpperCase()}</span>
+                  </div>
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100 font-bold text-slate-700 border-b border-slate-200">
+                        <th className="p-3 text-center">S.NO</th>
+                        <th className="p-3">PRODUCT NAME</th>
+                        <th className="p-3">SKU</th>
+                        <th className="p-3 text-right">SELLING PRICE</th>
+                        <th className="p-3 text-center">IN STOCK</th>
+                        <th className="p-3 text-center font-bold text-amber-700">UNITS SOLD</th>
+                        <th className="p-3 text-right font-black text-emerald-700">TOTAL SALES</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-semibold text-slate-800">
+                      {(Array.isArray(reportData) ? reportData : []).length === 0 ? (
+                        <tr><td colSpan="7" className="p-8 text-center text-slate-400 font-bold">No product performance records found.</td></tr>
+                      ) : (
+                        (Array.isArray(reportData) ? reportData : []).map((row, idx) => (
+                          <tr key={row.id || idx} className="hover:bg-slate-50 transition-colors">
+                            <td className="p-3 text-center text-slate-400 numeric">{idx + 1}</td>
+                            <td className="p-3 font-bold text-slate-900">{row.name}</td>
+                            <td className="p-3 font-mono text-slate-500 text-[11px]">{row.sku || "—"}</td>
+                            <td className="p-3 text-right numeric">₹{(row.selling_price || 0).toFixed(2)}</td>
+                            <td className="p-3 text-center font-bold numeric">{row.stock_quantity ?? 0}</td>
+                            <td className="p-3 text-center font-extrabold text-amber-600 numeric">{row.units_sold || 0}</td>
+                            <td className="p-3 text-right font-black text-emerald-700 numeric">₹{(row.total_sales || 0).toFixed(2)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                    <tfoot className="bg-amber-300 text-slate-900 font-black uppercase">
+                      <tr>
+                        <td colSpan="4" className="p-3">TOTAL</td>
+                        <td></td>
+                        <td className="p-3 text-center numeric">
+                          {(Array.isArray(reportData) ? reportData : []).reduce((acc, r) => acc + (r.units_sold || 0), 0)}
+                        </td>
+                        <td className="p-3 text-right text-emerald-900 numeric">
+                          ₹{(Array.isArray(reportData) ? reportData : []).reduce((acc, r) => acc + (r.total_sales || 0), 0).toFixed(2)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
               </div>
             )}
           </>

@@ -67,7 +67,7 @@ def checkout():
 
     # Fetch default tax rate from settings
     settings = TenantSetting.query.filter_by(tenant_id=g.parlour_id).first()
-    tax_rate = Decimal(str(settings.tax_rate)) if settings else Decimal("0.00")
+    default_tax_rate = Decimal(str(settings.tax_rate)) if settings and getattr(settings, "tax_rate", None) is not None else Decimal("0.00")
 
     subtotal = Decimal("0.00")
     total_discount = Decimal("0.00")
@@ -264,8 +264,19 @@ def checkout():
 
         # 3. Calculate Global Taxes & Grand Total
         # BUSINESS RULE #6: Apply GST/Tax ONLY to Services. Products have 0 GST/Tax.
-        calculated_tax = service_net * (tax_rate / Decimal("100.00"))
-        grand_total = service_net + calculated_tax + product_net
+        is_tax_enabled = bool(data.get("is_tax_enabled", True))
+        if not is_tax_enabled or data.get("tax_rate") == 0:
+            tax_rate = Decimal("0.00")
+            calculated_tax = Decimal("0.00")
+        elif "tax_amount" in data and data.get("tax_amount") is not None and data.get("tax_amount") != "":
+            calculated_tax = Decimal(str(data.get("tax_amount", 0)))
+            tax_rate = Decimal(str(data.get("tax_rate", default_tax_rate)))
+        else:
+            tax_rate = Decimal(str(data.get("tax_rate", default_tax_rate)))
+            calculated_tax = service_net * (tax_rate / Decimal("100.00"))
+
+        raw_grand_total = service_net + calculated_tax + product_net
+        grand_total = Decimal(str(round(float(raw_grand_total))))  # Round off to nearest whole rupee, e.g. 1543.50 -> 1544
 
         # 4. Verify Payment splits match grand total
         payment_total = Decimal("0.00")
@@ -310,6 +321,10 @@ def checkout():
         for line in line_items_to_save:
             line.invoice_id = invoice.id
             db.session.add(line)
+
+        for pay in payments_to_save:
+            pay.invoice_id = invoice.id
+            db.session.add(pay)
         # 7. Visit-Based Membership Counter Logic (Branch Scoped)
         if customer_id and str(customer_id) not in ["walkin", "0"]:
             from app.models.visit_membership import VisitMembershipSetting, CustomerVisitCounter
@@ -460,15 +475,20 @@ def get_invoices():
         if mem_price == 0.0 and inv.membership_name and len(inv.line_items) == 1 and not inv.line_items[0].service_id and not inv.line_items[0].product_id:
             mem_price = float(inv.subtotal)
 
+        pm_list = getattr(inv, "payments", []) or []
+        pm_summary = ", ".join([p.method.capitalize() for p in pm_list if getattr(p, "method", None)]) or "Cash"
+
         data.append({
             "id": inv.id,
             "invoice_number": inv.invoice_number,
-            "customer_name": f"{inv.customer.first_name} {inv.customer.last_name or ''}".strip(),
+            "customer_name": f"{inv.customer.first_name} {inv.customer.last_name or ''}".strip() if inv.customer else "Walk-in",
             "subtotal": float(inv.subtotal),
             "discount": float(inv.discount),
             "tax": float(inv.tax),
             "total": float(inv.total),
             "status": inv.status,
+            "payment_mode": pm_summary,
+            "payment_methods": [{"method": p.method, "amount": float(p.amount or 0)} for p in pm_list],
             "membership_name": inv.membership_name,
             "membership_price": mem_price,
             "membership_discount": float(inv.membership_discount or 0),

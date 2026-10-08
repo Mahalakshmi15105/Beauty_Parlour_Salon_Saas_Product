@@ -83,25 +83,11 @@ export function useFormKeyboardNavigation(containerRef, onSubmit) {
       const activeEl = document.activeElement;
       if (!activeEl) return;
 
-      // Handle Enter and ArrowRight key for form input advancement
-      if (e.key === "Enter" || e.key === "ArrowRight") {
+      // Handle Enter key for form input advancement (preserve Arrow keys and Numpad for typing)
+      if (e.key === "Enter") {
         // Allow multiline text entering inside textareas
-        if (activeEl.tagName === "TEXTAREA" && e.key === "Enter" && !e.ctrlKey) {
+        if (activeEl.tagName === "TEXTAREA" && !e.ctrlKey) {
           return;
-        }
-
-        // For ArrowRight, only advance if caret is at the end of input text or on non-text element
-        if (e.key === "ArrowRight") {
-          if (activeEl.tagName === "INPUT") {
-            const t = activeEl.type;
-            if (t === "text" || t === "search" || !t) {
-              const isAtEnd = activeEl.selectionStart === undefined || activeEl.selectionStart === activeEl.value.length;
-              if (!isAtEnd) return;
-            }
-          } else if (activeEl.tagName === "SELECT") {
-            // Allow native select option navigation
-            return;
-          }
         }
 
         // Validate active input field before advancing

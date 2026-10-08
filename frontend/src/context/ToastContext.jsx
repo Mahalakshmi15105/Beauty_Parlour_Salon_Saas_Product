@@ -25,6 +25,13 @@ export function ToastProvider({ children }) {
   const showError = useCallback((message) => addToast(message, "error", 5000), [addToast]);
   const showInfo = useCallback((message) => addToast(message, "info"), [addToast]);
 
+  // Expose on window for non-React utility functions
+  React.useEffect(() => {
+    window.__showSuccess = showSuccess;
+    window.__showError = showError;
+    window.__showInfo = showInfo;
+  }, [showSuccess, showError, showInfo]);
+
   return (
     <ToastContext.Provider value={{ showSuccess, showError, showInfo, addToast }}>
       {children}

@@ -1567,7 +1567,8 @@ function Billing() {
   const totalTaxAmount = isTaxEnabled
     ? (isTaxAmountOverridden ? (parseFloat(invoiceTaxAmount) || 0) : defaultTaxAmountFromSettings)
     : 0;
-  const netPayable = netTotal + totalTaxAmount;
+  const rawNetPayable = netTotal + totalTaxAmount;
+  const netPayable = Math.round(rawNetPayable); // Round off to nearest whole rupee e.g. 1543.50 -> 1544
 
   // Touch Mode alias bindings
   const subtotal = grossTotal;
@@ -1712,6 +1713,9 @@ function Billing() {
 
     const payload = {
       customer_id: selectedCustomerId === "walkin" || !selectedCustomerId ? "walkin" : parseInt(selectedCustomerId),
+      is_tax_enabled: isTaxEnabled,
+      tax_rate: isTaxEnabled ? (taxRate || 0) : 0,
+      tax_amount: isTaxEnabled ? totalTaxAmount : 0,
       line_items: cart
         .filter((x) => x.type === "service" || x.type === "product" || x.type === "membership")
         .map((x) => ({
@@ -1803,6 +1807,48 @@ function Billing() {
     return () => window.removeEventListener("keydown", handlePaymentShortcut, true);
   }, [activeSubTab, showPaymentModal, showReceipt]);
 
+  const handleViewInvoiceDetail = async (invOrId, action = null) => {
+    try {
+      let fullInvoice = null;
+      if (typeof invOrId === "object" && invOrId !== null && Array.isArray(invOrId.line_items) && invOrId.line_items.length > 0) {
+        fullInvoice = invOrId;
+      } else {
+        const id = typeof invOrId === "object" && invOrId !== null ? invOrId.id : invOrId;
+        const res = await API.get(`/invoices/${id}`);
+        fullInvoice = res?.data !== undefined ? res.data : res;
+      }
+
+      if (!fullInvoice) {
+        showError("Could not retrieve invoice details.");
+        return;
+      }
+
+      setInvoiceResult(fullInvoice);
+      setActivePrintInvoice(fullInvoice);
+
+      if (action === "print") {
+        setShowReceipt(false);
+        setSelectedInvoiceDetail(null);
+        setTimeout(() => {
+          printThermalReceiptElement(printReceiptRef, receiptSettings?.paper_size || "80mm");
+        }, 150);
+      } else if (action === "pdf") {
+        setShowReceipt(false);
+        setSelectedInvoiceDetail(null);
+        const invNum = fullInvoice.invoice_number || `INV-${fullInvoice.id}`;
+        setTimeout(() => {
+          downloadThermalReceiptPDF(printReceiptRef, invNum, receiptSettings?.paper_size || "80mm");
+        }, 150);
+      } else {
+        setShowReceipt(false);
+        setSelectedInvoiceDetail(fullInvoice);
+      }
+    } catch (err) {
+      console.error("Error loading invoice detail:", err);
+      showError(err.message || "Failed to load invoice receipt.");
+    }
+  };
+
   const handlePrintThermalReceipt = (inv = null) => {
     if (isPrintingRef.current) return;
     
@@ -1879,21 +1925,13 @@ function Billing() {
     setTimeout(() => setDraftSaved(false), 3000);
   };
 
-  const handleViewInvoiceDetail = (invId) => {
-    API.get(`/invoices/${invId}`)
-      .then((res) => {
-        setSelectedInvoiceDetail(res.data);
-      })
-      .catch((err) => showError(err.message || "Failed to load invoice details."));
-  };
-
-  // --- BILL ACTIONS IMPLEMENTATIONS ---
   const triggerSMSBill = (inv = null) => {
     const targetInv = inv || invoiceResult || selectedInvoiceDetail || activePrintInvoice;
     const targetCust = customers.find((c) => String(c.id) === String(selectedCustomerId));
-    const phone = targetInv?.customer_phone || targetInv?.customer?.phone || targetCust?.phone || "";
+    const rawPhone = targetInv?.customer_phone || targetInv?.customer?.phone || targetCust?.phone || "";
+    let cleanPhone = rawPhone.replace(/[^0-9]/g, "");
 
-    if (!phone || phone.trim() === "" || phone === "0000000000") {
+    if (!cleanPhone || cleanPhone.length < 5 || cleanPhone === "0000000000") {
       showError("Customer mobile number not available or Walk-in customer.");
       return;
     }
@@ -1905,8 +1943,21 @@ function Billing() {
     const amountStr = formatCurrency(totalVal);
     const smsMsg = `Hello ${customerName}, thank you for visiting ${parlourName}! Bill No: ${billNo}, Amount Paid: ${amountStr}. Thank you!`;
 
-    // Trigger SMS dispatch alert / Web SMS link
-    showError(`SMS Bill Notification:\n\nTo: ${phone}\nMessage: ${smsMsg}`);
+    // Attempt backend SMS dispatch if invoice ID is available
+    if (targetInv?.id) {
+      API.post(`/invoices/${targetInv.id}/sms`, { phone: cleanPhone, message: smsMsg }).catch(() => {});
+    }
+
+    showSuccess(`SMS Bill prepared for ${cleanPhone}!`);
+
+    // Open native device SMS application
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const smsUrl = `sms:${cleanPhone}${isIOS ? "&" : "?"}body=${encodeURIComponent(smsMsg)}`;
+    try {
+      window.location.href = smsUrl;
+    } catch (e) {
+      // Browser fallback
+    }
   };
 
   const triggerWhatsAppWeb = (inv = null) => {
@@ -3118,7 +3169,7 @@ function Billing() {
 
                 <div className="flex justify-between text-base font-extrabold text-primary border-t-2 border-primary/20 pt-3">
                   <span>Net Payable Amount:</span>
-                  <span className="numeric">{currencySymbol} {netPayable.toFixed(2)}</span>
+                  <span className="numeric">{currencySymbol} {Math.round(netPayable)}</span>
                 </div>
               </div>
 
@@ -3233,6 +3284,7 @@ function Billing() {
                   <th className="px-4 py-3 font-extrabold">Bill #</th>
                   <th className="px-4 py-3 font-extrabold">Date & Time</th>
                   <th className="px-4 py-3 font-extrabold">Customer Name</th>
+                  <th className="px-4 py-3 font-extrabold">Payment Mode</th>
                   <th className="px-4 py-3 font-extrabold">Membership Plan Price</th>
                   <th className="px-4 py-3 font-extrabold">Subtotal</th>
                   <th className="px-4 py-3 font-extrabold">Discount</th>
@@ -3245,13 +3297,13 @@ function Billing() {
               <tbody className="divide-y divide-border-soft">
                 {historyLoading ? (
                   <tr>
-                    <td colSpan={10} className="p-8 text-center text-text-secondary font-medium">
+                    <td colSpan={11} className="p-8 text-center text-text-secondary font-medium">
                       Loading invoice history...
                     </td>
                   </tr>
                 ) : filteredHistory.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="p-8 text-center text-text-secondary font-medium">
+                    <td colSpan={11} className="p-8 text-center text-text-secondary font-medium">
                       No invoices found in billing history.
                     </td>
                   </tr>
@@ -3263,6 +3315,11 @@ function Billing() {
                         {new Date(inv.created_at).toLocaleString()}
                       </td>
                       <td className="px-4 py-3 font-bold text-slate-900">{inv.customer_name}</td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                          {inv.payment_mode || "Cash"}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 font-bold text-purple-700 numeric">
                         {inv.membership_price > 0 ? (
                           <span>
@@ -3294,27 +3351,21 @@ function Billing() {
                       </td>
                       <td className="px-4 py-3 text-right space-x-1">
                         <button
-                          onClick={() => handleViewInvoiceDetail(inv.id)}
+                          onClick={() => handleViewInvoiceDetail(inv)}
                           className="bg-primary/10 hover:bg-primary/20 text-primary p-1.5 rounded-lg transition"
                           title="View Receipt Details"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => {
-                            handleViewInvoiceDetail(inv.id);
-                            setTimeout(() => handlePrintThermalReceipt(inv), 300);
-                          }}
+                          onClick={() => handleViewInvoiceDetail(inv, "print")}
                           className="bg-slate-100 hover:bg-slate-200 text-slate-700 p-1.5 rounded-lg transition"
                           title="Print Thermal Receipt"
                         >
                           <Printer className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => {
-                            handleViewInvoiceDetail(inv.id);
-                            setTimeout(() => handleDownloadPDF(inv), 300);
-                          }}
+                          onClick={() => handleViewInvoiceDetail(inv, "pdf")}
                           className="bg-slate-100 hover:bg-slate-200 text-slate-700 p-1.5 rounded-lg transition"
                           title="Download PDF Invoice"
                         >
@@ -3620,17 +3671,26 @@ function Billing() {
             {/* Functional Bill Action Buttons */}
             <div className="pt-3 border-t border-border-soft space-y-2">
               <p className="text-xs font-bold text-slate-700 uppercase">Bill Actions:</p>
-              <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="grid grid-cols-3 gap-2 text-xs">
                 {/* 1. Print Bill */}
                 <button
-                  onClick={handlePrintThermalReceipt}
+                  onClick={() => handlePrintThermalReceipt(selectedInvoiceDetail)}
                   className="bg-primary hover:bg-primary-hover text-white py-2 rounded-xl font-bold flex items-center justify-center space-x-1.5 shadow-xs"
                 >
                   <Printer className="w-3.5 h-3.5" />
                   <span>Print Bill</span>
                 </button>
 
-                {/* 2. SMS Bill */}
+                {/* 2. Download PDF */}
+                <button
+                  onClick={() => handleDownloadPDF(selectedInvoiceDetail)}
+                  className="bg-background hover:bg-slate-100 border border-border-soft text-slate-700 py-2 rounded-xl font-bold flex items-center justify-center space-x-1.5"
+                >
+                  <FileText className="w-3.5 h-3.5 text-primary" />
+                  <span>Download PDF</span>
+                </button>
+
+                {/* 3. SMS Bill */}
                 <button
                   onClick={() => triggerSMSBill(selectedInvoiceDetail)}
                   className="bg-background hover:bg-slate-100 border border-border-soft text-slate-700 py-2 rounded-xl font-bold flex items-center justify-center space-x-1.5"
@@ -3639,33 +3699,33 @@ function Billing() {
                   <span>SMS Bill</span>
                 </button>
 
-                {/* 3. WhatsApp Web */}
+                {/* 4. WhatsApp Web */}
                 <button
                   onClick={() => triggerWhatsAppWeb(selectedInvoiceDetail)}
                   className="bg-background hover:bg-slate-100 border border-border-soft text-slate-700 py-2 rounded-xl font-bold flex items-center justify-center space-x-1.5"
                 >
                   <Share2 className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>WhatsApp Web</span>
+                  <span>WhatsApp</span>
                 </button>
 
-                {/* 4. Set Reminder */}
+                {/* 5. Set Reminder */}
                 <button
                   onClick={() => setShowReminderModal(true)}
                   className="bg-background hover:bg-slate-100 border border-border-soft text-slate-700 py-2 rounded-xl font-bold flex items-center justify-center space-x-1.5"
                 >
                   <Bell className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Set Reminder</span>
+                  <span>Reminder</span>
+                </button>
+
+                {/* 6. Collect Feedback */}
+                <button
+                  onClick={() => setShowFeedbackModal(true)}
+                  className="bg-background hover:bg-slate-100 border border-border-soft text-slate-700 py-2 rounded-xl font-bold flex items-center justify-center space-x-1.5"
+                >
+                  <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
+                  <span>Feedback</span>
                 </button>
               </div>
-
-              {/* 5. Collect Feedback */}
-              <button
-                onClick={() => setShowFeedbackModal(true)}
-                className="w-full bg-background hover:bg-slate-100 border border-border-soft text-slate-700 py-2 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5"
-              >
-                <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
-                <span>Collect Client Feedback</span>
-              </button>
             </div>
           </div>
         </div>

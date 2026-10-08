@@ -5,9 +5,14 @@ import { X, Banknote, Save } from "lucide-react";
 
 const DENOMINATIONS = [500, 200, 100, 50, 20, 10, 5, 2, 1];
 
+const getLocalTodayDate = () => {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+};
+
 export default function CashDenominationModal({ isOpen, onClose, date: initialDate, onSuccess }) {
   const { showSuccess, showError } = useToast();
-  const [date, setDate] = useState(initialDate || new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(initialDate || getLocalTodayDate());
   const [counts, setCounts] = useState({
     500: 0,
     200: 0,
@@ -33,7 +38,10 @@ export default function CashDenominationModal({ isOpen, onClose, date: initialDa
   const fetchExpectedCash = () => {
     API.get(`/reports/daily-sales-statement?date=${date}`)
       .then((res) => {
-        const cashVal = res?.data?.totals?.cash || res?.data?.balance?.cash_pay || 0;
+        const payload = res?.data !== undefined ? res.data : res;
+        const cashVal = payload?.totals?.cash !== undefined 
+          ? payload.totals.cash 
+          : (payload?.balance?.cash_pay !== undefined ? payload.balance.cash_pay : (payload?.totals?.total || 0));
         setExpectedCashTotal(parseFloat(cashVal) || 0);
       })
       .catch(() => {
@@ -45,7 +53,7 @@ export default function CashDenominationModal({ isOpen, onClose, date: initialDa
     setLoading(true);
     API.get(`/cash-denominations?date=${date}`)
       .then((res) => {
-        const d = res.data || {};
+        const d = (res?.data !== undefined ? res.data : res) || {};
         setCounts({
           500: d.count_500 || 0,
           200: d.count_200 || 0,

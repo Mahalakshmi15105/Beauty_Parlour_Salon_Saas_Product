@@ -1359,23 +1359,30 @@ function BookingLinkPreview() {
       ? `/public/booking/branch/${user.branch_id}/config` 
       : `/public/booking/${tenantId}/config`;
 
+    const baseOrigin = (window.location.origin && !window.location.origin.includes("localhost") && !window.location.origin.includes("127.0.0.1")) 
+      ? window.location.origin 
+      : "https://salon.smartgonext.com";
+
     API.get(configUrl)
       .then((res) => {
         const d = res.data?.data || res.data || {};
         if (d.booking_url) {
-          setSeoUrl(`${window.location.origin}${d.booking_url}`);
+          setSeoUrl(`${baseOrigin}${d.booking_url}`);
         } else if (d.slug) {
-          setSeoUrl(`${window.location.origin}/book/${d.slug}-${tenantId}`);
+          setSeoUrl(`${baseOrigin}/book/${d.slug}-${tenantId}`);
         } else {
-          setSeoUrl(`${window.location.origin}/book/${tenantId}`);
+          setSeoUrl(`${baseOrigin}/book/${tenantId}`);
         }
       })
       .catch(() => {
-        setSeoUrl(`${window.location.origin}/book/${isBranchAdmin ? `branch/${user.branch_id}` : tenantId}`);
+        setSeoUrl(`${baseOrigin}/book/${isBranchAdmin ? `branch/${user.branch_id}` : tenantId}`);
       });
   }, [tenantId, isBranchAdmin, user.branch_id]);
 
-  const publicUrl = seoUrl || `${window.location.origin}/book/${isBranchAdmin ? `branch/${user.branch_id}` : tenantId}`;
+  const baseOrigin = (window.location.origin && !window.location.origin.includes("localhost") && !window.location.origin.includes("127.0.0.1")) 
+    ? window.location.origin 
+    : "https://salon.smartgonext.com";
+  const publicUrl = seoUrl || `${baseOrigin}/book/${isBranchAdmin ? `branch/${user.branch_id}` : tenantId}`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(publicUrl);

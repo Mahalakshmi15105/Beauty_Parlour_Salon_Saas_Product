@@ -36,6 +36,7 @@ function Employees() {
 
   // Form & Payroll State
   const [showModal, setShowModal] = useState(false);
+  const [showModalPassword, setShowModalPassword] = useState(false);
   const [editId, setEditId] = useState(null);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [showPayrollModal, setShowPayrollModal] = useState(false);
@@ -178,6 +179,7 @@ function Employees() {
 
   const openAddModal = () => {
     setEditId(null);
+    setShowModalPassword(false);
     setFormData({
       first_name: "",
       last_name: "",
@@ -201,6 +203,7 @@ function Employees() {
 
   const openEditModal = (emp) => {
     setEditId(emp.id);
+    setShowModalPassword(false);
     setFormData({
       first_name: emp.first_name || "",
       last_name: emp.last_name || "",
@@ -602,15 +605,26 @@ function Employees() {
                   <label className="block text-xs font-semibold text-text-secondary mb-1">
                     Login Password {!editId && <span className="text-red-500">*</span>}
                   </label>
-                  <input
-                    ref={passwordInputRef}
-                    type="password"
-                    required={!editId}
-                    placeholder={editId ? "Leave blank to keep current" : "Set employee password"}
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                  />
+                  <div className="relative">
+                    <input
+                      ref={passwordInputRef}
+                      type={showModalPassword ? "text" : "password"}
+                      required={!editId}
+                      placeholder={editId ? "Leave blank to keep current" : "Set employee password"}
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      className="w-full bg-background border border-border-soft px-3 py-2 pr-10 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowModalPassword(!showModalPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-md transition"
+                      tabIndex={-1}
+                      aria-label={showModalPassword ? "Hide password" : "Show password"}
+                    >
+                      {showModalPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
               </div>
 

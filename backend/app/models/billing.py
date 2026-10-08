@@ -52,6 +52,8 @@ class InvoiceLineItem(db.Model, TimestampMixin):
     # Relationships
     invoice = db.relationship("Invoice", back_populates="line_items")
     employee = db.relationship("Employee", back_populates="line_items")
+    service = db.relationship("Service", foreign_keys=[service_id])
+    product = db.relationship("Product", foreign_keys=[product_id])
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

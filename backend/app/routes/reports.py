@@ -478,14 +478,11 @@ def get_daily_sales_statement():
     start_dt = datetime.combine(target_date, datetime.min.time())
     end_dt = datetime.combine(target_date, datetime.max.time())
 
-    invoices = get_tenant_query(Invoice).filter(
+    invoices = get_branch_query(Invoice).filter(
         Invoice.created_at >= start_dt,
         Invoice.created_at <= end_dt,
         Invoice.status != "Voided"
     ).all()
-
-    if branch_id:
-        invoices = [inv for inv in invoices if getattr(inv, "branch_id", None) == branch_id]
 
     t_setting = TenantSetting.query.filter_by(tenant_id=tenant_id).first() if tenant_id else None
     default_tax_rate = Decimal(str(t_setting.tax_rate)) if t_setting and getattr(t_setting, "tax_rate", None) is not None else Decimal("18.00")
@@ -506,9 +503,14 @@ def get_daily_sales_statement():
         def _pm_str(p):
             return str(getattr(p, "payment_method", getattr(p, "method", "")) or "").strip().lower()
 
-        cash_paid = sum(Decimal(str(p.amount or 0)) for p in pm_list if _pm_str(p) == "cash")
-        paytm_paid = sum(Decimal(str(p.amount or 0)) for p in pm_list if _pm_str(p) in ["paytm", "google pay", "phonepe", "upi", "online"])
-        card_paid = sum(Decimal(str(p.amount or 0)) for p in pm_list if _pm_str(p) == "card")
+        if pm_list:
+            cash_paid = sum(Decimal(str(p.amount or 0)) for p in pm_list if _pm_str(p) == "cash")
+            paytm_paid = sum(Decimal(str(p.amount or 0)) for p in pm_list if _pm_str(p) in ["paytm", "google pay", "phonepe", "upi", "online"])
+            card_paid = sum(Decimal(str(p.amount or 0)) for p in pm_list if _pm_str(p) == "card")
+        else:
+            cash_paid = Decimal(str(inv.total or 0))
+            paytm_paid = Decimal("0.00")
+            card_paid = Decimal("0.00")
 
         items = getattr(inv, "items", []) or []
         for item in items:
@@ -579,17 +581,18 @@ def get_daily_sales_statement():
     }
 
     # Opening Cash Balance calculation
-    prev_invoices = get_tenant_query(Invoice).filter(
+    prev_invoices = get_branch_query(Invoice).filter(
         Invoice.created_at < start_dt,
         Invoice.status != "Voided"
     ).all()
-    if branch_id:
-        prev_invoices = [inv for inv in prev_invoices if getattr(inv, "branch_id", None) == branch_id]
 
     prev_cash_sum = Decimal("0.00")
     for inv in prev_invoices:
         pm_list = InvoicePayment.query.filter_by(invoice_id=inv.id).all()
-        prev_cash_sum += sum(Decimal(str(p.amount or 0)) for p in pm_list if str(getattr(p, "payment_method", getattr(p, "method", ""))).lower() == "cash")
+        if pm_list:
+            prev_cash_sum += sum(Decimal(str(p.amount or 0)) for p in pm_list if str(getattr(p, "payment_method", getattr(p, "method", ""))).lower() == "cash")
+        else:
+            prev_cash_sum += Decimal(str(inv.total or 0))
 
     prev_expenses_q = Expense.query.filter_by(tenant_id=tenant_id, is_deleted=False).filter(Expense.date < target_date) if tenant_id else None
     if prev_expenses_q and branch_id:
@@ -607,13 +610,11 @@ def get_daily_sales_statement():
 
     # Month till date stats
     first_of_month = target_date.replace(day=1)
-    month_invoices = get_tenant_query(Invoice).filter(
+    month_invoices = get_branch_query(Invoice).filter(
         Invoice.created_at >= datetime.combine(first_of_month, datetime.min.time()),
         Invoice.created_at <= end_dt,
         Invoice.status != "Voided"
     ).all()
-    if branch_id:
-        month_invoices = [inv for inv in month_invoices if getattr(inv, "branch_id", None) == branch_id]
 
     till_date_sales = sum(float(getattr(inv, "subtotal", 0) or 0) for inv in month_invoices)
     till_date_gst = sum(float(getattr(inv, "tax", 0) or 0) for inv in month_invoices)

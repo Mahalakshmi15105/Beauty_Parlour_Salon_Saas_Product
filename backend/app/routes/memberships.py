@@ -215,6 +215,10 @@ def create_plan():
             db.session.add(mapping)
 
         db.session.commit()
+        try:
+            cache.delete_pattern(f"membershipplans:{g.parlour_id}:*")
+        except Exception:
+            pass
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error creating plan: {str(e)}")
@@ -304,6 +308,10 @@ def update_plan(plan_id):
             db.session.add(mapping)
 
         db.session.commit()
+        try:
+            cache.delete_pattern(f"membershipplans:{g.parlour_id}:*")
+        except Exception:
+            pass
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error updating plan: {str(e)}")
@@ -330,6 +338,10 @@ def delete_plan(plan_id):
     try:
         plan.soft_delete()
         db.session.commit()
+        try:
+            cache.delete_pattern(f"membershipplans:{g.parlour_id}:*")
+        except Exception:
+            pass
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error deleting plan: {str(e)}")

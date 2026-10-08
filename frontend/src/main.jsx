@@ -5,6 +5,9 @@ import App from './App.jsx'
 import { LanguageCurrencyProvider } from './context/LanguageCurrencyContext.jsx'
 import { ThemeProvider } from './context/ThemeContext.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
+import { initNumpadFix } from './utils/numpadFix.js'
+
+initNumpadFix();
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
