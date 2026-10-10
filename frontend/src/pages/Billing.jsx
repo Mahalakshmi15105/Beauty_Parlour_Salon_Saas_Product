@@ -212,14 +212,17 @@ function Billing() {
     const newTabId = `tab-${Date.now()}`;
     const newTabName = `Bill #${tabCounter}`;
 
+    const firstCat = categories.length > 0 ? categories[0] : null;
     const newTabObj = {
       id: newTabId,
       name: newTabName,
       selectedCustomerId: "",
       customerSearchQuery: "",
       selectedGender: "",
-      selectedCategoryId: categories.length > 0 ? categories[0].id.toString() : "",
+      selectedCategoryId: firstCat ? firstCat.id.toString() : "",
+      categorySearchQuery: firstCat ? firstCat.name : "",
       selectedServiceId: "",
+      serviceSearchQuery: "",
       cart: [],
       invoiceTaxAmount: 0,
       isTaxAmountOverridden: false,
@@ -234,8 +237,10 @@ function Billing() {
     setSelectedCustomerId("");
     setCustomerSearchQuery("");
     setSelectedGender("");
-    setSelectedCategoryId(categories.length > 0 ? categories[0].id.toString() : "");
+    setSelectedCategoryId(firstCat ? firstCat.id.toString() : "");
+    setCategorySearchQuery(firstCat ? firstCat.name : "");
     setSelectedServiceId("");
+    setServiceSearchQuery("");
     setCart([]);
     setInvoiceTaxAmount(0);
     setIsTaxAmountOverridden(false);
@@ -260,7 +265,9 @@ function Billing() {
       setCustomerSearchQuery(nextTab.customerSearchQuery || "Walk-in Customer");
       setSelectedGender(nextTab.selectedGender || "Female");
       setSelectedCategoryId(nextTab.selectedCategoryId || "");
+      setCategorySearchQuery(nextTab.categorySearchQuery || (categories.find((c) => String(c.id) === String(nextTab.selectedCategoryId))?.name || ""));
       setSelectedServiceId(nextTab.selectedServiceId || "");
+      setServiceSearchQuery(nextTab.serviceSearchQuery || "");
       setCart(nextTab.cart || []);
       setInvoiceTaxAmount(nextTab.invoiceTaxAmount || 0);
       setIsTaxAmountOverridden(nextTab.isTaxAmountOverridden || false);
@@ -670,11 +677,17 @@ function Billing() {
     document.body.removeChild(link);
   };
 
-  // Auto-close customer dropdown when clicking or moving focus outside combobox container
+  // Auto-close dropdowns when clicking or moving focus outside combobox container
   useEffect(() => {
     const handleOutsideInteraction = (e) => {
       if (customerComboboxRef.current && !customerComboboxRef.current.contains(e.target)) {
         setIsCustomerDropdownOpen(false);
+      }
+      if (categoryComboboxRef.current && !categoryComboboxRef.current.contains(e.target)) {
+        setIsCategoryDropdownOpen(false);
+      }
+      if (serviceComboboxRef.current && !serviceComboboxRef.current.contains(e.target)) {
+        setIsServiceDropdownOpen(false);
       }
     };
 
@@ -1059,6 +1072,7 @@ function Billing() {
 
         if (catList.length > 0) {
           setSelectedCategoryId(catList[0].id.toString());
+          setCategorySearchQuery(catList[0].name);
         }
         setLoading(false);
       })
@@ -2713,19 +2727,37 @@ function Billing() {
                     ref={categorySelectRef}
                     type="text"
                     placeholder="Search Category..."
-                    value={categorySearchQuery || (categories.find((c) => String(c.id) === String(selectedCategoryId))?.name || "")}
-                    onFocus={() => {
+                    value={categorySearchQuery}
+                    onFocus={(e) => {
+                      e.target.select();
                       setIsCategoryDropdownOpen(true);
                       setCategoryHighlightedIndex(0);
                     }}
                     onChange={(e) => {
-                      setCategorySearchQuery(e.target.value);
+                      const val = e.target.value;
+                      setCategorySearchQuery(val);
                       setIsCategoryDropdownOpen(true);
                       setCategoryHighlightedIndex(0);
+                      if (val.trim() === "") {
+                        setSelectedCategoryId("");
+                        setSelectedServiceId("");
+                        setServiceSearchQuery("");
+                      } else {
+                        const exact = categories.find((c) => c.name?.toLowerCase().trim() === val.toLowerCase().trim());
+                        if (exact) {
+                          setSelectedCategoryId(String(exact.id));
+                        } else {
+                          setSelectedCategoryId("");
+                        }
+                      }
                     }}
                     onKeyDown={(e) => {
                       const filtered = categories.filter((cat) => {
-                        if (!categorySearchQuery) return true;
+                        if (!categorySearchQuery || categorySearchQuery.trim() === "") return true;
+                        const currentSelectedCat = categories.find((c) => String(c.id) === String(selectedCategoryId));
+                        if (currentSelectedCat && currentSelectedCat.name.toLowerCase().trim() === categorySearchQuery.toLowerCase().trim()) {
+                          return true;
+                        }
                         return cat.name?.toLowerCase().includes(categorySearchQuery.toLowerCase().trim());
                       });
 
@@ -2771,7 +2803,11 @@ function Billing() {
                   {/* Category Dropdown List */}
                   {isCategoryDropdownOpen && (() => {
                     const filtered = categories.filter((cat) => {
-                      if (!categorySearchQuery) return true;
+                      if (!categorySearchQuery || categorySearchQuery.trim() === "") return true;
+                      const currentSelectedCat = categories.find((c) => String(c.id) === String(selectedCategoryId));
+                      if (currentSelectedCat && currentSelectedCat.name.toLowerCase().trim() === categorySearchQuery.toLowerCase().trim()) {
+                        return true;
+                      }
                       return cat.name?.toLowerCase().includes(categorySearchQuery.toLowerCase().trim());
                     });
 
@@ -2825,21 +2861,31 @@ function Billing() {
                     type="text"
                     disabled={!selectedCategoryId}
                     placeholder={selectedCategoryId ? "Search Service by Name or Price..." : "-- Select Category First --"}
-                    value={serviceSearchQuery || (services.find((s) => String(s.id) === String(selectedServiceId)) ? `${services.find((s) => String(s.id) === String(selectedServiceId)).name} - ${currencySymbol} ${parseFloat(services.find((s) => String(s.id) === String(selectedServiceId)).price).toFixed(2)}` : "")}
-                    onFocus={() => {
+                    value={serviceSearchQuery}
+                    onFocus={(e) => {
                       if (selectedCategoryId) {
+                        e.target.select();
                         setIsServiceDropdownOpen(true);
                         setServiceHighlightedIndex(0);
                       }
                     }}
                     onChange={(e) => {
-                      setServiceSearchQuery(e.target.value);
+                      const val = e.target.value;
+                      setServiceSearchQuery(val);
                       setIsServiceDropdownOpen(true);
                       setServiceHighlightedIndex(0);
+                      if (val.trim() === "") {
+                        setSelectedServiceId("");
+                      }
                     }}
                     onKeyDown={(e) => {
                       const filtered = services.filter((svc) => {
-                        if (!serviceSearchQuery) return true;
+                        if (!serviceSearchQuery || serviceSearchQuery.trim() === "") return true;
+                        const currentSvc = services.find((s) => String(s.id) === String(selectedServiceId));
+                        const currentLabel = currentSvc ? `${currentSvc.name} - ${currencySymbol} ${parseFloat(currentSvc.price).toFixed(2)}` : "";
+                        if (currentLabel && currentLabel.toLowerCase().trim() === serviceSearchQuery.toLowerCase().trim()) {
+                          return true;
+                        }
                         const q = serviceSearchQuery.toLowerCase().trim();
                         const nameMatch = svc.name?.toLowerCase().includes(q);
                         const priceMatch = (svc.price !== undefined && svc.price !== null) ? String(svc.price).includes(q) : false;
@@ -2888,7 +2934,12 @@ function Billing() {
                   {/* Service Dropdown List */}
                   {isServiceDropdownOpen && selectedCategoryId && (() => {
                     const filtered = services.filter((svc) => {
-                      if (!serviceSearchQuery) return true;
+                      if (!serviceSearchQuery || serviceSearchQuery.trim() === "") return true;
+                      const currentSvc = services.find((s) => String(s.id) === String(selectedServiceId));
+                      const currentLabel = currentSvc ? `${currentSvc.name} - ${currencySymbol} ${parseFloat(currentSvc.price).toFixed(2)}` : "";
+                      if (currentLabel && currentLabel.toLowerCase().trim() === serviceSearchQuery.toLowerCase().trim()) {
+                        return true;
+                      }
                       const q = serviceSearchQuery.toLowerCase().trim();
                       const nameMatch = svc.name?.toLowerCase().includes(q);
                       const priceMatch = (svc.price !== undefined && svc.price !== null) ? String(svc.price).includes(q) : false;
@@ -4669,8 +4720,9 @@ function Billing() {
                       ref={modalCatSelectRef}
                       type="text"
                       placeholder="Search Product Category (e.g. Hair Care, Skin Care)..."
-                      value={modalProductCatSearchQuery || (categories.find((c) => String(c.id) === String(modalProductCategoryId))?.name || "")}
-                      onFocus={() => {
+                      value={modalProductCatSearchQuery}
+                      onFocus={(e) => {
+                        e.target.select();
                         setIsModalCatDropdownOpen(true);
                         setModalCatHighlightedIndex(0);
                       }}
@@ -4781,8 +4833,9 @@ function Billing() {
                       ref={modalProductSelectRef}
                       type="text"
                       placeholder="Search Product by Name or Price..."
-                      value={productSearchQuery || (products.find((p) => String(p.id) === String(modalProductId)) ? `${products.find((p) => String(p.id) === String(modalProductId)).name} - ${currencySymbol} ${parseFloat(products.find((p) => String(p.id) === String(modalProductId)).selling_price || products.find((p) => String(p.id) === String(modalProductId)).price || 0).toFixed(2)}` : "")}
-                      onFocus={() => {
+                      value={productSearchQuery}
+                      onFocus={(e) => {
+                        e.target.select();
                         setIsProductDropdownOpen(true);
                         setModalProdHighlightedIndex(0);
                       }}
