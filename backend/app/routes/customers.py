@@ -92,7 +92,7 @@ def get_customers():
         }
 
         try:
-            cache.set(cache_key, result_payload, timeout=60)
+            cache.set(cache_key, result_payload, timeout=300)
         except Exception:
             pass
 

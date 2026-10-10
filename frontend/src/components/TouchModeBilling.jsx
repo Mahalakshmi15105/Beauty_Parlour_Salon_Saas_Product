@@ -326,6 +326,7 @@ export default function TouchModeBilling({
                         c.phone?.includes(q)
                       );
                     })
+                    .slice(0, 30)
                     .map((c) => (
                       <div
                         key={c.id}

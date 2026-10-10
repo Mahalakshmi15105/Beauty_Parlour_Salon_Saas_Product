@@ -80,9 +80,10 @@ class Config:
     # Optimized low-memory database pool with auto-reconnect and connection health pre-ping
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_pre_ping": True,
-        "pool_recycle": 120,
-        "pool_size": 1 if SINGLE_THREAD else 3,
-        "max_overflow": 1 if SINGLE_THREAD else 2,
+        "pool_recycle": 280,
+        "pool_size": 1 if SINGLE_THREAD else 5,
+        "max_overflow": 1 if SINGLE_THREAD else 5,
+        "pool_timeout": 20,
         "connect_args": {
             "connect_timeout": 10,
             "read_timeout": 30,

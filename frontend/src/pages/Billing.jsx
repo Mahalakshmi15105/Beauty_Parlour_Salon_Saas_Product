@@ -60,6 +60,7 @@ const SUPPORTED_PAYMENT_METHODS = [
 
 import AddExpenseModal from "../components/AddExpenseModal";
 import CashDenominationModal from "../components/CashDenominationModal";
+import { getCachedCustomers, setCachedCustomers, updateOrAddCachedCustomer } from "../services/customerCache";
 
 function Billing() {
   const { showSuccess, showError } = useToast();
@@ -92,7 +93,7 @@ function Billing() {
   const [allServices, setAllServices] = useState([]);
   const [products, setProducts] = useState([]);
   const [employees, setEmployees] = useState([]);
-  const [customers, setCustomers] = useState([]);
+  const [customers, setCustomers] = useState(() => getCachedCustomers() || []);
 
   // Selection Filters
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
@@ -804,7 +805,9 @@ function Billing() {
       .then((savedCust) => {
         // Refresh customer list
         return API.get("/customers?limit=10000").then((resList) => {
-          setCustomers(resList.data.items || []);
+          const updatedItems = resList.data?.items || resList.data || [];
+          setCustomers(updatedItems);
+          setCachedCustomers(updatedItems);
           return savedCust;
         });
       })
@@ -953,7 +956,9 @@ function Billing() {
       .then((savedCust) => {
         // Refresh customer list
         return API.get("/customers?limit=10000").then((resList) => {
-          setCustomers(resList.data.items || []);
+          const updatedItems = resList.data?.items || resList.data || [];
+          setCustomers(updatedItems);
+          setCachedCustomers(updatedItems);
           return savedCust;
         });
       })
@@ -1008,6 +1013,11 @@ function Billing() {
   // Initial Load: Fetch Categories, Employees, Customers, Products, All Services, Settings, Membership Plans
   useEffect(() => {
     setLoading(true);
+    const cachedCustList = getCachedCustomers();
+    if (cachedCustList && cachedCustList.length > 0) {
+      setCustomers(cachedCustList);
+    }
+
     Promise.all([
       API.get("/service-categories"),
       API.get("/employees?limit=100"),
@@ -1019,9 +1029,11 @@ function Billing() {
     ])
       .then(([catRes, empRes, custRes, prodRes, allSvcRes, setRes, plansRes]) => {
         const catList = catRes.data || [];
+        const custList = custRes.data?.items || custRes.data || [];
         setCategories(catList);
         setEmployees(empRes.data.items || []);
-        setCustomers(custRes.data.items || []);
+        setCustomers(custList);
+        setCachedCustomers(custList);
         setProducts(prodRes.data.items || prodRes.data || []);
         setAllServices(allSvcRes.data.items || []);
         setMembershipPlans(plansRes.data.items || []);
@@ -2322,9 +2334,10 @@ function Billing() {
                         return name.includes(q) || phone.includes(q);
                       });
 
+                      const visibleCustomerList = filteredCustomerList.slice(0, 30);
                       const options = [
                         { type: "walkin", id: "walkin" },
-                        ...filteredCustomerList.map((c) => ({ type: "customer", id: c.id, data: c })),
+                        ...visibleCustomerList.map((c) => ({ type: "customer", id: c.id, data: c })),
                         { type: "add_new", id: "add_new" },
                       ];
 
@@ -2376,9 +2389,10 @@ function Billing() {
                       return name.includes(q) || phone.includes(q);
                     });
 
+                    const visibleCustomerList = filteredCustomerList.slice(0, 30);
                     const options = [
                       { type: "walkin", id: "walkin" },
-                      ...filteredCustomerList.map((c) => ({ type: "customer", id: c.id, data: c })),
+                      ...visibleCustomerList.map((c) => ({ type: "customer", id: c.id, data: c })),
                       { type: "add_new", id: "add_new" },
                     ];
 
@@ -5234,7 +5248,7 @@ function Billing() {
                   className="w-full bg-background border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition shadow-2xs"
                 >
                   <option value="">Search customer by Name or Mobile...</option>
-                  {customers.map((c) => (
+                  {customers.slice(0, 100).map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.first_name} {c.last_name || ""} ({c.phone || "No Mobile"})
                     </option>
