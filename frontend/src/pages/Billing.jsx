@@ -110,7 +110,13 @@ function Billing() {
   const [cart, setCart] = useState([]);
 
   // Regional & Tax Settings
-  const [taxRate, setTaxRate] = useState(18.0);
+  const [taxRate, setTaxRate] = useState(() => {
+    const saved = localStorage.getItem("app_tax_rate");
+    return saved !== null && !isNaN(parseFloat(saved)) ? parseFloat(saved) : 18.0;
+  });
+  const [taxName, setTaxName] = useState(() => {
+    return localStorage.getItem("app_tax_name") || "GST";
+  });
   const [isTaxEnabled, setIsTaxEnabled] = useState(true);
   const [invoiceTaxAmount, setInvoiceTaxAmount] = useState(0);
   const [isTaxAmountOverridden, setIsTaxAmountOverridden] = useState(false);
@@ -742,16 +748,30 @@ function Billing() {
   const fetchReceiptSettings = () => {
     API.get("/settings")
       .then((res) => {
-        if (res.data) {
-          if (res.data.receipt_settings) {
-            setReceiptSettings(res.data.receipt_settings);
+        const raw = res?.data || res || {};
+        if (raw.receipt_settings) {
+          setReceiptSettings(raw.receipt_settings);
+        }
+        if (raw.business_profile) {
+          setBusinessProfile(raw.business_profile);
+        }
+        if (raw.invoice_settings) {
+          if (raw.invoice_settings.tax_rate !== undefined && raw.invoice_settings.tax_rate !== null) {
+            const parsedRate = parseFloat(raw.invoice_settings.tax_rate);
+            if (!isNaN(parsedRate)) {
+              setTaxRate(parsedRate);
+              localStorage.setItem("app_tax_rate", parsedRate);
+            }
           }
-          if (res.data.business_profile) {
-            setBusinessProfile(res.data.business_profile);
+          if (raw.invoice_settings.tax_name) {
+            setTaxName(raw.invoice_settings.tax_name);
+            localStorage.setItem("app_tax_name", raw.invoice_settings.tax_name);
           }
         }
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.error("Failed to fetch settings in Billing:", err);
+      });
   };
 
   useEffect(() => {

@@ -369,6 +369,12 @@ function Settings() {
         setSaving(false);
         showSuccess("Settings updated successfully!");
         setSaveSuccess(true);
+        if (payload?.invoice_settings?.tax_rate !== undefined) {
+          localStorage.setItem("app_tax_rate", payload.invoice_settings.tax_rate);
+        }
+        if (payload?.invoice_settings?.tax_name) {
+          localStorage.setItem("app_tax_name", payload.invoice_settings.tax_name);
+        }
         setTimeout(() => setSaveSuccess(false), 3000);
       })
       .catch((err) => {
