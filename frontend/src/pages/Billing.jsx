@@ -1034,7 +1034,7 @@ function Billing() {
     Promise.all([
       API.get("/service-categories"),
       API.get("/employees?limit=100"),
-      API.get("/customers?limit=10000"),
+      API.get("/customers?limit=10000&branch_id=all"),
       API.get("/products?limit=10000"),
       API.get("/services?limit=10000"),
       API.get("/settings"),
@@ -1081,6 +1081,34 @@ function Billing() {
         setLoading(false);
       });
   }, []);
+
+  // Live dynamic customer search from server when typing in Billing
+  useEffect(() => {
+    const q = (customerSearchQuery || "").trim();
+    if (!q || q.toLowerCase() === "walk-in customer" || q.length < 2) return;
+
+    const timer = setTimeout(() => {
+      API.get(`/customers?q=${encodeURIComponent(q)}&branch_id=all&limit=50`)
+        .then((res) => {
+          const items = res.data?.items || res.items || (Array.isArray(res.data) ? res.data : []);
+          if (items && items.length > 0) {
+            setCustomers((prev) => {
+              const existingIds = new Set(prev.map((c) => String(c.id)));
+              const newItems = items.filter((c) => !existingIds.has(String(c.id)));
+              if (newItems.length > 0) {
+                const updated = [...newItems, ...prev];
+                setCachedCustomers(updated);
+                return updated;
+              }
+              return prev;
+            });
+          }
+        })
+        .catch((err) => console.debug("Dynamic customer search error:", err));
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [customerSearchQuery]);
 
   // Auto-focus category field when Add Product modal opens
   useEffect(() => {
@@ -2343,9 +2371,11 @@ function Billing() {
                       const filteredCustomerList = customers.filter((c) => {
                         if (!customerSearchQuery || customerSearchQuery === "Walk-in Customer") return true;
                         const q = customerSearchQuery.toLowerCase().trim();
+                        const cleanQ = q.replace(/[^0-9]/g, "");
                         const name = `${c.first_name || ""} ${c.last_name || ""}`.toLowerCase();
                         const phone = (c.phone || "").toLowerCase();
-                        return name.includes(q) || phone.includes(q);
+                        const cleanPhone = phone.replace(/[^0-9]/g, "");
+                        return name.includes(q) || phone.includes(q) || (cleanQ.length >= 3 && cleanPhone.includes(cleanQ));
                       });
 
                       const visibleCustomerList = filteredCustomerList.slice(0, 30);
@@ -2398,9 +2428,11 @@ function Billing() {
                     const filteredCustomerList = customers.filter((c) => {
                       if (!customerSearchQuery || customerSearchQuery === "Walk-in Customer") return true;
                       const q = customerSearchQuery.toLowerCase().trim();
+                      const cleanQ = q.replace(/[^0-9]/g, "");
                       const name = `${c.first_name || ""} ${c.last_name || ""}`.toLowerCase();
                       const phone = (c.phone || "").toLowerCase();
-                      return name.includes(q) || phone.includes(q);
+                      const cleanPhone = phone.replace(/[^0-9]/g, "");
+                      return name.includes(q) || phone.includes(q) || (cleanQ.length >= 3 && cleanPhone.includes(cleanQ));
                     });
 
                     const visibleCustomerList = filteredCustomerList.slice(0, 30);

@@ -35,17 +35,25 @@ def get_customers():
         logger.debug(f"Cache get error: {c_err}")
 
     try:
-        # Start branch query (strictly isolated per branch)
-        query = get_branch_query(Customer)
+        # Start query: if searching by keyword/phone or branch_id='all', search tenant-wide
+        b_param = request.headers.get("X-Branch-Id") or request.args.get("branch_id")
+        if q or b_param == "all":
+            query = get_tenant_query(Customer)
+        else:
+            query = get_branch_query(Customer)
 
         # Search filter
         if q:
-            query = query.filter(
-                (Customer.first_name.ilike(f"%{q}%")) |
-                (Customer.last_name.ilike(f"%{q}%")) |
-                (Customer.phone.ilike(f"%{q}%")) |
-                (Customer.email.ilike(f"%{q}%"))
-            )
+            clean_digits = "".join(filter(str.isdigit, q))
+            search_conds = [
+                Customer.first_name.ilike(f"%{q}%"),
+                Customer.last_name.ilike(f"%{q}%"),
+                Customer.phone.ilike(f"%{q}%"),
+                Customer.email.ilike(f"%{q}%")
+            ]
+            if clean_digits and len(clean_digits) >= 4:
+                search_conds.append(Customer.phone.ilike(f"%{clean_digits}%"))
+            query = query.filter(or_(*search_conds))
 
         # Gender filter
         if gender:

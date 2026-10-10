@@ -6,6 +6,7 @@ import { exportToCSV, printDataList, exportToPDF, exportToExcel } from "../utils
 import BulkUploadModal from "../components/BulkUploadModal";
 import DeleteConfirmModal from "../components/DeleteConfirmModal";
 import { useToast } from "../context/ToastContext";
+import { invalidateCustomerCache } from "../services/customerCache";
 
 function Customers() {
   const { showSuccess, showError } = useToast();
@@ -228,6 +229,7 @@ function Customers() {
 
     action
       .then(() => {
+        invalidateCustomerCache();
         setShowModal(false);
         showSuccess(editId ? "Customer updated successfully!" : "Customer registered successfully!");
         fetchCustomers(cursor);
@@ -249,6 +251,7 @@ function Customers() {
     setIsDeleting(true);
     API.delete(`/customers/${deleteTarget.id}`)
       .then(() => {
+        invalidateCustomerCache();
         showSuccess(`Customer "${deleteTarget.name}" permanently deleted.`);
         setDeleteTarget(null);
         setIsDeleting(false);
@@ -772,7 +775,10 @@ function Customers() {
         <BulkUploadModal
           module="customers"
           onClose={() => setShowBulkUpload(false)}
-          onSuccess={fetchCustomers}
+          onSuccess={() => {
+            invalidateCustomerCache();
+            fetchCustomers();
+          }}
         />
       )}
 

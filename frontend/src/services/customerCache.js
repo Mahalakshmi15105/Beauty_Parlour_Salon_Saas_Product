@@ -1,8 +1,8 @@
 // In-memory and SessionStorage persistent client cache for customers
 // Enables 0ms customer lookups, instant dropdown rendering, and offline resilience.
 
-const CACHE_KEY = "salon_customers_cache_v1";
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes fresh TTL
+const CACHE_KEY = "salon_customers_cache_v2";
+const CACHE_TTL_MS = 60 * 1000; // 1 minute fresh TTL
 
 let memoryCache = null;
 let memoryTimestamp = 0;
