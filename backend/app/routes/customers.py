@@ -24,9 +24,10 @@ def get_customers():
     limit = request.args.get("limit", 20)
     cursor = request.args.get("cursor")
     sort = request.args.get("sort", "-created_at")
+    is_all = request.args.get("all", "").strip().lower() in ["true", "1", "yes"]
 
     # 0. Check Redis cache first
-    cache_key = f"customers:{g.parlour_id}:{g.branch_id or 'all'}:{q}:{gender}:{limit}:{cursor}:{sort}"
+    cache_key = f"customers:{g.parlour_id}:{g.branch_id or 'all'}:{q}:{gender}:{limit}:{cursor}:{sort}:{is_all}"
     try:
         cached_data = cache.get(cache_key)
         if cached_data is not None:
@@ -59,45 +60,77 @@ def get_customers():
         if gender:
             query = query.filter(Customer.gender == gender)
 
-        # Sorting options
-        sort_field = "id"
-        sort_desc = False
-        if sort.startswith("-"):
-            sort_field = sort[1:]
-            sort_desc = True
+        # Total counts
+        total_count = query.count()
+        total_all = get_tenant_query(Customer).count()
+
+        if is_all:
+            # Full export without pagination
+            all_customers = query.order_by(Customer.first_name.asc(), Customer.id.asc()).all()
+            data = [
+                {
+                    "id": c.id,
+                    "first_name": c.first_name or "",
+                    "last_name": c.last_name or "",
+                    "phone": c.phone or "",
+                    "email": c.email or "",
+                    "gender": c.gender or "Other",
+                    "date_of_birth": c.date_of_birth.isoformat() if c.date_of_birth else None,
+                    "address": c.address or "",
+                    "notes": c.notes or "",
+                    "spot": c.spot or "",
+                    "branch_id": c.branch_id,
+                    "created_at": c.created_at.isoformat() if c.created_at else ""
+                } for c in all_customers
+            ]
+            result_payload = {
+                "items": data,
+                "next_cursor": None,
+                "total_count": total_count,
+                "total_customers": total_all
+            }
         else:
-            sort_field = sort
+            # Keyset pagination for fast UI scrolling
+            sort_field = "id"
+            sort_desc = False
+            if sort.startswith("-"):
+                sort_field = sort[1:]
+                sort_desc = True
+            else:
+                sort_field = sort
 
-        customers, next_cursor = paginate_query(
-            query=query,
-            model=Customer,
-            limit_val=limit,
-            cursor=cursor,
-            sort_field=sort_field,
-            sort_desc=sort_desc
-        )
+            customers, next_cursor = paginate_query(
+                query=query,
+                model=Customer,
+                limit_val=limit,
+                cursor=cursor,
+                sort_field=sort_field,
+                sort_desc=sort_desc
+            )
 
-        data = [
-            {
-                "id": c.id,
-                "first_name": c.first_name or "",
-                "last_name": c.last_name or "",
-                "phone": c.phone or "",
-                "email": c.email or "",
-                "gender": c.gender or "Other",
-                "date_of_birth": c.date_of_birth.isoformat() if c.date_of_birth else None,
-                "address": c.address or "",
-                "notes": c.notes or "",
-                "spot": c.spot or "",
-                "branch_id": c.branch_id,
-                "created_at": c.created_at.isoformat() if c.created_at else ""
-            } for c in (customers or [])
-        ]
+            data = [
+                {
+                    "id": c.id,
+                    "first_name": c.first_name or "",
+                    "last_name": c.last_name or "",
+                    "phone": c.phone or "",
+                    "email": c.email or "",
+                    "gender": c.gender or "Other",
+                    "date_of_birth": c.date_of_birth.isoformat() if c.date_of_birth else None,
+                    "address": c.address or "",
+                    "notes": c.notes or "",
+                    "spot": c.spot or "",
+                    "branch_id": c.branch_id,
+                    "created_at": c.created_at.isoformat() if c.created_at else ""
+                } for c in (customers or [])
+            ]
 
-        result_payload = {
-            "items": data,
-            "next_cursor": next_cursor
-        }
+            result_payload = {
+                "items": data,
+                "next_cursor": next_cursor,
+                "total_count": total_count,
+                "total_customers": total_all
+            }
 
         try:
             cache.set(cache_key, result_payload, timeout=300)
@@ -109,7 +142,9 @@ def get_customers():
         logger.warning(f"Customers query fallback: {cust_err}")
         return success_response({
             "items": [],
-            "next_cursor": None
+            "next_cursor": None,
+            "total_count": 0,
+            "total_customers": 0
         })
 
 

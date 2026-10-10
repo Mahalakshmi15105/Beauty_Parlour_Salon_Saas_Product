@@ -733,7 +733,24 @@ def manual_attendance_checkin():
     employee_id = data.get("employee_id")
     branch_id = data.get("branch_id")
     reason = (data.get("reason") or "Manual Front-Desk Fallback").strip()
-    status_type = (data.get("status") or "P").upper()
+    status_raw = str(data.get("status") or "P").strip().upper()
+    is_double = bool(data.get("is_double_deduction", False))
+
+    if status_raw in ["2L", "L_DOUBLE"] or (status_raw == "L" and is_double):
+        status_type = "2L"
+    elif status_raw in ["F", "OFF"]:
+        status_type = "F"
+    elif status_raw in ["P", "HP", "L"]:
+        status_type = status_raw
+    else:
+        status_type = "P"
+
+    def get_status_label(st):
+        if st == "P": return "Present (P)"
+        if st == "HP": return "Half Day (HP)"
+        if st in ["F", "OFF"]: return "Day Off (F)"
+        if st in ["2L", "L_DOUBLE"]: return "Leave with Double Deduction (2L)"
+        return "Leave (L)"
 
     if not employee_id:
         return jsonify({"status": "error", "message": "Select an employee to submit manual attendance"}), 400
@@ -772,15 +789,15 @@ def manual_attendance_checkin():
                     "message": f"This employee is already marked as Present today at {cin_time}."
                 }), 400
 
-            # Override/update existing status (e.g. from Leave/Off to Present, or from HP to Present)
-            existing.status = status_type if status_type in ["P", "HP", "OFF", "L"] else "P"
+            # Override/update existing status
+            existing.status = status_type
             existing.branch_id = target_branch_id
             existing.checkin_method = "Manual"
             existing.timestamp = now
             db.session.commit()
 
             cin_time = now.strftime("%I:%M %p")
-            status_label = "Present" if existing.status == "P" else ("Half Day" if existing.status == "HP" else ("Leave" if existing.status == "L" else "Day Off"))
+            status_label = get_status_label(existing.status)
             return jsonify({
                 "status": "success",
                 "action": "checkin",
@@ -802,13 +819,13 @@ def manual_attendance_checkin():
             checkin_method="Manual",
             location_flagged=False,
             location_unavailable=True,
-            status=status_type if status_type in ["P", "HP", "OFF", "L"] else "P"
+            status=status_type
         )
         db.session.add(attendance)
         db.session.commit()
 
         cin_time = now.strftime("%I:%M %p")
-        status_label = "Present" if attendance.status == "P" else ("Half Day" if attendance.status == "HP" else ("Leave" if attendance.status == "L" else "Day Off"))
+        status_label = get_status_label(attendance.status)
         return jsonify({
             "status": "success",
             "action": "checkin",

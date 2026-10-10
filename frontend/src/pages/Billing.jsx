@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
 import { useToast } from "../context/ToastContext";
-import { ThermalReceipt, printThermalReceiptElement, downloadThermalReceiptPDF } from "../components/ThermalReceipt";
+import { ThermalReceipt, printThermalReceiptElement, downloadThermalReceiptPDF, generateThermalReceiptPDF } from "../components/ThermalReceipt";
 import { getFullImageUrl } from "../utils/imageUrl";
 import TouchModeBilling from "../components/TouchModeBilling";
 import {
@@ -283,6 +283,9 @@ function Billing() {
 
   // Payment Settlement State
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [isSplitPayment, setIsSplitPayment] = useState(false);
+  const [isCheckoutSubmitting, setIsCheckoutSubmitting] = useState(false);
+  const isCheckoutSubmittingRef = useRef(false);
   const [selectedPaymentMethods, setSelectedPaymentMethods] = useState(["Cash"]);
   const [paymentAmounts, setPaymentAmounts] = useState({ Cash: "" });
 
@@ -384,6 +387,10 @@ function Billing() {
     plan_id: "",
     payment_method: "Cash",
   });
+  const [assignCustomerSearchQuery, setAssignCustomerSearchQuery] = useState("");
+  const [isAssignCustomerDropdownOpen, setIsAssignCustomerDropdownOpen] = useState(false);
+  const [assignCustomerHighlightedIndex, setAssignCustomerHighlightedIndex] = useState(0);
+  const assignCustomerComboboxRef = useRef(null);
   const [assignMembershipSaving, setAssignMembershipSaving] = useState(false);
   const [assignMembershipError, setAssignMembershipError] = useState(null);
   const assignMembershipModalRef = useRef(null);
@@ -394,23 +401,30 @@ function Billing() {
 
   const openAssignMembershipModal = (cust = null) => {
     let targetCustId = "";
+    let targetCustName = "";
     if (cust && cust.id) {
       targetCustId = String(cust.id);
+      targetCustName = `${cust.first_name} ${cust.last_name || ""} (${cust.phone || "No Mobile"})`;
     } else if (selectedCustomerId && selectedCustomerId !== "walkin") {
       targetCustId = selectedCustomerId;
+      const found = customers.find((c) => String(c.id) === String(selectedCustomerId));
+      if (found) {
+        targetCustName = `${found.first_name} ${found.last_name || ""} (${found.phone || "No Mobile"})`;
+      }
     }
     setAssignMembershipForm({
       customer_id: targetCustId,
       plan_id: "",
       payment_method: "",
     });
+    setAssignCustomerSearchQuery(targetCustName);
+    setIsAssignCustomerDropdownOpen(false);
     setAssignMembershipError(null);
     setShowAssignMembershipModal(true);
 
     setTimeout(() => {
       if (assignCustomerSelectRef.current) {
         assignCustomerSelectRef.current.focus();
-        openNativeSelectDropdown(assignCustomerSelectRef.current);
       }
     }, 100);
   };
@@ -606,10 +620,36 @@ function Billing() {
       if (productDropdownRef.current && !productDropdownRef.current.contains(event.target)) {
         setIsProductDropdownOpen(false);
       }
+      if (assignCustomerComboboxRef.current && !assignCustomerComboboxRef.current.contains(event.target)) {
+        setIsAssignCustomerDropdownOpen(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Live dynamic customer search for Assign Membership modal across all customers
+  useEffect(() => {
+    const q = (assignCustomerSearchQuery || "").trim();
+    if (!showAssignMembershipModal || !q || q.length < 2) return;
+
+    const timer = setTimeout(() => {
+      API.get(`/customers?q=${encodeURIComponent(q)}&branch_id=all&limit=100`)
+        .then((res) => {
+          const items = res.data?.items || res.items || (Array.isArray(res.data) ? res.data : []);
+          if (items && items.length > 0) {
+            setCustomers((prev) => {
+              const existingIds = new Set(prev.map((c) => String(c.id)));
+              const newItems = items.filter((c) => !existingIds.has(String(c.id)));
+              return newItems.length > 0 ? [...prev, ...newItems] : prev;
+            });
+          }
+        })
+        .catch(() => {});
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [assignCustomerSearchQuery, showAssignMembershipModal]);
 
   const getProductInputValue = () => {
     if (isProductDropdownOpen && productSearchQuery !== "") {
@@ -1654,7 +1694,30 @@ function Billing() {
   const totalDiscountAmount = totalDiscount;
   const grandTotal = netPayable;
 
+  const handleToggleSplitMode = () => {
+    setIsSplitPayment((prev) => {
+      const nextVal = !prev;
+      if (!nextVal) {
+        // Toggle OFF: Only one payment method allowed.
+        // Default to the first currently selected payment method (or Cash) with 100% netPayable
+        const singleMethod = selectedPaymentMethods[0] || "Cash";
+        setSelectedPaymentMethods([singleMethod]);
+        setPaymentAmounts({ [singleMethod]: netPayable.toFixed(2) });
+      }
+      return nextVal;
+    });
+  };
+
   const handleTogglePaymentMethod = (methodId) => {
+    if (!isSplitPayment) {
+      // Split is OFF: Only one payment method allowed.
+      // Selecting another method deselects others and allocates 100% to this method.
+      setSelectedPaymentMethods([methodId]);
+      setPaymentAmounts({ [methodId]: netPayable.toFixed(2) });
+      return;
+    }
+
+    // Split is ON: Multiple payment methods allowed.
     if (selectedPaymentMethods.includes(methodId)) {
       if (selectedPaymentMethods.length === 1) {
         showError("At least one payment method must remain selected.");
@@ -1767,8 +1830,12 @@ function Billing() {
       return;
     }
 
+    // Default Split toggle to OFF (single payment method)
+    setIsSplitPayment(false);
     setSelectedPaymentMethods(["Cash"]);
     setPaymentAmounts({ Cash: netPayable.toFixed(2) });
+    isCheckoutSubmittingRef.current = false;
+    setIsCheckoutSubmitting(false);
     setShowPaymentModal(true);
   };
 
@@ -1777,8 +1844,13 @@ function Billing() {
 
   const handleCheckoutSubmitRef = useRef(null);
 
-  // Submit Save Bill
+  // Submit Save Bill with Double-Click / Duplicate Submission Guard
   const handleCheckoutSubmit = () => {
+    // 1. Double-click lock guard
+    if (isCheckoutSubmittingRef.current || isCheckoutSubmitting) {
+      return;
+    }
+
     if (Math.abs(totalAllocatedPayment - netPayable) > 0.5) {
       alert(
         `Total payment allocated (${currencySymbol} ${totalAllocatedPayment.toFixed(
@@ -1790,7 +1862,16 @@ function Billing() {
       return;
     }
 
+    isCheckoutSubmittingRef.current = true;
+    setIsCheckoutSubmitting(true);
+    setLoading(true);
+
+    const clientTxId = (typeof crypto !== "undefined" && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `tx_${Date.now()}_${Math.random()}`;
+
     const payload = {
+      client_transaction_id: clientTxId,
       customer_id: selectedCustomerId === "walkin" || !selectedCustomerId ? "walkin" : parseInt(selectedCustomerId),
       is_tax_enabled: isTaxEnabled,
       tax_rate: isTaxEnabled ? (taxRate || 0) : 0,
@@ -1820,7 +1901,6 @@ function Billing() {
       use_membership: Boolean(useMembership),
     };
 
-    setLoading(true);
     API.post("/billing/checkout", payload)
       .then((res) => {
         const fullInvoice = res.data;
@@ -1830,6 +1910,8 @@ function Billing() {
         setShowReceipt(true);
         setCart([]);
         setLoading(false);
+        isCheckoutSubmittingRef.current = false;
+        setIsCheckoutSubmitting(false);
         fetchBillingHistory();
         if (selectedCustomerId && selectedCustomerId !== "walkin") {
           fetchCustomerMemberships(selectedCustomerId);
@@ -1844,6 +1926,8 @@ function Billing() {
       .catch((err) => {
         showError(err.message || "Checkout transaction failed.");
         setLoading(false);
+        isCheckoutSubmittingRef.current = false;
+        setIsCheckoutSubmitting(false);
       });
   };
 
@@ -1868,15 +1952,9 @@ function Billing() {
         e.preventDefault();
         e.stopPropagation();
 
-        console.log("[Billing Shortcut Triggered]", {
-          key: e.key,
-          code: e.code,
-          showPaymentModal,
-          target: e.target?.tagName
-        });
-
         if (showPaymentModal) {
-          // Payment modal is open -> submit Save Bill
+          // Payment modal is open -> submit Save Bill (with duplicate lock check)
+          if (isCheckoutSubmittingRef.current) return;
           if (handleCheckoutSubmitRef.current) {
             handleCheckoutSubmitRef.current();
           }
@@ -2046,7 +2124,94 @@ function Billing() {
     }
   };
 
-  const triggerWhatsAppWeb = (inv = null) => {
+  const buildReceiptWhatsAppText = (targetInv, parlourName, customerName, thankYouMsg) => {
+    const billNo = targetInv?.invoice_number || targetInv?.id || "N/A";
+    let formattedDate = "";
+    try {
+      const d = targetInv?.created_at ? new Date(targetInv.created_at) : new Date();
+      const dd = String(d.getDate()).padStart(2, "0");
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const yyyy = d.getFullYear();
+      let hours = d.getHours();
+      const mins = String(d.getMinutes()).padStart(2, "0");
+      const ampm = hours >= 12 ? "pm" : "am";
+      hours = hours % 12;
+      hours = hours ? String(hours).padStart(2, "0") : "12";
+      formattedDate = `${dd}/${mm}/${yyyy} ${hours}:${mins} ${ampm}`;
+    } catch (e) {
+      formattedDate = new Date().toLocaleDateString();
+    }
+
+    let msg = `*${(parlourName || "NEGHA PARLOUR").toUpperCase()}*\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `*Bill No:* ${billNo}\n`;
+    msg += `*Client:* ${customerName}\n`;
+    msg += `*Date:* ${formattedDate}\n`;
+
+    if (targetInv?.membership_name) {
+      msg += `*Loyalty Status:* ${targetInv.membership_name}\n`;
+    }
+
+    const lineItems = targetInv?.line_items || targetInv?.items || [];
+    if (lineItems.length > 0) {
+      msg += `━━━━━━━━━━━━━━━━━━━━\n`;
+      msg += `*SERVICES*                                *AMT*\n`;
+      lineItems.forEach((item) => {
+        const itemName = (item.item_name || item.name || item.service_name || item.product_name || "Item").toUpperCase();
+        const rate = item.unit_price || item.rate || item.price || 0;
+        const qty = item.quantity || item.qty || 1;
+        const lineTotal = item.line_total !== undefined ? item.line_total : (rate * qty);
+        const staff = item.staff_name || item.employee_name || (item.employee_names ? item.employee_names.join(", ") : "");
+        const isFreeReward = item.is_free_reward || item.is_free_visit_reward || (item.discount > 0 && item.line_total === 0);
+
+        msg += `*${itemName}*    ${isFreeReward ? "FREE" : formatCurrency(lineTotal)}\n`;
+        let details = `Qty: ${qty}  Rate: ${formatCurrency(rate)}`;
+        if (staff && staff !== "—") {
+          details += `  Staff: ${staff}`;
+        }
+        msg += `${details}\n`;
+      });
+    }
+
+    msg += `━━━━━━━━━━━━━━━━━━━━\n`;
+    const subtotalVal = targetInv?.subtotal !== undefined ? parseFloat(targetInv.subtotal) : 0;
+    msg += `*Subtotal:* ${formatCurrency(subtotalVal)}\n`;
+
+    if (targetInv?.membership_name && (parseFloat(targetInv?.membership_discount) >= 0 || parseFloat(targetInv?.discount) > 0)) {
+      const memDisc = parseFloat(targetInv?.membership_discount || targetInv?.discount || 0);
+      msg += `*Membership (${targetInv.membership_name}):* -${formatCurrency(memDisc)}\n`;
+    } else if ((parseFloat(targetInv?.discount) || 0) > 0) {
+      msg += `*Discount:* -${formatCurrency(targetInv.discount)}\n`;
+    }
+
+    const taxVal = parseFloat(targetInv?.tax || targetInv?.tax_amount || 0);
+    if (taxVal > 0) {
+      msg += `*GST (Service):* ${formatCurrency(taxVal)}\n`;
+    }
+
+    const netPayableVal = parseFloat(targetInv?.total || targetInv?.net_payable || 0);
+    msg += `━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `*NET PAYABLE:* *${formatCurrency(netPayableVal)}*\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━\n`;
+
+    msg += `*PAYMENT METHOD(S):*\n`;
+    if (targetInv?.payments && targetInv.payments.length > 0) {
+      targetInv.payments.forEach((p) => {
+        msg += `Paid (${p.method || p.payment_method || "Payment"}): ${formatCurrency(p.amount || 0)}\n`;
+      });
+    } else {
+      const method = targetInv?.payment_method || "Cash";
+      msg += `Paid (${method}): ${formatCurrency(netPayableVal)}\n`;
+    }
+
+    msg += `━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `${thankYouMsg || "Thank you for visiting. Please visit again."}\n`;
+    msg += `_Powered By SmartGoNext_`;
+
+    return msg;
+  };
+
+  const triggerWhatsAppWeb = async (inv = null) => {
     const targetInv = inv || invoiceResult || selectedInvoiceDetail || activePrintInvoice;
     const targetCust = customers.find((c) => String(c.id) === String(selectedCustomerId));
     const rawPhone = targetInv?.customer_phone || targetInv?.customer?.phone || targetCust?.phone || "";
@@ -2066,18 +2231,44 @@ function Billing() {
     const parlourName = businessProfile?.name || "Beauty Parlour";
     const customerName = targetInv?.customer_name || targetInv?.customer?.first_name || targetCust?.first_name || "Customer";
     const billNo = targetInv?.invoice_number || targetInv?.id || "N/A";
-    const totalVal = targetInv?.total || targetInv?.net_payable || 0;
-    const amountStr = formatCurrency(totalVal);
     const thankYouMsg = receiptSettings?.thank_you_message || "Thank you for visiting. Please visit again!";
 
-    const text = encodeURIComponent(
-      `Hello ${customerName}, thank you for visiting ${parlourName}!\n\n` +
-        `🧾 Bill No: ${billNo}\n` +
-        `💰 Amount Paid: ${amountStr}\n\n` +
-        `${thankYouMsg}`
-    );
+    const billMessage = buildReceiptWhatsAppText(targetInv, parlourName, customerName, thankYouMsg);
+    const encodedText = encodeURIComponent(billMessage);
 
-    window.open(`https://wa.me/${cleanPhone}?text=${text}`, "_blank");
+    if (targetInv) {
+      setActivePrintInvoice(targetInv);
+    }
+
+    // Generate PDF for WhatsApp sharing / downloading
+    try {
+      const pdfRes = await generateThermalReceiptPDF(printReceiptRef, billNo, receiptSettings?.paper_size || "80mm");
+      if (pdfRes && pdfRes.file && navigator.canShare && navigator.canShare({ files: [pdfRes.file] })) {
+        try {
+          await navigator.share({
+            files: [pdfRes.file],
+            title: `Bill #${billNo}`,
+            text: billMessage,
+          });
+          showSuccess("Bill PDF shared to WhatsApp successfully!");
+          return;
+        } catch (shareErr) {
+          if (shareErr.name === "AbortError") return;
+          // User closed share dialog, fall back to opening WhatsApp Web
+        }
+      }
+
+      // Download PDF receipt
+      if (pdfRes && pdfRes.pdf) {
+        pdfRes.pdf.save(pdfRes.filename);
+      }
+    } catch (pdfErr) {
+      console.warn("Could not auto-generate PDF for WhatsApp:", pdfErr);
+    }
+
+    // Open WhatsApp Web/Mobile with structured receipt message
+    window.open(`https://wa.me/${cleanPhone}?text=${encodedText}`, "_blank");
+    showSuccess("Bill structure opened in WhatsApp & PDF downloaded for attachment!");
   };
 
   const handleSaveReminderSubmit = () => {
@@ -3615,7 +3806,34 @@ function Billing() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-2">Select Payment Methods:</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold text-slate-700">
+                    Select Payment Method{isSplitPayment ? "s" : ""}:
+                  </label>
+                  {/* Split Toggle Switch */}
+                  <div
+                    onClick={handleToggleSplitMode}
+                    className="flex items-center space-x-2 bg-slate-100 hover:bg-slate-200/80 px-2.5 py-1 rounded-full cursor-pointer transition select-none"
+                    title={isSplitPayment ? "Disable Split: Use single payment method" : "Enable Split: Divide bill across multiple payment methods"}
+                  >
+                    <span className="text-[11px] font-extrabold text-slate-700">Split</span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={isSplitPayment}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        isSplitPayment ? "bg-primary" : "bg-slate-300"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                          isSplitPayment ? "translate-x-4" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-2.5">
                   {SUPPORTED_PAYMENT_METHODS.map((pm) => {
                     const isSelected = selectedPaymentMethods.includes(pm.id);
@@ -3638,7 +3856,8 @@ function Billing() {
                           <span className="text-xs font-bold text-slate-900">{pm.label}</span>
                         </div>
                         <input
-                          type="checkbox"
+                          type={isSplitPayment ? "checkbox" : "radio"}
+                          name="payment_method_modal_option"
                           checked={isSelected}
                           readOnly
                           className="rounded text-primary focus:ring-primary h-4 w-4"
@@ -3650,26 +3869,34 @@ function Billing() {
               </div>
 
               <div className="space-y-3 pt-2 border-t border-border-soft">
-                <label className="block text-xs font-bold text-slate-700">Enter Allocated Payment Amounts:</label>
+                <label className="block text-xs font-bold text-slate-700">
+                  {isSplitPayment ? "Enter Allocated Payment Amounts:" : "Allocated Payment Amount:"}
+                </label>
                 {selectedPaymentMethods.map((mId) => (
                   <div key={mId} className="flex items-center justify-between bg-background border border-border-soft p-3 rounded-xl">
                     <span className="text-xs font-bold text-slate-800">{mId} Amount ({currencySymbol}):</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={paymentAmounts[mId] || ""}
-                      onFocus={(e) => e.target.select()}
-                      onChange={(e) => handleUpdatePaymentAmount(mId, e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === "ArrowRight") {
-                          e.preventDefault();
-                          if (submitInvoiceBtnRef.current) submitInvoiceBtnRef.current.focus();
-                        }
-                      }}
-                      placeholder="0.00"
-                      className="w-32 bg-white border border-border-soft px-3 py-1.5 rounded-lg text-xs font-extrabold text-slate-900 text-right focus:outline-none focus:border-primary focus:ring-2 focus:ring-pink-500/20 numeric"
-                    />
+                    {isSplitPayment ? (
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={paymentAmounts[mId] || ""}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => handleUpdatePaymentAmount(mId, e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === "ArrowRight") {
+                            e.preventDefault();
+                            if (submitInvoiceBtnRef.current) submitInvoiceBtnRef.current.focus();
+                          }
+                        }}
+                        placeholder="0.00"
+                        className="w-32 bg-white border border-border-soft px-3 py-1.5 rounded-lg text-xs font-extrabold text-slate-900 text-right focus:outline-none focus:border-primary focus:ring-2 focus:ring-pink-500/20 numeric"
+                      />
+                    ) : (
+                      <span className="w-32 bg-slate-100 border border-border-soft px-3 py-1.5 rounded-lg text-xs font-extrabold text-slate-900 text-right numeric select-none">
+                        {currencySymbol} {netPayable.toFixed(2)}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -3677,24 +3904,39 @@ function Billing() {
               <div className="pt-4 border-t border-border-soft flex justify-end space-x-3">
                 <button
                   type="button"
+                  disabled={isCheckoutSubmitting || loading}
                   onClick={() => setShowPaymentModal(false)}
-                  className="px-4 py-2.5 border border-border-soft rounded-xl text-xs font-bold text-slate-600 hover:bg-background"
+                  className="px-4 py-2.5 border border-border-soft rounded-xl text-xs font-bold text-slate-600 hover:bg-background disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   ref={submitInvoiceBtnRef}
                   type="button"
+                  disabled={isCheckoutSubmitting || loading}
                   onClick={handleCheckoutSubmit}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === "Space") {
                       e.preventDefault();
-                      handleCheckoutSubmit();
+                      if (!isCheckoutSubmitting && !loading) {
+                        handleCheckoutSubmit();
+                      }
                     }
                   }}
-                  className="px-6 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-extrabold shadow-md shadow-pink-500/20"
+                  className={`px-6 py-2.5 bg-primary text-white rounded-xl text-xs font-extrabold shadow-md shadow-pink-500/20 flex items-center space-x-2 ${
+                    isCheckoutSubmitting || loading
+                      ? "opacity-60 cursor-not-allowed pointer-events-none"
+                      : "hover:bg-primary-hover cursor-pointer"
+                  }`}
                 >
-                  Save Bill (F2 / Ctrl + Enter)
+                  {(isCheckoutSubmitting || loading) ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving Bill...</span>
+                    </>
+                  ) : (
+                    <span>Save Bill (F2 / Ctrl + Enter)</span>
+                  )}
                 </button>
               </div>
             </div>
@@ -5312,33 +5554,160 @@ function Billing() {
                 </div>
               )}
 
-              {/* Field 1: Customer Selection */}
-              <div>
+              {/* Field 1: Customer Selection Combobox */}
+              <div ref={assignCustomerComboboxRef} className="relative">
                 <label className="block text-xs font-bold text-slate-700 mb-1">Customer *</label>
-                <select
-                  ref={assignCustomerSelectRef}
-                  value={assignMembershipForm.customer_id}
-                  onChange={(e) => setAssignMembershipForm({ ...assignMembershipForm, customer_id: e.target.value })}
-                  onFocus={(e) => openNativeSelectDropdown(e.target)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === "ArrowRight") {
-                      e.preventDefault();
-                      if (assignPlanSelectRef.current) {
-                        assignPlanSelectRef.current.focus();
-                        openNativeSelectDropdown(assignPlanSelectRef.current);
+                <div className="relative">
+                  <input
+                    ref={assignCustomerSelectRef}
+                    type="text"
+                    required
+                    placeholder="Search customer by Name or Mobile..."
+                    value={assignCustomerSearchQuery}
+                    onFocus={() => {
+                      setIsAssignCustomerDropdownOpen(true);
+                      setAssignCustomerHighlightedIndex(0);
+                    }}
+                    onChange={(e) => {
+                      setAssignCustomerSearchQuery(e.target.value);
+                      setIsAssignCustomerDropdownOpen(true);
+                      setAssignCustomerHighlightedIndex(0);
+                      if (assignMembershipForm.customer_id) {
+                        setAssignMembershipForm({ ...assignMembershipForm, customer_id: "" });
                       }
-                    }
-                  }}
-                  required
-                  className="w-full bg-background border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition shadow-2xs"
-                >
-                  <option value="">Search customer by Name or Mobile...</option>
-                  {customers.slice(0, 100).map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.first_name} {c.last_name || ""} ({c.phone || "No Mobile"})
-                    </option>
-                  ))}
-                </select>
+                    }}
+                    onKeyDown={(e) => {
+                      const filteredList = customers.filter((c) => {
+                        if (!assignCustomerSearchQuery) return true;
+                        const q = assignCustomerSearchQuery.toLowerCase().trim();
+                        const cleanQ = q.replace(/[^0-9]/g, "");
+                        const name = `${c.first_name || ""} ${c.last_name || ""}`.toLowerCase();
+                        const phone = (c.phone || "").toLowerCase();
+                        const cleanPhone = phone.replace(/[^0-9]/g, "");
+                        return (
+                          name.includes(q) ||
+                          phone.includes(q) ||
+                          (cleanQ.length >= 3 && cleanPhone.includes(cleanQ))
+                        );
+                      });
+
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        if (!isAssignCustomerDropdownOpen) {
+                          setIsAssignCustomerDropdownOpen(true);
+                        }
+                        if (filteredList.length > 0) {
+                          setAssignCustomerHighlightedIndex((prev) => (prev + 1) % Math.min(filteredList.length, 100));
+                        }
+                      } else if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        if (filteredList.length > 0) {
+                          setAssignCustomerHighlightedIndex((prev) => (prev - 1 + Math.min(filteredList.length, 100)) % Math.min(filteredList.length, 100));
+                        }
+                      } else if (e.key === "Enter" || e.key === "ArrowRight") {
+                        if (isAssignCustomerDropdownOpen && filteredList.length > 0) {
+                          e.preventDefault();
+                          const chosen = filteredList[assignCustomerHighlightedIndex] || filteredList[0];
+                          if (chosen) {
+                            setAssignMembershipForm({ ...assignMembershipForm, customer_id: chosen.id.toString() });
+                            setAssignCustomerSearchQuery(`${chosen.first_name} ${chosen.last_name || ""} (${chosen.phone || "No Mobile"})`);
+                            setIsAssignCustomerDropdownOpen(false);
+                            if (assignPlanSelectRef.current) {
+                              assignPlanSelectRef.current.focus();
+                              openNativeSelectDropdown(assignPlanSelectRef.current);
+                            }
+                          }
+                        } else if (!isAssignCustomerDropdownOpen) {
+                          e.preventDefault();
+                          if (assignPlanSelectRef.current) {
+                            assignPlanSelectRef.current.focus();
+                            openNativeSelectDropdown(assignPlanSelectRef.current);
+                          }
+                        }
+                      }
+                    }}
+                    className="w-full bg-background border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition shadow-2xs pr-8"
+                  />
+                  {assignMembershipForm.customer_id ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAssignMembershipForm({ ...assignMembershipForm, customer_id: "" });
+                        setAssignCustomerSearchQuery("");
+                        setIsAssignCustomerDropdownOpen(true);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-rose-500 hover:text-rose-700 font-bold"
+                      title="Clear selection"
+                    >
+                      ✕
+                    </button>
+                  ) : (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                      <ChevronDown className="w-4 h-4" />
+                    </span>
+                  )}
+                </div>
+
+                {isAssignCustomerDropdownOpen && (
+                  <div className="absolute left-0 right-0 mt-1 bg-surface border border-border-soft rounded-xl shadow-xl z-50 max-h-56 overflow-y-auto divide-y divide-border-soft">
+                    {(() => {
+                      const filteredList = customers.filter((c) => {
+                        if (!assignCustomerSearchQuery) return true;
+                        const q = assignCustomerSearchQuery.toLowerCase().trim();
+                        const cleanQ = q.replace(/[^0-9]/g, "");
+                        const name = `${c.first_name || ""} ${c.last_name || ""}`.toLowerCase();
+                        const phone = (c.phone || "").toLowerCase();
+                        const cleanPhone = phone.replace(/[^0-9]/g, "");
+                        return (
+                          name.includes(q) ||
+                          phone.includes(q) ||
+                          (cleanQ.length >= 3 && cleanPhone.includes(cleanQ))
+                        );
+                      });
+
+                      if (filteredList.length === 0) {
+                        return (
+                          <div className="p-3 text-center text-xs text-slate-500 font-medium">
+                            No matching customer found.
+                          </div>
+                        );
+                      }
+
+                      return filteredList.slice(0, 100).map((c, idx) => {
+                        const isSelected = String(assignMembershipForm.customer_id) === String(c.id);
+                        const isHighlighted = idx === assignCustomerHighlightedIndex;
+                        return (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => {
+                              setAssignMembershipForm({ ...assignMembershipForm, customer_id: c.id.toString() });
+                              setAssignCustomerSearchQuery(`${c.first_name} ${c.last_name || ""} (${c.phone || "No Mobile"})`);
+                              setIsAssignCustomerDropdownOpen(false);
+                              if (assignPlanSelectRef.current) {
+                                assignPlanSelectRef.current.focus();
+                                openNativeSelectDropdown(assignPlanSelectRef.current);
+                              }
+                            }}
+                            className={`w-full text-left px-3.5 py-2.5 text-xs transition flex justify-between items-center ${
+                              isHighlighted
+                                ? "bg-pink-50 text-pink-700 font-bold"
+                                : isSelected
+                                ? "bg-pink-50/60 text-pink-700 font-semibold"
+                                : "hover:bg-slate-50 text-slate-800"
+                            }`}
+                          >
+                            <div>
+                              <span className="font-bold">{c.first_name} {c.last_name || ""}</span>
+                              <span className="text-[11px] text-slate-500 block numeric">{c.phone || "No Mobile"}</span>
+                            </div>
+                            {isSelected && <Check className="w-4 h-4 text-pink-600" />}
+                          </button>
+                        );
+                      });
+                    })()}
+                  </div>
+                )}
               </div>
 
               {/* Field 2: Select Membership Plan */}

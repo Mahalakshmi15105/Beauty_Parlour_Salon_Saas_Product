@@ -102,7 +102,7 @@ function CustomerMemberships() {
   };
 
   const fetchCustomers = () => {
-    API.get("/customers?limit=100").then((res) => setAllCustomers(res.data.items || []));
+    API.get("/customers?limit=10000&branch_id=all").then((res) => setAllCustomers(res.data.items || []));
   };
 
   useEffect(() => {
@@ -128,11 +128,34 @@ function CustomerMemberships() {
   // Customer Autocomplete Lookup for the View Specific section
   useEffect(() => {
     if (customerSearch.trim().length >= 2) {
-      API.get(`/customers?q=${customerSearch}`).then((res) => setCustomers(res.data.items || []));
+      API.get(`/customers?q=${encodeURIComponent(customerSearch.trim())}&branch_id=all`).then((res) => setCustomers(res.data.items || []));
     } else {
       setCustomers([]);
     }
   }, [customerSearch]);
+
+  // Live dynamic server lookup for Assign Membership Combobox (handles 1000+ customers)
+  useEffect(() => {
+    const term = (comboboxSearch || "").trim();
+    if (!showAssignModal || term.length < 2) return;
+
+    const timer = setTimeout(() => {
+      API.get(`/customers?q=${encodeURIComponent(term)}&branch_id=all&limit=100`)
+        .then((res) => {
+          const items = res.data?.items || [];
+          if (items.length > 0) {
+            setAllCustomers((prev) => {
+              const existingIds = new Set(prev.map((c) => String(c.id)));
+              const newItems = items.filter((c) => !existingIds.has(String(c.id)));
+              return newItems.length > 0 ? [...prev, ...newItems] : prev;
+            });
+          }
+        })
+        .catch(() => {});
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [comboboxSearch, showAssignModal]);
 
   // Click outside Combobox dropdown handler
   useEffect(() => {
@@ -879,12 +902,16 @@ function CustomerMemberships() {
                     }}
                     onKeyDown={(e) => {
                       const filtered = allCustomers.filter((c) => {
-                        const term = comboboxSearch.toLowerCase();
+                        if (!comboboxSearch) return true;
+                        const term = comboboxSearch.toLowerCase().trim();
+                        const cleanTerm = term.replace(/[^0-9]/g, "");
+                        const name = `${c.first_name || ""} ${c.last_name || ""}`.toLowerCase();
+                        const phone = (c.phone || "").toLowerCase();
+                        const cleanPhone = phone.replace(/[^0-9]/g, "");
                         return (
-                          !term ||
-                          `${c.first_name} ${c.last_name || ""} ${c.phone || ""}`
-                            .toLowerCase()
-                            .includes(term)
+                          name.includes(term) ||
+                          phone.includes(term) ||
+                          (cleanTerm.length >= 3 && cleanPhone.includes(cleanTerm))
                         );
                       });
 
@@ -894,12 +921,12 @@ function CustomerMemberships() {
                           setShowComboboxDropdown(true);
                         }
                         if (filtered.length > 0) {
-                          setComboboxHighlightedIndex((prev) => (prev + 1) % filtered.length);
+                          setComboboxHighlightedIndex((prev) => (prev + 1) % Math.min(filtered.length, 100));
                         }
                       } else if (e.key === "ArrowUp") {
                         e.preventDefault();
                         if (filtered.length > 0) {
-                          setComboboxHighlightedIndex((prev) => (prev - 1 + filtered.length) % filtered.length);
+                          setComboboxHighlightedIndex((prev) => (prev - 1 + Math.min(filtered.length, 100)) % Math.min(filtered.length, 100));
                         }
                       } else if (e.key === "Enter" || e.key === "ArrowRight") {
                         if (showComboboxDropdown && filtered.length > 0) {
@@ -938,17 +965,28 @@ function CustomerMemberships() {
 
                 {showComboboxDropdown && (
                   <div className="absolute left-0 right-0 mt-1 bg-surface border border-border-soft rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto divide-y divide-border-soft">
-                    {allCustomers
-                      .filter((c) => {
-                        const term = comboboxSearch.toLowerCase();
+                    {(() => {
+                      const filteredList = allCustomers.filter((c) => {
+                        if (!comboboxSearch) return true;
+                        const term = comboboxSearch.toLowerCase().trim();
+                        const cleanTerm = term.replace(/[^0-9]/g, "");
+                        const name = `${c.first_name || ""} ${c.last_name || ""}`.toLowerCase();
+                        const phone = (c.phone || "").toLowerCase();
+                        const cleanPhone = phone.replace(/[^0-9]/g, "");
                         return (
-                          !term ||
-                          `${c.first_name} ${c.last_name || ""} ${c.phone || ""}`
-                            .toLowerCase()
-                            .includes(term)
+                          name.includes(term) ||
+                          phone.includes(term) ||
+                          (cleanTerm.length >= 3 && cleanPhone.includes(cleanTerm))
                         );
-                      })
-                      .map((c, idx) => {
+                      });
+
+                      if (filteredList.length === 0) {
+                        return (
+                          <div className="px-3 py-2.5 text-xs text-text-secondary">No customers found.</div>
+                        );
+                      }
+
+                      return filteredList.slice(0, 100).map((c, idx) => {
                         const isSelected = assignForm.customer_id === c.id.toString();
                         const isHighlighted = idx === comboboxHighlightedIndex;
                         return (
@@ -971,18 +1009,8 @@ function CustomerMemberships() {
                             {isSelected && <Check className="w-3.5 h-3.5" />}
                           </button>
                         );
-                      })}
-                    {allCustomers.filter((c) => {
-                      const term = comboboxSearch.toLowerCase();
-                      return (
-                        !term ||
-                        `${c.first_name} ${c.last_name || ""} ${c.phone || ""}`
-                          .toLowerCase()
-                          .includes(term)
-                      );
-                    }).length === 0 && (
-                      <div className="px-3 py-2.5 text-xs text-text-secondary">No customers found.</div>
-                    )}
+                      });
+                    })()}
                   </div>
                 )}
               </div>

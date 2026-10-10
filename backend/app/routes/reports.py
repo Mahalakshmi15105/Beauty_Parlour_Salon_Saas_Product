@@ -843,6 +843,7 @@ def get_attendance_salary_report():
     salary_rows = []
 
     tot_salary = 0.0
+    tot_per_day = 0.0
     tot_target = 0.0
     tot_achieved = 0.0
     tot_net = 0.0
@@ -853,7 +854,7 @@ def get_attendance_salary_report():
     for idx, emp in enumerate(employees):
         emp_att_map = {}
 
-        # BUG 2 FIX: Default unlogged past dates and future dates to blank ""
+        # Default unlogged past dates and future dates to blank ""
         for d in range(1, total_days + 1):
             dt_val = date(year, month, d)
             if dt_val > today_curr:
@@ -864,6 +865,7 @@ def get_attendance_salary_report():
         emp_atts = [att for att in attendances if att.employee_id == emp.id]
         off_count = 0
         leave_count = 0
+        double_leave_count = 0
         total_worked_days = 0.0
 
         for att in emp_atts:
@@ -876,31 +878,47 @@ def get_attendance_salary_report():
                 emp_att_map[str(day_num)] = "1"
             elif st in ["HP", "HalfDay", "Half-Day"]:
                 emp_att_map[str(day_num)] = "0.5"
-            elif st in ["OFF", "DayOff"]:
-                emp_att_map[str(day_num)] = "OFF"
+            elif st in ["OFF", "F", "DayOff"]:
+                emp_att_map[str(day_num)] = "F"
+            elif st in ["2L", "L_DOUBLE", "2"]:
+                emp_att_map[str(day_num)] = "2L"
             elif st in ["L", "Leave"]:
                 emp_att_map[str(day_num)] = "L"
 
         for d in range(1, total_days + 1):
             val = emp_att_map[str(d)]
+            dt_val = date(year, month, d)
+            is_weekend = dt_val.weekday() in [5, 6]  # 5 is Saturday, 6 is Sunday
+
             if val == "1":
                 total_worked_days += 1.0
             elif val == "0.5":
-                total_worked_days += 0.5
-            elif val == "OFF":
+                if is_weekend:
+                    # Half day on Saturday or Sunday: deducts 1 full day of salary instead of 0.5 day
+                    # Full day is 1.0; deducting 1.0 gives 0.0 credit for this day.
+                    total_worked_days += 0.0
+                else:
+                    total_worked_days += 0.5
+            elif val in ["OFF", "F"]:
                 off_count += 1
             elif val == "L":
                 leave_count += 1
+            elif val == "2L":
+                double_leave_count += 1
+
+        allowed_offs = getattr(emp, "monthly_offs", 4) or 4
+        # 4 offs are paid offs (no deduction). Any extra offs beyond 4 are unpaid.
+        paid_offs = min(off_count, allowed_offs)
 
         att_matrix.append({
             "sno": idx + 1,
             "id": emp.id,
             "name": f"{emp.first_name} {emp.last_name or ''}".strip(),
             "days": emp_att_map,
-            "total_days": total_worked_days,
-            "leaves_taken": off_count + leave_count,
-            "allowed_offs": getattr(emp, "monthly_offs", 4) or 4,
-            "leaves_summary": f"{off_count + leave_count}/{getattr(emp, 'monthly_offs', 4) or 4}"
+            "total_days": round(total_worked_days + paid_offs, 1),
+            "leaves_taken": off_count + leave_count + double_leave_count,
+            "allowed_offs": allowed_offs,
+            "leaves_summary": f"{off_count + leave_count + double_leave_count}/{allowed_offs}"
         })
 
         # Achieved revenue this month (strictly calculated ONLY from Services)
@@ -917,14 +935,21 @@ def get_attendance_salary_report():
 
         salary_val = float(emp.salary or 0.0)
         target_val = float(emp.target or 0.0)
+        per_day_salary = round(salary_val / total_days, 2) if total_days > 0 and salary_val > 0 else 0.0
 
-        # REVERSE-ENGINEERED FORMULA: NET = (SALARY / DAYS_IN_MONTH) * TOTAL_WORKED_DAYS
-        net_salary = round((salary_val / total_days) * total_worked_days, 2) if salary_val > 0 else 0.0
+        # Effective paid days: worked days + paid offs (4 allowed offs won't deduct salary)
+        effective_paid_days = total_worked_days + paid_offs
+
+        # 2L leaves deduct double amount (1 day already uncredited from work + 1 extra day penalty)
+        double_leave_penalty = double_leave_count * per_day_salary
+
+        net_salary = round(max((per_day_salary * effective_paid_days) - double_leave_penalty, 0.0), 2) if salary_val > 0 else 0.0
         
-        # REVERSE-ENGINEERED FORMULA: FINAL PAYABLE = NET - ADVANCE - DEDUCTIONS
+        # FINAL PAYABLE = NET - ADVANCE - DEDUCTIONS
         final_payable = round(max(net_salary - emp_advances - emp_deductions, 0.0), 2)
 
         tot_salary += salary_val
+        tot_per_day += per_day_salary
         tot_target += target_val
         tot_achieved += emp_achieved
         tot_net += net_salary
@@ -937,12 +962,14 @@ def get_attendance_salary_report():
             "id": emp.id,
             "name": f"{emp.first_name} {emp.last_name or ''}".strip(),
             "salary": salary_val,
+            "per_day": per_day_salary,
             "target": target_val,
             "achieved": round(emp_achieved, 2),
-            "off": off_count + leave_count,
-            "allowed_offs": getattr(emp, "monthly_offs", 4) or 4,
-            "leaves_summary": f"{off_count + leave_count}/{getattr(emp, 'monthly_offs', 4) or 4}",
-            "total_days": total_worked_days,
+            "off": off_count,
+            "leave": leave_count + double_leave_count,
+            "allowed_offs": allowed_offs,
+            "leaves_summary": f"{off_count + leave_count + double_leave_count}/{allowed_offs}",
+            "total_days": round(effective_paid_days, 1),
             "net": net_salary,
             "advance": emp_advances,
             "less_amount": emp_deductions,
@@ -956,6 +983,7 @@ def get_attendance_salary_report():
         "salary_report": salary_rows,
         "totals": {
             "salary": round(tot_salary, 2),
+            "per_day": round(tot_per_day, 2),
             "target": round(tot_target, 2),
             "achieved": round(tot_achieved, 2),
             "net": round(tot_net, 2),

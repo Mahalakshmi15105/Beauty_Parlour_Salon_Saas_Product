@@ -174,7 +174,7 @@ export function buildThermalReceiptHtml(targetEl, paperSize = "80mm") {
 </html>`;
 }
 
-export async function downloadThermalReceiptPDF(elementOrRef, invoiceNumber = "INV-0001", paperSize = "80mm") {
+export async function generateThermalReceiptPDF(elementOrRef, invoiceNumber = "INV-0001", paperSize = "80mm") {
   let targetEl = null;
   let invNum = invoiceNumber;
 
@@ -194,7 +194,7 @@ export async function downloadThermalReceiptPDF(elementOrRef, invoiceNumber = "I
 
   if (!targetEl) {
     if (window.__showError) window.__showError("Thermal receipt content is not available for PDF export.");
-    return;
+    return null;
   }
 
   const is58mm = paperSize === "58mm";
@@ -242,19 +242,31 @@ export async function downloadThermalReceiptPDF(elementOrRef, invoiceNumber = "I
 
     pdf.addImage(imgData, "PNG", 0, 0, imgWidth, pageHeight);
     const cleanInvNumber = (invNum || invoiceNumber || "Receipt").replace(/[^a-zA-Z0-9_-]/g, "_");
-    pdf.save(`Invoice_${cleanInvNumber}.pdf`);
-    if (window.__showSuccess) {
-      window.__showSuccess("PDF invoice downloaded successfully!");
-    }
+    const filename = `Invoice_${cleanInvNumber}.pdf`;
+    const blob = pdf.output("blob");
+    const file = new File([blob], filename, { type: "application/pdf" });
+    return { pdf, blob, file, filename };
   } catch (err) {
     console.error("PDF Export Error:", err);
     if (window.__showError) {
-      window.__showError("Failed to download PDF receipt: " + (err?.message || "Render error"));
+      window.__showError("Failed to generate PDF receipt: " + (err?.message || "Render error"));
     }
+    return null;
   } finally {
     if (iframe && iframe.parentNode) {
       iframe.parentNode.removeChild(iframe);
     }
+  }
+}
+
+export async function downloadThermalReceiptPDF(elementOrRef, invoiceNumber = "INV-0001", paperSize = "80mm") {
+  const result = await generateThermalReceiptPDF(elementOrRef, invoiceNumber, paperSize);
+  if (result && result.pdf) {
+    result.pdf.save(result.filename);
+    if (window.__showSuccess) {
+      window.__showSuccess("PDF invoice downloaded successfully!");
+    }
+    return result;
   }
 }
 

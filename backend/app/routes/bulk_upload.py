@@ -100,8 +100,27 @@ def bulk_upload_customers():
         validation_errors = []
         valid_customers = []
         
+        # Pre-fetch existing customer phones in a single query for high-speed O(1) bulk validation
+        existing_phones = set()
+        try:
+            phone_q = get_tenant_query(Customer).with_entities(Customer.phone).filter(Customer.phone.isnot(None))
+            if g.branch_id and g.role in ["BranchAdmin"]:
+                phone_q = phone_q.filter_by(branch_id=g.branch_id)
+            existing_phones = {str(p[0]).strip() for p in phone_q.all() if p[0]}
+        except Exception as err:
+            logger.warning(f"Failed to prefetch existing customer phones: {err}")
+            existing_phones = None
+
+        seen_file_phones = set()
+
         for idx, row_data in enumerate(data, 2):  # Start from row 2 (1-based indexing)
-            errors = validate_customer_data(row_data, g.parlour_id, g.branch_id)
+            errors = validate_customer_data(
+                row_data, 
+                g.parlour_id, 
+                g.branch_id, 
+                existing_phones=existing_phones, 
+                seen_file_phones=seen_file_phones
+            )
             if errors:
                 validation_errors.append({
                     'row': idx,
@@ -109,7 +128,7 @@ def bulk_upload_customers():
                     'data': row_data
                 })
             else:
-                valid_customers.append(row_data)
+                valid_customers.append((idx, row_data))
         
         # Check subscription plan customer limit
         max_cust = None
@@ -140,13 +159,13 @@ def bulk_upload_customers():
         successful_count = 0
         failed_count = len(validation_errors)
         
-        for customer_data in valid_customers:
+        for row_idx, customer_data in valid_customers:
             try:
                 # Parse date of birth if provided
                 dob = None
                 if customer_data.get('date_of_birth'):
                     try:
-                        dob = datetime.strptime(customer_data['date_of_birth'], '%Y-%m-%d').date()
+                        dob = datetime.strptime(str(customer_data['date_of_birth']), '%Y-%m-%d').date()
                     except ValueError:
                         pass
                 
@@ -169,7 +188,7 @@ def bulk_upload_customers():
                 logger.error(f"Error inserting customer: {str(e)}")
                 failed_count += 1
                 validation_errors.append({
-                    'row': valid_customers.index(customer_data) + 2,
+                    'row': row_idx,
                     'errors': [f"Database error: {str(e)}"],
                     'data': customer_data
                 })
@@ -250,8 +269,27 @@ def bulk_upload_employees():
         validation_errors = []
         valid_employees = []
         
+        # Pre-fetch existing employee phones in a single query for high-speed O(1) bulk validation
+        existing_phones = set()
+        try:
+            phone_q = get_tenant_query(Employee).with_entities(Employee.phone).filter(Employee.phone.isnot(None))
+            if g.branch_id and g.role in ["BranchAdmin"]:
+                phone_q = phone_q.filter_by(branch_id=g.branch_id)
+            existing_phones = {str(p[0]).strip() for p in phone_q.all() if p[0]}
+        except Exception as err:
+            logger.warning(f"Failed to prefetch existing employee phones: {err}")
+            existing_phones = None
+
+        seen_file_phones = set()
+
         for idx, row_data in enumerate(data, 2):
-            errors = validate_employee_data(row_data, g.parlour_id, g.branch_id)
+            errors = validate_employee_data(
+                row_data, 
+                g.parlour_id, 
+                g.branch_id, 
+                existing_phones=existing_phones, 
+                seen_file_phones=seen_file_phones
+            )
             if errors:
                 validation_errors.append({
                     'row': idx,
@@ -259,7 +297,7 @@ def bulk_upload_employees():
                     'data': row_data
                 })
             else:
-                valid_employees.append(row_data)
+                valid_employees.append((idx, row_data))
         
         # Check subscription plan employee limit
         max_emp = None
@@ -290,7 +328,7 @@ def bulk_upload_employees():
         successful_count = 0
         failed_count = len(validation_errors)
         
-        for employee_data in valid_employees:
+        for row_idx, employee_data in valid_employees:
             try:
                 # Parse joining date if provided
                 joining_date = None
@@ -356,7 +394,7 @@ def bulk_upload_employees():
                 logger.error(f"Error inserting employee: {str(e)}")
                 failed_count += 1
                 validation_errors.append({
-                    'row': valid_employees.index(employee_data) + 2,
+                    'row': row_idx,
                     'errors': [f"Database error: {str(e)}"],
                     'data': employee_data
                 })

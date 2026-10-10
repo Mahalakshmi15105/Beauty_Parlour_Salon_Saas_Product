@@ -113,7 +113,8 @@ function BulkUploadModal({ module, onClose, onSuccess }) {
       const response = await API.post(`/bulk-upload/${module}`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
-        }
+        },
+        timeout: 300000 // 5 minutes timeout for bulk imports
       });
 
       const resData = response?.data || response;
@@ -125,7 +126,7 @@ function BulkUploadModal({ module, onClose, onSuccess }) {
       }
     } catch (err) {
       console.error("[BulkUploadModal] Upload Error:", err);
-      const errMsg = err?.message || err?.response?.data?.message || err?.error || "Upload failed. Please check file formatting and try again.";
+      const errMsg = err?.response?.data?.message || err?.message || err?.error || "Upload failed. Please check file formatting and try again.";
       setError(errMsg);
       setStep(2);
     } finally {

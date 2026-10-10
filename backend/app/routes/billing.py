@@ -15,6 +15,15 @@ import logging
 logger = logging.getLogger(__name__)
 billing_bp = Blueprint("billing", __name__)
 
+import time
+_recent_checkouts = {}  # key -> (timestamp, response_data)
+
+def _clean_recent_checkouts():
+    now = time.time()
+    expired = [k for k, (ts, _) in _recent_checkouts.items() if now - ts > 60]
+    for k in expired:
+        _recent_checkouts.pop(k, None)
+
 @billing_bp.route("/billing/checkout", methods=["POST"])
 @require_role(["ParlourAdmin", "BranchAdmin"])
 def checkout():
@@ -30,6 +39,23 @@ def checkout():
             message="Line items and payment allocations are required.",
             status_code=400
         )
+
+    # Deduplication and rapid double-click guard
+    _clean_recent_checkouts()
+    client_tx_id = data.get("client_transaction_id") or data.get("idempotency_key")
+    cache_key = f"{g.parlour_id}:{client_tx_id}" if client_tx_id else None
+    if cache_key and cache_key in _recent_checkouts:
+        logger.warning(f"Duplicate checkout request intercepted by client_tx_id {cache_key}")
+        _, cached_resp = _recent_checkouts[cache_key]
+        return success_response(cached_resp, 201)
+
+    dedup_sum = sum(float(p.get("amount", 0)) for p in payments_data)
+    dedup_sig = f"{g.parlour_id}:{customer_id}:{len(line_items_data)}:{round(dedup_sum, 2)}"
+    if dedup_sig in _recent_checkouts:
+        ts, cached_resp = _recent_checkouts[dedup_sig]
+        if time.time() - ts < 4.0:
+            logger.warning(f"Duplicate checkout request intercepted by rapid double-click signature {dedup_sig}")
+            return success_response(cached_resp, 201)
 
     # Determine target_branch_id
     target_branch_id = None
@@ -460,7 +486,7 @@ def checkout():
             "amount": float(pay.amount)
         })
 
-    return success_response({
+    result_data = {
         "id": invoice.id,
         "invoice_id": invoice.id,
         "invoice_number": invoice.invoice_number,
@@ -485,7 +511,13 @@ def checkout():
         "payments": response_payments,
         "membership_name": invoice.membership_name,
         "membership_discount": float(invoice.membership_discount or 0)
-    }, 201)
+    }
+
+    if cache_key:
+        _recent_checkouts[cache_key] = (time.time(), result_data)
+    _recent_checkouts[dedup_sig] = (time.time(), result_data)
+
+    return success_response(result_data, 201)
 
 
 @billing_bp.route("/invoices", methods=["GET"])

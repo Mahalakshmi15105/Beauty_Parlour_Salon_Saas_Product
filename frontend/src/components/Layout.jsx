@@ -109,6 +109,18 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
   const [shopNameTypography, setShopNameTypography] = useState(null);
   const [imgFailed, setImgFailed] = useState(false);
   const [branchData, setBranchData] = useState(null);
+  const [customerTotalCount, setCustomerTotalCount] = useState(() => {
+    return parseInt(localStorage.getItem("total_customers_count") || "0", 10);
+  });
+
+  useEffect(() => {
+    const handleCountUpdate = (e) => {
+      const cnt = Number(e?.detail || 0);
+      setCustomerTotalCount(cnt);
+    };
+    window.addEventListener("customers-count-updated", handleCountUpdate);
+    return () => window.removeEventListener("customers-count-updated", handleCountUpdate);
+  }, []);
 
   const fetchBranding = () => {
     if (user?.role === "BranchAdmin" && user?.branch_id) {
@@ -506,8 +518,13 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
               <Menu className="w-5 h-5 text-slate-700" />
             </button>
 
-            <h2 className="text-sm font-bold text-text-primary uppercase tracking-wide">
-              {t(menuItems.find((x) => x.id === activeTab)?.labelKey || activeTab)}
+            <h2 className="text-sm font-bold text-text-primary uppercase tracking-wide flex items-center gap-2">
+              <span>{t(menuItems.find((x) => x.id === activeTab)?.labelKey || activeTab)}</span>
+              {activeTab === "customers" && customerTotalCount > 0 && (
+                <span className="bg-primary/10 text-primary border border-primary/25 text-[11px] font-black px-2.5 py-0.5 rounded-full shadow-2xs normal-case tracking-normal">
+                  Total: {customerTotalCount.toLocaleString()}
+                </span>
+              )}
             </h2>
           </div>
 

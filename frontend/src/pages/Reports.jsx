@@ -451,9 +451,9 @@ function Reports() {
       const parlourNameStr = d.parlour_name || "SmartGoNext Beauty SaaS";
       const titleStr = `ATTENDANCE & SALARY REPORT - ${d.month_year || ""}`;
 
-      const totalCols = 2 + numDays + 1 + 1 + 11; // Attendance + Gap + Salary
+      const totalCols = 2 + numDays + 1 + 1 + 12; // Attendance + Gap + Salary
 
-      const headerRow = ["S.NO", "NAME", ...days.map((day) => `Day ${day.day}`), "TOTAL DAYS", "", "S.NO", "NAME", "SALARY", "TARGET", "ACHIEVED", "OFF", "TOTAL DAYS", "NET", "ADVANCE", "LESS AMOUNT", "AMOUNT"];
+      const headerRow = ["S.NO", "NAME", ...days.map((day) => `Day ${day.day}`), "TOTAL DAYS", "", "S.NO", "NAME", "SALARY", "PER DAY", "TARGET", "ACHIEVED", "OFF", "TOTAL DAYS", "NET", "ADVANCE", "LESS AMOUNT", "AMOUNT"];
 
       const wsData = [
         [parlourNameStr],
@@ -483,6 +483,7 @@ function Reports() {
           sal.sno || "",
           sal.name || "",
           sal.salary !== undefined ? sal.salary : "",
+          sal.per_day !== undefined ? Number(sal.per_day).toFixed(2) : "",
           sal.target !== undefined ? sal.target : "",
           sal.achieved !== undefined ? sal.achieved : "",
           sal.off !== undefined ? sal.off : "",
@@ -495,7 +496,7 @@ function Reports() {
       }
 
       const totalRowIdx = 4 + maxRows;
-      wsData.push(["TOTAL", "", ...days.map(() => ""), "", "", "", "TOTAL", d.totals?.salary || 0, d.totals?.target || 0, d.totals?.achieved || 0, "", "", Number(d.totals?.net || 0).toFixed(2), d.totals?.advance || 0, d.totals?.less_amount || 0, Number(d.totals?.amount || 0).toFixed(2)]);
+      wsData.push(["TOTAL", "", ...days.map(() => ""), "", "", "", "TOTAL", d.totals?.salary || 0, Number(d.totals?.per_day || 0).toFixed(2), d.totals?.target || 0, d.totals?.achieved || 0, "", "", Number(d.totals?.net || 0).toFixed(2), d.totals?.advance || 0, d.totals?.less_amount || 0, Number(d.totals?.amount || 0).toFixed(2)]);
 
       const ws = XLSX.utils.aoa_to_sheet(wsData);
 
@@ -1065,12 +1066,14 @@ function Reports() {
                                 <td
                                   key={d.day}
                                   className={`p-1 border-l border-slate-200 font-bold numeric ${
-                                    val === "OFF"
-                                      ? "bg-emerald-600 text-white"
+                                    val === "OFF" || val === "F"
+                                      ? "bg-emerald-600 text-white font-bold"
+                                      : val === "2L"
+                                      ? "bg-purple-700 text-white font-black"
                                       : val === "L"
                                       ? "bg-rose-600 text-white font-black"
                                       : val === "0.5"
-                                      ? "bg-amber-400 text-slate-900"
+                                      ? "bg-amber-400 text-slate-900 font-bold"
                                       : val === "1"
                                       ? "text-slate-800"
                                       : "text-slate-300 font-normal"
@@ -1100,6 +1103,7 @@ function Reports() {
                         <tr className="bg-slate-100 font-bold text-slate-700 border-b border-slate-200">
                           <th className="p-2">NAME</th>
                           <th className="p-2 text-right">SALARY</th>
+                          <th className="p-2 text-right text-sky-700 font-black">PER DAY</th>
                           <th className="p-2 text-right">NET</th>
                           <th className="p-2 text-right text-emerald-600">ADV</th>
                           <th className="p-2 text-right text-rose-600">LESS</th>
@@ -1111,6 +1115,7 @@ function Reports() {
                           <tr key={sal.sno} className="hover:bg-slate-50">
                             <td className="p-2 font-bold text-slate-900">{sal.name}</td>
                             <td className="p-2 text-right numeric">₹{sal.salary}</td>
+                            <td className="p-2 text-right font-bold text-sky-700 numeric">₹{sal.per_day !== undefined ? Number(sal.per_day).toFixed(2) : "0.00"}</td>
                             <td className="p-2 text-right font-bold numeric">₹{sal.net.toFixed(2)}</td>
                             <td className="p-2 text-right font-bold text-emerald-600 numeric">₹{sal.advance}</td>
                             <td className="p-2 text-right font-bold text-rose-600 numeric">₹{sal.less_amount}</td>
@@ -1122,6 +1127,7 @@ function Reports() {
                         <tr>
                           <td className="p-2">TOTAL</td>
                           <td className="p-2 text-right numeric">₹{reportData.totals?.salary}</td>
+                          <td className="p-2 text-right text-sky-800 font-black numeric">₹{reportData.totals?.per_day !== undefined ? Number(reportData.totals?.per_day).toFixed(2) : "0.00"}</td>
                           <td className="p-2 text-right numeric">₹{reportData.totals?.net?.toFixed(2)}</td>
                           <td className="p-2 text-right numeric">₹{reportData.totals?.advance}</td>
                           <td className="p-2 text-right numeric">₹{reportData.totals?.less_amount}</td>

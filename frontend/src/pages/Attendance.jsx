@@ -39,6 +39,7 @@ export default function Attendance() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
   const [manualReason, setManualReason] = useState("");
   const [manualStatus, setManualStatus] = useState("P");
+  const [isDoubleDeduction, setIsDoubleDeduction] = useState(false);
   const [manualLoading, setManualLoading] = useState(false);
   const [manualFeedback, setManualFeedback] = useState(null);
 
@@ -89,17 +90,21 @@ export default function Attendance() {
     const selectedEmp = employeesList.find((e) => String(e.id) === String(selectedEmployeeId));
     const empBranchId = selectedEmp?.branch_id || user?.branch_id;
 
+    const finalStatus = manualStatus === "L" && isDoubleDeduction ? "2L" : manualStatus;
+
     API.post("/attendance/manual-checkin", {
       action_type: manualAction,
       employee_id: parseInt(selectedEmployeeId, 10),
       branch_id: empBranchId ? parseInt(empBranchId, 10) : undefined,
       reason: manualReason || "Manual Front-Desk Fallback",
-      status: manualStatus,
+      status: finalStatus,
+      is_double_deduction: manualStatus === "L" && isDoubleDeduction,
     })
       .then((res) => {
         setManualLoading(false);
         setManualFeedback({ type: "success", message: res.data?.message || "Manual attendance recorded successfully." });
         setManualReason("");
+        setIsDoubleDeduction(false);
         fetchAttendance();
       })
       .catch((err) => {
@@ -371,10 +376,20 @@ export default function Attendance() {
                               <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
                               <span>Half Day (HP)</span>
                             </span>
-                          ) : r.status === "OFF" ? (
+                          ) : r.status === "F" || r.status === "OFF" ? (
+                            <span className="inline-flex items-center space-x-1.5 bg-sky-50 border border-sky-200 text-sky-700 px-3 py-1 rounded-full text-[11px] font-extrabold">
+                              <CheckCircle className="w-3.5 h-3.5 text-sky-600" />
+                              <span>Off (Paid Off)</span>
+                            </span>
+                          ) : r.status === "2L" || r.status === "L_DOUBLE" ? (
+                            <span className="inline-flex items-center space-x-1.5 bg-purple-50 border border-purple-200 text-purple-700 px-3 py-1 rounded-full text-[11px] font-extrabold">
+                              <ShieldAlert className="w-3.5 h-3.5 text-purple-600" />
+                              <span>Leave (2x Deduction)</span>
+                            </span>
+                          ) : r.status === "L" || r.status === "Leave" ? (
                             <span className="inline-flex items-center space-x-1.5 bg-rose-50 border border-rose-200 text-rose-700 px-3 py-1 rounded-full text-[11px] font-extrabold">
                               <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
-                              <span>Off / Leave</span>
+                              <span>Leave (1x Deduction)</span>
                             </span>
                           ) : (
                             <span className="inline-flex items-center space-x-1.5 bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1 rounded-full text-[11px] font-extrabold">
@@ -466,7 +481,10 @@ export default function Attendance() {
                         name="manualStatus"
                         value="P"
                         checked={manualStatus === "P"}
-                        onChange={() => setManualStatus("P")}
+                        onChange={() => {
+                          setManualStatus("P");
+                          setIsDoubleDeduction(false);
+                        }}
                         className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                       />
                       <span className="text-xs font-extrabold text-emerald-700">P (Present)</span>
@@ -477,7 +495,12 @@ export default function Attendance() {
                         name="manualStatus"
                         value="HP"
                         checked={manualStatus === "HP"}
-                        onChange={() => setManualStatus("HP")}
+                        onChange={() => {
+                          setManualStatus("HP");
+                          const isWeekend = new Date().getDay() === 0 || new Date().getDay() === 6;
+                          if (isWeekend) setIsDoubleDeduction(true);
+                          else setIsDoubleDeduction(false);
+                        }}
                         className="w-4 h-4 text-amber-600 focus:ring-amber-500 cursor-pointer"
                       />
                       <span className="text-xs font-extrabold text-amber-700">HP (Half Day)</span>
@@ -486,14 +509,64 @@ export default function Attendance() {
                       <input
                         type="radio"
                         name="manualStatus"
+                        value="F"
+                        checked={manualStatus === "F"}
+                        onChange={() => {
+                          setManualStatus("F");
+                          setIsDoubleDeduction(false);
+                        }}
+                        className="w-4 h-4 text-sky-600 focus:ring-sky-500 cursor-pointer"
+                      />
+                      <span className="text-xs font-extrabold text-sky-700">F (Off)</span>
+                    </label>
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="manualStatus"
                         value="L"
-                        checked={manualStatus === "L" || manualStatus === "OFF"}
-                        onChange={() => setManualStatus("L")}
+                        checked={manualStatus === "L"}
+                        onChange={() => {
+                          setManualStatus("L");
+                          const isWeekend = new Date().getDay() === 0 || new Date().getDay() === 6;
+                          if (isWeekend) setIsDoubleDeduction(true);
+                        }}
                         className="w-4 h-4 text-rose-600 focus:ring-rose-500 cursor-pointer"
                       />
-                      <span className="text-xs font-extrabold text-rose-700">L / OFF (Leave / Day Off)</span>
+                      <span className="text-xs font-extrabold text-rose-700">L (Leave)</span>
                     </label>
                   </div>
+
+                  {/* Double Payment / Deduction toggle - Enabled for Leave (L) and Half Day (HP) */}
+                  {(manualStatus === "L" || manualStatus === "HP") && (
+                    <div className="mt-3 p-3.5 bg-rose-50/90 border border-rose-200 rounded-2xl flex items-center justify-between transition-all">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs font-black text-rose-900 uppercase tracking-wide">
+                            Double Payment / Deduction
+                          </span>
+                          {(new Date().getDay() === 0 || new Date().getDay() === 6) && (
+                            <span className="bg-rose-200 text-rose-900 text-[10px] font-black px-2 py-0.5 rounded-full">
+                              Weekend (Sat/Sun)
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-rose-700 font-medium">
+                          {manualStatus === "L"
+                            ? "Deducts 2 days of salary for this leave (Saturday/Sunday penalty)."
+                            : "Deducts 1 full day of salary for taking half day leave on weekend (Saturday/Sunday penalty)."}
+                        </p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={isDoubleDeduction}
+                          onChange={(e) => setIsDoubleDeduction(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-600"></div>
+                      </label>
+                    </div>
+                  )}
                 </div>
               )}
 

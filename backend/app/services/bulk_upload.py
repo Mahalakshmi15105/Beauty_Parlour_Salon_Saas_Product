@@ -515,24 +515,31 @@ def parse_excel_file(file_data, module_name):
             if req_field not in header_to_field.values():
                 return False, [], f"Missing required column: {req}"
 
-        # Parse data rows
+        # Pre-calculate column index and field name for fast O(1) extraction
+        header_indices = []
+        for col_idx, header in enumerate(raw_headers):
+            field_name = header_to_field.get(header)
+            if field_name:
+                header_indices.append((col_idx, field_name))
+
+        # Parse data rows using fast values_only streaming
         data = []
         errors = []
-        
-        for row_num, row in enumerate(ws.iter_rows(min_row=2), 2):
-            row_data = {}
-            row_errors = []
-            
-            # Check if row is completely empty
-            row_cells = [cell.value for cell in row[:len(raw_headers)]]
-            if all(v is None or str(v).strip() == "" for v in row_cells):
+
+        for row_num, row_cells in enumerate(ws.iter_rows(min_row=2, values_only=True), 2):
+            if not row_cells:
                 continue
 
-            for col_num, header in enumerate(raw_headers, 1):
-                field_name = header_to_field.get(header)
-                if not field_name:
-                    continue
-                cell_value = ws.cell(row=row_num, column=col_num).value
+            # Check if row is completely empty
+            row_prefix = row_cells[:len(raw_headers)]
+            if all(v is None or str(v).strip() == "" for v in row_prefix):
+                continue
+
+            row_data = {}
+            row_errors = []
+
+            for col_idx, field_name in header_indices:
+                cell_value = row_cells[col_idx] if col_idx < len(row_cells) else None
                 row_data[field_name] = convert_cell_value(cell_value, field_name)
             
             # Validate required fields
@@ -575,6 +582,15 @@ def convert_cell_value(value, field_name):
             return int(float(val_str)) if val_str else 0
         except (ValueError, TypeError):
             return 0
+    elif field_name == 'phone':
+        if isinstance(value, float):
+            return str(int(value))
+        elif isinstance(value, int):
+            return str(value)
+        val_str = str(value).strip() if value is not None else ""
+        if val_str.endswith('.0') and val_str[:-2].replace('.', '').isdigit():
+            val_str = val_str[:-2]
+        return val_str if val_str and val_str.lower() not in ['none', 'null', 'nan'] else None
     elif field_name in ['date_of_birth', 'joining_date']:
         if isinstance(value, datetime):
             return value.strftime('%Y-%m-%d')
@@ -592,7 +608,7 @@ def convert_cell_value(value, field_name):
         val_str = str(value).strip() if value is not None else ""
         return val_str if val_str and val_str.lower() not in ['none', 'null', 'nan'] else None
 
-def validate_customer_data(row_data, tenant_id, branch_id=None):
+def validate_customer_data(row_data, tenant_id, branch_id=None, existing_phones=None, seen_file_phones=None):
     """Validate customer data according to existing rules"""
     from app.models.customer import Customer
     from app.database import db
@@ -626,20 +642,29 @@ def validate_customer_data(row_data, tenant_id, branch_id=None):
     
     # Check for duplicate phone in tenant context
     if phone:
-        from app.utils.auth import get_tenant_query
-        try:
-            query = get_tenant_query(Customer).filter_by(phone=phone)
-            if branch_id:
-                query = query.filter_by(branch_id=branch_id)
-            existing = query.first()
-            if existing:
+        if existing_phones is not None:
+            if phone in existing_phones:
                 errors.append(f"Customer with phone {phone} already exists")
-        except Exception as e:
-            logger.warning(f"Customer duplicate check notice: {e}")
+            elif seen_file_phones is not None:
+                if phone in seen_file_phones:
+                    errors.append(f"Duplicate phone {phone} found in uploaded file")
+                else:
+                    seen_file_phones.add(phone)
+        else:
+            from app.utils.auth import get_tenant_query
+            try:
+                query = get_tenant_query(Customer).filter_by(phone=phone)
+                if branch_id:
+                    query = query.filter_by(branch_id=branch_id)
+                existing = query.first()
+                if existing:
+                    errors.append(f"Customer with phone {phone} already exists")
+            except Exception as e:
+                logger.warning(f"Customer duplicate check notice: {e}")
     
     return errors
 
-def validate_employee_data(row_data, tenant_id, branch_id=None):
+def validate_employee_data(row_data, tenant_id, branch_id=None, existing_phones=None, seen_file_phones=None):
     """Validate employee data according to existing rules"""
     from app.models.employee import Employee
     from app.database import db
@@ -702,16 +727,25 @@ def validate_employee_data(row_data, tenant_id, branch_id=None):
     
     # Check for duplicate phone in tenant/branch context
     if phone:
-        from app.utils.auth import get_tenant_query
-        try:
-            query = get_tenant_query(Employee).filter_by(phone=phone)
-            if branch_id:
-                query = query.filter_by(branch_id=branch_id)
-            existing = query.first()
-            if existing:
+        if existing_phones is not None:
+            if phone in existing_phones:
                 errors.append(f"Employee with phone {phone} already exists")
-        except Exception as e:
-            logger.warning(f"Employee duplicate check notice: {e}")
+            elif seen_file_phones is not None:
+                if phone in seen_file_phones:
+                    errors.append(f"Duplicate phone {phone} found in uploaded file")
+                else:
+                    seen_file_phones.add(phone)
+        else:
+            from app.utils.auth import get_tenant_query
+            try:
+                query = get_tenant_query(Employee).filter_by(phone=phone)
+                if branch_id:
+                    query = query.filter_by(branch_id=branch_id)
+                existing = query.first()
+                if existing:
+                    errors.append(f"Employee with phone {phone} already exists")
+            except Exception as e:
+                logger.warning(f"Employee duplicate check notice: {e}")
     
     return errors
 

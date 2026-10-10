@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
 import { useModalFocusTrap, useFormKeyboardNavigation, focusAndOpenSelect } from "../utils/keyboardNavigation";
-import { UserRoundX, X, MessageSquare, Phone, AlertTriangle, Calendar, Settings as SettingsIcon, Printer, FileSpreadsheet, FileText, Upload, Eye } from "lucide-react";
+import { UserRoundX, X, MessageSquare, Phone, AlertTriangle, Calendar, Settings as SettingsIcon, Printer, FileSpreadsheet, FileText, Upload, Eye, Users, Loader2 } from "lucide-react";
 import { exportToCSV, printDataList, exportToPDF, exportToExcel } from "../utils/exportUtils";
 import BulkUploadModal from "../components/BulkUploadModal";
 import DeleteConfirmModal from "../components/DeleteConfirmModal";
@@ -15,7 +15,11 @@ function Customers() {
   const firstNameInputRef = useRef(null);
   const phoneInputRef = useRef(null);
   const [customers, setCustomers] = useState([]);
+  const [totalCustomers, setTotalCustomers] = useState(() => {
+    return parseInt(localStorage.getItem("total_customers_count") || "0", 10);
+  });
   const [loading, setLoading] = useState(true);
+  const [exportLoading, setExportLoading] = useState(false);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
   const [gender, setGender] = useState("");
@@ -81,13 +85,20 @@ function Customers() {
     setLoading(true);
     let url = `/customers?limit=10`;
     if (currentCursor) url += `&cursor=${currentCursor}`;
-    if (search) url += `&q=${search}`;
-    if (gender) url += `&gender=${gender}`;
+    if (search) url += `&q=${encodeURIComponent(search)}`;
+    if (gender) url += `&gender=${encodeURIComponent(gender)}`;
 
     API.get(url)
       .then((res) => {
-        setCustomers(res.data.items || []);
-        setNextCursor(res.data.next_cursor || null);
+        const items = res.data?.items || [];
+        setCustomers(items);
+        setNextCursor(res.data?.next_cursor || null);
+        const total = res.data?.total_customers ?? res.data?.total_count ?? items.length;
+        setTotalCustomers(total);
+        try {
+          localStorage.setItem("total_customers_count", String(total));
+        } catch (e) {}
+        window.dispatchEvent(new CustomEvent('customers-count-updated', { detail: total }));
         setLoading(false);
       })
       .catch((err) => {
@@ -104,64 +115,122 @@ function Customers() {
     }
   }, [search, gender, activeSubTab, churnThreshold]);
 
-  const handlePrint = () => {
-    const exportData = activeSubTab === "dormant" ? dormantCustomers : customers;
-    const title = activeSubTab === "dormant" ? "Dormant Clients List" : "Customers List";
-    const columns = [
-      { header: "Name", accessor: (row) => `${row.first_name || ""} ${row.last_name || ""}`.trim() },
-      { header: "Phone", accessor: "phone" },
-      { header: "Email", accessor: "email" },
-      { header: "Gender", accessor: "gender" },
-      { header: "DOB", accessor: "date_of_birth" }
-    ];
-    printDataList(title, exportData, columns);
+  // Fetch complete dataset (all 1000+ customers) for export / printing
+  const fetchAllCustomersForExport = async () => {
+    if (activeSubTab === "dormant") {
+      return dormantCustomers;
+    }
+    let url = `/customers?all=true`;
+    if (search) url += `&q=${encodeURIComponent(search)}`;
+    if (gender) url += `&gender=${encodeURIComponent(gender)}`;
+
+    const res = await API.get(url);
+    const data = res?.data?.items || res?.data || [];
+    return Array.isArray(data) ? data : [];
   };
 
-  const handleExportCSV = () => {
-    const exportData = activeSubTab === "dormant" ? dormantCustomers : customers;
-    const title = activeSubTab === "dormant" ? "Dormant Clients List" : "Customers List";
-    const filename = activeSubTab === "dormant" ? "dormant_clients_list" : "customers_list";
-    const columns = [
-      { header: "First Name", accessor: "first_name" },
-      { header: "Last Name", accessor: "last_name" },
-      { header: "Phone", accessor: "phone" },
-      { header: "Email", accessor: "email" },
-      { header: "Gender", accessor: "gender" },
-      { header: "DOB", accessor: "date_of_birth" },
-      { header: "Address", accessor: "address" }
-    ];
-    exportToCSV(exportData, columns, filename);
+  const handlePrint = async () => {
+    try {
+      setExportLoading(true);
+      const exportData = await fetchAllCustomersForExport();
+      if (!exportData || exportData.length === 0) {
+        showError("No customers found to print.");
+        return;
+      }
+      const title = activeSubTab === "dormant" ? "Dormant Clients List" : "Customers List";
+      const columns = [
+        { header: "Name", accessor: (row) => `${row.first_name || ""} ${row.last_name || ""}`.trim() },
+        { header: "Phone", accessor: "phone" },
+        { header: "Email", accessor: "email" },
+        { header: "Gender", accessor: "gender" },
+        { header: "DOB", accessor: "date_of_birth" }
+      ];
+      printDataList(title, exportData, columns);
+    } catch (err) {
+      showError("Failed to prepare complete customer list for printing.");
+    } finally {
+      setExportLoading(false);
+    }
   };
 
-  const handleExportExcel = () => {
-    const exportData = activeSubTab === "dormant" ? dormantCustomers : customers;
-    const title = activeSubTab === "dormant" ? "Dormant Clients List" : "Customers List";
-    const filename = activeSubTab === "dormant" ? "dormant_clients_list" : "customers_list";
-    const columns = [
-      { header: "First Name", accessor: "first_name" },
-      { header: "Last Name", accessor: "last_name" },
-      { header: "Phone Number", accessor: "phone" },
-      { header: "Email", accessor: "email" },
-      { header: "Gender", accessor: "gender" },
-      { header: "Date of Birth", accessor: "date_of_birth" },
-      { header: "Address", accessor: "address" },
-      { header: "Notes", accessor: "notes" }
-    ];
-    exportToExcel(title, exportData, columns, filename);
+  const handleExportCSV = async () => {
+    try {
+      setExportLoading(true);
+      const exportData = await fetchAllCustomersForExport();
+      if (!exportData || exportData.length === 0) {
+        showError("No customers found to export.");
+        return;
+      }
+      const title = activeSubTab === "dormant" ? "Dormant Clients List" : "Customers List";
+      const filename = activeSubTab === "dormant" ? "dormant_clients_list" : "customers_list";
+      const columns = [
+        { header: "First Name", accessor: "first_name" },
+        { header: "Last Name", accessor: "last_name" },
+        { header: "Phone", accessor: "phone" },
+        { header: "Email", accessor: "email" },
+        { header: "Gender", accessor: "gender" },
+        { header: "DOB", accessor: "date_of_birth" },
+        { header: "Address", accessor: "address" }
+      ];
+      exportToCSV(exportData, columns, filename);
+    } catch (err) {
+      showError("Failed to export complete customer list to CSV.");
+    } finally {
+      setExportLoading(false);
+    }
   };
 
-  const handleExportPDF = () => {
-    const exportData = activeSubTab === "dormant" ? dormantCustomers : customers;
-    const title = activeSubTab === "dormant" ? "Dormant Clients List" : "Customers List";
-    const filename = activeSubTab === "dormant" ? "dormant_clients_list" : "customers_list";
-    const columns = [
-      { header: "Name", accessor: (row) => `${row.first_name || ""} ${row.last_name || ""}`.trim(), width: 35 },
-      { header: "Phone", accessor: "phone", width: 25 },
-      { header: "Email", accessor: "email", width: 35 },
-      { header: "Gender", accessor: "gender", width: 20 },
-      { header: "DOB", accessor: "date_of_birth", width: 25 }
-    ];
-    exportToPDF(title, exportData, columns, filename);
+  const handleExportExcel = async () => {
+    try {
+      setExportLoading(true);
+      const exportData = await fetchAllCustomersForExport();
+      if (!exportData || exportData.length === 0) {
+        showError("No customers found to export.");
+        return;
+      }
+      const title = activeSubTab === "dormant" ? "Dormant Clients List" : "Customers List";
+      const filename = activeSubTab === "dormant" ? "dormant_clients_list" : "customers_list";
+      const columns = [
+        { header: "First Name", accessor: "first_name" },
+        { header: "Last Name", accessor: "last_name" },
+        { header: "Phone Number", accessor: "phone" },
+        { header: "Email", accessor: "email" },
+        { header: "Gender", accessor: "gender" },
+        { header: "Date of Birth", accessor: "date_of_birth" },
+        { header: "Address", accessor: "address" },
+        { header: "Notes", accessor: "notes" }
+      ];
+      exportToExcel(title, exportData, columns, filename);
+    } catch (err) {
+      showError("Failed to export complete customer list to Excel.");
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    try {
+      setExportLoading(true);
+      const exportData = await fetchAllCustomersForExport();
+      if (!exportData || exportData.length === 0) {
+        showError("No customers found to export.");
+        return;
+      }
+      const title = activeSubTab === "dormant" ? "Dormant Clients List" : "Customers List";
+      const filename = activeSubTab === "dormant" ? "dormant_clients_list" : "customers_list";
+      const columns = [
+        { header: "Name", accessor: (row) => `${row.first_name || ""} ${row.last_name || ""}`.trim(), width: 35 },
+        { header: "Phone", accessor: "phone", width: 25 },
+        { header: "Email", accessor: "email", width: 35 },
+        { header: "Gender", accessor: "gender", width: 20 },
+        { header: "DOB", accessor: "date_of_birth", width: 25 }
+      ];
+      exportToPDF(title, exportData, columns, filename);
+    } catch (err) {
+      showError("Failed to export complete customer list to PDF.");
+    } finally {
+      setExportLoading(false);
+    }
   };
 
   const handleNextPage = () => {
@@ -268,8 +337,14 @@ function Customers() {
       {/* Title Bar */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-xl font-semibold text-text-primary">Customers Manager</h1>
-          <p className="text-xs text-text-secondary">Manage visitor directories, preferences, and dormant re-engagement campaigns.</p>
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-semibold text-text-primary">Customers Manager</h1>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-primary/10 text-primary border border-primary/20 shadow-2xs">
+              <Users className="w-3.5 h-3.5" />
+              Total Customers: <span className="numeric">{totalCustomers.toLocaleString()}</span>
+            </span>
+          </div>
+          <p className="text-xs text-text-secondary mt-0.5">Manage visitor directories, preferences, and dormant re-engagement campaigns.</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -292,11 +367,14 @@ function Customers() {
       <div className="flex border-b border-border-soft space-x-2">
         <button
           onClick={() => setActiveSubTab("all")}
-          className={`py-2.5 px-4 font-semibold text-xs border-b-2 transition-all ${
+          className={`py-2.5 px-4 font-semibold text-xs border-b-2 transition-all flex items-center gap-2 ${
             activeSubTab === "all" ? "border-primary text-primary" : "border-transparent text-text-secondary hover:text-text-primary"
           }`}
         >
-          All Customers
+          <span>All Customers</span>
+          <span className="bg-primary text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-2xs">
+            {totalCustomers.toLocaleString()}
+          </span>
         </button>
         <button
           onClick={() => setActiveSubTab("dormant")}
@@ -333,26 +411,29 @@ function Customers() {
             <div className="flex space-x-2 border-l border-border-soft pl-4">
               <button
                 onClick={handlePrint}
-                className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-slate-200"
-                title="Print List"
+                disabled={exportLoading}
+                className="bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-slate-200 cursor-pointer"
+                title={`Print All Customers (${totalCustomers})`}
               >
-                <Printer className="w-3.5 h-3.5" />
+                {exportLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Printer className="w-3.5 h-3.5" />}
                 <span>Print</span>
               </button>
               <button
                 onClick={handleExportExcel}
-                className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-emerald-200"
-                title="Export to Excel"
+                disabled={exportLoading}
+                className="bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 text-emerald-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-emerald-200 cursor-pointer"
+                title={`Export All Customers to Excel (${totalCustomers})`}
               >
-                <FileSpreadsheet className="w-3.5 h-3.5" />
+                {exportLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
                 <span>Excel</span>
               </button>
               <button
                 onClick={handleExportPDF}
-                className="bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-rose-200"
-                title="Export to PDF"
+                disabled={exportLoading}
+                className="bg-rose-50 hover:bg-rose-100 disabled:opacity-50 text-rose-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-rose-200 cursor-pointer"
+                title={`Export All Customers to PDF (${totalCustomers})`}
               >
-                <FileText className="w-3.5 h-3.5" />
+                {exportLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
                 <span>PDF</span>
               </button>
             </div>
@@ -360,6 +441,23 @@ function Customers() {
 
           {/* Data Table */}
           <div className="bg-surface border border-border-soft rounded-lg overflow-hidden">
+            {/* Prominent Header Banner Showing Total Number of Customers */}
+            <div className="px-6 py-3 bg-slate-50/90 dark:bg-slate-800/40 border-b border-border-soft flex justify-between items-center text-xs">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-slate-600 dark:text-slate-300">Total Registered Customers:</span>
+                <span className="bg-primary text-white font-black text-xs px-2.5 py-0.5 rounded-full shadow-2xs">
+                  {totalCustomers.toLocaleString()}
+                </span>
+              </div>
+              <div className="text-slate-500 font-medium text-[11px]">
+                {search ? (
+                  <span>Showing results matching &quot;<strong className="text-slate-700">{search}</strong>&quot;</span>
+                ) : (
+                  <span>All <strong className="text-slate-700">{totalCustomers.toLocaleString()}</strong> customers exported on Print/Excel/PDF</span>
+                )}
+              </div>
+            </div>
+
             {loading ? (
               <div className="p-8 space-y-4">
                 <div className="h-6 bg-border-soft rounded animate-pulse w-1/4"></div>
