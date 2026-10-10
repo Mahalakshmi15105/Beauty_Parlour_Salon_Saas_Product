@@ -768,54 +768,59 @@ def manual_attendance_checkin():
     branch = Branch.query.get(target_branch_id)
     branch_name = branch.name if branch else "Main Branch"
 
-    today_curr = get_ist_today()
-    today_start = datetime.combine(today_curr, datetime.min.time())
-    today_end = datetime.combine(today_curr, datetime.max.time())
+    date_str = (data.get("date") or "").strip()
+    target_date = get_ist_today()
+    if date_str:
+        try:
+            target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            target_date = get_ist_today()
 
-    # Check any attendance today for this employee across branch or tenant
+    target_start = datetime.combine(target_date, datetime.min.time())
+    target_end = datetime.combine(target_date, datetime.max.time())
+
+    # Check any attendance on target date for this employee across branch or tenant
     existing = Attendance.query.filter_by(
         employee_id=employee.id
-    ).filter(Attendance.timestamp >= today_start, Attendance.timestamp <= today_end).order_by(Attendance.timestamp.desc()).first()
+    ).filter(Attendance.timestamp >= target_start, Attendance.timestamp <= target_end).order_by(Attendance.timestamp.desc()).first()
 
     now = get_ist_now()
+    if target_date == get_ist_today():
+        att_timestamp = now
+    else:
+        att_timestamp = datetime.combine(target_date, datetime.strptime("09:30:00", "%H:%M:%S").time())
+
+    date_formatted = target_date.strftime("%d %b %Y")
 
     if action_type == "checkin":
         if existing:
-            # If same status already recorded (and already Present/Half Day), inform user
-            if existing.status == status_type and existing.status in ["P", "HP"]:
-                cin_time = existing.timestamp.strftime("%I:%M %p")
-                return jsonify({
-                    "status": "error",
-                    "message": f"This employee is already marked as Present today at {cin_time}."
-                }), 400
-
-            # Override/update existing status
+            # Override/update existing status for that date
             existing.status = status_type
             existing.branch_id = target_branch_id
             existing.checkin_method = "Manual"
-            existing.timestamp = now
+            if target_date == get_ist_today():
+                existing.timestamp = now
             db.session.commit()
 
-            cin_time = now.strftime("%I:%M %p")
             status_label = get_status_label(existing.status)
             return jsonify({
                 "status": "success",
                 "action": "checkin",
-                "message": f"✅ Attendance updated to {status_label} for {employee.first_name} {employee.last_name or ''} at {cin_time} ({branch_name}).",
+                "message": f"✅ Attendance updated to {status_label} for {employee.first_name} {employee.last_name or ''} for {date_formatted} ({branch_name}).",
                 "data": {
                     "id": existing.id,
                     "employee_name": f"{employee.first_name} {employee.last_name or ''}".strip(),
-                    "checkin_time": cin_time,
+                    "date": target_date.strftime("%Y-%m-%d"),
                     "status": existing.status
                 }
             }), 200
 
-        # Create new Manual Check-in
+        # Create new Manual Check-in on target_date
         attendance = Attendance(
             tenant_id=tenant_id or employee.tenant_id or 1,
             employee_id=employee.id,
             branch_id=target_branch_id,
-            timestamp=now,
+            timestamp=att_timestamp,
             checkin_method="Manual",
             location_flagged=False,
             location_unavailable=True,
@@ -824,16 +829,15 @@ def manual_attendance_checkin():
         db.session.add(attendance)
         db.session.commit()
 
-        cin_time = now.strftime("%I:%M %p")
         status_label = get_status_label(attendance.status)
         return jsonify({
             "status": "success",
             "action": "checkin",
-            "message": f"✅ Manual check-in ({status_label}) submitted for {employee.first_name} {employee.last_name or ''} at {cin_time} ({branch_name}). Audit Reason: {reason}",
+            "message": f"✅ Manual attendance ({status_label}) submitted for {employee.first_name} {employee.last_name or ''} for {date_formatted} ({branch_name}). Audit Reason: {reason}",
             "data": {
                 "id": attendance.id,
                 "employee_name": f"{employee.first_name} {employee.last_name or ''}".strip(),
-                "checkin_time": cin_time,
+                "date": target_date.strftime("%Y-%m-%d"),
                 "status": attendance.status
             }
         }), 201
@@ -842,10 +846,10 @@ def manual_attendance_checkin():
         if not existing:
             return jsonify({
                 "status": "error",
-                "message": "This employee has not checked in today yet."
+                "message": f"This employee has no check-in recorded on {date_formatted}."
             }), 400
 
-        if existing.check_out_time:
+        if existing.check_out_time and target_date == get_ist_today():
             cout_time = existing.check_out_time.strftime("%I:%M %p")
             return jsonify({
                 "status": "error",
@@ -853,15 +857,17 @@ def manual_attendance_checkin():
             }), 400
 
         # Perform Manual Check-out
-        existing.check_out_time = now
-        existing.status = status_type if status_type in ["P", "HP", "OFF"] else "P"
+        if target_date == get_ist_today():
+            existing.check_out_time = now
+        else:
+            existing.check_out_time = datetime.combine(target_date, datetime.strptime("18:30:00", "%H:%M:%S").time())
         db.session.commit()
 
-        cout_time = now.strftime("%I:%M %p")
+        cout_time = existing.check_out_time.strftime("%I:%M %p")
         return jsonify({
             "status": "success",
             "action": "checkout",
-            "message": f"✅ Manual check-out recorded for {employee.first_name} {employee.last_name or ''} at {cout_time}. Audit Reason: {reason}",
+            "message": f"✅ Check-out recorded for {employee.first_name} {employee.last_name or ''} on {date_formatted} at {cout_time}. Audit Reason: {reason}",
             "data": {
                 "id": existing.id,
                 "employee_name": f"{employee.first_name} {employee.last_name or ''}".strip(),

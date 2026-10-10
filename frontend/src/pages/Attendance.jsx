@@ -39,9 +39,19 @@ export default function Attendance() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
   const [manualReason, setManualReason] = useState("");
   const [manualStatus, setManualStatus] = useState("P");
+  const [manualDate, setManualDate] = useState(getTodayStr());
   const [isDoubleDeduction, setIsDoubleDeduction] = useState(false);
   const [manualLoading, setManualLoading] = useState(false);
   const [manualFeedback, setManualFeedback] = useState(null);
+
+  const checkIsWeekend = (dateStr) => {
+    if (!dateStr) return false;
+    const parts = dateStr.split("-").map(Number);
+    if (parts.length !== 3) return false;
+    const dt = new Date(parts[0], parts[1] - 1, parts[2]);
+    const dayOfWeek = dt.getDay();
+    return dayOfWeek === 0 || dayOfWeek === 6;
+  };
 
   // Fetch branches and employees on mount
   useEffect(() => {
@@ -94,11 +104,12 @@ export default function Attendance() {
 
     API.post("/attendance/manual-checkin", {
       action_type: manualAction,
+      date: manualDate,
       employee_id: parseInt(selectedEmployeeId, 10),
       branch_id: empBranchId ? parseInt(empBranchId, 10) : undefined,
       reason: manualReason || "Manual Front-Desk Fallback",
       status: finalStatus,
-      is_double_deduction: manualStatus === "L" && isDoubleDeduction,
+      is_double_deduction: (manualStatus === "L" || manualStatus === "HP") && isDoubleDeduction,
     })
       .then((res) => {
         setManualLoading(false);
@@ -468,6 +479,31 @@ export default function Attendance() {
                 </div>
               </div>
 
+              {/* Attendance Date Selector */}
+              <div>
+                <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">
+                  ATTENDANCE DATE *
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={manualDate}
+                  max={getTodayStr()}
+                  onChange={(e) => {
+                    const chosen = e.target.value;
+                    setManualDate(chosen);
+                    if (chosen && (manualStatus === "L" || manualStatus === "HP")) {
+                      if (checkIsWeekend(chosen)) setIsDoubleDeduction(true);
+                      else setIsDoubleDeduction(false);
+                    }
+                  }}
+                  className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:border-pink-500 transition numeric"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Select today or any past date to record or update attendance for that day.
+                </p>
+              </div>
+
               {/* Status Selector */}
               {manualAction === "checkin" && (
                 <div>
@@ -497,8 +533,7 @@ export default function Attendance() {
                         checked={manualStatus === "HP"}
                         onChange={() => {
                           setManualStatus("HP");
-                          const isWeekend = new Date().getDay() === 0 || new Date().getDay() === 6;
-                          if (isWeekend) setIsDoubleDeduction(true);
+                          if (checkIsWeekend(manualDate)) setIsDoubleDeduction(true);
                           else setIsDoubleDeduction(false);
                         }}
                         className="w-4 h-4 text-amber-600 focus:ring-amber-500 cursor-pointer"
@@ -527,8 +562,8 @@ export default function Attendance() {
                         checked={manualStatus === "L"}
                         onChange={() => {
                           setManualStatus("L");
-                          const isWeekend = new Date().getDay() === 0 || new Date().getDay() === 6;
-                          if (isWeekend) setIsDoubleDeduction(true);
+                          if (checkIsWeekend(manualDate)) setIsDoubleDeduction(true);
+                          else setIsDoubleDeduction(false);
                         }}
                         className="w-4 h-4 text-rose-600 focus:ring-rose-500 cursor-pointer"
                       />
@@ -544,7 +579,7 @@ export default function Attendance() {
                           <span className="text-xs font-black text-rose-900 uppercase tracking-wide">
                             Double Payment / Deduction
                           </span>
-                          {(new Date().getDay() === 0 || new Date().getDay() === 6) && (
+                          {checkIsWeekend(manualDate) && (
                             <span className="bg-rose-200 text-rose-900 text-[10px] font-black px-2 py-0.5 rounded-full">
                               Weekend (Sat/Sun)
                             </span>
