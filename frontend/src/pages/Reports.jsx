@@ -820,12 +820,12 @@ function Reports() {
                               <td className="p-2 text-center font-bold text-slate-400 numeric">{row.sno}</td>
                               <td className="p-2 font-bold text-slate-900">{row.service}</td>
                               <td className="p-2">{row.staff}</td>
-                              <td className="p-2 text-right numeric">₹{row.amt}</td>
-                              <td className="p-2 text-right numeric">₹{row.gst}</td>
-                              <td className="p-2 text-right numeric">₹{row.cash}</td>
-                              <td className="p-2 text-right numeric">₹{row.paytm}</td>
-                              <td className="p-2 text-right numeric">₹{row.card}</td>
-                              <td className="p-2 text-right font-black text-slate-900 numeric">₹{row.total}</td>
+                              <td className="p-2 text-right numeric">₹{Math.round(row.amt || 0)}</td>
+                              <td className="p-2 text-right numeric">₹{Math.round(row.gst || 0)}</td>
+                              <td className="p-2 text-right numeric">₹{Math.round(row.cash || 0)}</td>
+                              <td className="p-2 text-right numeric">₹{Math.round(row.paytm || 0)}</td>
+                              <td className="p-2 text-right numeric">₹{Math.round(row.card || 0)}</td>
+                              <td className="p-2 text-right font-black text-slate-900 numeric">₹{Math.round(row.total || 0)}</td>
                             </tr>
                           ))
                         )}
@@ -833,12 +833,12 @@ function Reports() {
                       <tfoot className="bg-amber-300 text-slate-900 font-black">
                         <tr>
                           <td colSpan="3" className="p-2 uppercase">TOTAL</td>
-                          <td className="p-2 text-right numeric">₹{reportData.totals?.amt}</td>
-                          <td className="p-2 text-right numeric">₹{reportData.totals?.gst}</td>
-                          <td className="p-2 text-right numeric">₹{reportData.totals?.cash}</td>
-                          <td className="p-2 text-right numeric">₹{reportData.totals?.paytm}</td>
-                          <td className="p-2 text-right numeric">₹{reportData.totals?.card}</td>
-                          <td className="p-2 text-right text-rose-700 numeric">₹{reportData.totals?.total}</td>
+                          <td className="p-2 text-right numeric">₹{Math.round(reportData.totals?.amt || 0)}</td>
+                          <td className="p-2 text-right numeric">₹{Math.round(reportData.totals?.gst || 0)}</td>
+                          <td className="p-2 text-right numeric">₹{Math.round(reportData.totals?.cash || 0)}</td>
+                          <td className="p-2 text-right numeric">₹{Math.round(reportData.totals?.paytm || 0)}</td>
+                          <td className="p-2 text-right numeric">₹{Math.round(reportData.totals?.card || 0)}</td>
+                          <td className="p-2 text-right text-rose-700 numeric">₹{Math.round(reportData.totals?.total || 0)}</td>
                         </tr>
                       </tfoot>
                     </table>
@@ -871,13 +871,13 @@ function Reports() {
 
                     {/* Summary Balance Box */}
                     <div className="bg-emerald-600 text-white p-3 rounded-2xl text-xs space-y-1 font-bold">
-                      <div className="flex justify-between"><span>OPENING BAL :</span><span className="numeric">₹{reportData.balance?.opening_bal}</span></div>
-                      <div className="flex justify-between text-rose-200"><span>* TOTAL SALE</span><span className="numeric">₹{reportData.balance?.total_sale}</span></div>
-                      <div className="flex justify-between"><span>* CASH PAY</span><span className="numeric">₹{reportData.balance?.cash_pay}</span></div>
-                      <div className="flex justify-between"><span>* PHONE PAY</span><span className="numeric">₹{reportData.balance?.phone_pay}</span></div>
-                      <div className="flex justify-between"><span>* CARD</span><span className="numeric">₹{reportData.balance?.card}</span></div>
-                      <div className="flex justify-between text-rose-200"><span>* EXPENSE</span><span className="numeric">₹{reportData.balance?.expense}</span></div>
-                      <div className="border-t border-emerald-400 pt-1 flex justify-between text-sm font-black"><span>CLOSING BAL</span><span className="numeric">₹{reportData.balance?.closing_bal}</span></div>
+                      <div className="flex justify-between"><span>OPENING BAL :</span><span className="numeric">₹{Math.round(reportData.balance?.opening_bal || 0)}</span></div>
+                      <div className="flex justify-between text-rose-200"><span>* TOTAL SALE</span><span className="numeric">₹{Math.round(reportData.balance?.total_sale || 0)}</span></div>
+                      <div className="flex justify-between"><span>* CASH PAY</span><span className="numeric">₹{Math.round(reportData.balance?.cash_pay || 0)}</span></div>
+                      <div className="flex justify-between"><span>* PHONE PAY</span><span className="numeric">₹{Math.round(reportData.balance?.phone_pay || 0)}</span></div>
+                      <div className="flex justify-between"><span>* CARD</span><span className="numeric">₹{Math.round(reportData.balance?.card || 0)}</span></div>
+                      <div className="flex justify-between text-rose-200"><span>* EXPENSE</span><span className="numeric">₹{Math.round(reportData.balance?.expense || 0)}</span></div>
+                      <div className="border-t border-emerald-400 pt-1 flex justify-between text-sm font-black"><span>CLOSING BAL</span><span className="numeric">₹{Math.round(reportData.balance?.closing_bal || 0)}</span></div>
                     </div>
 
                     {/* Cash Denomination Box */}
@@ -916,7 +916,7 @@ function Reports() {
                         <tr key={st.sno}>
                           <td className="p-2 text-slate-400 numeric">{st.sno}</td>
                           <td className="p-2 font-bold text-slate-900">{st.staff_name}</td>
-                          <td className="p-2 text-right font-black text-emerald-600 numeric">₹{st.achieved}</td>
+                          <td className="p-2 text-right font-black text-emerald-600 numeric">₹{Math.round(st.achieved || 0)}</td>
                         </tr>
                       ))}
                     </tbody>

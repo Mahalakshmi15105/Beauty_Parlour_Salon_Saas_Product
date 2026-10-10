@@ -9,7 +9,7 @@ from app.utils.responses import success_response, error_response
 from app.utils.auth import require_role, get_tenant_query, get_branch_query
 from sqlalchemy import func, cast, Date
 from datetime import datetime, date, timedelta, timezone
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 import io
 import csv
 import logging
@@ -500,19 +500,26 @@ def get_daily_sales_statement():
     for inv in invoices:
         pm_list = InvoicePayment.query.filter_by(invoice_id=inv.id).all()
         
-        def _pm_str(p):
-            return str(getattr(p, "payment_method", getattr(p, "method", "")) or "").strip().lower()
+        def _categorize_pm(p):
+            m = str(getattr(p, "payment_method", getattr(p, "method", "")) or "").strip().lower()
+            if "cash" in m:
+                return "cash"
+            elif "card" in m:
+                return "card"
+            return "paytm"  # UPI, Paytm, Google Pay, PhonePe, Net Banking, etc.
 
         if pm_list:
-            cash_paid = sum(Decimal(str(p.amount or 0)) for p in pm_list if _pm_str(p) == "cash")
-            paytm_paid = sum(Decimal(str(p.amount or 0)) for p in pm_list if _pm_str(p) in ["paytm", "google pay", "phonepe", "upi", "online"])
-            card_paid = sum(Decimal(str(p.amount or 0)) for p in pm_list if _pm_str(p) == "card")
+            cash_paid = sum(Decimal(str(p.amount or 0)) for p in pm_list if _categorize_pm(p) == "cash")
+            paytm_paid = sum(Decimal(str(p.amount or 0)) for p in pm_list if _categorize_pm(p) == "paytm")
+            card_paid = sum(Decimal(str(p.amount or 0)) for p in pm_list if _categorize_pm(p) == "card")
         else:
             cash_paid = Decimal(str(inv.total or 0))
             paytm_paid = Decimal("0.00")
             card_paid = Decimal("0.00")
 
         items = getattr(inv, "items", []) or []
+        inv_raw_total = Decimal("0.00")
+        computed_items = []
         for item in items:
             serv_name = item.service.name if getattr(item, "service", None) else (item.product.name if getattr(item, "product", None) else "Service Item")
             emp_name = f"{item.employee.first_name} {item.employee.last_name or ''}".strip() if getattr(item, "employee", None) else "Staff"
@@ -531,28 +538,81 @@ def get_daily_sales_statement():
             is_inclusive = getattr(getattr(item, "service", None), "tax_inclusive", False)
             line_gst = (line_amt * (tax_rate_val / Decimal("100.00"))) if not is_inclusive else Decimal("0.00")
             line_total = line_amt + line_gst
+            inv_raw_total += line_total
 
-            total_amt += line_amt
-            total_gst += line_gst
-            grand_total += line_total
+            computed_items.append({
+                "serv_name": serv_name,
+                "emp_name": emp_name,
+                "line_amt": line_amt,
+                "line_gst": line_gst,
+                "line_total": line_total
+            })
 
-            if emp_name not in staff_sales_map:
-                staff_sales_map[emp_name] = Decimal("0.00")
-            staff_sales_map[emp_name] += line_total
-
+        num_items = len(computed_items)
+        if num_items == 0:
+            # Fallback if an invoice has no items recorded
+            r_tot = int(Decimal(str(inv.total or 0)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
             line_items_data.append({
                 "sno": sno,
-                "service": serv_name,
-                "staff": emp_name,
-                "amt": float(line_amt),
-                "gst": float(line_gst),
-                "cash": float(cash_paid) if sno == 1 else 0.0,
-                "paytm": float(paytm_paid) if sno == 1 else 0.0,
-                "card": float(card_paid) if sno == 1 else 0.0,
+                "service": "General Sale",
+                "staff": "Staff",
+                "amt": r_tot,
+                "gst": 0,
+                "cash": int(Decimal(str(cash_paid)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
+                "paytm": int(Decimal(str(paytm_paid)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
+                "card": int(Decimal(str(card_paid)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
                 "mc": 0,
-                "total": float(line_total)
+                "total": r_tot
             })
+            total_amt += Decimal(str(inv.total or 0))
+            grand_total += Decimal(str(inv.total or 0))
             sno += 1
+        else:
+            for c_item in computed_items:
+                line_amt = c_item["line_amt"]
+                line_gst = c_item["line_gst"]
+                line_total = c_item["line_total"]
+                serv_name = c_item["serv_name"]
+                emp_name = c_item["emp_name"]
+
+                total_amt += line_amt
+                total_gst += line_gst
+                grand_total += line_total
+
+                if emp_name not in staff_sales_map:
+                    staff_sales_map[emp_name] = Decimal("0.00")
+                staff_sales_map[emp_name] += line_total
+
+                if num_items == 1:
+                    item_cash = cash_paid
+                    item_paytm = paytm_paid
+                    item_card = card_paid
+                else:
+                    ratio = (line_total / inv_raw_total) if inv_raw_total > Decimal("0.00") else (Decimal("1.00") / Decimal(str(num_items)))
+                    item_cash = cash_paid * ratio
+                    item_paytm = paytm_paid * ratio
+                    item_card = card_paid * ratio
+
+                r_line_amt = int(Decimal(str(line_amt)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+                r_line_gst = int(Decimal(str(line_gst)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+                r_line_total = int(Decimal(str(line_total)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+                r_item_cash = int(Decimal(str(item_cash)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+                r_item_paytm = int(Decimal(str(item_paytm)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+                r_item_card = int(Decimal(str(item_card)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+                line_items_data.append({
+                    "sno": sno,
+                    "service": serv_name,
+                    "staff": emp_name,
+                    "amt": r_line_amt,
+                    "gst": r_line_gst,
+                    "cash": r_item_cash,
+                    "paytm": r_item_paytm,
+                    "card": r_item_card,
+                    "mc": 0,
+                    "total": r_line_total
+                })
+                sno += 1
 
         total_cash += cash_paid
         total_paytm += paytm_paid
@@ -628,23 +688,23 @@ def get_daily_sales_statement():
         "day_name": target_date.strftime("%A").upper(),
         "line_items": line_items_data,
         "totals": {
-            "amt": float(total_amt),
-            "gst": float(total_gst),
-            "cash": float(total_cash),
-            "paytm": float(total_paytm),
-            "card": float(total_card),
-            "total": float(grand_total)
+            "amt": int(Decimal(str(total_amt)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
+            "gst": int(Decimal(str(total_gst)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
+            "cash": int(Decimal(str(total_cash)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
+            "paytm": int(Decimal(str(total_paytm)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
+            "card": int(Decimal(str(total_card)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
+            "total": int(Decimal(str(grand_total)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
         },
         "expenses": expense_list,
-        "total_expenses": total_expenses,
+        "total_expenses": int(round(total_expenses)),
         "balance": {
-            "opening_bal": round(opening_bal, 2),
-            "total_sale": float(grand_total),
-            "cash_pay": float(total_cash),
-            "phone_pay": float(total_paytm),
-            "card": float(total_card),
-            "expense": total_expenses,
-            "closing_bal": round(closing_bal, 2)
+            "opening_bal": int(round(opening_bal)),
+            "total_sale": int(Decimal(str(grand_total)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
+            "cash_pay": int(Decimal(str(total_cash)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
+            "phone_pay": int(Decimal(str(total_paytm)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
+            "card": int(Decimal(str(total_card)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
+            "expense": int(round(total_expenses)),
+            "closing_bal": int(round(closing_bal))
         },
         "cash_denomination": cd_data,
         "staff_achieved": staff_achieved_list,

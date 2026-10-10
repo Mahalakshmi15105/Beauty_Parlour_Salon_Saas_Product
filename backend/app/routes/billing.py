@@ -9,7 +9,7 @@ from app.models.user import TenantSetting
 from app.utils.responses import success_response, error_response
 from app.utils.auth import require_role, get_tenant_query, get_branch_query
 from app.utils.query import paginate_query, generate_unique_invoice_number
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 import logging
 
 logger = logging.getLogger(__name__)
@@ -302,7 +302,7 @@ def checkout():
             calculated_tax = service_net * (tax_rate / Decimal("100.00"))
 
         raw_grand_total = service_net + calculated_tax + product_net
-        grand_total = Decimal(str(round(float(raw_grand_total))))  # Round off to nearest whole rupee, e.g. 1543.50 -> 1544
+        grand_total = Decimal(str(raw_grand_total)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)  # Round off to nearest whole rupee with half-up, e.g. 52.50 -> 53
 
         # 4. Verify Payment splits match grand total
         payment_total = Decimal("0.00")
@@ -576,10 +576,10 @@ def get_invoices():
                 "last_name": inv.customer.last_name or "",
                 "phone": cust_phone
             } if inv.customer else None,
-            "subtotal": float(inv.subtotal),
-            "discount": float(inv.discount),
-            "tax": float(inv.tax),
-            "total": float(inv.total),
+            "subtotal": float(round(inv.subtotal, 2)),
+            "discount": float(round(inv.discount, 2)),
+            "tax": float(round(inv.tax, 2)),
+            "total": float(Decimal(str(inv.total)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)) if inv.total is not None else 0.0,
             "status": inv.status,
             "payment_mode": pm_summary,
             "payment_methods": [{"method": p.method, "amount": float(p.amount or 0)} for p in pm_list],
@@ -664,6 +664,62 @@ def get_invoice(invoice_id):
         "payments": payments,
         "membership_name": invoice.membership_name,
         "membership_discount": float(invoice.membership_discount or 0)
+    })
+
+
+@billing_bp.route("/invoices/<int:invoice_id>/payment-method", methods=["PUT", "PATCH"])
+@require_role(["ParlourAdmin", "BranchAdmin"])
+def update_invoice_payment_method(invoice_id):
+    invoice = get_branch_query(Invoice).filter_by(id=invoice_id).first()
+    if not invoice:
+        return error_response(
+            error_code="INVOICE_NOT_FOUND",
+            message="Invoice not found or access denied.",
+            status_code=404
+        )
+
+    data = request.get_json() or {}
+    new_method = data.get("payment_method") or data.get("method")
+    payment_methods_list = data.get("payment_methods")
+
+    if not new_method and not payment_methods_list:
+        return error_response(
+            error_code="VALIDATION_FAILED",
+            message="Please provide a valid payment method.",
+            status_code=400
+        )
+
+    if payment_methods_list and isinstance(payment_methods_list, list):
+        for pm in payment_methods_list:
+            pm_id = pm.get("id")
+            pm_method = pm.get("method")
+            if pm_id and pm_method:
+                pay_rec = InvoicePayment.query.filter_by(id=pm_id, invoice_id=invoice.id).first()
+                if pay_rec:
+                    pay_rec.method = str(pm_method).strip()
+    elif new_method:
+        payments = InvoicePayment.query.filter_by(invoice_id=invoice.id).all()
+        if payments:
+            for p in payments:
+                p.method = str(new_method).strip()
+        else:
+            db.session.add(InvoicePayment(
+                tenant_id=g.parlour_id,
+                invoice_id=invoice.id,
+                method=str(new_method).strip(),
+                amount=invoice.total
+            ))
+
+    db.session.commit()
+
+    updated_payments = InvoicePayment.query.filter_by(invoice_id=invoice.id).all()
+    pm_summary = ", ".join([p.method.capitalize() for p in updated_payments if getattr(p, "method", None)]) or (new_method.capitalize() if new_method else "Cash")
+
+    return success_response({
+        "invoice_id": invoice.id,
+        "payment_mode": pm_summary,
+        "payments": [{"id": p.id, "method": p.method, "amount": float(p.amount)} for p in updated_payments],
+        "message": "Payment method updated successfully."
     })
 
 

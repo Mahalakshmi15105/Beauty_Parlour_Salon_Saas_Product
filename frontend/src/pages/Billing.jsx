@@ -329,6 +329,13 @@ function Billing() {
   const [historyToDate, setHistoryToDate] = useState("");
   const [historyLoading, setHistoryLoading] = useState(false);
 
+  // Edit Payment Method Modal State
+  const [showEditPaymentModal, setShowEditPaymentModal] = useState(false);
+  const [invoiceToEditPayment, setInvoiceToEditPayment] = useState(null);
+  const [editingPaymentMethod, setEditingPaymentMethod] = useState("Cash");
+  const [editingPaymentSplitList, setEditingPaymentSplitList] = useState([]);
+  const [savingPaymentMethod, setSavingPaymentMethod] = useState(false);
+
   // Sub-Modals for Bill Actions
   const [showReminderModal, setShowReminderModal] = useState(false);
   const [reminderType, setReminderType] = useState("Follow-up appointment");
@@ -2249,23 +2256,100 @@ function Billing() {
     return msg;
   };
 
+  const handleOpenEditPaymentMethod = (inv) => {
+    if (!inv) return;
+    setInvoiceToEditPayment(inv);
+    const currentMode = inv.payment_mode || inv.payment_method || "Cash";
+    setEditingPaymentMethod(currentMode.split(",")[0].trim() || "Cash");
+    const splits = inv.payments || inv.payment_methods || [];
+    setEditingPaymentSplitList(splits.map((s, idx) => ({
+      id: s.id || idx,
+      method: s.method || "Cash",
+      amount: s.amount || 0
+    })));
+    setShowEditPaymentModal(true);
+  };
+
+  const handleSavePaymentMethod = async () => {
+    if (!invoiceToEditPayment) return;
+    setSavingPaymentMethod(true);
+    try {
+      let payload = {};
+      if (editingPaymentSplitList.length > 1) {
+        payload = { payment_methods: editingPaymentSplitList };
+      } else {
+        payload = { payment_method: editingPaymentMethod };
+      }
+
+      const res = await API.put(`/invoices/${invoiceToEditPayment.id}/payment-method`, payload);
+      const updatedData = res.data || res;
+      const updatedMode = updatedData.payment_mode || editingPaymentMethod;
+
+      setInvoicesHistory((prev) =>
+        prev.map((item) =>
+          item.id === invoiceToEditPayment.id
+            ? {
+                ...item,
+                payment_mode: updatedMode,
+                payments: updatedData.payments || item.payments,
+              }
+            : item
+        )
+      );
+
+      if (selectedInvoiceDetail && selectedInvoiceDetail.id === invoiceToEditPayment.id) {
+        setSelectedInvoiceDetail((prev) => ({
+          ...prev,
+          payment_mode: updatedMode,
+          payments: updatedData.payments || prev.payments,
+        }));
+      }
+
+      showSuccess(`Payment mode updated to ${updatedMode} successfully!`);
+      setShowEditPaymentModal(false);
+      setInvoiceToEditPayment(null);
+    } catch (err) {
+      showError(err.response?.data?.message || err.message || "Failed to update payment method.");
+    } finally {
+      setSavingPaymentMethod(false);
+    }
+  };
+
   const triggerWhatsAppWeb = async (inv = null) => {
     const targetInv = inv || invoiceResult || selectedInvoiceDetail || activePrintInvoice;
     const targetCustId = targetInv?.customer_id || targetInv?.customer?.id || (selectedCustomerId !== "walkin" ? selectedCustomerId : null);
     const matchedCust = customers.find((c) => String(c.id) === String(targetCustId)) || (selectedCustomerId && selectedCustomerId !== "walkin" ? customers.find((c) => String(c.id) === String(selectedCustomerId)) : null);
 
-    const rawPhone = targetInv?.customer_phone || targetInv?.customer?.phone || matchedCust?.phone || "";
-    let cleanPhone = rawPhone.replace(/[^0-9]/g, "");
-
-    if (!cleanPhone || cleanPhone.length < 5 || cleanPhone === "0000000000") {
-      showError("Customer mobile number not available or Walk-in customer.");
-      return;
+    let rawPhone = targetInv?.customer_phone || targetInv?.customer?.phone || matchedCust?.phone || "";
+    if (!rawPhone && customerSearchQuery) {
+      const match = customerSearchQuery.match(/\d{10}/);
+      if (match) rawPhone = match[0];
     }
 
-    if (cleanPhone.length === 10) {
-      cleanPhone = `91${cleanPhone}`;
-    } else if (cleanPhone.length === 12 && cleanPhone.startsWith("91")) {
-      // Valid 12-digit Indian number with 91
+    let cleanDigits = (rawPhone || "").replace(/[^0-9]/g, "");
+
+    // If customer mobile number is missing, prompt to input the customer's phone number directly
+    if (!cleanDigits || cleanDigits.length < 10 || cleanDigits === "0000000000") {
+      const inputPhone = window.prompt("Customer mobile number not found. Enter 10-digit mobile number to send WhatsApp bill:", "");
+      if (!inputPhone) return;
+      cleanDigits = inputPhone.replace(/[^0-9]/g, "");
+    }
+
+    // Strip leading 0 if present (e.g., 09876543210 -> 9876543210)
+    if (cleanDigits.length === 11 && cleanDigits.startsWith("0")) {
+      cleanDigits = cleanDigits.slice(1);
+    }
+
+    let targetPhone = cleanDigits;
+    if (cleanDigits.length === 10) {
+      targetPhone = `91${cleanDigits}`;
+    } else if (cleanDigits.length === 12 && cleanDigits.startsWith("91")) {
+      targetPhone = cleanDigits;
+    }
+
+    if (!targetPhone || targetPhone.length < 10) {
+      showError("Please enter a valid 10-digit mobile number.");
+      return;
     }
 
     const parlourName = businessProfile?.name || "Beauty Parlour";
@@ -2283,56 +2367,49 @@ function Billing() {
     const fullTargetInv = {
       ...targetInv,
       customer_name: resolvedCustomerName,
-      customer_phone: cleanPhone || targetInv?.customer_phone || matchedCust?.phone || "",
+      customer_phone: targetPhone,
       customer: targetInv?.customer || (matchedCust ? {
         id: matchedCust.id,
         first_name: matchedCust.first_name,
         last_name: matchedCust.last_name || "",
-        phone: matchedCust.phone || cleanPhone
+        phone: targetPhone
       } : {
         first_name: resolvedCustomerName,
         last_name: "",
-        phone: cleanPhone
+        phone: targetPhone
       })
     };
 
     const billMessage = buildReceiptWhatsAppText(fullTargetInv, parlourName, resolvedCustomerName, thankYouMsg);
     const encodedText = encodeURIComponent(billMessage);
 
-    setActivePrintInvoice(fullTargetInv);
+    // Open WhatsApp directly without any PDF generation or attachment
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const waUrl = isMobile
+      ? `https://api.whatsapp.com/send?phone=${targetPhone}&text=${encodedText}`
+      : `https://web.whatsapp.com/send?phone=${targetPhone}&text=${encodedText}`;
 
-    // Wait a brief moment for React state to re-render the thermal receipt ref DOM
-    await new Promise((resolve) => setTimeout(resolve, 150));
-
-    // Generate PDF for WhatsApp sharing / downloading
+    // Reuse the existing WhatsApp Web tab rather than opening a new tab on every billing
+    let waWin = null;
     try {
-      const pdfRes = await generateThermalReceiptPDF(printReceiptRef, billNo, receiptSettings?.paper_size || "80mm");
-      if (pdfRes && pdfRes.file && navigator.canShare && navigator.canShare({ files: [pdfRes.file] })) {
-        try {
-          await navigator.share({
-            files: [pdfRes.file],
-            title: `Bill #${billNo}`,
-            text: billMessage,
-          });
-          showSuccess("Bill PDF shared to WhatsApp successfully!");
-          return;
-        } catch (shareErr) {
-          if (shareErr.name === "AbortError") return;
-          // User closed share dialog, fall back to opening WhatsApp Web
-        }
+      if (window.__waWebWindow && !window.__waWebWindow.closed) {
+        window.__waWebWindow.location.href = waUrl;
+        window.__waWebWindow.focus();
+        waWin = window.__waWebWindow;
       }
-
-      // Download PDF receipt
-      if (pdfRes && pdfRes.pdf) {
-        pdfRes.pdf.save(pdfRes.filename);
-      }
-    } catch (pdfErr) {
-      console.warn("Could not auto-generate PDF for WhatsApp:", pdfErr);
+    } catch {
+      // Cross-origin write fallback handled by window.open with identical window name
     }
 
-    // Open WhatsApp Web/Mobile with structured receipt message
-    window.open(`https://wa.me/${cleanPhone}?text=${encodedText}`, "_blank");
-    showSuccess("Bill structure opened in WhatsApp & PDF downloaded for attachment!");
+    if (!waWin) {
+      waWin = window.open(waUrl, "whatsapp_web_chat");
+      if (waWin) {
+        window.__waWebWindow = waWin;
+        waWin.focus();
+      }
+    }
+
+    showSuccess(`WhatsApp chat opened for ${resolvedCustomerName} (${targetPhone})!`);
   };
 
   const handleSaveReminderSubmit = () => {
@@ -3777,18 +3854,18 @@ function Billing() {
                       <td className="px-4 py-3 font-bold text-purple-700 numeric">
                         {inv.membership_price > 0 ? (
                           <span>
-                            {currencySymbol} {inv.membership_price.toFixed(2)}
+                            {currencySymbol} {Math.round(inv.membership_price)}
                             {inv.membership_name ? <span className="block text-[10px] text-slate-500 font-semibold">{inv.membership_name}</span> : null}
                           </span>
                         ) : (
                           <span className="text-slate-400 font-normal">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 numeric">{currencySymbol} {inv.subtotal.toFixed(2)}</td>
-                      <td className="px-4 py-3 text-danger numeric">-{currencySymbol} {inv.discount.toFixed(2)}</td>
-                      <td className="px-4 py-3 numeric">{currencySymbol} {inv.tax.toFixed(2)}</td>
+                      <td className="px-4 py-3 numeric">{currencySymbol} {Math.round(inv.subtotal)}</td>
+                      <td className="px-4 py-3 text-danger numeric">{inv.discount > 0 ? `-${currencySymbol} ${Math.round(inv.discount)}` : `-${currencySymbol} 0`}</td>
+                      <td className="px-4 py-3 numeric">{currencySymbol} {Math.round(inv.tax)}</td>
                       <td className="px-4 py-3 font-extrabold text-slate-900 numeric">
-                        {currencySymbol} {inv.total.toFixed(2)}
+                        {currencySymbol} {Math.round(inv.total)}
                       </td>
                       <td className="px-4 py-3">
                         <span
@@ -3803,13 +3880,20 @@ function Billing() {
                           {inv.status}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right space-x-1">
+                      <td className="px-4 py-3 text-right space-x-1 whitespace-nowrap">
                         <button
                           onClick={() => handleViewInvoiceDetail(inv)}
                           className="bg-primary/10 hover:bg-primary/20 text-primary p-1.5 rounded-lg transition"
                           title="View Receipt Details"
                         >
                           <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleOpenEditPaymentMethod(inv)}
+                          className="bg-amber-50 hover:bg-amber-100 text-amber-700 p-1.5 rounded-lg transition border border-amber-200"
+                          title="Edit Payment Mode"
+                        >
+                          <CreditCard className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleViewInvoiceDetail(inv, "print")}
@@ -4213,7 +4297,16 @@ function Billing() {
                   <span>WhatsApp</span>
                 </button>
 
-                {/* 5. Set Reminder */}
+                {/* 5. Edit Payment Mode */}
+                <button
+                  onClick={() => handleOpenEditPaymentMethod(selectedInvoiceDetail)}
+                  className="bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-800 py-2 rounded-xl font-bold flex items-center justify-center space-x-1.5"
+                >
+                  <CreditCard className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Edit Payment Mode</span>
+                </button>
+
+                {/* 6. Set Reminder */}
                 <button
                   onClick={() => setShowReminderModal(true)}
                   className="bg-background hover:bg-slate-100 border border-border-soft text-slate-700 py-2 rounded-xl font-bold flex items-center justify-center space-x-1.5"
@@ -5907,6 +6000,131 @@ function Billing() {
         isOpen={showCashDenominationModal}
         onClose={() => setShowCashDenominationModal(false)}
       />
+
+      {/* Edit Payment Method Modal */}
+      {showEditPaymentModal && invoiceToEditPayment && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-surface max-w-md w-full rounded-2xl shadow-2xl border border-border-soft overflow-hidden">
+            <div className="px-6 py-4 border-b border-border-soft flex justify-between items-center bg-primary-light">
+              <div className="flex items-center space-x-2">
+                <CreditCard className="w-5 h-5 text-primary" />
+                <h3 className="font-extrabold text-slate-900 text-sm">
+                  Edit Payment Mode — Bill #{invoiceToEditPayment.invoice_number || invoiceToEditPayment.id}
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  setShowEditPaymentModal(false);
+                  setInvoiceToEditPayment(null);
+                }}
+                className="text-slate-400 hover:text-slate-700 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs">
+              {/* Customer and Bill Amount Information (READ ONLY) */}
+              <div className="bg-background border border-border-soft rounded-xl p-3 space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-semibold">Client Name:</span>
+                  <span className="font-bold text-slate-900">{invoiceToEditPayment.customer_name || "Walk-in Customer"}</span>
+                </div>
+                <div className="flex justify-between items-center border-t border-border-soft pt-1.5">
+                  <span className="text-slate-500 font-semibold">Total Bill Amount:</span>
+                  <span className="font-extrabold text-slate-900 text-sm numeric">
+                    {currencySymbol} {Math.round(invoiceToEditPayment.total || 0)}
+                  </span>
+                </div>
+                <p className="text-[10px] text-amber-700 bg-amber-50 rounded-lg p-1.5 border border-amber-200 font-medium">
+                  🔒 Notice: Bill amount cannot be modified. Only the payment method/mode can be updated.
+                </p>
+              </div>
+
+              {/* Single Payment Method or Split Payments Selection */}
+              {editingPaymentSplitList.length > 1 ? (
+                <div className="space-y-2">
+                  <label className="font-bold text-slate-700 uppercase tracking-wider block">
+                    Update Split Payment Modes:
+                  </label>
+                  {editingPaymentSplitList.map((split, sIdx) => (
+                    <div key={split.id || sIdx} className="flex items-center justify-between gap-3 bg-background border border-border-soft p-2.5 rounded-xl">
+                      <span className="font-bold numeric text-slate-800">
+                        {currencySymbol} {Math.round(split.amount)}
+                      </span>
+                      <select
+                        value={split.method}
+                        onChange={(e) => {
+                          const newM = e.target.value;
+                          setEditingPaymentSplitList((prev) =>
+                            prev.map((item, idx) => (idx === sIdx ? { ...item, method: newM } : item))
+                          );
+                        }}
+                        className="bg-surface border border-border-soft rounded-lg px-2.5 py-1.5 font-bold text-slate-800 focus:outline-none focus:border-primary text-xs"
+                      >
+                        <option value="Cash">Cash</option>
+                        <option value="Google pay">Google pay</option>
+                        <option value="PhonePe">PhonePe</option>
+                        <option value="Paytm">Paytm</option>
+                        <option value="Card">Card</option>
+                        <option value="UPI">UPI</option>
+                        <option value="Net Banking">Net Banking</option>
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <label className="font-bold text-slate-700 uppercase tracking-wider block">
+                    Select Correct Payment Mode:
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {["Cash", "Google pay", "PhonePe", "Paytm", "Card", "UPI"].map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setEditingPaymentMethod(m)}
+                        className={`p-2.5 rounded-xl text-left font-bold border transition flex items-center justify-between ${
+                          editingPaymentMethod.toLowerCase() === m.toLowerCase()
+                            ? "border-primary bg-primary/10 text-primary shadow-xs"
+                            : "border-border-soft hover:bg-slate-50 text-slate-700"
+                        }`}
+                      >
+                        <span>{m}</span>
+                        {editingPaymentMethod.toLowerCase() === m.toLowerCase() && (
+                          <Check className="w-4 h-4 text-primary" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Submit Buttons */}
+              <div className="pt-3 border-t border-border-soft flex gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditPaymentModal(false);
+                    setInvoiceToEditPayment(null);
+                  }}
+                  className="px-4 py-2 border border-border-soft rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSavePaymentMethod}
+                  disabled={savingPaymentMethod}
+                  className="px-5 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-bold shadow-xs disabled:opacity-50"
+                >
+                  {savingPaymentMethod ? "Updating..." : "Save Payment Mode"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
