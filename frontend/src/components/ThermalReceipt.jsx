@@ -142,12 +142,39 @@ export function buildThermalReceiptHtml(targetEl, paperSize = "80mm") {
       .p-1 { padding: 2px !important; }
       .p-1\\.5 { padding: 3px !important; }
       .p-2 { padding: 4px !important; }
+      .mt-0\\.5 { margin-top: 2px !important; }
+      .mt-1 { margin-top: 4px !important; }
+      .mb-0\\.5 { margin-bottom: 2px !important; }
+      .mb-1 { margin-bottom: 4px !important; }
+      .pt-0\\.5 { padding-top: 2px !important; }
+      .pt-1 { padding-top: 4px !important; }
+      .pb-0\\.5 { padding-bottom: 2px !important; }
+      .pb-1 { padding-bottom: 4px !important; }
       .space-y-0\\.5 > * + * { margin-top: 2px !important; }
       .space-y-1 > * + * { margin-top: 2px !important; }
       .space-y-1\\.5 > * + * { margin-top: 3px !important; }
       .space-y-2 > * + * { margin-top: 4px !important; }
+      .space-x-1 > * + * { margin-left: 4px !important; }
+      .space-x-2 > * + * { margin-left: 8px !important; }
+      .space-x-3 > * + * { margin-left: 12px !important; }
+      .gap-1, .gap-x-1 { gap: 4px !important; column-gap: 4px !important; }
+      .gap-2, .gap-x-2 { gap: 8px !important; column-gap: 8px !important; }
+      .gap-3, .gap-x-3 { gap: 12px !important; column-gap: 12px !important; }
+      .shrink-0 { flex-shrink: 0 !important; }
+      .flex-wrap { flex-wrap: wrap !important; }
+      .mr-1 { margin-right: 4px !important; }
+      .mr-2 { margin-right: 8px !important; }
+      .text-\\[10px\\], [class*="text-[10px]"] { font-size: 10px !important; }
+      .text-\\[11px\\], [class*="text-[11px]"] { font-size: 11px !important; }
+      .text-xs { font-size: 11.5px !important; }
+      .text-sm { font-size: 13px !important; }
+      .text-base { font-size: 14px !important; }
+      .leading-tight { line-height: 1.25 !important; }
+      .leading-normal { line-height: 1.4 !important; }
+      .italic { font-style: italic !important; }
+      .font-mono { font-family: 'Courier New', Courier, monospace !important; }
       .truncate { overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
-      .break-words { overflow-wrap: break-word !important; }
+      .break-words { overflow-wrap: break-word !important; word-break: break-word !important; }
       table { width: 100%; border-collapse: collapse; }
       th, td { font-size: 11px; padding: 2px 0; color: #000000; }
       .dashed-line {
@@ -397,7 +424,35 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
   const showMrp = settings.show_mrp !== false;
   const showTax = settings.show_tax !== false;
 
-  const customerName = invoice.customer_name || (invoice.customer ? `${invoice.customer.first_name || ''} ${invoice.customer.last_name || ''}`.trim() : "Walk-in Customer") || "Walk-in Customer";
+  const resolveCustomerName = (inv) => {
+    if (!inv) return "Walk-in Customer";
+    if (inv.customer_name && typeof inv.customer_name === "string" && inv.customer_name.trim()) {
+      return inv.customer_name.trim();
+    }
+    if (inv.customer) {
+      if (typeof inv.customer === "string" && inv.customer.trim()) {
+        return inv.customer.trim();
+      }
+      if (typeof inv.customer === "object") {
+        const first = inv.customer.first_name || "";
+        const last = inv.customer.last_name || "";
+        const combined = `${first} ${last}`.trim();
+        if (combined) return combined;
+        if (inv.customer.name && typeof inv.customer.name === "string" && inv.customer.name.trim()) {
+          return inv.customer.name.trim();
+        }
+      }
+    }
+    if (inv.client_name && typeof inv.client_name === "string" && inv.client_name.trim()) {
+      return inv.client_name.trim();
+    }
+    if (inv.customerName && typeof inv.customerName === "string" && inv.customerName.trim()) {
+      return inv.customerName.trim();
+    }
+    return "Walk-in Customer";
+  };
+
+  const customerName = resolveCustomerName(invoice);
 
   const getCleanBillNumber = (inv) => {
     if (!inv) return "1";
@@ -536,23 +591,23 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
       <div className="border-b border-slate-200 my-1 w-full" />
 
       {/* 2. INVOICE METADATA (Bill No -> Client -> Date -> Loyalty Visit Status) */}
-      <div className="text-xs space-y-0.5 text-black">
-        <div className="flex justify-between font-bold">
-          <span>Bill No:</span>
-          <span className="font-extrabold numeric">{cleanBillNo}</span>
+      <div className="text-xs space-y-1 text-black">
+        <div className="flex justify-between items-center font-bold">
+          <span className="shrink-0 mr-2">Bill No:</span>
+          <span className="font-extrabold numeric text-right">{cleanBillNo}</span>
         </div>
-        <div className="flex justify-between font-bold">
-          <span>Client:</span>
-          <span className="truncate max-w-[150px]">{customerName}</span>
+        <div className="flex justify-between items-start font-bold">
+          <span className="shrink-0 mr-2">Client:</span>
+          <span className="text-right font-extrabold break-words">{customerName}</span>
         </div>
-        <div className="flex justify-between font-semibold">
-          <span>Date:</span>
-          <span className="numeric">{formattedDate}</span>
+        <div className="flex justify-between items-center font-semibold">
+          <span className="shrink-0 mr-2">Date:</span>
+          <span className="numeric text-right">{formattedDate}</span>
         </div>
         {!hideLoyaltyStatus && invoice.membership_name && (
-          <div className="flex justify-between font-bold text-black border-t border-slate-200 pt-0.5 mt-0.5">
-            <span>Loyalty Status:</span>
-            <span className="font-extrabold text-right">{invoice.membership_name}</span>
+          <div className="flex justify-between font-bold text-black border-t border-slate-200 pt-1 mt-1">
+            <span className="shrink-0 mr-2">Loyalty Status:</span>
+            <span className="font-extrabold text-right break-words">{invoice.membership_name}</span>
           </div>
         )}
       </div>
@@ -622,10 +677,10 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
                               </span>
                             </div>
                             {(showQty || showRate || staffName) && (
-                              <div className="text-[11px] text-black space-x-2">
-                                {showQty && <span>Qty: <span className="numeric">{qty}</span></span>}
-                                {showRate && <span>Rate: <span className="numeric">{formatCurrency(rate)}</span></span>}
-                                {staffName && <span className="italic">Staff: {staffName}</span>}
+                              <div className="text-[10px] text-black flex flex-wrap items-center gap-x-3 mt-0.5 leading-tight font-mono">
+                                {showQty && <span>Qty:&nbsp;<span className="numeric">{qty}</span></span>}
+                                {showRate && <span>Rate:&nbsp;<span className="numeric">{formatCurrency(rate)}</span></span>}
+                                {staffName && <span className="italic">Staff:&nbsp;{staffName}</span>}
                               </div>
                             )}
                             {item.discount > 0 && !isFreeReward && (
@@ -662,10 +717,14 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
                               <span className="w-1/3 text-right font-extrabold numeric">{formatCurrency(amount)}</span>
                             </div>
                             {(showQty || showRate || showMrp) && (
-                              <div className="text-[11px] text-black space-x-2">
-                                {showQty && <span>Qty: <span className="numeric">{qty}</span></span>}
-                                {showRate && <span>Rate: <span className="numeric">{formatCurrency(rate)}</span></span>}
-                                {showMrp && <span>MRP: <span className="numeric">{formatCurrency(mrp)}</span></span>}
+                              <div className="text-[10px] text-black flex flex-wrap items-center gap-x-3 mt-0.5 leading-tight font-mono">
+                                {showQty && <span>Qty:&nbsp;<span className="numeric">{qty}</span></span>}
+                                {showRate && <span>Rate:&nbsp;<span className="numeric">{formatCurrency(rate)}</span></span>}
+                                {showMrp && mrp > rate && (
+                                  <span className="line-through text-slate-500">
+                                    MRP:&nbsp;{formatCurrency(mrp)}
+                                  </span>
+                                )}
                               </div>
                             )}
                             {item.discount > 0 && (

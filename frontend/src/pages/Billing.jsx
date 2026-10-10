@@ -2081,9 +2081,27 @@ function Billing() {
     const targetInvoice = inv || invoiceResult || selectedInvoiceDetail || activePrintInvoice;
     const invNumber = targetInvoice?.invoice_number || targetInvoice?.id || "INV-0001";
 
-    if (targetInvoice) {
-      setActivePrintInvoice(targetInvoice);
-    }
+    const targetCustId = targetInvoice?.customer_id || targetInvoice?.customer?.id || (selectedCustomerId !== "walkin" ? selectedCustomerId : null);
+    const matchedCust = customers.find((c) => String(c.id) === String(targetCustId));
+    const resolvedCustName = (
+      targetInvoice?.customer_name ||
+      (targetInvoice?.customer ? `${targetInvoice.customer.first_name || ''} ${targetInvoice.customer.last_name || ''}`.trim() : "") ||
+      (matchedCust ? `${matchedCust.first_name || ''} ${matchedCust.last_name || ''}`.trim() : "") ||
+      "Walk-in Customer"
+    ).trim() || "Walk-in Customer";
+
+    const fullTargetInv = {
+      ...targetInvoice,
+      customer_name: resolvedCustName,
+      customer: targetInvoice?.customer || (matchedCust ? {
+        id: matchedCust.id,
+        first_name: matchedCust.first_name,
+        last_name: matchedCust.last_name || "",
+        phone: matchedCust.phone || ""
+      } : { first_name: resolvedCustName, last_name: "", phone: "" })
+    };
+
+    setActivePrintInvoice(fullTargetInv);
 
     setTimeout(() => {
       downloadThermalReceiptPDF(printReceiptRef, invNumber, receiptSettings?.paper_size || "80mm");
@@ -2233,8 +2251,10 @@ function Billing() {
 
   const triggerWhatsAppWeb = async (inv = null) => {
     const targetInv = inv || invoiceResult || selectedInvoiceDetail || activePrintInvoice;
-    const targetCust = customers.find((c) => String(c.id) === String(selectedCustomerId));
-    const rawPhone = targetInv?.customer_phone || targetInv?.customer?.phone || targetCust?.phone || "";
+    const targetCustId = targetInv?.customer_id || targetInv?.customer?.id || (selectedCustomerId !== "walkin" ? selectedCustomerId : null);
+    const matchedCust = customers.find((c) => String(c.id) === String(targetCustId)) || (selectedCustomerId && selectedCustomerId !== "walkin" ? customers.find((c) => String(c.id) === String(selectedCustomerId)) : null);
+
+    const rawPhone = targetInv?.customer_phone || targetInv?.customer?.phone || matchedCust?.phone || "";
     let cleanPhone = rawPhone.replace(/[^0-9]/g, "");
 
     if (!cleanPhone || cleanPhone.length < 5 || cleanPhone === "0000000000") {
@@ -2249,16 +2269,40 @@ function Billing() {
     }
 
     const parlourName = businessProfile?.name || "Beauty Parlour";
-    const customerName = targetInv?.customer_name || targetInv?.customer?.first_name || targetCust?.first_name || "Customer";
+    const resolvedCustomerName = (
+      targetInv?.customer_name ||
+      (targetInv?.customer ? `${targetInv.customer.first_name || ''} ${targetInv.customer.last_name || ''}`.trim() : "") ||
+      (matchedCust ? `${matchedCust.first_name || ''} ${matchedCust.last_name || ''}`.trim() : "") ||
+      (selectedCustomerId && selectedCustomerId !== "walkin" ? (customerSearchQuery || "").replace(/\s*\([^)]*\)/, "").trim() : "") ||
+      "Walk-in Customer"
+    ).trim() || "Walk-in Customer";
+
     const billNo = targetInv?.invoice_number || targetInv?.id || "N/A";
     const thankYouMsg = receiptSettings?.thank_you_message || "Thank you for visiting. Please visit again!";
 
-    const billMessage = buildReceiptWhatsAppText(targetInv, parlourName, customerName, thankYouMsg);
+    const fullTargetInv = {
+      ...targetInv,
+      customer_name: resolvedCustomerName,
+      customer_phone: cleanPhone || targetInv?.customer_phone || matchedCust?.phone || "",
+      customer: targetInv?.customer || (matchedCust ? {
+        id: matchedCust.id,
+        first_name: matchedCust.first_name,
+        last_name: matchedCust.last_name || "",
+        phone: matchedCust.phone || cleanPhone
+      } : {
+        first_name: resolvedCustomerName,
+        last_name: "",
+        phone: cleanPhone
+      })
+    };
+
+    const billMessage = buildReceiptWhatsAppText(fullTargetInv, parlourName, resolvedCustomerName, thankYouMsg);
     const encodedText = encodeURIComponent(billMessage);
 
-    if (targetInv) {
-      setActivePrintInvoice(targetInv);
-    }
+    setActivePrintInvoice(fullTargetInv);
+
+    // Wait a brief moment for React state to re-render the thermal receipt ref DOM
+    await new Promise((resolve) => setTimeout(resolve, 150));
 
     // Generate PDF for WhatsApp sharing / downloading
     try {

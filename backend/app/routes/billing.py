@@ -561,10 +561,21 @@ def get_invoices():
         pm_list = getattr(inv, "payments", []) or []
         pm_summary = ", ".join([p.method.capitalize() for p in pm_list if getattr(p, "method", None)]) or "Cash"
 
+        cust_name = f"{inv.customer.first_name} {inv.customer.last_name or ''}".strip() if inv.customer else "Walk-in Customer"
+        cust_phone = inv.customer.phone if inv.customer else ""
+
         data.append({
             "id": inv.id,
             "invoice_number": inv.invoice_number,
-            "customer_name": f"{inv.customer.first_name} {inv.customer.last_name or ''}".strip() if inv.customer else "Walk-in",
+            "customer_id": inv.customer_id,
+            "customer_name": cust_name,
+            "customer_phone": cust_phone,
+            "customer": {
+                "id": inv.customer.id,
+                "first_name": inv.customer.first_name,
+                "last_name": inv.customer.last_name or "",
+                "phone": cust_phone
+            } if inv.customer else None,
             "subtotal": float(inv.subtotal),
             "discount": float(inv.discount),
             "tax": float(inv.tax),
@@ -628,14 +639,21 @@ def get_invoice(invoice_id):
             "amount": float(pay.amount)
         })
 
+    cust_name = f"{invoice.customer.first_name} {invoice.customer.last_name or ''}".strip() if invoice.customer else "Walk-in Customer"
+    cust_phone = invoice.customer.phone if invoice.customer else ""
+
     return success_response({
         "id": invoice.id,
         "invoice_number": invoice.invoice_number,
+        "customer_id": invoice.customer_id,
+        "customer_name": cust_name,
+        "customer_phone": cust_phone,
         "customer": {
+            "id": invoice.customer.id,
             "first_name": invoice.customer.first_name,
-            "last_name": invoice.customer.last_name,
-            "phone": invoice.customer.phone
-        },
+            "last_name": invoice.customer.last_name or "",
+            "phone": cust_phone
+        } if invoice.customer else None,
         "subtotal": float(invoice.subtotal),
         "discount": float(invoice.discount),
         "tax": float(invoice.tax),
