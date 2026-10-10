@@ -42,8 +42,6 @@ TEMPLATE_HEADERS = {
         'Service Name',
         'Category Name',
         'Price',
-        'Duration (minutes)',
-        'Description',
         'Status',
         'Membership Plan Name',
         'Membership Discount (%)',
@@ -140,13 +138,20 @@ FIELD_MAPPINGS = {
     'services': {
         'Service Name': 'name',
         'Category Name': 'category_name',
+        'Category': 'category_name',
         'Price': 'price',
-        'Duration (minutes)': 'duration_minutes',
-        'Description': 'description',
+        'Price (₹)': 'price',
         'Status': 'status',
         'Membership Plan Name': 'membership_plan_name',
         'Membership Discount (%)': 'membership_discount_percentage',
-        'Membership Discount Amount': 'membership_discount_amount'
+        'Membership Discount Amount': 'membership_discount_amount',
+        'Duration (minutes)': 'duration_minutes',
+        'Duration (mins)': 'duration_minutes',
+        'Duration': 'duration_minutes',
+        'Description': 'description',
+        'Service Name *': 'name',
+        'Category Name *': 'category_name',
+        'Price *': 'price',
     },
     'products': {
         'Product Name': 'name',
@@ -174,7 +179,7 @@ REQUIRED_FIELDS = {
 OPTIONAL_FIELDS = {
     'customers': ['Last Name', 'Gender', 'Date of Birth', 'Address', 'Spot', 'Email', 'Notes'],
     'employees': ['Last Name', 'Role / Job Title', 'Role', 'Login Username / Email', 'Login Password', 'Specialization', 'Salary', 'Target', 'Level', 'Status', 'Joining Date', 'Shift Start Time', 'Shift End Time', 'Monthly Paid Offs', 'Commission %'],
-    'services': ['Description', 'Status', 'Membership Plan Name', 'Membership Discount (%)', 'Membership Discount Amount'],
+    'services': ['Status', 'Membership Plan Name', 'Membership Discount (%)', 'Membership Discount Amount', 'Duration (minutes)', 'Description'],
     'products': ['Category', 'SKU', 'Barcode', 'Low Stock Threshold', 'Status']
 }
 
@@ -211,7 +216,9 @@ def generate_excel_template(module_name, tenant_id=None, branch_id=None):
         mode = get_membership_mode(tenant_id, branch_id)
 
         if module_name == 'services' and mode not in ['paid_plan', 'discount_plan']:
-            headers = ['Service Name', 'Category Name', 'Price', 'Duration (minutes)', 'Description', 'Status']
+            headers = ['Service Name', 'Category Name', 'Price', 'Status']
+        elif module_name == 'services':
+            headers = ['Service Name', 'Category Name', 'Price', 'Status', 'Membership Plan Name', 'Membership Discount (%)', 'Membership Discount Amount']
         elif module_name in TEMPLATE_HEADERS:
             headers = list(TEMPLATE_HEADERS[module_name])
         else:
@@ -245,6 +252,14 @@ def generate_excel_template(module_name, tenant_id=None, branch_id=None):
                     amt_col_idx = headers.index('Membership Discount Amount') + 1
                     formula_str = f"=IF(AND(ISNUMBER({price_col}{row_num}), ISNUMBER({pct_col}{row_num})), ROUND({price_col}{row_num}*({pct_col}{row_num}/100), 2), \"\")"
                     ws.cell(row=row_num, column=amt_col_idx, value=formula_str)
+        
+        # Auto-adjust column widths with proper padding so headers are clearly readable
+        for col_num, header in enumerate(headers, 1):
+            col_letter = openpyxl.utils.get_column_letter(col_num) if hasattr(openpyxl.utils, 'get_column_letter') else chr(64 + col_num)
+            header_len = len(str(header))
+            sample_val = str(sample_data[0].get(field_mapping.get(header, ''), '')) if sample_data else ''
+            max_len = max(header_len, len(sample_val), 14)
+            ws.column_dimensions[col_letter].width = max_len + 6
         
         # Add Excel Data Validation Dropdowns
         from openpyxl.worksheet.datavalidation import DataValidation
@@ -431,8 +446,6 @@ def get_sample_data(module_name, membership_mode="paid_plan"):
             'name': 'Haircut',
             'category_name': 'Hair Services',
             'price': '500',
-            'duration_minutes': '30',
-            'description': 'Basic haircut',
             'status': 'active'
         }
         if membership_mode in ['paid_plan', 'discount_plan']:
@@ -703,21 +716,20 @@ def validate_employee_data(row_data, tenant_id, branch_id=None):
     return errors
 
 def validate_service_data(row_data, tenant_id):
-    """Validate service data according to existing rules"""
+    """Validate service data according to Add New Service form fields"""
     from app.models.catalog import Service, ServiceCategory
     from app.database import db
+    from sqlalchemy import func
     
     errors = []
     
-    # Validate required fields
+    # Validate required fields matching Add New Service popup
     if not row_data.get('name'):
         errors.append("Service Name is required")
     if not row_data.get('category_name'):
         errors.append("Category Name is required")
     if row_data.get('price') is None:
         errors.append("Price is required")
-    if row_data.get('duration_minutes') is None:
-        errors.append("Duration is required")
     
     # Validate price
     price = row_data.get('price', 0)
@@ -728,28 +740,40 @@ def validate_service_data(row_data, tenant_id):
     except (ValueError, TypeError):
         errors.append("Invalid Price value")
     
-    # Validate duration
-    duration = row_data.get('duration_minutes', 0)
-    try:
-        dur_val = int(duration)
-        if dur_val <= 0:
-            errors.append("Duration must be a positive integer")
-    except (ValueError, TypeError):
-        errors.append("Invalid Duration value")
+    # Set default duration if not specified
+    if not row_data.get('duration_minutes'):
+        row_data['duration_minutes'] = 30
+
+    # Set default status if not specified
+    if not row_data.get('status'):
+        row_data['status'] = 'active'
+    else:
+        st = str(row_data['status']).strip().lower()
+        row_data['status'] = 'active' if st in ['active', '1', 'true', 'yes'] else 'inactive'
     
-    # Validate category exists in tenant context
-    category_name = row_data.get('category_name')
+    # Validate or auto-create category in tenant context
+    category_name = str(row_data.get('category_name', '')).strip()
     if category_name:
-        category = ServiceCategory.query.filter_by(tenant_id=tenant_id, name=category_name).first()
-        if not category:
-            errors.append(f"Category '{category_name}' does not exist")
-        else:
+        category = ServiceCategory.query.filter_by(tenant_id=tenant_id, is_deleted=False).filter(
+            func.lower(ServiceCategory.name) == func.lower(category_name)
+        ).first()
+        if category:
             row_data['category_id'] = category.id
+        else:
+            try:
+                new_cat = ServiceCategory(tenant_id=tenant_id, name=category_name)
+                db.session.add(new_cat)
+                db.session.flush()
+                row_data['category_id'] = new_cat.id
+            except Exception as e:
+                errors.append(f"Category '{category_name}' could not be created: {str(e)}")
     
     # Check for duplicate service name in tenant context
-    service_name = row_data.get('name')
+    service_name = str(row_data.get('name', '')).strip()
     if service_name:
-        existing = Service.query.filter_by(tenant_id=tenant_id, name=service_name).first()
+        existing = Service.query.filter_by(tenant_id=tenant_id, is_deleted=False).filter(
+            func.lower(Service.name) == func.lower(service_name)
+        ).first()
         if existing:
             errors.append(f"Service '{service_name}' already exists")
     
