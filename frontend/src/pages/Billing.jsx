@@ -61,6 +61,7 @@ const SUPPORTED_PAYMENT_METHODS = [
 import AddExpenseModal from "../components/AddExpenseModal";
 import CashDenominationModal from "../components/CashDenominationModal";
 import { getCachedCustomers, setCachedCustomers, updateOrAddCachedCustomer } from "../services/customerCache";
+import { getCachedBillingData, setCachedBillingData } from "../services/billingCache";
 
 function Billing() {
   const { showSuccess, showError } = useToast();
@@ -87,12 +88,19 @@ function Billing() {
   const productSelectRef = useRef(null);
   const addProductBtnRef = useRef(null);
 
-  // Master Datasets
-  const [categories, setCategories] = useState([]);
-  const [services, setServices] = useState([]);
-  const [allServices, setAllServices] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [employees, setEmployees] = useState([]);
+  // Master Datasets with instant 0ms cached prefill
+  const initialBillingCache = getCachedBillingData() || {};
+  const [categories, setCategories] = useState(() => initialBillingCache.categories || []);
+  const [allServices, setAllServices] = useState(() => initialBillingCache.allServices || []);
+  const [services, setServices] = useState(() => {
+    if (initialBillingCache.allServices && initialBillingCache.categories && initialBillingCache.categories.length > 0) {
+      const firstCatId = String(initialBillingCache.categories[0].id);
+      return initialBillingCache.allServices.filter(s => String(s.category_id) === firstCatId);
+    }
+    return [];
+  });
+  const [products, setProducts] = useState(() => initialBillingCache.products || []);
+  const [employees, setEmployees] = useState(() => initialBillingCache.employees || []);
   const [customers, setCustomers] = useState(() => getCachedCustomers() || []);
 
   // Selection Filters
@@ -269,7 +277,7 @@ function Billing() {
 
       setSelectedCustomerId(nextTab.selectedCustomerId || "walkin");
       setCustomerSearchQuery(nextTab.customerSearchQuery || "Walk-in Customer");
-      setSelectedGender(nextTab.selectedGender || "Female");
+      setSelectedGender(nextTab.selectedGender || "");
       setSelectedCategoryId(nextTab.selectedCategoryId || "");
       setCategorySearchQuery(nextTab.categorySearchQuery || (categories.find((c) => String(c.id) === String(nextTab.selectedCategoryId))?.name || ""));
       setSelectedServiceId(nextTab.selectedServiceId || "");
@@ -471,7 +479,7 @@ function Billing() {
     const cust = customers.find((c) => String(c.id) === String(customer_id));
     if (cust) {
       setCustomerSearchQuery(`${cust.first_name} ${cust.last_name || ""} (${cust.phone || ""})`);
-      setSelectedGender(cust.gender || "Female");
+      setSelectedGender(cust.gender || "");
     }
 
     const planPrice = parseFloat(selectedPlan.price || 0);
@@ -792,7 +800,7 @@ function Billing() {
       last_name: "",
       phone: "",
       email: "",
-      gender: selectedGender || "Female",
+      gender: selectedGender || "",
       spot: "",
       plan_id: membershipPlans.length > 0 ? membershipPlans[0].id.toString() : "",
       benefits: [],
@@ -883,24 +891,32 @@ function Billing() {
         }).then(() => savedCust);
       })
       .then((savedCust) => {
-        // Refresh customer list
-        return API.get("/customers?limit=10000").then((resList) => {
-          const updatedItems = resList.data?.items || resList.data || [];
-          setCustomers(updatedItems);
-          setCachedCustomers(updatedItems);
-          return savedCust;
-        });
-      })
-      .then((savedCust) => {
-        // Select the new customer in the billing screen
-        setSelectedCustomerId(String(savedCust.id));
-        setNewlyCreatedCustomerId(String(savedCust.id));
-        setSelectedGender(savedCust.gender || "Female");
-        setCustomerSearchQuery(`${savedCust.first_name} ${savedCust.last_name || ""} (${savedCust.phone})`);
+        // Select the new customer in the billing screen with exact chosen gender
+        const resolvedGender = savedCust.gender || newMembershipForm.gender || "Female";
+        const fullCust = {
+          ...savedCust,
+          gender: resolvedGender,
+          first_name: savedCust.first_name || first_name,
+          last_name: savedCust.last_name !== undefined ? savedCust.last_name : (newMembershipForm.last_name || ""),
+          phone: savedCust.phone || phone
+        };
+
+        const updatedList = updateOrAddCachedCustomer(fullCust);
+        if (updatedList) {
+          setCustomers(updatedList);
+        } else {
+          setCustomers((prev) => [fullCust, ...prev.filter((c) => c.id !== fullCust.id)]);
+        }
+
+        setSelectedCustomerId(String(fullCust.id));
+        setNewlyCreatedCustomerId(String(fullCust.id));
+        setSelectedGender(resolvedGender);
+        setCustomerSearchQuery(`${fullCust.first_name} ${fullCust.last_name || ""} (${fullCust.phone})`);
         setShowNewMembershipModal(false);
         setNewMembershipSaving(false);
-        setActionNotice(`New customer ${savedCust.first_name} created with membership assigned!`);
+        setActionNotice(`New customer ${fullCust.first_name} created with membership assigned!`);
         setTimeout(() => setActionNotice(null), 4000);
+        return fullCust;
 
         // Load the new customer's membership for discount application
         API.get(`/customers/${savedCust.id}/history`)
@@ -1011,7 +1027,7 @@ function Billing() {
     if (dupLoc) {
       showError(`Customer with mobile number ${phone} already exists (${dupLoc.first_name} ${dupLoc.last_name || ""}). Automatically selecting existing customer.`);
       setSelectedCustomerId(String(dupLoc.id));
-      setSelectedGender(dupLoc.gender || "Female");
+      setSelectedGender(dupLoc.gender || "");
       setCustomerSearchQuery(`${dupLoc.first_name} ${dupLoc.last_name || ""} (${dupLoc.phone})`);
       setShowQuickCustomerModal(false);
       setTimeout(() => advanceToNextRef(customerSelectRef.current, genderSelectRef), 100);
@@ -1034,22 +1050,30 @@ function Billing() {
     apiCall
       .then((res) => res.data?.data || res.data)
       .then((savedCust) => {
-        // Refresh customer list
-        return API.get("/customers?limit=10000").then((resList) => {
-          const updatedItems = resList.data?.items || resList.data || [];
-          setCustomers(updatedItems);
-          setCachedCustomers(updatedItems);
-          return savedCust;
-        });
-      })
-      .then((savedCust) => {
         if (savedCust && savedCust.id) {
-          setSelectedCustomerId(String(savedCust.id));
-          if (!quickCustomerEditId) {
-            setNewlyCreatedCustomerId(String(savedCust.id));
+          // Preserve the exact gender chosen in the form (Male/Female/Other)
+          const resolvedGender = savedCust.gender || gender || "Female";
+          const fullCust = {
+            ...savedCust,
+            gender: resolvedGender,
+            first_name: savedCust.first_name || first_name,
+            last_name: savedCust.last_name !== undefined ? savedCust.last_name : (quickCustomerForm.last_name || ""),
+            phone: savedCust.phone || phone,
+          };
+
+          const updatedList = updateOrAddCachedCustomer(fullCust);
+          if (updatedList) {
+            setCustomers(updatedList);
+          } else {
+            setCustomers((prev) => [fullCust, ...prev.filter((c) => c.id !== fullCust.id)]);
           }
-          setSelectedGender(savedCust.gender || "Female");
-          setCustomerSearchQuery(`${savedCust.first_name} ${savedCust.last_name || ""} (${savedCust.phone})`);
+
+          setSelectedCustomerId(String(fullCust.id));
+          if (!quickCustomerEditId) {
+            setNewlyCreatedCustomerId(String(fullCust.id));
+          }
+          setSelectedGender(resolvedGender);
+          setCustomerSearchQuery(`${fullCust.first_name} ${fullCust.last_name || ""} (${fullCust.phone})`);
 
           // Load active membership for discount application
           API.get(`/customers/${savedCust.id}/history`)
@@ -1092,10 +1116,34 @@ function Billing() {
 
   // Initial Load: Fetch Categories, Employees, Customers, Products, All Services, Settings, Membership Plans
   useEffect(() => {
-    setLoading(true);
+    const cachedData = getCachedBillingData();
     const cachedCustList = getCachedCustomers();
+
     if (cachedCustList && cachedCustList.length > 0) {
       setCustomers(cachedCustList);
+    }
+
+    if (cachedData) {
+      if (cachedData.categories && cachedData.categories.length > 0) {
+        setCategories(cachedData.categories);
+        if (!selectedCategoryId) {
+          setSelectedCategoryId(String(cachedData.categories[0].id));
+          setCategorySearchQuery(cachedData.categories[0].name);
+        }
+      }
+      if (cachedData.allServices && cachedData.allServices.length > 0) {
+        setAllServices(cachedData.allServices);
+        const firstCatId = selectedCategoryId || (cachedData.categories?.[0]?.id ? String(cachedData.categories[0].id) : "");
+        if (firstCatId) {
+          setServices(cachedData.allServices.filter((s) => String(s.category_id) === firstCatId));
+        }
+      }
+      if (cachedData.products) setProducts(cachedData.products);
+      if (cachedData.employees) setEmployees(cachedData.employees);
+      if (cachedData.membershipPlans) setMembershipPlans(cachedData.membershipPlans);
+      setLoading(false);
+    } else {
+      setLoading(true);
     }
 
     Promise.all([
@@ -1110,13 +1158,26 @@ function Billing() {
       .then(([catRes, empRes, custRes, prodRes, allSvcRes, setRes, plansRes]) => {
         const catList = catRes.data || [];
         const custList = custRes.data?.items || custRes.data || [];
+        const allSvcList = allSvcRes.data.items || [];
+        const prodList = prodRes.data.items || prodRes.data || [];
+        const empList = empRes.data.items || [];
+        const plansList = plansRes.data.items || [];
+
         setCategories(catList);
-        setEmployees(empRes.data.items || []);
+        setEmployees(empList);
         setCustomers(custList);
         setCachedCustomers(custList);
-        setProducts(prodRes.data.items || prodRes.data || []);
-        setAllServices(allSvcRes.data.items || []);
-        setMembershipPlans(plansRes.data.items || []);
+        setProducts(prodList);
+        setAllServices(allSvcList);
+        setMembershipPlans(plansList);
+
+        setCachedBillingData({
+          categories: catList,
+          allServices: allSvcList,
+          products: prodList,
+          employees: empList,
+          membershipPlans: plansList,
+        });
 
         const settingsData = setRes?.data || setRes;
         const invSet = settingsData?.invoice_settings || {};
@@ -1137,9 +1198,10 @@ function Billing() {
           setCurrencySymbol(regSet.currency_symbol);
         }
 
-        if (catList.length > 0) {
+        if (catList.length > 0 && !selectedCategoryId) {
           setSelectedCategoryId(catList[0].id.toString());
           setCategorySearchQuery(catList[0].name);
+          setServices(allSvcList.filter((s) => String(s.category_id) === String(catList[0].id)));
         }
         setLoading(false);
       })
@@ -1197,7 +1259,7 @@ function Billing() {
     }
   }, [showAddProductModal]);
 
-  // Fetch Category Services
+  // Fetch Category Services (Instant 0ms in-memory cache lookup with API fallback)
   useEffect(() => {
     if (!selectedCategoryId) {
       setServices([]);
@@ -1205,6 +1267,24 @@ function Billing() {
       return;
     }
 
+    // 1. Instant 0ms cache filtering when allServices is already in memory
+    if (allServices && allServices.length > 0) {
+      const filtered = allServices.filter((s) => String(s.category_id) === String(selectedCategoryId));
+      setServices(filtered);
+      setSelectedServiceId("");
+      if (shouldFocusServiceRef.current) {
+        shouldFocusServiceRef.current = false;
+        setTimeout(() => {
+          if (serviceSelectRef.current) {
+            serviceSelectRef.current.focus();
+            openNativeSelectDropdown(serviceSelectRef.current);
+          }
+        }, 60);
+      }
+      return;
+    }
+
+    // 2. Fallback to server if allServices is not yet in memory
     API.get(`/services?category_id=${selectedCategoryId}&limit=100`)
       .then((res) => {
         const svcs = res.data.items || [];
@@ -1221,7 +1301,7 @@ function Billing() {
         }
       })
       .catch((err) => console.error("Error fetching category services:", err));
-  }, [selectedCategoryId]);
+  }, [selectedCategoryId, allServices]);
 
   // Fetch Billing History
   const fetchBillingHistory = () => {

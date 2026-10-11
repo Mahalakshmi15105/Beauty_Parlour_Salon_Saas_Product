@@ -27,7 +27,9 @@ def get_customers():
     is_all = request.args.get("all", "").strip().lower() in ["true", "1", "yes"]
 
     # 0. Check Redis cache first
-    cache_key = f"customers:{g.parlour_id}:{g.branch_id or 'all'}:{q}:{gender}:{limit}:{cursor}:{sort}:{is_all}"
+    b_param = request.headers.get("X-Branch-Id") or request.args.get("branch_id")
+    b_key = b_param or g.branch_id or "all"
+    cache_key = f"customers:{g.parlour_id}:{b_key}:{q}:{gender}:{limit}:{cursor}:{sort}:{is_all}"
     try:
         cached_data = cache.get(cache_key)
         if cached_data is not None:
@@ -37,7 +39,6 @@ def get_customers():
 
     try:
         # Start query: if searching by keyword/phone or branch_id='all', search tenant-wide
-        b_param = request.headers.get("X-Branch-Id") or request.args.get("branch_id")
         if q or b_param == "all":
             query = get_tenant_query(Customer)
         else:
@@ -277,8 +278,16 @@ def create_customer():
     return success_response({
         "id": customer.id,
         "first_name": customer.first_name,
+        "last_name": customer.last_name,
         "phone": customer.phone,
-        "spot": customer.spot
+        "email": customer.email,
+        "gender": customer.gender,
+        "date_of_birth": customer.date_of_birth.isoformat() if customer.date_of_birth else None,
+        "address": customer.address,
+        "notes": customer.notes,
+        "spot": customer.spot,
+        "branch_id": customer.branch_id,
+        "created_at": customer.created_at.isoformat() if customer.created_at else None
     }, 201)
 
 

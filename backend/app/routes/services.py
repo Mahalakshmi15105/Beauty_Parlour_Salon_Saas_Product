@@ -1,7 +1,8 @@
 from flask import Blueprint, request, g
 from app.database import db
 from app.models.catalog import ServiceCategory, Service
-from app.models.membership import MembershipPlanService
+from app.models.membership import MembershipPlanService, MembershipPlan
+from sqlalchemy.orm import joinedload
 from app.utils.responses import success_response, error_response
 from app.utils.auth import require_role, get_tenant_query, get_branch_query
 from app.utils.query import paginate_query
@@ -110,6 +111,7 @@ def create_category():
         db.session.add(category)
         db.session.commit()
         cache.delete(f"categories:tenant:{g.parlour_id}")
+        cache.delete_pattern(f"services:{g.parlour_id}:*")
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error creating category: {str(e)}")
@@ -155,6 +157,7 @@ def update_category(category_id):
         db.session.commit()
         from app.services.cache import cache
         cache.delete(f"categories:tenant:{g.parlour_id}")
+        cache.delete_pattern(f"services:{g.parlour_id}:*")
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error updating category: {str(e)}")
@@ -192,6 +195,7 @@ def delete_category(category_id):
         db.session.commit()
         from app.services.cache import cache
         cache.delete(f"categories:tenant:{g.parlour_id}")
+        cache.delete_pattern(f"services:{g.parlour_id}:*")
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error deleting category: {str(e)}")
@@ -215,6 +219,18 @@ def get_services():
     limit = request.args.get("limit", 20)
     cursor = request.args.get("cursor")
     sort = request.args.get("sort", "name")
+
+    # 0. Check Redis/memory cache first for ultra-fast instant responses
+    from app.services.cache import cache
+    b_param = request.headers.get("X-Branch-Id") or request.args.get("branch_id")
+    b_key = b_param or g.branch_id or "all"
+    cache_key = f"services:{g.parlour_id}:{b_key}:{q}:{category_id}:{status}:{limit}:{cursor}:{sort}"
+    try:
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return success_response(cached_data)
+    except Exception as c_err:
+        logger.debug(f"Services cache get skipped: {c_err}")
 
     query = get_branch_query(Service)
 
@@ -241,6 +257,9 @@ def get_services():
     else:
         sort_field = sort
 
+    # Eager load category to prevent N+1 queries
+    query = query.options(joinedload(Service.category))
+
     services, next_cursor = paginate_query(
         query=query,
         model=Service,
@@ -250,6 +269,27 @@ def get_services():
         sort_desc=sort_desc
     )
 
+    # Batch load all discounts in ONE query instead of N+1 individual queries
+    service_ids = [s.id for s in services]
+    discounts_by_service = {}
+    if service_ids:
+        try:
+            mps_records = (
+                db.session.query(MembershipPlanService, MembershipPlan.name)
+                .outerjoin(MembershipPlan, MembershipPlanService.membership_plan_id == MembershipPlan.id)
+                .filter(MembershipPlanService.service_id.in_(service_ids))
+                .all()
+            )
+            for mps, p_name in mps_records:
+                discounts_by_service.setdefault(mps.service_id, []).append({
+                    "plan_id": mps.membership_plan_id,
+                    "plan_name": p_name or f"Plan #{mps.membership_plan_id}",
+                    "percentage": float(mps.discount_percentage or 0.0),
+                    "amount": float(mps.discount_amount or 0.0)
+                })
+        except Exception as e:
+            logger.error(f"Error loading discounts in batch: {str(e)}")
+
     data = []
     for s in services:
         try:
@@ -257,21 +297,7 @@ def get_services():
         except Exception:
             cat_name = None
 
-        discounts = []
-        try:
-            for mps in MembershipPlanService.query.filter_by(service_id=s.id).all():
-                try:
-                    p_name = mps.plan.name if mps.plan else f"Plan #{mps.membership_plan_id}"
-                except Exception:
-                    p_name = f"Plan #{mps.membership_plan_id}"
-                discounts.append({
-                    "plan_id": mps.membership_plan_id,
-                    "plan_name": p_name,
-                    "percentage": float(mps.discount_percentage or 0.0),
-                    "amount": float(mps.discount_amount or 0.0)
-                })
-        except Exception as e:
-            logger.error(f"Error loading discounts for service {s.id}: {str(e)}")
+        discounts = discounts_by_service.get(s.id, [])
 
         data.append({
             "id": s.id,
@@ -287,10 +313,17 @@ def get_services():
             "created_at": s.created_at.isoformat() if s.created_at else None
         })
 
-    return success_response({
+    result_payload = {
         "items": data,
         "next_cursor": next_cursor
-    })
+    }
+
+    try:
+        cache.set(cache_key, result_payload, timeout=600)
+    except Exception:
+        pass
+
+    return success_response(result_payload)
 
 
 @services_bp.route("/services/<int:service_id>", methods=["GET"])
@@ -410,6 +443,8 @@ def create_service():
                 db.session.add(mps)
 
         db.session.commit()
+        from app.services.cache import cache
+        cache.delete_pattern(f"services:{g.parlour_id}:*")
     except Exception as e:
         db.session.rollback()
         import traceback
@@ -512,6 +547,8 @@ def update_service(service_id):
                     db.session.add(mps)
 
         db.session.commit()
+        from app.services.cache import cache
+        cache.delete_pattern(f"services:{g.parlour_id}:*")
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error updating service: {str(e)}")
@@ -539,6 +576,8 @@ def delete_service(service_id):
         MembershipPlanService.query.filter_by(service_id=service.id).delete()
         service.soft_delete()
         db.session.commit()
+        from app.services.cache import cache
+        cache.delete_pattern(f"services:{g.parlour_id}:*")
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error deleting service: {str(e)}")

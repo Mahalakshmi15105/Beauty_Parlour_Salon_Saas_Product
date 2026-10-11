@@ -2,7 +2,7 @@
 // Enables 0ms customer lookups, instant dropdown rendering, and offline resilience.
 
 const CACHE_KEY = "salon_customers_cache_v2";
-const CACHE_TTL_MS = 60 * 1000; // 1 minute fresh TTL
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes fresh TTL with background revalidation
 
 let memoryCache = null;
 let memoryTimestamp = 0;
