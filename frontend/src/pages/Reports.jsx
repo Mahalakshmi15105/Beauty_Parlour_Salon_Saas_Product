@@ -20,7 +20,10 @@ import {
   AlertCircle,
   FileCheck,
   UserCheck,
-  DollarSign
+  DollarSign,
+  Edit2,
+  Check,
+  X
 } from "lucide-react";
 
 function Reports() {
@@ -41,7 +44,35 @@ function Reports() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Daily Sales Statement Opening Balance manual editing
+  const [isEditingOpening, setIsEditingOpening] = useState(false);
+  const [editOpeningVal, setEditOpeningVal] = useState("");
+  const [savingOpening, setSavingOpening] = useState(false);
+
+  const handleSaveOpeningBalance = async () => {
+    const num = parseFloat(editOpeningVal);
+    if (isNaN(num)) {
+      showError("Please enter a valid numeric opening balance.");
+      return;
+    }
+    setSavingOpening(true);
+    try {
+      await API.post("/reports/daily-sales-statement/opening-balance", {
+        date: selectedDate,
+        opening_balance: num
+      });
+      showSuccess("Opening balance updated! Closing balance recalculated.");
+      setIsEditingOpening(false);
+      fetchReport();
+    } catch (err) {
+      showError(err?.response?.data?.message || err?.message || "Failed to update opening balance.");
+    } finally {
+      setSavingOpening(false);
+    }
+  };
+
   const fetchReport = () => {
+    setIsEditingOpening(false);
     setLoading(true);
     setError(null);
     setReportData(null);
@@ -871,7 +902,66 @@ function Reports() {
 
                     {/* Summary Balance Box */}
                     <div className="bg-emerald-600 text-white p-3 rounded-2xl text-xs space-y-1 font-bold">
-                      <div className="flex justify-between"><span>OPENING BAL :</span><span className="numeric">₹{Math.round(reportData.balance?.opening_bal || 0)}</span></div>
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-1.5">
+                          <span>OPENING BAL :</span>
+                          {!isEditingOpening && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditOpeningVal(reportData.balance?.opening_bal ?? "");
+                                setIsEditingOpening(true);
+                              }}
+                              title="Edit Opening Balance"
+                              className="text-emerald-200 hover:text-white transition-colors p-0.5 rounded hover:bg-emerald-700/60"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                        {isEditingOpening ? (
+                          <div className="flex items-center gap-1">
+                            <span className="text-white text-xs">₹</span>
+                            <input
+                              type="number"
+                              value={editOpeningVal}
+                              onChange={(e) => setEditOpeningVal(e.target.value)}
+                              className="w-20 px-1.5 py-0.5 rounded bg-white text-slate-900 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-emerald-300"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleSaveOpeningBalance();
+                                if (e.key === "Escape") setIsEditingOpening(false);
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={handleSaveOpeningBalance}
+                              disabled={savingOpening}
+                              title="Save"
+                              className="p-1 rounded bg-emerald-700 hover:bg-emerald-800 text-white"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setIsEditingOpening(false)}
+                              title="Cancel"
+                              className="p-1 rounded bg-rose-600/80 hover:bg-rose-700 text-white"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <span className="numeric">₹{Math.round(reportData.balance?.opening_bal || 0)}</span>
+                            {reportData.balance?.is_manual_opening && (
+                              <span className="text-[10px] bg-emerald-700/80 text-emerald-100 px-1.5 py-0.2 rounded font-normal" title="Manually edited">
+                                edited
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                       <div className="flex justify-between text-rose-200"><span>* TOTAL SALE</span><span className="numeric">₹{Math.round(reportData.balance?.total_sale || 0)}</span></div>
                       <div className="flex justify-between"><span>* CASH PAY</span><span className="numeric">₹{Math.round(reportData.balance?.cash_pay || 0)}</span></div>
                       <div className="flex justify-between"><span>* PHONE PAY</span><span className="numeric">₹{Math.round(reportData.balance?.phone_pay || 0)}</span></div>

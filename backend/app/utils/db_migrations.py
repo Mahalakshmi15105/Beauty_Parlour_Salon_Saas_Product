@@ -138,6 +138,14 @@ def run_auto_migrations():
             except Exception:
                 db.session.rollback()
 
+        # 6. Add opening_balance to cash_denominations if missing
+        try:
+            db.session.execute(text("ALTER TABLE `cash_denominations` ADD COLUMN `opening_balance` DECIMAL(10, 2) NULL;"))
+            db.session.commit()
+            logger.info("AUTO-MIGRATION: Added 'opening_balance' column to table 'cash_denominations'.")
+        except Exception:
+            db.session.rollback()
+
         logger.info("AUTO-MIGRATION: Database schema check completed successfully.")
     except Exception as e:
         logger.error(f"AUTO-MIGRATION ERROR: {e}")

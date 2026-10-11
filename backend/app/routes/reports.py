@@ -641,28 +641,31 @@ def get_daily_sales_statement():
     }
 
     # Opening Cash Balance calculation
-    prev_invoices = get_branch_query(Invoice).filter(
-        Invoice.created_at < start_dt,
-        Invoice.status != "Voided"
-    ).all()
+    if cd_rec and getattr(cd_rec, "opening_balance", None) is not None:
+        opening_bal = float(cd_rec.opening_balance)
+    else:
+        prev_invoices = get_branch_query(Invoice).filter(
+            Invoice.created_at < start_dt,
+            Invoice.status != "Voided"
+        ).all()
 
-    prev_cash_sum = Decimal("0.00")
-    for inv in prev_invoices:
-        pm_list = InvoicePayment.query.filter_by(invoice_id=inv.id).all()
-        if pm_list:
-            prev_cash_sum += sum(Decimal(str(p.amount or 0)) for p in pm_list if str(getattr(p, "payment_method", getattr(p, "method", ""))).lower() == "cash")
-        else:
-            prev_cash_sum += Decimal(str(inv.total or 0))
+        prev_cash_sum = Decimal("0.00")
+        for inv in prev_invoices:
+            pm_list = InvoicePayment.query.filter_by(invoice_id=inv.id).all()
+            if pm_list:
+                prev_cash_sum += sum(Decimal(str(p.amount or 0)) for p in pm_list if str(getattr(p, "payment_method", getattr(p, "method", ""))).lower() == "cash")
+            else:
+                prev_cash_sum += Decimal(str(inv.total or 0))
 
-    prev_expenses_q = Expense.query.filter_by(tenant_id=tenant_id, is_deleted=False).filter(Expense.date < target_date) if tenant_id else None
-    if prev_expenses_q and branch_id:
-        prev_expenses_q = prev_expenses_q.filter_by(branch_id=branch_id)
-    prev_exp_sum = sum(Decimal(str(exp.amount or 0)) for exp in (prev_expenses_q.all() if prev_expenses_q else []))
+        prev_expenses_q = Expense.query.filter_by(tenant_id=tenant_id, is_deleted=False).filter(Expense.date < target_date) if tenant_id else None
+        if prev_expenses_q and branch_id:
+            prev_expenses_q = prev_expenses_q.filter_by(branch_id=branch_id)
+        prev_exp_sum = sum(Decimal(str(exp.amount or 0)) for exp in (prev_expenses_q.all() if prev_expenses_q else []))
 
-    init_bal = Decimal(str(getattr(branch, "initial_opening_balance", 0) or 0)) if branch else Decimal("0.00")
-    opening_bal = float(init_bal + prev_cash_sum - prev_exp_sum)
-    if opening_bal < 0:
-        opening_bal = 0.0
+        init_bal = Decimal(str(getattr(branch, "initial_opening_balance", 0) or 0)) if branch else Decimal("0.00")
+        opening_bal = float(init_bal + prev_cash_sum - prev_exp_sum)
+        if opening_bal < 0:
+            opening_bal = 0.0
 
     closing_bal = opening_bal + float(total_cash) - total_expenses
 
@@ -699,6 +702,7 @@ def get_daily_sales_statement():
         "total_expenses": int(round(total_expenses)),
         "balance": {
             "opening_bal": int(round(opening_bal)),
+            "is_manual_opening": bool(cd_rec and getattr(cd_rec, "opening_balance", None) is not None),
             "total_sale": int(Decimal(str(grand_total)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
             "cash_pay": int(Decimal(str(total_cash)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
             "phone_pay": int(Decimal(str(total_paytm)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
@@ -714,6 +718,52 @@ def get_daily_sales_statement():
             "walkin": till_date_walkin,
             "abv": round(till_date_abv, 4)
         }
+    })
+
+
+@reports_bp.route("/reports/daily-sales-statement/opening-balance", methods=["POST"])
+@reports_bp.route("/daily-sales-statement/opening-balance", methods=["POST"])
+@require_role(["ParlourAdmin", "BranchAdmin", "Receptionist"])
+def update_daily_opening_balance():
+    data = request.get_json() or {}
+    date_str = data.get("date")
+    opening_bal_val = data.get("opening_balance")
+    branch_id = data.get("branch_id") or getattr(g, "branch_id", None) or 1
+    tenant_id = getattr(g, "parlour_id", None) or getattr(g, "tenant_id", 1)
+
+    if not date_str:
+        return error_response("MISSING_DATE", "Date is required.", 400)
+    try:
+        target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return error_response("INVALID_DATE", "Date must be YYYY-MM-DD.", 400)
+
+    from app.models.cash_denomination import CashDenomination
+    cd_rec = CashDenomination.query.filter_by(
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        date=target_date
+    ).first()
+
+    val_dec = Decimal(str(opening_bal_val)) if opening_bal_val is not None else Decimal("0.00")
+
+    if cd_rec:
+        cd_rec.opening_balance = val_dec
+    else:
+        cd_rec = CashDenomination(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            date=target_date,
+            opening_balance=val_dec,
+            total=0.0
+        )
+        db.session.add(cd_rec)
+    db.session.commit()
+
+    return success_response({
+        "message": "Opening balance updated successfully.",
+        "date": target_date.isoformat(),
+        "opening_balance": float(val_dec)
     })
 
 

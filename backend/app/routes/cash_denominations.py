@@ -1,5 +1,6 @@
 from flask import Blueprint, request, g, jsonify
 from datetime import datetime, date
+from decimal import Decimal
 from app.database import db
 from app.models.cash_denomination import CashDenomination
 from app.utils.responses import success_response, error_response
@@ -55,7 +56,8 @@ def get_cash_denomination():
         "count_5": record.count_5,
         "count_2": record.count_2,
         "count_1": record.count_1,
-        "total": float(record.total or 0.0)
+        "total": float(record.total or 0.0),
+        "opening_balance": float(record.opening_balance) if getattr(record, "opening_balance", None) is not None else None
     })
 
 
@@ -101,7 +103,10 @@ def save_cash_denomination():
         record.count_2 = c2
         record.count_1 = c1
         record.total = total
+        if "opening_balance" in data:
+            record.opening_balance = Decimal(str(data["opening_balance"])) if data.get("opening_balance") is not None else None
     else:
+        op_bal = Decimal(str(data["opening_balance"])) if data.get("opening_balance") is not None else None
         record = CashDenomination(
             tenant_id=g.parlour_id,
             branch_id=branch_id,
@@ -115,7 +120,8 @@ def save_cash_denomination():
             count_5=c5,
             count_2=c2,
             count_1=c1,
-            total=total
+            total=total,
+            opening_balance=op_bal
         )
         db.session.add(record)
 

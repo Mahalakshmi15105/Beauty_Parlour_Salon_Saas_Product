@@ -163,6 +163,7 @@ def ensure_database_exists(database_uri: str):
                     conn.execute(text("ALTER TABLE branches ADD COLUMN wifi_ssid VARCHAR(100) NULL;"))
                     conn.execute(text("ALTER TABLE branches ADD COLUMN wifi_public_ip VARCHAR(100) NULL;"))
                     conn.execute(text("ALTER TABLE branches ADD COLUMN enforce_wifi BOOLEAN NOT NULL DEFAULT FALSE;"))
+                    conn.execute(text("ALTER TABLE cash_denominations ADD COLUMN opening_balance DECIMAL(10,2) NULL;"))
                     conn.commit()
                 except Exception:
                     pass

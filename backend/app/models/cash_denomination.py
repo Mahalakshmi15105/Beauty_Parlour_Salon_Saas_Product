@@ -21,6 +21,7 @@ class CashDenomination(db.Model):
     count_1 = db.Column(db.Integer, nullable=False, default=0)
 
     total = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
+    opening_balance = db.Column(db.Numeric(10, 2), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
