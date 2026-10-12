@@ -335,9 +335,9 @@ function Customers() {
   return (
     <div className="space-y-6">
       {/* Title Bar */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <h1 className="text-xl font-semibold text-text-primary">Customers Manager</h1>
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-primary/10 text-primary border border-primary/20 shadow-2xs">
               <Users className="w-3.5 h-3.5" />
@@ -346,17 +346,17 @@ function Customers() {
           </div>
           <p className="text-xs text-text-secondary mt-0.5">Manage visitor directories, preferences, and dormant re-engagement campaigns.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
             onClick={() => setShowBulkUpload(true)}
-            className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2"
+            className="flex-1 sm:flex-initial justify-center bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition flex items-center gap-1.5"
           >
             <Upload className="w-4 h-4" />
             Bulk Upload
           </button>
           <button
             onClick={openAddModal}
-            className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition"
+            className="flex-1 sm:flex-initial justify-center bg-primary hover:bg-primary-hover text-white px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition"
           >
             + Add Customer
           </button>
@@ -364,10 +364,10 @@ function Customers() {
       </div>
 
       {/* Sub-navigation Tabs */}
-      <div className="flex border-b border-border-soft space-x-2">
+      <div className="flex border-b border-border-soft space-x-2 overflow-x-auto scrollbar-none">
         <button
           onClick={() => setActiveSubTab("all")}
-          className={`py-2.5 px-4 font-semibold text-xs border-b-2 transition-all flex items-center gap-2 ${
+          className={`py-2.5 px-4 font-semibold text-xs border-b-2 transition-all flex items-center gap-2 shrink-0 ${
             activeSubTab === "all" ? "border-primary text-primary" : "border-transparent text-text-secondary hover:text-text-primary"
           }`}
         >
@@ -378,7 +378,7 @@ function Customers() {
         </button>
         <button
           onClick={() => setActiveSubTab("dormant")}
-          className={`py-2.5 px-4 font-semibold text-xs border-b-2 transition-all flex items-center space-x-1.5 ${
+          className={`py-2.5 px-4 font-semibold text-xs border-b-2 transition-all flex items-center space-x-1.5 shrink-0 ${
             activeSubTab === "dormant" ? "border-primary text-primary" : "border-transparent text-text-secondary hover:text-text-primary"
           }`}
         >
@@ -389,30 +389,32 @@ function Customers() {
 
       {activeSubTab === "all" ? (
         <>
-          <div className="bg-surface border border-border-soft p-4 rounded-lg flex space-x-4 items-center">
-            <input
-              type="text"
-              placeholder="Search by name, phone, or email..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 bg-background border border-border-soft px-4 py-2 rounded-lg text-sm focus:outline-none focus:border-primary"
-            />
-            <select
-              value={gender}
-              onChange={(e) => setGender(e.target.value)}
-              className="bg-background border border-border-soft px-4 py-2 rounded-lg text-sm text-text-secondary focus:outline-none"
-            >
-              <option value="">All Genders</option>
-              <option value="Female">Female</option>
-              <option value="Male">Male</option>
-              <option value="Other">Other</option>
-            </select>
+          <div className="bg-surface border border-border-soft p-3 sm:p-4 rounded-xl flex flex-col md:flex-row gap-3 md:items-center">
+            <div className="flex-1 flex flex-col sm:flex-row gap-2">
+              <input
+                type="text"
+                placeholder="Search by name, phone, or email..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="flex-1 bg-background border border-border-soft px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm focus:outline-none focus:border-primary"
+              />
+              <select
+                value={gender}
+                onChange={(e) => setGender(e.target.value)}
+                className="bg-background border border-border-soft px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm text-text-secondary focus:outline-none shrink-0"
+              >
+                <option value="">All Genders</option>
+                <option value="Female">Female</option>
+                <option value="Male">Male</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
 
-            <div className="flex space-x-2 border-l border-border-soft pl-4">
+            <div className="flex items-center justify-between sm:justify-start gap-2 border-t md:border-t-0 md:border-l border-border-soft pt-2 md:pt-0 md:pl-3">
               <button
                 onClick={handlePrint}
                 disabled={exportLoading}
-                className="bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-slate-200 cursor-pointer"
+                className="flex-1 sm:flex-initial justify-center bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs font-semibold flex items-center gap-1 transition border border-slate-200 cursor-pointer"
                 title={`Print All Customers (${totalCustomers})`}
               >
                 {exportLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Printer className="w-3.5 h-3.5" />}
@@ -421,7 +423,7 @@ function Customers() {
               <button
                 onClick={handleExportExcel}
                 disabled={exportLoading}
-                className="bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 text-emerald-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-emerald-200 cursor-pointer"
+                className="flex-1 sm:flex-initial justify-center bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 text-emerald-700 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs font-semibold flex items-center gap-1 transition border border-emerald-200 cursor-pointer"
                 title={`Export All Customers to Excel (${totalCustomers})`}
               >
                 {exportLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
@@ -430,7 +432,7 @@ function Customers() {
               <button
                 onClick={handleExportPDF}
                 disabled={exportLoading}
-                className="bg-rose-50 hover:bg-rose-100 disabled:opacity-50 text-rose-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-rose-200 cursor-pointer"
+                className="flex-1 sm:flex-initial justify-center bg-rose-50 hover:bg-rose-100 disabled:opacity-50 text-rose-700 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs font-semibold flex items-center gap-1 transition border border-rose-200 cursor-pointer"
                 title={`Export All Customers to PDF (${totalCustomers})`}
               >
                 {exportLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
@@ -439,12 +441,12 @@ function Customers() {
             </div>
           </div>
 
-          {/* Data Table */}
-          <div className="bg-surface border border-border-soft rounded-lg overflow-hidden">
+          {/* Data Display: Mobile Cards + Desktop Table */}
+          <div className="bg-surface border border-border-soft rounded-xl overflow-hidden shadow-sm">
             {/* Prominent Header Banner Showing Total Number of Customers */}
-            <div className="px-6 py-3 bg-slate-50/90 dark:bg-slate-800/40 border-b border-border-soft flex justify-between items-center text-xs">
+            <div className="px-4 sm:px-6 py-3 bg-slate-50/90 dark:bg-slate-800/40 border-b border-border-soft flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 text-xs">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-slate-600 dark:text-slate-300">Total Registered Customers:</span>
+                <span className="font-semibold text-slate-600 dark:text-slate-300">Total Registered:</span>
                 <span className="bg-primary text-white font-black text-xs px-2.5 py-0.5 rounded-full shadow-2xs">
                   {totalCustomers.toLocaleString()}
                 </span>
@@ -453,7 +455,7 @@ function Customers() {
                 {search ? (
                   <span>Showing results matching &quot;<strong className="text-slate-700">{search}</strong>&quot;</span>
                 ) : (
-                  <span>All <strong className="text-slate-700">{totalCustomers.toLocaleString()}</strong> customers exported on Print/Excel/PDF</span>
+                  <span>All <strong className="text-slate-700">{totalCustomers.toLocaleString()}</strong> customers ready for export</span>
                 )}
               </div>
             </div>
@@ -474,79 +476,167 @@ function Customers() {
                 </button>
               </div>
             ) : (
-          <>
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-primary-light border-b border-border-soft">
-                  <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Name</th>
-                  <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Phone</th>
-                  <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Email</th>
-                  <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Gender</th>
-                  <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-soft">
-                {customers.map((c) => (
-                  <tr key={c.id} className="hover:bg-background/50 transition">
-                    <td className="px-6 py-4 text-sm font-medium text-text-primary">
-                      <div className="flex items-center space-x-2">
-                        <span>{c.first_name} {c.last_name}</span>
-                        {c.days_since_last_visit && c.days_since_last_visit >= 60 && (
-                          <span className="bg-indigo-100 text-indigo-800 border border-indigo-200 text-[10px] font-extrabold px-2 py-0.5 rounded-full flex items-center space-x-1">
-                            <UserRoundX className="w-3 h-3 text-indigo-600" />
-                            <span>Inactive • <span className="numeric">{c.days_since_last_visit}</span> Days</span>
+              <>
+                {/* Mobile Touch Cards View (visible on < md) */}
+                <div className="block md:hidden divide-y divide-border-soft">
+                  {customers.map((c) => (
+                    <div key={c.id} className="p-4 space-y-3 bg-surface hover:bg-background/40 transition">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-primary/10 text-primary font-extrabold text-sm flex items-center justify-center shrink-0">
+                            {(c.first_name?.[0] || "C").toUpperCase()}
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-sm text-text-primary">
+                              {c.first_name} {c.last_name || ""}
+                            </h4>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              {c.gender && (
+                                <span className="text-[10px] font-semibold text-text-secondary bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+                                  {c.gender}
+                                </span>
+                              )}
+                              {c.days_since_last_visit && c.days_since_last_visit >= 60 && (
+                                <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1">
+                                  <UserRoundX className="w-3 h-3 text-indigo-600" />
+                                  <span>Inactive {c.days_since_last_visit}d</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Contact row with direct call & whatsapp links */}
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        {c.phone && (
+                          <>
+                            <a
+                              href={`tel:${c.phone}`}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-semibold transition"
+                            >
+                              <Phone className="w-3.5 h-3.5 text-primary" />
+                              <span className="numeric">{c.phone}</span>
+                            </a>
+                            <a
+                              href={`https://wa.me/${c.phone.replace(/[^0-9]/g, "")}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-semibold transition"
+                            >
+                              <MessageSquare className="w-3.5 h-3.5" />
+                              <span>WhatsApp</span>
+                            </a>
+                          </>
+                        )}
+                        {c.email && (
+                          <span className="text-[11px] text-text-secondary truncate max-w-[200px]">
+                            {c.email}
                           </span>
                         )}
                       </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-text-secondary numeric">{c.phone}</td>
-                    <td className="px-6 py-4 text-sm text-text-secondary">{c.email || "-"}</td>
-                    <td className="px-6 py-4 text-sm text-text-secondary">{c.gender || "-"}</td>
-                    <td className="px-6 py-4 text-sm space-x-3">
-                      <button onClick={() => setViewCustomer(c)} className="text-indigo-600 font-medium hover:underline">
-                        View
-                      </button>
-                      <button onClick={() => openEditModal(c)} className="text-primary hover:underline">
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteClick(c)}
-                        className="text-danger hover:underline font-semibold"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
 
-            {/* Pagination Controls */}
-            <div className="px-6 py-4 border-t border-border-soft flex justify-between items-center">
-              <button
-                disabled={cursorHistory.length === 0}
-                onClick={handlePrevPage}
-                className="px-4 py-2 border border-border-soft rounded-lg text-sm disabled:opacity-50 transition"
-              >
-                Previous
-              </button>
-              <button
-                disabled={!nextCursor}
-                onClick={handleNextPage}
-                className="px-4 py-2 border border-border-soft rounded-lg text-sm disabled:opacity-50 transition"
-              >
-                Next
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </>
-  ) : (
-          <div className="grid grid-cols-12 gap-6">
+                      {/* Card Action Buttons */}
+                      <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border-soft/60">
+                        <button
+                          onClick={() => setViewCustomer(c)}
+                          className="py-1.5 px-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>View</span>
+                        </button>
+                        <button
+                          onClick={() => openEditModal(c)}
+                          className="py-1.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1"
+                        >
+                          <span>Edit</span>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteClick(c)}
+                          className="py-1.5 px-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1"
+                        >
+                          <span>Delete</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop Table View (visible on >= md) */}
+                <div className="hidden md:block overflow-x-auto w-full">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-primary-light border-b border-border-soft">
+                        <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Name</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Phone</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Email</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Gender</th>
+                        <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border-soft">
+                      {customers.map((c) => (
+                        <tr key={c.id} className="hover:bg-background/50 transition">
+                          <td className="px-6 py-4 text-sm font-medium text-text-primary">
+                            <div className="flex items-center space-x-2">
+                              <span>{c.first_name} {c.last_name}</span>
+                              {c.days_since_last_visit && c.days_since_last_visit >= 60 && (
+                                <span className="bg-indigo-100 text-indigo-800 border border-indigo-200 text-[10px] font-extrabold px-2 py-0.5 rounded-full flex items-center space-x-1">
+                                  <UserRoundX className="w-3 h-3 text-indigo-600" />
+                                  <span>Inactive • <span className="numeric">{c.days_since_last_visit}</span> Days</span>
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-text-secondary numeric">{c.phone}</td>
+                          <td className="px-6 py-4 text-sm text-text-secondary">{c.email || "-"}</td>
+                          <td className="px-6 py-4 text-sm text-text-secondary">{c.gender || "-"}</td>
+                          <td className="px-6 py-4 text-sm space-x-3">
+                            <button onClick={() => setViewCustomer(c)} className="text-indigo-600 font-medium hover:underline">
+                              View
+                            </button>
+                            <button onClick={() => openEditModal(c)} className="text-primary hover:underline">
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteClick(c)}
+                              className="text-danger hover:underline font-semibold"
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination Controls */}
+                <div className="px-4 sm:px-6 py-3.5 border-t border-border-soft flex justify-between items-center">
+                  <button
+                    disabled={cursorHistory.length === 0}
+                    onClick={handlePrevPage}
+                    className="px-4 py-2 border border-border-soft rounded-lg text-xs sm:text-sm font-semibold disabled:opacity-50 transition"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    disabled={!nextCursor}
+                    onClick={handleNextPage}
+                    className="px-4 py-2 border border-border-soft rounded-lg text-xs sm:text-sm font-semibold disabled:opacity-50 transition"
+                  >
+                    Next
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </>
+      ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Left panel: Message Template Editor */}
-            <div className="col-span-12 md:col-span-4 space-y-4">
-              <div className="bg-surface border border-border-soft p-5 rounded-xl space-y-4 shadow-sm">
+            <div className="col-span-12 lg:col-span-4 space-y-4">
+              <div className="bg-surface border border-border-soft p-4 sm:p-5 rounded-xl space-y-4 shadow-sm">
                 <h3 className="text-xs font-bold text-text-primary uppercase tracking-wider flex items-center space-x-1.5">
                   <SettingsIcon className="w-4 h-4 text-primary" />
                   <span>Re-engagement Settings</span>
@@ -593,7 +683,7 @@ function Customers() {
             </div>
 
             {/* Right panel: Dormant Client List */}
-            <div className="col-span-12 md:col-span-8 space-y-4">
+            <div className="col-span-12 lg:col-span-8 space-y-4">
               <div className="bg-surface border border-border-soft rounded-xl overflow-hidden shadow-sm">
                 {dormantLoading ? (
                   <div className="p-8 text-center text-xs font-bold text-slate-500 flex flex-col items-center justify-center space-y-2">
@@ -611,53 +701,96 @@ function Customers() {
                     </p>
                   </div>
                 ) : (
-                  <table className="w-full text-left border-collapse text-sm">
-                    <thead>
-                      <tr className="bg-primary-light border-b border-border-soft">
-                        <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Client</th>
-                        <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Inactivity Duration</th>
-                        <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Last Visit Date</th>
-                        <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase text-right">Quick Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border-soft">
+                  <>
+                    {/* Mobile Dormant Cards */}
+                    <div className="block md:hidden divide-y divide-border-soft">
                       {(Array.isArray(dormantCustomers) ? dormantCustomers : []).map((c) => {
                         const weeks = Math.floor(c.days_inactive / 7);
                         const customMessage = messageTemplate
                           .replace("[Name]", c.first_name)
                           .replace("[Weeks]", weeks);
-                        
+
                         return (
-                          <tr key={c.id} className="hover:bg-background/50 transition">
-                            <td className="px-6 py-4 text-sm font-medium text-text-primary">
+                          <div key={c.id} className="p-4 space-y-2.5 bg-surface hover:bg-background/40 transition">
+                            <div className="flex items-start justify-between">
                               <div>
-                                <p className="font-semibold">{c.first_name} {c.last_name}</p>
-                                <p className="text-[10px] text-text-secondary font-mono">{c.phone}</p>
+                                <h4 className="font-bold text-sm text-text-primary">{c.first_name} {c.last_name || ""}</h4>
+                                <p className="text-xs text-text-secondary numeric mt-0.5">{c.phone}</p>
                               </div>
-                            </td>
-                            <td className="px-6 py-4 text-sm">
-                              <span className="text-rose-600 font-bold">{c.days_inactive} Days</span>
-                              <span className="text-[10px] text-text-secondary ml-2 font-medium">({weeks} Weeks)</span>
-                            </td>
-                            <td className="px-6 py-4 text-sm text-text-secondary font-medium">
-                              {c.last_visit_date ? new Date(c.last_visit_date).toLocaleDateString() : "No visits recorded"}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-right">
+                              <span className="text-rose-600 bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-full text-xs font-black">
+                                {c.days_inactive}d Inactive
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-text-secondary">
+                              Last Visit: <span className="font-medium text-text-primary">{c.last_visit_date ? new Date(c.last_visit_date).toLocaleDateString() : "No visits recorded"}</span>
+                            </div>
+                            <div className="pt-2">
                               <a
                                 href={`https://wa.me/${c.phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(customMessage)}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center space-x-1 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-2xs animate-pulse hover:animate-none"
+                                className="w-full inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-bold transition shadow-xs"
                               >
                                 <MessageSquare className="w-3.5 h-3.5" />
-                                <span>Re-engage</span>
+                                <span>Re-engage on WhatsApp</span>
                               </a>
-                            </td>
-                          </tr>
+                            </div>
+                          </div>
                         );
                       })}
-                    </tbody>
-                  </table>
+                    </div>
+
+                    {/* Desktop Dormant Table */}
+                    <div className="hidden md:block overflow-x-auto w-full">
+                      <table className="w-full text-left border-collapse text-sm">
+                        <thead>
+                          <tr className="bg-primary-light border-b border-border-soft">
+                            <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Client</th>
+                            <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Inactivity Duration</th>
+                            <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Last Visit Date</th>
+                            <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase text-right">Quick Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border-soft">
+                          {(Array.isArray(dormantCustomers) ? dormantCustomers : []).map((c) => {
+                            const weeks = Math.floor(c.days_inactive / 7);
+                            const customMessage = messageTemplate
+                              .replace("[Name]", c.first_name)
+                              .replace("[Weeks]", weeks);
+                            
+                            return (
+                              <tr key={c.id} className="hover:bg-background/50 transition">
+                                <td className="px-6 py-4 text-sm font-medium text-text-primary">
+                                  <div>
+                                    <p className="font-semibold">{c.first_name} {c.last_name}</p>
+                                    <p className="text-[10px] text-text-secondary font-mono">{c.phone}</p>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 text-sm">
+                                  <span className="text-rose-600 font-bold">{c.days_inactive} Days</span>
+                                  <span className="text-[10px] text-text-secondary ml-2 font-medium">({weeks} Weeks)</span>
+                                </td>
+                                <td className="px-6 py-4 text-sm text-text-secondary font-medium">
+                                  {c.last_visit_date ? new Date(c.last_visit_date).toLocaleDateString() : "No visits recorded"}
+                                </td>
+                                <td className="px-6 py-4 text-sm text-right">
+                                  <a
+                                    href={`https://wa.me/${c.phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(customMessage)}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center space-x-1 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-2xs animate-pulse hover:animate-none"
+                                  >
+                                    <MessageSquare className="w-3.5 h-3.5" />
+                                    <span>Re-engage</span>
+                                  </a>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
                 )}
               </div>
             </div>
@@ -666,9 +799,9 @@ function Customers() {
 
       {/* Add/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div ref={modalRef} className="glowe-glass-card max-w-lg w-full rounded-3xl shadow-2xl border border-white/70 overflow-hidden">
-            <div className="px-6 py-4 border-b border-pink-100/60 flex justify-between items-center bg-white/50 backdrop-blur-md">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in">
+          <div ref={modalRef} className="glowe-glass-card max-w-lg w-full max-h-[92vh] flex flex-col rounded-3xl shadow-2xl border border-white/70 overflow-hidden">
+            <div className="px-6 py-4 border-b border-pink-100/60 flex justify-between items-center bg-white/50 backdrop-blur-md shrink-0">
               <div className="flex items-center space-x-2">
                 <h3 className="text-md font-bold text-slate-900">
                   {editId ? "Edit Customer" : "Add New Customer"}
@@ -690,7 +823,7 @@ function Customers() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form ref={formRef} onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form ref={formRef} onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">First Name *</label>
@@ -783,9 +916,9 @@ function Customers() {
       
       {/* View Customer Details Modal */}
       {viewCustomer && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="glowe-glass-card max-w-lg w-full rounded-3xl shadow-2xl border border-white/70 overflow-hidden">
-            <div className="px-6 py-4 border-b border-pink-100/60 flex justify-between items-center bg-white/50 backdrop-blur-md">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in">
+          <div className="glowe-glass-card max-w-lg w-full max-h-[92vh] flex flex-col rounded-3xl shadow-2xl border border-white/70 overflow-hidden">
+            <div className="px-6 py-4 border-b border-pink-100/60 flex justify-between items-center bg-white/50 backdrop-blur-md shrink-0">
               <div className="flex items-center space-x-2">
                 <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-black text-xs">
                   {viewCustomer.first_name?.charAt(0).toUpperCase()}
@@ -802,7 +935,7 @@ function Customers() {
               </button>
             </div>
 
-            <div className="p-6 space-y-4 text-xs font-sans">
+            <div className="p-6 space-y-4 text-xs font-sans overflow-y-auto">
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Phone Number</span>

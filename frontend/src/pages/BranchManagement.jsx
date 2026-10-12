@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
 import { Building2, Plus, Edit, Trash2, AlertTriangle, Check, X, Clock, Phone, Mail, MapPin, Wifi } from "lucide-react";
 import { useModalFocusTrap, useFormKeyboardNavigation } from "../utils/keyboardNavigation";
+import DeleteConfirmModal from "../components/DeleteConfirmModal";
 
 function BranchManagement() {
   const modalRef = useRef(null);
@@ -18,6 +19,8 @@ function BranchManagement() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingBranch, setEditingBranch] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -143,18 +146,28 @@ function BranchManagement() {
       });
   };
 
-  const handleDeleteBranch = (branchId) => {
-    if (window.confirm("Are you sure you want to delete this branch? This action cannot be undone.")) {
-      API.delete(`/branches/${branchId}`)
-        .then(() => {
-          setSuccess("Branch deleted successfully!");
-          setTimeout(() => setSuccess(null), 3000);
-          fetchBranches();
-        })
-        .catch((err) => {
-          setError(err.response?.data?.message || err.message || "Failed to delete branch");
-        });
-    }
+  const handleDeleteBranchClick = (branch) => {
+    setDeleteTarget({
+      id: branch.id,
+      name: branch.name,
+    });
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    API.delete(`/branches/${deleteTarget.id}`)
+      .then(() => {
+        setSuccess(`Branch "${deleteTarget.name}" deleted successfully!`);
+        setTimeout(() => setSuccess(null), 3000);
+        setDeleteTarget(null);
+        setIsDeleting(false);
+        fetchBranches();
+      })
+      .catch((err) => {
+        setIsDeleting(false);
+        setError(err.response?.data?.message || err.message || "Failed to delete branch");
+      });
   };
 
   const handleEditClick = (branch) => {
@@ -317,7 +330,7 @@ function BranchManagement() {
                     <Edit className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => handleDeleteBranch(branch.id)}
+                    onClick={() => handleDeleteBranchClick(branch)}
                     className="p-1.5 hover:bg-background rounded-lg text-text-secondary hover:text-danger transition"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -776,6 +789,16 @@ function BranchManagement() {
           </div>
         </div>
       )}
+      {/* Modern In-App Compulsory Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={Boolean(deleteTarget)}
+        title="Delete Branch?"
+        itemName={deleteTarget?.name}
+        itemType="branch"
+        loading={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onClose={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

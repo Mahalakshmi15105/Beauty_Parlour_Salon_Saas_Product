@@ -5,6 +5,7 @@ import { useModalFocusTrap, useFormKeyboardNavigation } from "../utils/keyboardN
 import { X, Printer, FileSpreadsheet, FileText, Upload, HardDrive } from "lucide-react";
 import { exportToCSV, printDataList, exportToPDF, exportToExcel } from "../utils/exportUtils";
 import BulkUploadModal from "../components/BulkUploadModal";
+import DeleteConfirmModal from "../components/DeleteConfirmModal";
 import GoogleDriveGuardModal from "../components/GoogleDriveGuardModal";
 import StorageService from "../services/storageService";
 import { useToast } from "../context/ToastContext";
@@ -402,26 +403,55 @@ function Services() {
       });
   };
 
-  const handleDeleteService = (id) => {
-    API.delete(`/services/${id}`)
-      .then(() => {
-        showSuccess("Service deleted.");
-        fetchServices(cursor);
-      })
-      .catch((err) => {
-        showError(err.response?.data?.message || err.message || "Failed to delete service.");
-      });
+  // Delete Confirmation State
+  const [deleteTarget, setDeleteTarget] = useState(null); // { id, name, type: 'service' | 'category' }
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteServiceClick = (service) => {
+    setDeleteTarget({
+      id: service.id,
+      name: service.name,
+      type: "service",
+    });
   };
 
-  const handleDeleteCategory = (id) => {
-    API.delete(`/service-categories/${id}`)
-      .then(() => {
-        showSuccess("Category deleted.");
-        fetchCategories();
-      })
-      .catch((err) => {
-        showError(err.response?.data?.message || err.message || "Failed to delete category.");
-      });
+  const handleDeleteCategoryClick = (category) => {
+    setDeleteTarget({
+      id: category.id,
+      name: category.name,
+      type: "category",
+    });
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+
+    if (deleteTarget.type === "service") {
+      API.delete(`/services/${deleteTarget.id}`)
+        .then(() => {
+          showSuccess(`Service "${deleteTarget.name}" deleted successfully.`);
+          setDeleteTarget(null);
+          setIsDeleting(false);
+          fetchServices(cursor);
+        })
+        .catch((err) => {
+          setIsDeleting(false);
+          showError(err.response?.data?.message || err.message || "Failed to delete service.");
+        });
+    } else if (deleteTarget.type === "category") {
+      API.delete(`/service-categories/${deleteTarget.id}`)
+        .then(() => {
+          showSuccess(`Category "${deleteTarget.name}" deleted successfully.`);
+          setDeleteTarget(null);
+          setIsDeleting(false);
+          fetchCategories();
+        })
+        .catch((err) => {
+          setIsDeleting(false);
+          showError(err.response?.data?.message || err.message || "Failed to delete category.");
+        });
+    }
   };
 
   // View Service Modal State
@@ -435,23 +465,23 @@ function Services() {
           <h1 className="text-xl font-semibold text-text-primary">Services & Treatments Catalog</h1>
           <p className="text-xs text-text-secondary">Manage service offerings, category partitions, and pricing.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+        <div className="grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
           <button
             onClick={() => setShowBulkUpload(true)}
-            className="flex-1 sm:flex-none justify-center bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition flex items-center gap-1.5"
+            className="justify-center bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-2 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition flex items-center gap-1.5"
           >
-            <Upload className="w-4 h-4" />
-            <span>Bulk Upload</span>
+            <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span className="truncate">Bulk Upload</span>
           </button>
           <button
             onClick={() => setShowCategoryModal(true)}
-            className="flex-1 sm:flex-none justify-center border border-border-soft hover:bg-background text-text-primary px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition"
+            className="justify-center border border-border-soft hover:bg-background text-text-primary px-2 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition truncate text-center"
           >
             Categories
           </button>
           <button
             onClick={openAddServiceModal}
-            className="flex-1 sm:flex-none justify-center bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition shadow-xs"
+            className="justify-center bg-primary hover:bg-primary-hover text-white px-2.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shadow-xs truncate text-center"
           >
             + Add Service
           </button>
@@ -506,7 +536,7 @@ function Services() {
         </div>
       </div>
 
-      {/* Data Table */}
+      {/* Data Table / Mobile Cards */}
       <div className="bg-surface border border-border-soft rounded-2xl overflow-hidden shadow-xs">
         {loading ? (
           <div className="p-8 space-y-4">
@@ -524,7 +554,62 @@ function Services() {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto w-full">
+            {/* Mobile Cards (Visible on screens < sm) */}
+            <div className="block sm:hidden divide-y divide-border-soft">
+              {services.map((s) => (
+                <div key={s.id} className="p-3.5 space-y-2.5 bg-surface hover:bg-background/40 transition">
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-bold text-sm text-text-primary break-words">{s.name}</h4>
+                      <p className="text-xs text-text-secondary mt-0.5">{s.category_name || "General"}</p>
+                    </div>
+                    <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full shrink-0 ${
+                      s.status === "active" ? "bg-success/15 text-success" : "bg-danger/15 text-danger"
+                    }`}>
+                      {s.status}
+                    </span>
+                  </div>
+
+                  {s.membership_discounts && s.membership_discounts.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {s.membership_discounts.map((d, idx) => {
+                        const pObj = membershipPlans.find((p) => String(p.id) === String(d.plan_id));
+                        const planLabel = d.plan_name || pObj?.name || pObj?.plan_name || `Plan #${d.plan_id}`;
+                        const discountStr = d.percentage > 0 ? `${d.percentage}%` : formatCurrency(d.amount);
+                        return (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center text-[10px] font-bold bg-pink-50 text-pink-700 border border-pink-200 px-2 py-0.5 rounded-full"
+                          >
+                            {planLabel} ({discountStr})
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="flex justify-between items-center pt-1 border-t border-border-soft/60">
+                    <span className="text-sm font-extrabold text-primary numeric">
+                      {formatCurrency(s.price)}
+                    </span>
+                    <div className="flex items-center space-x-2 text-xs">
+                      <button onClick={() => setViewService(s)} className="text-indigo-600 hover:text-indigo-800 font-bold px-2 py-1 bg-indigo-50 rounded-lg">
+                        View
+                      </button>
+                      <button onClick={() => openEditServiceModal(s)} className="text-primary hover:underline font-bold px-2 py-1 bg-pink-50 rounded-lg">
+                        Edit
+                      </button>
+                      <button onClick={() => handleDeleteServiceClick(s)} className="text-danger hover:underline font-bold px-2 py-1 bg-rose-50 rounded-lg">
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table View (Visible on screens >= sm) */}
+            <div className="hidden sm:block overflow-x-auto w-full">
               <table className="w-full text-left border-collapse min-w-[650px]">
               <thead>
                 <tr className="bg-primary-light border-b border-border-soft">
@@ -577,7 +662,7 @@ function Services() {
                       <button onClick={() => openEditServiceModal(s)} className="text-primary hover:underline font-semibold">
                         Edit
                       </button>
-                      <button onClick={() => handleDeleteService(s.id)} className="text-danger hover:underline">
+                      <button onClick={() => handleDeleteServiceClick(s)} className="text-danger hover:underline">
                         Delete
                       </button>
                     </td>
@@ -913,8 +998,8 @@ function Services() {
                               Edit
                             </button>
                             <button
-                              onClick={() => handleDeleteCategory(c.id)}
-                              className="text-xs text-danger hover:underline"
+                              onClick={() => handleDeleteCategoryClick(c)}
+                              className="text-xs text-danger hover:underline font-semibold"
                             >
                               Delete
                             </button>
@@ -1045,6 +1130,17 @@ function Services() {
       <GoogleDriveGuardModal
         isOpen={showDriveGuard}
         onClose={() => setShowDriveGuard(false)}
+      />
+
+      {/* Modern In-App Compulsory Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={Boolean(deleteTarget)}
+        title={deleteTarget?.type === "category" ? "Delete Category?" : "Delete Service?"}
+        itemName={deleteTarget?.name}
+        itemType={deleteTarget?.type || "service"}
+        loading={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onClose={() => setDeleteTarget(null)}
       />
     </div>
   );

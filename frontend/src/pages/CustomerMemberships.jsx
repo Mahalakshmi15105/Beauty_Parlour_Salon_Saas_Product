@@ -498,14 +498,14 @@ function CustomerMemberships() {
   return (
     <div className="space-y-6">
       {/* Title Bar */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h1 className="text-xl font-semibold text-text-primary">Customer Subscriptions & Packages</h1>
           <p className="text-xs text-text-secondary">Assign membership packages, manage benefit balances, renewals, and upgrades.</p>
         </div>
         <button
           onClick={() => openAssignModal()}
-          className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition"
+          className="w-full sm:w-auto bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition"
         >
           + Assign Membership
         </button>
@@ -580,15 +580,15 @@ function CustomerMemberships() {
             </div>
           ) : (
             memberships.map((m) => (
-              <div key={m.id} className="bg-surface border border-border-soft rounded-lg p-6 space-y-4 shadow-sm">
-                <div className="flex justify-between items-start border-b border-border-soft pb-4">
+              <div key={m.id} className="bg-surface border border-border-soft rounded-lg p-4 sm:p-6 space-y-4 shadow-sm">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-border-soft pb-4">
                   <div>
                     <h4 className="text-base font-semibold text-text-primary">{m.plan_name}</h4>
-                    <p className="text-xs text-text-secondary mt-1">
+                    <p className="text-xs text-text-secondary mt-0.5">
                       Expires: {new Date(m.expires_at).toLocaleDateString()}
                     </p>
                   </div>
-                  <div className="flex items-center space-x-3">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${
                       m.status === "active" ? "bg-success/15 text-success" : "bg-danger/15 text-danger"
                     }`}>
@@ -625,7 +625,7 @@ function CustomerMemberships() {
                   {(!m.benefits || m.benefits.length === 0) ? (
                     <p className="text-xs text-text-secondary">No free service perks attached to this plan.</p>
                   ) : (
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       {(m.benefits || []).map((b) => (
                         <div key={b.id || b.service_id} className="bg-background border border-border-soft p-3 rounded-lg flex justify-between items-center">
                           <span className="text-xs font-medium text-text-primary">{b.service_name}</span>
@@ -704,7 +704,92 @@ function CustomerMemberships() {
             </button>
           </div>
         </div>
-        <div className="overflow-x-auto">
+        {/* Mobile View Cards */}
+        <div className="block md:hidden divide-y divide-border-soft">
+          {(() => {
+            const filteredMemberships = allMemberships.filter((m) => {
+              if (statusFilter === "active") return m.status === "active";
+              if (statusFilter === "cancelled") return m.status !== "active";
+              return true;
+            });
+
+            if (filteredMemberships.length === 0) {
+              return (
+                <div className="p-8 text-center text-xs text-text-secondary">
+                  No assigned memberships found for status "{statusFilter}".
+                </div>
+              );
+            }
+
+            return filteredMemberships.map((m) => (
+              <div key={m.id} className="p-4 space-y-2.5 bg-surface hover:bg-background/40 transition">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h4 className="font-bold text-sm text-text-primary">{m.customer_name}</h4>
+                    <p className="text-xs text-text-secondary numeric">{m.customer_phone || "No phone"}</p>
+                  </div>
+                  <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                    m.status === "active" ? "bg-success/15 text-success" : "bg-danger/15 text-danger"
+                  }`}>
+                    {m.status}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-1 text-xs pt-1 border-t border-border-soft/60">
+                  <span className="font-bold text-primary">{m.plan_name}</span>
+                  <span className="text-[11px] text-text-secondary">
+                    Expires: {new Date(m.expires_at).toLocaleDateString()}
+                  </span>
+                </div>
+
+                {/* Mobile actions */}
+                <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border-soft/60">
+                  <button
+                    onClick={() => {
+                      const mockCust = {
+                        id: m.customer_id,
+                        first_name: m.customer_name.split(" ")[0],
+                        last_name: m.customer_name.split(" ").slice(1).join(" "),
+                        phone: m.customer_phone
+                      };
+                      fetchCustomerMemberships(mockCust);
+                    }}
+                    className="flex-1 py-1 px-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition text-center"
+                  >
+                    View Perks
+                  </button>
+                  {m.invoice_id && (
+                    <button
+                      onClick={() => openBillPreviewModalForInvoice(m.invoice_id)}
+                      className="flex-1 py-1 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold transition text-center"
+                    >
+                      Bill
+                    </button>
+                  )}
+                  {m.status === "active" && (
+                    <>
+                      <button
+                        onClick={() => openRenewModal(m)}
+                        className="py-1 px-2 bg-pink-50 hover:bg-pink-100 text-primary rounded-lg text-xs font-bold transition"
+                      >
+                        Renew
+                      </button>
+                      <button
+                        onClick={() => handleCancel(m.id)}
+                        className="py-1 px-2 bg-rose-50 hover:bg-rose-100 text-danger rounded-lg text-xs font-bold transition"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ));
+          })()}
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-primary-light border-b border-border-soft">

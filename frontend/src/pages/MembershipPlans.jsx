@@ -4,7 +4,8 @@ import { useToast } from "../context/ToastContext";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { useModalFocusTrap, useFormKeyboardNavigation } from "../utils/keyboardNavigation";
 import { X, Printer, FileSpreadsheet, FileText } from "lucide-react";
-import { exportToCSV, printDataList, exportToPDF, exportToExcel } from "../utils/exportUtils";
+import BulkUploadModal from "../components/BulkUploadModal";
+import DeleteConfirmModal from "../components/DeleteConfirmModal";
 
 function MembershipPlans() {
   const { showSuccess, showError } = useToast();
@@ -25,6 +26,8 @@ function MembershipPlans() {
   // Form Modal Toggle
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Plan Validity & Date State
   const getTodayDateStr = () => new Date().toISOString().split("T")[0];
@@ -221,59 +224,71 @@ function MembershipPlans() {
       });
   };
 
-  const handleDelete = (id, planName = "this plan") => {
-    if (window.confirm(`Are you sure you want to delete "${planName}"?`)) {
-      API.delete(`/membership-plans/${id}`)
-        .then(() => {
-          showSuccess("Membership plan deleted successfully!");
-          fetchPlans(cursor);
-        })
-        .catch((err) => {
-          const errMsg = err.response?.data?.message || err.message || "Failed to delete.";
-          showError(errMsg);
-        });
-    }
+  const handleDeleteClick = (p) => {
+    setDeleteTarget({
+      id: p.id,
+      name: p.name,
+    });
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    API.delete(`/membership-plans/${deleteTarget.id}`)
+      .then(() => {
+        showSuccess(`Membership plan "${deleteTarget.name}" deleted successfully!`);
+        setDeleteTarget(null);
+        setIsDeleting(false);
+        fetchPlans(cursor);
+      })
+      .catch((err) => {
+        setIsDeleting(false);
+        const errMsg = err.response?.data?.message || err.message || "Failed to delete.";
+        showError(errMsg);
+      });
   };
 
   return (
     <div className="space-y-6">
       {/* Title Bar */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h1 className="text-xl font-semibold text-text-primary">Membership Plans</h1>
           <p className="text-xs text-text-secondary">Configure salon membership tiers, pricing, free perks, and discount rates.</p>
         </div>
         <button
           onClick={openAddModal}
-          className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition"
+          className="w-full sm:w-auto bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition"
         >
           + Create Plan
         </button>
       </div>
 
       {/* Filter / Search Bar */}
-      <div className="bg-surface border border-border-soft p-4 rounded-lg flex space-x-4 items-center">
-        <input
-          type="text"
-          placeholder="Search plan name or description..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 bg-background border border-border-soft px-4 py-2 rounded-lg text-sm focus:outline-none focus:border-primary"
-        />
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="bg-background border border-border-soft px-4 py-2 rounded-lg text-sm text-text-secondary focus:outline-none"
-        >
-          <option value="">All Statuses</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
+      <div className="bg-surface border border-border-soft p-3 sm:p-4 rounded-xl flex flex-col md:flex-row gap-3 md:items-center">
+        <div className="flex-1 flex flex-col sm:flex-row gap-2">
+          <input
+            type="text"
+            placeholder="Search plan name or description..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="flex-1 bg-background border border-border-soft px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm focus:outline-none focus:border-primary"
+          />
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="bg-background border border-border-soft px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm text-text-secondary focus:outline-none shrink-0"
+          >
+            <option value="">All Statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
 
-        <div className="flex space-x-2 border-l border-border-soft pl-4">
+        <div className="flex items-center justify-between sm:justify-start gap-2 border-t md:border-t-0 md:border-l border-border-soft pt-2 md:pt-0 md:pl-3">
           <button
             onClick={handlePrint}
-            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-slate-200"
+            className="flex-1 sm:flex-initial justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs font-semibold flex items-center gap-1 transition border border-slate-200"
             title="Print List"
           >
             <Printer className="w-3.5 h-3.5" />
@@ -281,7 +296,7 @@ function MembershipPlans() {
           </button>
           <button
             onClick={handleExportExcel}
-            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-emerald-200"
+            className="flex-1 sm:flex-initial justify-center bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs font-semibold flex items-center gap-1 transition border border-emerald-200"
             title="Export to Excel"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
@@ -289,7 +304,7 @@ function MembershipPlans() {
           </button>
           <button
             onClick={handleExportPDF}
-            className="bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-rose-200"
+            className="flex-1 sm:flex-initial justify-center bg-rose-50 hover:bg-rose-100 text-rose-700 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs font-semibold flex items-center gap-1 transition border border-rose-200"
             title="Export to PDF"
           >
             <FileText className="w-3.5 h-3.5" />
@@ -298,8 +313,8 @@ function MembershipPlans() {
         </div>
       </div>
 
-      {/* Data Table */}
-      <div className="bg-surface border border-border-soft rounded-lg overflow-hidden">
+      {/* Data Display: Mobile Cards + Desktop Table */}
+      <div className="bg-surface border border-border-soft rounded-xl overflow-hidden shadow-sm">
         {loading ? (
           <div className="p-8 space-y-4">
             <div className="h-6 bg-border-soft rounded animate-pulse w-1/4"></div>
@@ -316,57 +331,102 @@ function MembershipPlans() {
           </div>
         ) : (
           <>
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-primary-light border-b border-border-soft">
-                  <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Plan Name</th>
-                  <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Price</th>
-                  <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Validity</th>
-                  <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Status</th>
-                  <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-soft">
-                {plans.map((p) => (
-                  <tr key={p.id} className="hover:bg-background/50 transition">
-                    <td className="px-6 py-4 text-sm font-medium text-text-primary">
-                      <p>{p.name}</p>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-text-secondary numeric">{formatCurrency(p.price)}</td>
-                    <td className="px-6 py-4 text-sm text-text-secondary"><span className="numeric">{p.duration_days}</span> Days</td>
-                    <td className="px-6 py-4 text-sm">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        p.status === "active" ? "bg-success/15 text-success" : "bg-danger/15 text-danger"
-                      }`}>
-                        {p.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm space-x-3">
-                      <button onClick={() => openEditModal(p)} className="text-primary hover:underline">
+            {/* Mobile Touch Cards View (visible on < md) */}
+            <div className="block md:hidden divide-y divide-border-soft">
+              {plans.map((p) => (
+                <div key={p.id} className="p-4 space-y-3 bg-surface hover:bg-background/40 transition">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h4 className="font-bold text-sm text-text-primary">{p.name}</h4>
+                      <p className="text-xs text-text-secondary mt-0.5">
+                        Validity: <span className="numeric font-semibold text-text-primary">{p.duration_days} Days</span>
+                      </p>
+                    </div>
+                    <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${
+                      p.status === "active" ? "bg-success/15 text-success" : "bg-danger/15 text-danger"
+                    }`}>
+                      {p.status}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs pt-1 border-t border-border-soft/60">
+                    <div>
+                      <span className="text-[10px] text-text-secondary uppercase font-semibold block">Plan Price</span>
+                      <span className="text-sm font-extrabold text-primary numeric">{formatCurrency(p.price)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => openEditModal(p)}
+                        className="py-1 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition"
+                      >
                         Edit
                       </button>
-                      <button onClick={() => handleDelete(p.id, p.name)} className="text-danger hover:underline">
+                      <button
+                        onClick={() => handleDeleteClick(p)}
+                        className="py-1 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-bold transition"
+                      >
                         Delete
                       </button>
-                    </td>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table View (visible on >= md) */}
+            <div className="hidden md:block overflow-x-auto w-full">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-primary-light border-b border-border-soft">
+                    <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Plan Name</th>
+                    <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Price</th>
+                    <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Validity</th>
+                    <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Status</th>
+                    <th className="px-6 py-3 text-xs font-semibold text-text-secondary uppercase">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-border-soft">
+                  {plans.map((p) => (
+                    <tr key={p.id} className="hover:bg-background/50 transition">
+                      <td className="px-6 py-4 text-sm font-medium text-text-primary">
+                        <p>{p.name}</p>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-text-secondary numeric">{formatCurrency(p.price)}</td>
+                      <td className="px-6 py-4 text-sm text-text-secondary"><span className="numeric">{p.duration_days}</span> Days</td>
+                      <td className="px-6 py-4 text-sm">
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          p.status === "active" ? "bg-success/15 text-success" : "bg-danger/15 text-danger"
+                        }`}>
+                          {p.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm space-x-3">
+                        <button onClick={() => openEditModal(p)} className="text-primary hover:underline">
+                          Edit
+                        </button>
+                        <button onClick={() => handleDeleteClick(p)} className="text-danger hover:underline">
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
             {/* Pagination Controls */}
-            <div className="px-6 py-4 border-t border-border-soft flex justify-between items-center">
+            <div className="px-4 sm:px-6 py-3.5 border-t border-border-soft flex justify-between items-center text-xs sm:text-sm">
               <button
                 disabled={cursorHistory.length === 0}
                 onClick={handlePrevPage}
-                className="px-4 py-2 border border-border-soft rounded-lg text-sm disabled:opacity-50 transition"
+                className="px-4 py-2 border border-border-soft rounded-lg font-semibold disabled:opacity-50 transition"
               >
                 Previous
               </button>
               <button
                 disabled={!nextCursor}
                 onClick={handleNextPage}
-                className="px-4 py-2 border border-border-soft rounded-lg text-sm disabled:opacity-50 transition"
+                className="px-4 py-2 border border-border-soft rounded-lg font-semibold disabled:opacity-50 transition"
               >
                 Next
               </button>
@@ -513,6 +573,17 @@ function MembershipPlans() {
           </div>
         </div>
       )}
+
+      {/* Modern In-App Compulsory Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={Boolean(deleteTarget)}
+        title="Delete Membership Plan?"
+        itemName={deleteTarget?.name}
+        itemType="membership plan"
+        loading={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onClose={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

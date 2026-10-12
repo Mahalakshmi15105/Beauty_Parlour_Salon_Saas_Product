@@ -725,8 +725,8 @@ export default function WhatsAppCampaigns() {
                 </div>
               </div>
 
-              <div className="border border-border-soft rounded-2xl overflow-hidden">
-                <table className="w-full text-left border-collapse text-sm">
+              <div className="border border-border-soft rounded-2xl overflow-x-auto">
+                <table className="w-full text-left border-collapse text-sm min-w-[500px]">
                   <thead>
                     <tr className="bg-slate-100 border-b border-border-soft text-slate-700">
                       <th className="py-2.5 px-3 font-bold">Customer Name</th>

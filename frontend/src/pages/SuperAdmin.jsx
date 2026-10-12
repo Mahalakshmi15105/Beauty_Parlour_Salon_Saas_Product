@@ -3,6 +3,7 @@ import API from "../services/api";
 import { useToast } from "../context/ToastContext";
 import { X, Eye, Pencil, Trash2, BarChart3, Users, Building2, CreditCard, Settings, TrendingUp, MessageSquare, Key, CheckCircle, XCircle } from "lucide-react";
 import { useModalFocusTrap, useFormKeyboardNavigation } from "../utils/keyboardNavigation";
+import DeleteConfirmModal from "../components/DeleteConfirmModal";
 
 function SuperAdmin() {
   const { showSuccess, showError } = useToast();
@@ -252,13 +253,30 @@ function SuperAdmin() {
     setShowPlanModal(true);
   };
 
-  const handleDeletePlan = (planId) => {
-    // Confirmed action
-    if (true) {
-      API.delete(`/super-admin/subscription-plans/${planId}`)
-        .then(() => fetchData())
-        .catch((err) => showError(err.message || "Plan deletion failed."));
-    }
+  const [deletePlanTarget, setDeletePlanTarget] = useState(null);
+  const [isDeletingPlan, setIsDeletingPlan] = useState(false);
+
+  const handleDeletePlanClick = (plan) => {
+    setDeletePlanTarget({
+      id: plan.id,
+      name: plan.name,
+    });
+  };
+
+  const handleConfirmDeletePlan = () => {
+    if (!deletePlanTarget) return;
+    setIsDeletingPlan(true);
+    API.delete(`/super-admin/subscription-plans/${deletePlanTarget.id}`)
+      .then(() => {
+        showSuccess(`Subscription plan "${deletePlanTarget.name}" deleted.`);
+        setDeletePlanTarget(null);
+        setIsDeletingPlan(false);
+        fetchData();
+      })
+      .catch((err) => {
+        setIsDeletingPlan(false);
+        showError(err.response?.data?.message || err.message || "Plan deletion failed.");
+      });
   };
 
   if (loading) {
@@ -615,7 +633,7 @@ function SuperAdmin() {
                     <button onClick={() => handleEditPlan(p)} className="text-primary hover:text-primary-hover">
                       <Pencil className="w-4 h-4" />
                     </button>
-                    <button onClick={() => handleDeletePlan(p.id)} className="text-danger hover:text-danger-hover">
+                    <button onClick={() => handleDeletePlanClick(p)} className="text-danger hover:text-danger-hover">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -1222,6 +1240,17 @@ function SuperAdmin() {
           </div>
         </div>
       )}
+
+      {/* In-App Compulsory Plan Delete Modal */}
+      <DeleteConfirmModal
+        isOpen={Boolean(deletePlanTarget)}
+        title="Delete Subscription Plan?"
+        itemName={deletePlanTarget?.name}
+        itemType="subscription plan"
+        loading={isDeletingPlan}
+        onConfirm={handleConfirmDeletePlan}
+        onClose={() => setDeletePlanTarget(null)}
+      />
     </div>
   );
 }

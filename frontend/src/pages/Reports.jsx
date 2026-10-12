@@ -848,15 +848,15 @@ function Reports() {
         </div>
 
         {/* Export Action Buttons: PDF & Excel */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
           {/* PDF Export Button */}
           <button
             onClick={handleExportCustomPDF}
             disabled={exportingPdf || loading || !reportData}
-            className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl text-xs font-extrabold flex items-center space-x-2 transition shadow-md disabled:opacity-50 cursor-pointer"
+            className="flex-1 sm:flex-none justify-center bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl text-xs font-extrabold flex items-center space-x-2 transition shadow-md disabled:opacity-50 cursor-pointer"
             title="Download formatted report as PDF"
           >
-            <FileText className="w-4 h-4" />
+            <FileText className="w-4 h-4 shrink-0" />
             <span>{exportingPdf ? "Generating PDF..." : "Download PDF"}</span>
           </button>
 
@@ -864,17 +864,17 @@ function Reports() {
           <button
             onClick={handleExportCustomExcel}
             disabled={loading || !reportData}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-extrabold flex items-center space-x-2 transition shadow-md disabled:opacity-50 cursor-pointer"
+            className="flex-1 sm:flex-none justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-extrabold flex items-center space-x-2 transition shadow-md disabled:opacity-50 cursor-pointer"
             title="Download report as Excel spreadsheet (.xlsx)"
           >
-            <FileSpreadsheet className="w-4 h-4" />
+            <FileSpreadsheet className="w-4 h-4 shrink-0" />
             <span>Download Excel</span>
           </button>
         </div>
       </div>
 
       {/* Segmented Sub-Tabs */}
-      <div className="flex flex-wrap gap-2 bg-white/60 backdrop-blur-md border border-pink-100/60 p-2.5 rounded-2xl shadow-xs">
+      <div className="flex items-center gap-2 bg-white/60 backdrop-blur-md border border-pink-100/60 p-2 sm:p-2.5 rounded-2xl shadow-xs overflow-x-auto scrollbar-none">
         {[
           { id: "daily_sales_statement", label: "Daily Sales Statement", icon: FileCheck },
           { id: "monthly_staff_performance", label: "Monthly Performance - Staff", icon: UserCheck },
@@ -889,13 +889,13 @@ function Reports() {
             <button
               key={tab.id}
               onClick={() => setReportType(tab.id)}
-              className={`px-4 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center space-x-2 ${
+              className={`px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-extrabold transition flex items-center space-x-2 shrink-0 whitespace-nowrap ${
                 reportType === tab.id
                   ? "glowe-pink-gradient text-white shadow-md"
                   : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"
               }`}
             >
-              <Icon className="w-4 h-4" />
+              <Icon className="w-4 h-4 shrink-0" />
               <span>{tab.label}</span>
             </button>
           );
@@ -937,7 +937,8 @@ function Reports() {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                   {/* Left: Invoice Line Items */}
                   <div className="lg:col-span-8 border border-slate-200 rounded-2xl overflow-hidden">
-                    <table className="w-full text-left text-xs border-collapse">
+                    <div className="overflow-x-auto w-full">
+                      <table className="w-full text-left text-xs border-collapse min-w-[550px]">
                       <thead>
                         <tr className="bg-amber-300 text-slate-900 border-b border-amber-400 font-extrabold uppercase">
                           <th className="p-2 text-center">S.NO</th>
@@ -982,6 +983,7 @@ function Reports() {
                         </tr>
                       </tfoot>
                     </table>
+                    </div>
                   </div>
 
                   {/* Right: Expenses & Cash Denomination */}
@@ -1107,20 +1109,22 @@ function Reports() {
                   <div className="bg-amber-300 text-slate-900 px-3 py-1.5 text-xs font-black uppercase text-center border-b border-amber-400">
                     STAFF ACHIEVED
                   </div>
-                  <table className="w-full text-xs text-left">
-                    <thead className="bg-slate-50 font-bold text-slate-700">
-                      <tr><th className="p-2">S.NO</th><th className="p-2">STAFF NAME</th><th className="p-2 text-right">ACHIEVED</th></tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 font-semibold">
-                      {(reportData.staff_achieved || []).map((st) => (
-                        <tr key={st.sno}>
-                          <td className="p-2 text-slate-400 numeric">{st.sno}</td>
-                          <td className="p-2 font-bold text-slate-900">{st.staff_name}</td>
-                          <td className="p-2 text-right font-black text-emerald-600 numeric">₹{Math.round(st.achieved || 0)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <div className="overflow-x-auto w-full">
+                    <table className="w-full text-xs text-left min-w-[260px]">
+                      <thead className="bg-slate-50 font-bold text-slate-700">
+                        <tr><th className="p-2">S.NO</th><th className="p-2">STAFF NAME</th><th className="p-2 text-right">ACHIEVED</th></tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-semibold">
+                        {(reportData.staff_achieved || []).map((st) => (
+                          <tr key={st.sno}>
+                            <td className="p-2 text-slate-400 numeric">{st.sno}</td>
+                            <td className="p-2 font-bold text-slate-900">{st.staff_name}</td>
+                            <td className="p-2 text-right font-black text-emerald-600 numeric">₹{Math.round(st.achieved || 0)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             )}
@@ -1133,7 +1137,8 @@ function Reports() {
                 </div>
 
                 <div className="border border-slate-200 rounded-2xl overflow-hidden">
-                  <table className="w-full text-left text-xs border-collapse">
+                  <div className="overflow-x-auto w-full">
+                    <table className="w-full text-left text-xs border-collapse min-w-[700px]">
                     <thead>
                       <tr className="bg-amber-300 text-slate-900 font-black uppercase border-b border-amber-400">
                         <th className="p-2 text-center">S.NO</th>
@@ -1178,6 +1183,7 @@ function Reports() {
                       </tr>
                     </tfoot>
                   </table>
+                  </div>
                 </div>
 
                 {/* Summary Boxes */}

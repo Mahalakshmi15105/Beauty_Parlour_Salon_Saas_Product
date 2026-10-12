@@ -62,6 +62,7 @@ import AddExpenseModal from "../components/AddExpenseModal";
 import CashDenominationModal from "../components/CashDenominationModal";
 import { getCachedCustomers, setCachedCustomers, updateOrAddCachedCustomer } from "../services/customerCache";
 import { getCachedBillingData, setCachedBillingData } from "../services/billingCache";
+import { getCachedEmployees, setCachedEmployees } from "../services/employeeCache";
 
 function Billing() {
   const { showSuccess, showError } = useToast();
@@ -92,15 +93,9 @@ function Billing() {
   const initialBillingCache = getCachedBillingData() || {};
   const [categories, setCategories] = useState(() => initialBillingCache.categories || []);
   const [allServices, setAllServices] = useState(() => initialBillingCache.allServices || []);
-  const [services, setServices] = useState(() => {
-    if (initialBillingCache.allServices && initialBillingCache.categories && initialBillingCache.categories.length > 0) {
-      const firstCatId = String(initialBillingCache.categories[0].id);
-      return initialBillingCache.allServices.filter(s => String(s.category_id) === firstCatId);
-    }
-    return [];
-  });
+  const [services, setServices] = useState([]);
   const [products, setProducts] = useState(() => initialBillingCache.products || []);
-  const [employees, setEmployees] = useState(() => initialBillingCache.employees || []);
+  const [employees, setEmployees] = useState(() => getCachedEmployees() || initialBillingCache.employees || []);
   const [customers, setCustomers] = useState(() => getCachedCustomers() || []);
 
   // Selection Filters
@@ -226,15 +221,14 @@ function Billing() {
     const newTabId = `tab-${Date.now()}`;
     const newTabName = `Bill #${tabCounter}`;
 
-    const firstCat = categories.length > 0 ? categories[0] : null;
     const newTabObj = {
       id: newTabId,
       name: newTabName,
       selectedCustomerId: "",
       customerSearchQuery: "",
       selectedGender: "",
-      selectedCategoryId: firstCat ? firstCat.id.toString() : "",
-      categorySearchQuery: firstCat ? firstCat.name : "",
+      selectedCategoryId: "",
+      categorySearchQuery: "",
       selectedServiceId: "",
       serviceSearchQuery: "",
       cart: [],
@@ -251,10 +245,11 @@ function Billing() {
     setSelectedCustomerId("");
     setCustomerSearchQuery("");
     setSelectedGender("");
-    setSelectedCategoryId(firstCat ? firstCat.id.toString() : "");
-    setCategorySearchQuery(firstCat ? firstCat.name : "");
+    setSelectedCategoryId("");
+    setCategorySearchQuery("");
     setSelectedServiceId("");
     setServiceSearchQuery("");
+    setServices([]);
     setCart([]);
     setInvoiceTaxAmount(0);
     setIsTaxAmountOverridden(false);
@@ -325,7 +320,14 @@ function Billing() {
     auto_print: false,
     thank_you_message: "Thank you for visiting. Please visit again.",
   });
-  const [businessProfile, setBusinessProfile] = useState({});
+  const [businessProfile, setBusinessProfile] = useState(() => {
+    try {
+      const saved = localStorage.getItem("salon_business_profile");
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      return {};
+    }
+  });
   const isPrintingRef = useRef(false);
   const printReceiptRef = useRef(null);
   const [activePrintInvoice, setActivePrintInvoice] = useState(null);
@@ -769,6 +771,9 @@ function Billing() {
         }
         if (raw.business_profile) {
           setBusinessProfile(raw.business_profile);
+          try {
+            localStorage.setItem("salon_business_profile", JSON.stringify(raw.business_profile));
+          } catch (e) {}
         }
         if (raw.invoice_settings) {
           if (raw.invoice_settings.tax_rate !== undefined && raw.invoice_settings.tax_rate !== null) {
@@ -1123,23 +1128,35 @@ function Billing() {
       setCustomers(cachedCustList);
     }
 
+    const cachedEmpList = getCachedEmployees();
+    if (cachedEmpList && cachedEmpList.length > 0) {
+      setEmployees(cachedEmpList);
+    }
+
+    // Fast parallel fetch for employees (loads in ~30ms, never waits for massive 10,000 customers query)
+    API.get("/employees?limit=100")
+      .then((empRes) => {
+        const empList = empRes.data?.items || empRes.data || [];
+        if (empList.length > 0) {
+          setEmployees(empList);
+          setCachedEmployees(empList);
+          setCachedBillingData({ employees: empList });
+        }
+      })
+      .catch((err) => console.debug("Employee quick fetch skipped:", err));
+
     if (cachedData) {
       if (cachedData.categories && cachedData.categories.length > 0) {
         setCategories(cachedData.categories);
-        if (!selectedCategoryId) {
-          setSelectedCategoryId(String(cachedData.categories[0].id));
-          setCategorySearchQuery(cachedData.categories[0].name);
-        }
       }
       if (cachedData.allServices && cachedData.allServices.length > 0) {
         setAllServices(cachedData.allServices);
-        const firstCatId = selectedCategoryId || (cachedData.categories?.[0]?.id ? String(cachedData.categories[0].id) : "");
-        if (firstCatId) {
-          setServices(cachedData.allServices.filter((s) => String(s.category_id) === firstCatId));
-        }
       }
       if (cachedData.products) setProducts(cachedData.products);
-      if (cachedData.employees) setEmployees(cachedData.employees);
+      if (cachedData.employees) {
+        setEmployees(cachedData.employees);
+        setCachedEmployees(cachedData.employees);
+      }
       if (cachedData.membershipPlans) setMembershipPlans(cachedData.membershipPlans);
       setLoading(false);
     } else {
@@ -1165,6 +1182,7 @@ function Billing() {
 
         setCategories(catList);
         setEmployees(empList);
+        setCachedEmployees(empList);
         setCustomers(custList);
         setCachedCustomers(custList);
         setProducts(prodList);
@@ -1184,6 +1202,13 @@ function Billing() {
         const regSet = settingsData?.regional_settings || {};
         const bilSet = settingsData?.billing_settings || {};
 
+        if (settingsData?.business_profile) {
+          setBusinessProfile(settingsData.business_profile);
+          try {
+            localStorage.setItem("salon_business_profile", JSON.stringify(settingsData.business_profile));
+          } catch (e) {}
+        }
+
         if (bilSet.billing_mode) {
           localStorage.setItem("billing_mode", bilSet.billing_mode);
           setIsTouchMode(bilSet.billing_mode === "touch");
@@ -1198,10 +1223,8 @@ function Billing() {
           setCurrencySymbol(regSet.currency_symbol);
         }
 
-        if (catList.length > 0 && !selectedCategoryId) {
-          setSelectedCategoryId(catList[0].id.toString());
-          setCategorySearchQuery(catList[0].name);
-          setServices(allSvcList.filter((s) => String(s.category_id) === String(catList[0].id)));
+        if (selectedCategoryId) {
+          setServices(allSvcList.filter((s) => String(s.category_id) === String(selectedCategoryId)));
         }
         setLoading(false);
       })
@@ -2249,7 +2272,7 @@ function Billing() {
     }
   };
 
-  const buildReceiptWhatsAppText = (targetInv, parlourName, customerName, thankYouMsg) => {
+  const buildReceiptWhatsAppText = (targetInv, parlourName, customerName, thankYouMsg, bizProfile = null) => {
     const billNo = targetInv?.invoice_number || targetInv?.id || "N/A";
     let formattedDate = "";
     try {
@@ -2267,7 +2290,29 @@ function Billing() {
       formattedDate = new Date().toLocaleDateString();
     }
 
-    let msg = `*${(parlourName || "NEGHA PARLOUR").toUpperCase()}*\n`;
+    const effectiveProfile = bizProfile || businessProfile || {};
+    const effectiveShopName = (parlourName || effectiveProfile?.name || "NEGHA PARLOUR").toUpperCase();
+
+    let msg = `*${effectiveShopName}*\n`;
+
+    // Shop Address under shop name
+    const shopAddrParts = [
+      effectiveProfile?.address,
+      effectiveProfile?.city,
+      effectiveProfile?.state,
+      effectiveProfile?.postal_code
+    ].filter(Boolean);
+    const shopAddr = shopAddrParts.join(", ");
+    if (shopAddr) {
+      msg += `📍 ${shopAddr}\n`;
+    }
+
+    // Shop Phone number under shop name
+    const shopPhone = effectiveProfile?.phone || effectiveProfile?.alternate_phone || "";
+    if (shopPhone) {
+      msg += `📞 Ph: ${shopPhone}\n`;
+    }
+
     msg += `━━━━━━━━━━━━━━━━━━━━\n`;
     msg += `*Bill No:* ${billNo}\n`;
     msg += `*Client:* ${customerName}\n`;
@@ -2460,7 +2505,7 @@ function Billing() {
       })
     };
 
-    const billMessage = buildReceiptWhatsAppText(fullTargetInv, parlourName, resolvedCustomerName, thankYouMsg);
+    const billMessage = buildReceiptWhatsAppText(fullTargetInv, parlourName, resolvedCustomerName, thankYouMsg, businessProfile);
     const encodedText = encodeURIComponent(billMessage);
 
     // Open WhatsApp directly without any PDF generation or attachment
@@ -2544,8 +2589,8 @@ function Billing() {
       )}
 
       {/* Main Mode Navigation Tabs (Multi-Tab POS Billing) */}
-      <div className="flex justify-between items-center bg-surface border border-border-soft p-2.5 rounded-2xl shadow-xs overflow-x-auto">
-        <div className="flex items-center space-x-2">
+      <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3 bg-surface border border-border-soft p-2.5 rounded-2xl shadow-xs">
+        <div className="flex items-center space-x-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
           {/* Active Bill Tabs */}
           {billingTabs.map((tab) => {
             const isTabActive = activeSubTab === "checkout" && activeTabId === tab.id;
@@ -3170,7 +3215,7 @@ function Billing() {
                   <input
                     ref={categorySelectRef}
                     type="text"
-                    placeholder="Search Category..."
+                    placeholder="Select a Category..."
                     value={categorySearchQuery}
                     onFocus={(e) => {
                       e.target.select();

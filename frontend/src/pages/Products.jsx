@@ -6,6 +6,7 @@ import { useModalFocusTrap, useFormKeyboardNavigation } from "../utils/keyboardN
 import { AlertTriangle, X, Printer, FileSpreadsheet, FileText, Boxes, Users, ClipboardList, Plus, Trash2, Edit, CheckCircle, Upload, HardDrive } from "lucide-react";
 import { exportToCSV, printDataList, exportToPDF, exportToExcel } from "../utils/exportUtils";
 import BulkUploadModal from "../components/BulkUploadModal";
+import DeleteConfirmModal from "../components/DeleteConfirmModal";
 import GoogleDriveGuardModal from "../components/GoogleDriveGuardModal";
 import StorageService from "../services/storageService";
 
@@ -237,15 +238,12 @@ function Products() {
       });
   };
 
-  const handleDeleteCategory = (id) => {
-    API.delete(`/service-categories/${id}`)
-      .then(() => {
-        showSuccess("Category deleted.");
-        fetchCategories();
-      })
-      .catch((err) => {
-        showError(err.response?.data?.message || err.message || "Failed to delete category.");
-      });
+  const handleDeleteCategoryClick = (cat) => {
+    setDeleteTarget({
+      id: cat.id,
+      name: cat.name,
+      type: "category",
+    });
   };
 
   useEffect(() => {
@@ -326,17 +324,16 @@ function Products() {
       });
   };
 
-  const handleDelete = (id) => {
-    // Confirmed action
-    if (true) {
-      API.delete(`/products/${id}`)
-        .then(() => {
-          fetchProducts(cursor);
-        })
-        .catch((err) => {
-          showError(err.message || "Failed to delete.");
-        });
-    }
+  // Compulsory Delete Confirmation State
+  const [deleteTarget, setDeleteTarget] = useState(null); // { id, name, type: 'product' | 'supplier' | 'category' }
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteProductClick = (prod) => {
+    setDeleteTarget({
+      id: prod.id,
+      name: prod.name,
+      type: "product",
+    });
   };
 
   // Suppliers CRUD
@@ -379,15 +376,53 @@ function Products() {
       });
   };
 
-  const handleSupplierDelete = (id) => {
-    // Confirmed action
-    if (true) {
-      API.delete(`/suppliers/${id}`)
+  const handleDeleteSupplierClick = (sup) => {
+    setDeleteTarget({
+      id: sup.id,
+      name: sup.name,
+      type: "supplier",
+    });
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+
+    if (deleteTarget.type === "product") {
+      API.delete(`/products/${deleteTarget.id}`)
         .then(() => {
+          showSuccess(`Product "${deleteTarget.name}" deleted successfully.`);
+          setDeleteTarget(null);
+          setIsDeleting(false);
+          fetchProducts(cursor);
+        })
+        .catch((err) => {
+          setIsDeleting(false);
+          showError(err.response?.data?.message || err.message || "Failed to delete product.");
+        });
+    } else if (deleteTarget.type === "supplier") {
+      API.delete(`/suppliers/${deleteTarget.id}`)
+        .then(() => {
+          showSuccess(`Supplier "${deleteTarget.name}" deleted successfully.`);
+          setDeleteTarget(null);
+          setIsDeleting(false);
           fetchSuppliers();
         })
         .catch((err) => {
-          showError(err.message || "Failed to delete.");
+          setIsDeleting(false);
+          showError(err.response?.data?.message || err.message || "Failed to delete supplier.");
+        });
+    } else if (deleteTarget.type === "category") {
+      API.delete(`/service-categories/${deleteTarget.id}`)
+        .then(() => {
+          showSuccess(`Category "${deleteTarget.name}" deleted successfully.`);
+          setDeleteTarget(null);
+          setIsDeleting(false);
+          fetchCategories();
+        })
+        .catch((err) => {
+          setIsDeleting(false);
+          showError(err.response?.data?.message || err.message || "Failed to delete category.");
         });
     }
   };
@@ -565,45 +600,45 @@ function Products() {
           <h1 className="text-xl font-semibold text-text-primary">Inventory & Supplier Module</h1>
           <p className="text-xs text-text-secondary">Track retail stock levels, purchase history ledger, and coordinate supplier order transactions.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
           {activeTab === "suppliers" ? (
             <>
               <button
                 onClick={() => setShowBulkUpload(true)}
-                className="flex-1 sm:flex-none justify-center bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition flex items-center gap-1.5"
+                className="justify-center bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium transition flex items-center gap-1.5"
               >
-                <Upload className="w-4 h-4" />
-                <span>Bulk Upload</span>
+                <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                <span className="truncate">Bulk Upload</span>
               </button>
               <button
                 onClick={openAddSupplierModal}
-                className="flex-1 sm:flex-none justify-center bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition flex items-center space-x-1.5 shadow-xs"
+                className="justify-center bg-primary hover:bg-primary-hover text-white px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center space-x-1.5 shadow-xs"
               >
-                <Plus className="w-4 h-4" />
-                <span>Add Supplier</span>
+                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                <span className="truncate">Add Supplier</span>
               </button>
             </>
           ) : (
             <>
               <button
                 onClick={() => setShowCategoryModal(true)}
-                className="flex-1 sm:flex-none justify-center bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition flex items-center gap-1.5"
+                className="justify-center bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-medium transition flex items-center gap-1.5"
               >
-                <ClipboardList className="w-4 h-4" />
-                <span>Categories</span>
+                <ClipboardList className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                <span className="truncate">Categories</span>
               </button>
               <button
                 onClick={() => setShowBulkUpload(true)}
-                className="flex-1 sm:flex-none justify-center bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition flex items-center gap-1.5"
+                className="justify-center bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-medium transition flex items-center gap-1.5"
               >
-                <Upload className="w-4 h-4" />
-                <span>Bulk Upload</span>
+                <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                <span className="truncate">Bulk Upload</span>
               </button>
               <button
                 onClick={openAddModal}
-                className="flex-1 sm:flex-none justify-center bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition flex items-center space-x-1.5 shadow-xs"
+                className="col-span-2 sm:col-auto justify-center bg-primary hover:bg-primary-hover text-white px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center space-x-1.5 shadow-xs text-center"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                 <span>Add Product</span>
               </button>
             </>
@@ -697,39 +732,85 @@ function Products() {
                 No active suppliers found in directory. Click "+ Add Supplier" to create one.
               </div>
             ) : (
-              <div className="overflow-x-auto w-full">
-                <table className="w-full text-left border-collapse min-w-[650px]">
-                  <thead>
-                    <tr className="bg-primary-light border-b border-border-soft">
-                      <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Supplier Name</th>
-                      <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Contact Name</th>
-                      <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Phone/WhatsApp</th>
-                      <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Email</th>
-                      <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Address</th>
-                      <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border-soft">
-                    {suppliers.map((s) => (
-                      <tr key={s.id} className="hover:bg-background/50 transition">
-                        <td className="px-6 py-4 text-sm font-semibold text-text-primary">{s.name}</td>
-                        <td className="px-6 py-4 text-sm text-text-secondary">{s.contact_name || "—"}</td>
-                        <td className="px-6 py-4 text-sm text-text-secondary">{s.phone}</td>
-                        <td className="px-6 py-4 text-sm text-text-secondary">{s.email || "—"}</td>
-                        <td className="px-6 py-4 text-sm text-text-secondary truncate max-w-xs">{s.address || "—"}</td>
-                        <td className="px-6 py-4 text-sm space-x-3 text-right">
-                          <button onClick={() => openEditSupplierModal(s)} className="text-primary hover:underline">
-                            <Edit className="w-4 h-4 inline" />
+              <>
+                {/* Mobile Cards View (Visible on screens < md) */}
+                <div className="block md:hidden divide-y divide-border-soft">
+                  {suppliers.map((s) => (
+                    <div key={s.id} className="p-3.5 space-y-2 bg-surface hover:bg-background/40 transition">
+                      <div className="flex justify-between items-start gap-2">
+                        <div>
+                          <h4 className="font-bold text-sm text-text-primary">{s.name}</h4>
+                          {s.contact_name && <p className="text-xs text-text-secondary mt-0.5">Contact: {s.contact_name}</p>}
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <button onClick={() => openEditSupplierModal(s)} className="p-1.5 text-primary hover:bg-pink-50 rounded-lg">
+                            <Edit className="w-4 h-4" />
                           </button>
-                          <button onClick={() => handleSupplierDelete(s.id)} className="text-danger hover:underline">
-                            <Trash2 className="w-4 h-4 inline" />
+                          <button onClick={() => handleDeleteSupplierClick(s)} className="p-1.5 text-danger hover:bg-rose-50 rounded-lg">
+                            <Trash2 className="w-4 h-4" />
                           </button>
-                        </td>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-border-soft/60">
+                        <div>
+                          <span className="text-[10px] text-text-secondary uppercase font-semibold block">Phone</span>
+                          {s.phone ? (
+                            <a href={`tel:${s.phone}`} className="text-primary font-bold hover:underline">
+                              {s.phone}
+                            </a>
+                          ) : "—"}
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-text-secondary uppercase font-semibold block">Email</span>
+                          <span className="text-slate-700 truncate block">{s.email || "—"}</span>
+                        </div>
+                      </div>
+
+                      {s.address && (
+                        <p className="text-[11px] text-slate-500 pt-1">
+                          📍 {s.address}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop Table View (Visible on screens >= md) */}
+                <div className="hidden md:block overflow-x-auto w-full">
+                  <table className="w-full text-left border-collapse min-w-[650px]">
+                    <thead>
+                      <tr className="bg-primary-light border-b border-border-soft">
+                        <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Supplier Name</th>
+                        <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Contact Name</th>
+                        <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Phone/WhatsApp</th>
+                        <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Email</th>
+                        <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase">Address</th>
+                        <th className="px-6 py-3 text-sm font-semibold text-text-secondary uppercase text-right">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-border-soft">
+                      {suppliers.map((s) => (
+                        <tr key={s.id} className="hover:bg-background/50 transition">
+                          <td className="px-6 py-4 text-sm font-semibold text-text-primary">{s.name}</td>
+                          <td className="px-6 py-4 text-sm text-text-secondary">{s.contact_name || "—"}</td>
+                          <td className="px-6 py-4 text-sm text-text-secondary">{s.phone}</td>
+                          <td className="px-6 py-4 text-sm text-text-secondary">{s.email || "—"}</td>
+                          <td className="px-6 py-4 text-sm text-text-secondary truncate max-w-xs">{s.address || "—"}</td>
+                          <td className="px-6 py-4 text-sm space-x-3 text-right">
+                            <button onClick={() => openEditSupplierModal(s)} className="text-primary hover:underline">
+                              <Edit className="w-4 h-4 inline" />
+                            </button>
+                            <button onClick={() => handleDeleteSupplierClick(s)} className="text-danger hover:underline">
+                              <Trash2 className="w-4 h-4 inline" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </div>
         </>
@@ -829,7 +910,87 @@ function Products() {
               )
             ) : (
               <>
-                <div className="overflow-x-auto w-full">
+              <>
+                {/* Mobile Cards View (Visible on screens < md) */}
+                <div className="block md:hidden divide-y divide-border-soft">
+                  {products.map((p) => {
+                    const isLowStock = p.stock_quantity <= p.low_stock_threshold;
+                    return (
+                      <div key={p.id} className={`p-3.5 space-y-3 bg-surface hover:bg-background/40 transition ${isLowStock ? "bg-rose-50/20" : ""}`}>
+                        <div className="flex items-start gap-3">
+                          {p.image_url ? (
+                            <img src={p.image_url} alt={p.name} className="w-12 h-12 rounded-xl object-cover border border-border-soft shrink-0" />
+                          ) : (
+                            <div className="w-12 h-12 rounded-xl bg-pink-50 text-pink-500 flex items-center justify-center font-bold text-sm shrink-0 border border-pink-100">
+                              {p.name ? p.name.charAt(0).toUpperCase() : "P"}
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <h4 className="font-bold text-sm text-text-primary break-words leading-tight">{p.name}</h4>
+                            <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                              <span className="text-[10px] font-semibold text-text-secondary bg-slate-100 px-1.5 py-0.5 rounded">
+                                {p.category || "General"}
+                              </span>
+                              {p.barcode && (
+                                <span className="text-[10px] text-slate-500 font-mono">
+                                  #{p.barcode}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 numeric ${
+                            isLowStock ? "bg-danger/15 text-danger animate-pulse" : "bg-success/15 text-success"
+                          }`}>
+                            {p.stock_quantity} left
+                          </span>
+                        </div>
+
+                        {/* Price Details Grid */}
+                        <div className="grid grid-cols-3 gap-2 bg-background/60 p-2 rounded-xl border border-border-soft/60 text-center">
+                          <div>
+                            <span className="text-[9px] uppercase font-bold text-slate-400 block">Selling</span>
+                            <span className="text-xs font-black text-primary numeric">{formatCurrency(p.selling_price)}</span>
+                          </div>
+                          <div>
+                            <span className="text-[9px] uppercase font-bold text-slate-400 block">MRP</span>
+                            <span className="text-xs font-bold text-slate-700 numeric">{formatCurrency(p.mrp)}</span>
+                          </div>
+                          <div>
+                            <span className="text-[9px] uppercase font-bold text-slate-400 block">Cost</span>
+                            <span className="text-xs font-semibold text-slate-500 numeric">{formatCurrency(p.cost_price)}</span>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex justify-between items-center pt-1 border-t border-border-soft/60">
+                          <span className="text-[10px] text-text-secondary">
+                            Min: <strong className="numeric">{p.low_stock_threshold}</strong>
+                          </span>
+                          <div className="flex items-center space-x-2 text-xs">
+                            <button
+                              onClick={() => handleOpenReorder(p)}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition inline-flex items-center space-x-1 ${
+                                isLowStock ? "bg-rose-500 text-white" : "bg-slate-100 text-slate-700 border border-slate-200"
+                              }`}
+                            >
+                              <CheckCircle className="w-3 h-3" />
+                              <span>Restock</span>
+                            </button>
+                            <button onClick={() => openEditModal(p)} className="px-2 py-1 bg-pink-50 text-primary font-bold rounded-lg hover:underline">
+                              Edit
+                            </button>
+                            <button onClick={() => handleDeleteProductClick(p)} className="px-2 py-1 bg-rose-50 text-danger font-bold rounded-lg hover:underline">
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Desktop Table View (Visible on screens >= md) */}
+                <div className="hidden md:block overflow-x-auto w-full">
                   <table className="w-full text-left border-collapse min-w-[700px]">
                   <thead>
                     <tr className="bg-primary-light border-b border-border-soft">
@@ -895,7 +1056,7 @@ function Products() {
                               <span>Restock</span>
                             </button>
                             <button onClick={() => openEditModal(p)} className="text-primary hover:underline font-medium text-xs">Edit</button>
-                            <button onClick={() => handleDelete(p.id)} className="text-danger hover:underline font-medium text-xs">Delete</button>
+                            <button onClick={() => handleDeleteProductClick(p)} className="text-danger hover:underline font-medium text-xs">Delete</button>
                           </td>
                         </tr>
                       );
@@ -903,6 +1064,7 @@ function Products() {
                   </tbody>
                 </table>
               </div>
+            </>
 
               {/* Pagination Controls */}
               <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-border-soft flex justify-between items-center text-xs sm:text-sm">
@@ -1081,8 +1243,8 @@ function Products() {
                               Edit
                             </button>
                             <button
-                              onClick={() => handleDeleteCategory(c.id)}
-                              className="text-xs text-danger hover:underline"
+                              onClick={() => handleDeleteCategoryClick(c)}
+                              className="text-xs text-danger hover:underline font-semibold"
                             >
                               Delete
                             </button>
@@ -1532,6 +1694,23 @@ function Products() {
       <GoogleDriveGuardModal
         isOpen={showDriveGuard}
         onClose={() => setShowDriveGuard(false)}
+      />
+
+      {/* Modern In-App Compulsory Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={Boolean(deleteTarget)}
+        title={
+          deleteTarget?.type === "category"
+            ? "Delete Category?"
+            : deleteTarget?.type === "supplier"
+            ? "Delete Supplier?"
+            : "Delete Product?"
+        }
+        itemName={deleteTarget?.name}
+        itemType={deleteTarget?.type || "product"}
+        loading={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onClose={() => setDeleteTarget(null)}
       />
     </div>
   );

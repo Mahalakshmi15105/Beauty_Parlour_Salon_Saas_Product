@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
 import { useModalFocusTrap, useFormKeyboardNavigation, focusAndOpenSelect } from "../utils/keyboardNavigation";
-import { X, Printer, FileSpreadsheet, FileText, Upload, DollarSign, Eye, EyeOff, Check, Copy, UserCheck } from "lucide-react";
+import { X, Printer, FileSpreadsheet, FileText, Upload, DollarSign, Eye, EyeOff, Check, Copy, UserCheck, Phone } from "lucide-react";
 import { exportToCSV, printDataList, exportToPDF, exportToExcel } from "../utils/exportUtils";
 import BulkUploadModal from "../components/BulkUploadModal";
 import AddPayrollAdjustmentModal from "../components/AddPayrollAdjustmentModal";
@@ -310,7 +310,7 @@ function Employees() {
   return (
     <div className="space-y-6">
       {/* Title Bar */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-semibold text-text-primary">Staff & Employee Roster</h1>
@@ -322,27 +322,27 @@ function Employees() {
           </div>
           <p className="text-xs text-text-secondary">Configure commissions, salaries, specializations, and access status.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <button
             onClick={() => {
               setSelectedPayrollEmpId(null);
               setShowPayrollModal(true);
             }}
-            className="bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2"
+            className="flex-1 sm:flex-initial justify-center bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-700 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center gap-1.5"
           >
             <DollarSign className="w-4 h-4 text-indigo-600" />
-            Advance / Deduction
+            <span>Advance / Deduction</span>
           </button>
           <button
             onClick={() => setShowBulkUpload(true)}
-            className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2"
+            className="flex-1 sm:flex-initial justify-center bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition flex items-center gap-1.5"
           >
             <Upload className="w-4 h-4" />
-            Bulk Upload
+            <span>Bulk Upload</span>
           </button>
           <button
             onClick={openAddModal}
-            className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition"
+            className="w-full sm:w-auto justify-center bg-primary hover:bg-primary-hover text-white px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition"
           >
             + Add Employee
           </button>
@@ -350,28 +350,30 @@ function Employees() {
       </div>
 
       {/* Filter / Search Bar */}
-      <div className="bg-surface border border-border-soft p-4 rounded-lg flex space-x-4 items-center">
-        <input
-          type="text"
-          placeholder="Search by name, phone, specialization..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 bg-background border border-border-soft px-4 py-2 rounded-lg text-sm focus:outline-none focus:border-primary"
-        />
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="bg-background border border-border-soft px-4 py-2 rounded-lg text-sm text-text-secondary focus:outline-none"
-        >
-          <option value="">All Statuses</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
+      <div className="bg-surface border border-border-soft p-3 sm:p-4 rounded-xl flex flex-col md:flex-row gap-3 md:items-center">
+        <div className="flex-1 flex flex-col sm:flex-row gap-2">
+          <input
+            type="text"
+            placeholder="Search by name, phone, specialization..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="flex-1 bg-background border border-border-soft px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm focus:outline-none focus:border-primary"
+          />
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="bg-background border border-border-soft px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm text-text-secondary focus:outline-none shrink-0"
+          >
+            <option value="">All Statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
 
-        <div className="flex space-x-2 border-l border-border-soft pl-4">
+        <div className="flex items-center justify-between sm:justify-start gap-2 border-t md:border-t-0 md:border-l border-border-soft pt-2 md:pt-0 md:pl-3">
           <button
             onClick={handlePrint}
-            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-slate-200"
+            className="flex-1 sm:flex-initial justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs font-semibold flex items-center gap-1 transition border border-slate-200"
             title="Print List"
           >
             <Printer className="w-3.5 h-3.5" />
@@ -379,7 +381,7 @@ function Employees() {
           </button>
           <button
             onClick={handleExportExcel}
-            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-emerald-200"
+            className="flex-1 sm:flex-initial justify-center bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs font-semibold flex items-center gap-1 transition border border-emerald-200"
             title="Export to Excel"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
@@ -387,7 +389,7 @@ function Employees() {
           </button>
           <button
             onClick={handleExportPDF}
-            className="bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-rose-200"
+            className="flex-1 sm:flex-initial justify-center bg-rose-50 hover:bg-rose-100 text-rose-700 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs font-semibold flex items-center gap-1 transition border border-rose-200"
             title="Export to PDF"
           >
             <FileText className="w-3.5 h-3.5" />
@@ -396,8 +398,8 @@ function Employees() {
         </div>
       </div>
 
-      {/* Data Table */}
-      <div className="bg-surface border border-border-soft rounded-lg overflow-hidden">
+      {/* Data Display: Mobile Cards + Desktop Table */}
+      <div className="bg-surface border border-border-soft rounded-xl overflow-hidden shadow-sm">
         {loading ? (
           <div className="p-8 space-y-4">
             <div className="h-6 bg-border-soft rounded animate-pulse w-1/4"></div>
@@ -414,110 +416,202 @@ function Employees() {
           </div>
         ) : (
           <>
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-primary-light border-b border-border-soft">
-                  <th className="px-5 py-3 text-sm font-semibold text-text-secondary uppercase">Name</th>
-                  <th className="px-5 py-3 text-sm font-semibold text-text-secondary uppercase">Email / Username</th>
-                  <th className="px-5 py-3 text-sm font-semibold text-text-secondary uppercase">Password</th>
-                  <th className="px-5 py-3 text-sm font-semibold text-text-secondary uppercase">Phone</th>
-                  <th className="px-5 py-3 text-sm font-semibold text-text-secondary uppercase">Status</th>
-                  <th className="px-5 py-3 text-sm font-semibold text-text-secondary uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-soft">
-                {employees.map((emp) => {
-                  const showPass = !!visiblePasswords[emp.id];
-                  const displayEmail = emp.username || emp.email || emp.phone || "-";
-                  const displayPass = emp.password || emp.phone || "123456";
+            {/* Mobile Touch Cards View (visible on < md) */}
+            <div className="block md:hidden divide-y divide-border-soft">
+              {employees.map((emp) => {
+                const showPass = !!visiblePasswords[emp.id];
+                const displayEmail = emp.username || emp.email || "-";
+                const displayPass = emp.password || emp.phone || "123456";
 
-                  return (
-                    <tr key={emp.id} className="hover:bg-background/50 transition">
-                      <td className="px-5 py-4 text-sm font-bold text-text-primary">
-                        {emp.first_name} {emp.last_name || ""}
-                      </td>
-                      <td className="px-5 py-4 text-sm text-text-secondary font-medium">
-                        {displayEmail}
-                      </td>
-                      <td className="px-5 py-4 text-sm text-text-secondary">
-                        <div className="flex items-center space-x-2">
-                          <span className="numeric text-xs bg-slate-100 px-2 py-1 rounded-md text-slate-800 font-bold">
-                            {showPass ? displayPass : "••••••••"}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setVisiblePasswords((prev) => ({
-                                ...prev,
-                                [emp.id]: !prev[emp.id],
-                              }))
-                            }
-                            className="text-slate-400 hover:text-slate-600 p-1 rounded-md transition"
-                            title={showPass ? "Hide Password" : "Show Password"}
-                          >
-                            {showPass ? <EyeOff className="w-3.5 h-3.5 text-pink-600" /> : <Eye className="w-3.5 h-3.5" />}
-                          </button>
-                          {!emp.password && (
+                return (
+                  <div key={emp.id} className="p-4 space-y-3 bg-surface hover:bg-background/40 transition">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 text-primary font-extrabold text-sm flex items-center justify-center shrink-0">
+                          {(emp.first_name?.[0] || "E").toUpperCase()}
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-sm text-text-primary">
+                            {emp.first_name} {emp.last_name || ""}
+                          </h4>
+                          <p className="text-[11px] text-text-secondary truncate max-w-[180px]">
+                            {displayEmail}
+                          </p>
+                        </div>
+                      </div>
+                      <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${
+                        emp.status === "active" ? "bg-success/15 text-success" : "bg-danger/15 text-danger"
+                      }`}>
+                        {emp.status}
+                      </span>
+                    </div>
+
+                    {/* Contact & Password Info */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1 border-t border-border-soft/60">
+                      {emp.phone && (
+                        <a
+                          href={`tel:${emp.phone}`}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-semibold transition"
+                        >
+                          <Phone className="w-3.5 h-3.5 text-primary" />
+                          <span className="numeric">{emp.phone}</span>
+                        </a>
+                      )}
+
+                      <div className="flex items-center space-x-1.5">
+                        <span className="numeric text-[11px] bg-slate-100 px-2 py-0.5 rounded-md text-slate-800 font-bold">
+                          {showPass ? displayPass : "••••••••"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setVisiblePasswords((prev) => ({
+                              ...prev,
+                              [emp.id]: !prev[emp.id],
+                            }))
+                          }
+                          className="text-slate-400 hover:text-slate-600 p-1 rounded-md"
+                          title={showPass ? "Hide Password" : "Show Password"}
+                        >
+                          {showPass ? <EyeOff className="w-3.5 h-3.5 text-pink-600" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border-soft/60">
+                      <button
+                        onClick={() => setViewEmp(emp)}
+                        className="py-1.5 px-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>View</span>
+                      </button>
+                      <button
+                        onClick={() => openEditModal(emp)}
+                        className="py-1.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1"
+                      >
+                        <span>Edit</span>
+                      </button>
+                      <button
+                        onClick={() => handleDeleteClick(emp)}
+                        className="py-1.5 px-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1"
+                      >
+                        <span>Delete</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop Table View (visible on >= md) */}
+            <div className="hidden md:block overflow-x-auto w-full">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-primary-light border-b border-border-soft">
+                    <th className="px-5 py-3 text-xs font-semibold text-text-secondary uppercase">Name</th>
+                    <th className="px-5 py-3 text-xs font-semibold text-text-secondary uppercase">Email / Username</th>
+                    <th className="px-5 py-3 text-xs font-semibold text-text-secondary uppercase">Password</th>
+                    <th className="px-5 py-3 text-xs font-semibold text-text-secondary uppercase">Phone</th>
+                    <th className="px-5 py-3 text-xs font-semibold text-text-secondary uppercase">Status</th>
+                    <th className="px-5 py-3 text-xs font-semibold text-text-secondary uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-soft">
+                  {employees.map((emp) => {
+                    const showPass = !!visiblePasswords[emp.id];
+                    const displayEmail = emp.username || emp.email || emp.phone || "-";
+                    const displayPass = emp.password || emp.phone || "123456";
+
+                    return (
+                      <tr key={emp.id} className="hover:bg-background/50 transition">
+                        <td className="px-5 py-4 text-sm font-bold text-text-primary">
+                          {emp.first_name} {emp.last_name || ""}
+                        </td>
+                        <td className="px-5 py-4 text-sm text-text-secondary font-medium">
+                          {displayEmail}
+                        </td>
+                        <td className="px-5 py-4 text-sm text-text-secondary">
+                          <div className="flex items-center space-x-2">
+                            <span className="numeric text-xs bg-slate-100 px-2 py-1 rounded-md text-slate-800 font-bold">
+                              {showPass ? displayPass : "••••••••"}
+                            </span>
                             <button
                               type="button"
-                              onClick={() => openEditModal(emp)}
-                              className="text-[10px] font-semibold text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-1.5 py-0.5 rounded border border-amber-200 transition"
-                              title="Older record - click to set a new plain password"
+                              onClick={() =>
+                                setVisiblePasswords((prev) => ({
+                                  ...prev,
+                                  [emp.id]: !prev[emp.id],
+                                }))
+                              }
+                              className="text-slate-400 hover:text-slate-600 p-1 rounded-md transition"
+                              title={showPass ? "Hide Password" : "Show Password"}
                             >
-                              Reset
+                              {showPass ? <EyeOff className="w-3.5 h-3.5 text-pink-600" /> : <Eye className="w-3.5 h-3.5" />}
                             </button>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-5 py-4 text-sm text-text-secondary numeric">{emp.phone}</td>
-                      <td className="px-5 py-4 text-sm">
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          emp.status === "active" ? "bg-success/15 text-success" : "bg-danger/15 text-danger"
-                        }`}>
-                          {emp.status}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 text-sm space-x-3">
-                        <button
-                          onClick={() => setViewEmp(emp)}
-                          className="text-indigo-600 hover:text-indigo-800 font-bold hover:underline"
-                        >
-                          View
-                        </button>
-                        <button onClick={() => openEditModal(emp)} className="text-primary hover:underline font-bold">
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteClick(emp)}
-                          className="text-danger hover:underline font-semibold"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                            {!emp.password && (
+                              <button
+                                type="button"
+                                onClick={() => openEditModal(emp)}
+                                className="text-[10px] font-semibold text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-1.5 py-0.5 rounded border border-amber-200 transition"
+                                title="Older record - click to set a new plain password"
+                              >
+                                Reset
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-5 py-4 text-sm text-text-secondary numeric">{emp.phone}</td>
+                        <td className="px-5 py-4 text-sm">
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                            emp.status === "active" ? "bg-success/15 text-success" : "bg-danger/15 text-danger"
+                          }`}>
+                            {emp.status}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4 text-sm space-x-3">
+                          <button
+                            onClick={() => setViewEmp(emp)}
+                            className="text-indigo-600 hover:text-indigo-800 font-bold hover:underline"
+                          >
+                            View
+                          </button>
+                          <button onClick={() => openEditModal(emp)} className="text-primary hover:underline font-bold">
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClick(emp)}
+                            className="text-danger hover:underline font-semibold"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
 
             {/* Pagination Controls */}
-            <div className="px-6 py-4 border-t border-border-soft flex justify-between items-center bg-slate-50/50">
+            <div className="px-4 sm:px-6 py-3.5 border-t border-border-soft flex flex-col sm:flex-row justify-between items-center gap-2 bg-slate-50/50">
               <span className="text-xs font-medium text-text-secondary">
                 Showing <span className="font-bold text-text-primary">{employees.length}</span> of{" "}
                 <span className="font-bold text-text-primary">{totalCount || employees.length}</span> employees
               </span>
-              <div className="flex gap-2">
+              <div className="flex gap-2 w-full sm:w-auto justify-end">
                 <button
                   disabled={cursorHistory.length === 0}
                   onClick={handlePrevPage}
-                  className="px-4 py-1.5 border border-border-soft rounded-lg text-xs font-semibold disabled:opacity-50 transition hover:bg-background"
+                  className="flex-1 sm:flex-initial px-4 py-1.5 border border-border-soft rounded-lg text-xs font-semibold disabled:opacity-50 transition hover:bg-background"
                 >
                   Previous
                 </button>
                 <button
                   disabled={!nextCursor}
                   onClick={handleNextPage}
-                  className="px-4 py-1.5 border border-border-soft rounded-lg text-xs font-semibold disabled:opacity-50 transition hover:bg-background"
+                  className="flex-1 sm:flex-initial px-4 py-1.5 border border-border-soft rounded-lg text-xs font-semibold disabled:opacity-50 transition hover:bg-background"
                 >
                   Next
                 </button>
@@ -529,9 +623,9 @@ function Employees() {
 
       {/* Add/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div ref={modalRef} className="glowe-glass-card max-w-lg w-full rounded-3xl shadow-2xl border border-white/70 overflow-hidden">
-            <div className="px-6 py-4 border-b border-pink-100/60 flex justify-between items-center bg-white/50 backdrop-blur-md">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in">
+          <div ref={modalRef} className="glowe-glass-card max-w-lg w-full max-h-[92vh] flex flex-col rounded-3xl shadow-2xl border border-white/70 overflow-hidden">
+            <div className="px-6 py-4 border-b border-pink-100/60 flex justify-between items-center bg-white/50 backdrop-blur-md shrink-0">
               <h3 className="text-md font-bold text-slate-900">
                 {editId ? "Edit Employee" : "Add New Employee"}
               </h3>
@@ -539,7 +633,7 @@ function Employees() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form ref={formRef} onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form ref={formRef} onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">First Name *</label>
@@ -767,9 +861,9 @@ function Employees() {
 
       {/* View Employee Profile Modal */}
       {viewEmp && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="glowe-glass-card max-w-lg w-full rounded-3xl shadow-2xl border border-white/70 overflow-hidden">
-            <div className="px-6 py-4 border-b border-pink-100/60 flex justify-between items-center bg-white/50 backdrop-blur-md">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in">
+          <div className="glowe-glass-card max-w-lg w-full max-h-[92vh] flex flex-col rounded-3xl shadow-2xl border border-white/70 overflow-hidden">
+            <div className="px-6 py-4 border-b border-pink-100/60 flex justify-between items-center bg-white/50 backdrop-blur-md shrink-0">
               <div className="flex items-center space-x-2">
                 <UserCheck className="w-5 h-5 text-pink-600" />
                 <h3 className="text-md font-bold text-slate-900">Employee Details Profile</h3>
@@ -779,7 +873,7 @@ function Employees() {
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 overflow-y-auto">
               <div className="flex items-center space-x-4 bg-pink-50/60 p-4 rounded-2xl border border-pink-100">
                 <div className="w-12 h-12 rounded-full bg-pink-500 text-white flex items-center justify-center font-black text-lg">
                   {viewEmp.first_name?.[0]?.toUpperCase() || "E"}

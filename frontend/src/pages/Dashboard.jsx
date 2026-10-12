@@ -221,29 +221,29 @@ function Dashboard() {
   return (
     <div className="space-y-8 pb-12">
       {/* Title & Filter Bar */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h1 className="text-xl font-semibold text-text-primary">{t("dashboard_overview")}</h1>
           <p className="text-xs text-text-secondary">Real-time revenue metrics, staff performance, and inventory health.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center space-x-1.5 text-xs">
-            <span className="font-semibold text-text-secondary">From:</span>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
+          <div className="flex items-center space-x-1 text-xs">
+            <span className="font-semibold text-text-secondary text-[11px]">From:</span>
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="bg-surface border border-border-soft px-3 py-1 rounded-lg text-xs text-text-primary focus:outline-none focus:border-primary"
+              className="bg-surface border border-border-soft px-2.5 py-1 rounded-lg text-xs text-text-primary focus:outline-none focus:border-primary"
             />
           </div>
 
-          <div className="flex items-center space-x-1.5 text-xs">
-            <span className="font-semibold text-text-secondary">To:</span>
+          <div className="flex items-center space-x-1 text-xs">
+            <span className="font-semibold text-text-secondary text-[11px]">To:</span>
             <input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="bg-surface border border-border-soft px-3 py-1 rounded-lg text-xs text-text-primary focus:outline-none focus:border-primary"
+              className="bg-surface border border-border-soft px-2.5 py-1 rounded-lg text-xs text-text-primary focus:outline-none focus:border-primary"
             />
           </div>
 
@@ -347,7 +347,7 @@ function Dashboard() {
                   key={emp.id || idx}
                   className={`p-4 md:p-5 rounded-2xl border ${rank.border} ${rank.bg} flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm hover:shadow-md transition`}
                 >
-                  <div className="flex items-center space-x-4 min-w-[200px]">
+                  <div className="flex items-center space-x-3 sm:space-x-4 w-full md:w-auto md:min-w-[200px]">
                     <span className="text-xs font-extrabold px-3 py-1.5 rounded-full bg-white text-slate-800 border border-slate-200 shadow-2xs shrink-0">
                       {rank.badge}
                     </span>

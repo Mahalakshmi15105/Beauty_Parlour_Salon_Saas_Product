@@ -754,74 +754,113 @@ def get_customer_history(customer_id):
 @customers_bp.route("/customers/dormant", methods=["GET"])
 @require_role(["ParlourAdmin", "BranchAdmin"])
 def get_dormant_customers():
-    setting = TenantSetting.query.filter_by(tenant_id=g.parlour_id, branch_id=g.branch_id if g.role == "BranchAdmin" else None).first()
-    threshold_days = setting.churn_days_threshold if setting and setting.churn_days_threshold else 45
+    try:
+        # 1. Parse threshold days from query parameter ?days=45, fallback to TenantSetting or default 45
+        days_arg = request.args.get("days", type=int)
+        if days_arg and days_arg > 0:
+            threshold_days = days_arg
+        else:
+            setting = TenantSetting.query.filter_by(
+                tenant_id=g.parlour_id,
+                branch_id=g.branch_id if g.role == "BranchAdmin" else None
+            ).first()
+            threshold_days = setting.churn_days_threshold if (setting and setting.churn_days_threshold) else 45
 
-    now = datetime.utcnow()
-    limit_date = now - timedelta(days=threshold_days)
+        # 2. Compute limit date
+        now_naive = datetime.utcnow()
+        limit_date_naive = now_naive - timedelta(days=threshold_days)
 
-    # Build invoice subquery with branch isolation
-    invoice_filter = [
-        Invoice.tenant_id == g.parlour_id,
-        Invoice.status != "Voided"
-    ]
-    if g.role == "BranchAdmin" and g.branch_id:
-        invoice_filter.append(Invoice.branch_id == g.branch_id)
+        # 3. Branch isolation
+        b_hdr = request.headers.get("X-Branch-Id") or request.args.get("branch_id")
+        target_branch = None
+        if g.role == "BranchAdmin" and g.branch_id:
+            target_branch = g.branch_id
+        elif g.role == "ParlourAdmin" and b_hdr and str(b_hdr).strip() not in ("all", "main", "null", "0", "None"):
+            try:
+                target_branch = int(b_hdr)
+            except (ValueError, TypeError):
+                pass
 
-    subquery = db.session.query(
-        Invoice.customer_id,
-        func.max(Invoice.created_at).label("last_visit")
-    ).filter(
-        *invoice_filter
-    ).group_by(Invoice.customer_id).subquery()
+        # Build invoice subquery with branch & status filters
+        invoice_filter = [
+            Invoice.status != "Voided"
+        ]
+        if hasattr(Invoice, "tenant_id") and g.parlour_id:
+            invoice_filter.append(Invoice.tenant_id == g.parlour_id)
+        if target_branch:
+            invoice_filter.append(Invoice.branch_id == target_branch)
 
-    query = db.session.query(
-        Customer,
-        subquery.c.last_visit
-    ).filter(
-        Customer.tenant_id == g.parlour_id
-    )
-    
-    # Add branch filter for BranchAdmin
-    if g.role == "BranchAdmin" and g.branch_id:
-        query = query.filter(Customer.branch_id == g.branch_id)
-    
-    query = query.outerjoin(
-        subquery, Customer.id == subquery.c.customer_id
-    )
+        subquery = db.session.query(
+            Invoice.customer_id.label("customer_id"),
+            func.max(Invoice.created_at).label("last_visit")
+        ).filter(
+            *invoice_filter
+        ).group_by(Invoice.customer_id).subquery()
 
-    query = query.filter(
-        or_(
-            subquery.c.last_visit < limit_date,
-            and_(
-                subquery.c.last_visit == None,
-                Customer.created_at < limit_date
+        # Build customer query
+        cust_filter = [
+            Customer.is_deleted == False
+        ]
+        if hasattr(Customer, "tenant_id") and g.parlour_id:
+            cust_filter.append(Customer.tenant_id == g.parlour_id)
+        if target_branch:
+            cust_filter.append(Customer.branch_id == target_branch)
+
+        query = db.session.query(
+            Customer,
+            subquery.c.last_visit
+        ).filter(
+            *cust_filter
+        ).outerjoin(
+            subquery, Customer.id == subquery.c.customer_id
+        )
+
+        # Filter by inactivity threshold
+        query = query.filter(
+            or_(
+                subquery.c.last_visit < limit_date_naive,
+                and_(
+                    subquery.c.last_visit.is_(None),
+                    or_(
+                        Customer.created_at < limit_date_naive,
+                        Customer.created_at.is_(None)
+                    )
+                )
             )
         )
-    )
 
-    results = query.limit(100).all()
+        results = query.limit(200).all()
 
-    data = []
-    for customer, last_visit in results:
-        ref_date = last_visit or customer.created_at
-        days_since = (now - ref_date).days
-        
-        data.append({
-            "id": customer.id,
-            "first_name": customer.first_name,
-            "last_name": customer.last_name or "",
-            "phone": customer.phone,
-            "email": customer.email or "",
-            "gender": customer.gender or "",
-            "last_visit_date": last_visit.isoformat() if last_visit else None,
-            "days_inactive": days_since,
-            "created_at": customer.created_at.isoformat()
+        data = []
+        for customer, last_visit in results:
+            ref_date = last_visit or customer.created_at
+            if ref_date:
+                if getattr(ref_date, "tzinfo", None) is not None:
+                    clean_ref = ref_date.astimezone(timezone.utc).replace(tzinfo=None)
+                else:
+                    clean_ref = ref_date
+                days_since = max(0, (now_naive - clean_ref).days)
+            else:
+                days_since = threshold_days
+
+            data.append({
+                "id": customer.id,
+                "first_name": customer.first_name,
+                "last_name": customer.last_name or "",
+                "phone": customer.phone,
+                "email": customer.email or "",
+                "gender": customer.gender or "",
+                "last_visit_date": last_visit.isoformat() if last_visit and hasattr(last_visit, "isoformat") else None,
+                "days_inactive": days_since,
+                "created_at": customer.created_at.isoformat() if customer.created_at and hasattr(customer.created_at, "isoformat") else None
+            })
+
+        data.sort(key=lambda x: x["days_inactive"], reverse=True)
+
+        return success_response({
+            "items": data,
+            "threshold_days": threshold_days
         })
-
-    data.sort(key=lambda x: x["days_inactive"], reverse=True)
-
-    return success_response({
-        "items": data,
-        "threshold_days": threshold_days
-    })
+    except Exception as e:
+        logger.exception(f"Error fetching dormant customers: {e}")
+        return error_response(f"Failed to load dormant customers: {str(e)}", 500)
