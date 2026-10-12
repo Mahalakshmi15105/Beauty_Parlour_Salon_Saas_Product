@@ -517,106 +517,175 @@ def get_daily_sales_statement():
             paytm_paid = Decimal("0.00")
             card_paid = Decimal("0.00")
 
+        inv_subtotal = Decimal(str(getattr(inv, "subtotal", 0) or 0))
+        inv_discount = Decimal(str(getattr(inv, "discount", 0) or 0))
+        if inv_discount == Decimal("0.00") and getattr(inv, "membership_discount", None):
+            inv_discount = Decimal(str(inv.membership_discount or 0))
+        inv_tax = Decimal(str(getattr(inv, "tax", 0) or 0))
+        inv_total = Decimal(str(getattr(inv, "total", 0) or 0))
+        if inv_total == Decimal("0.00"):
+            inv_total = max(Decimal("0.00"), inv_subtotal - inv_discount + inv_tax)
+
         items = getattr(inv, "items", []) or []
-        inv_raw_total = Decimal("0.00")
-        computed_items = []
-        for item in items:
-            serv_name = item.service.name if getattr(item, "service", None) else (item.product.name if getattr(item, "product", None) else "Service Item")
-            emp_name = f"{item.employee.first_name} {item.employee.last_name or ''}".strip() if getattr(item, "employee", None) else "Staff"
-            
-            tax_rate_val = Decimal("0.00")
-            if getattr(item, "tax_rate", None) is not None:
-                tax_rate_val = Decimal(str(item.tax_rate))
-            elif getattr(item, "service", None) and getattr(item.service, "tax_rate", None) is not None:
-                tax_rate_val = Decimal(str(item.service.tax_rate))
-            else:
-                tax_rate_val = default_tax_rate
+        num_items = len(items)
 
-            unit_price = Decimal(str(getattr(item, "unit_price", 0) or 0))
-            quantity = Decimal(str(getattr(item, "quantity", 1) or 1))
-            line_amt = unit_price * quantity
-            is_inclusive = getattr(getattr(item, "service", None), "tax_inclusive", False)
-            line_gst = (line_amt * (tax_rate_val / Decimal("100.00"))) if not is_inclusive else Decimal("0.00")
-            line_total = line_amt + line_gst
-            inv_raw_total += line_total
-
-            computed_items.append({
-                "serv_name": serv_name,
-                "emp_name": emp_name,
-                "line_amt": line_amt,
-                "line_gst": line_gst,
-                "line_total": line_total
-            })
-
-        num_items = len(computed_items)
         if num_items == 0:
             # Fallback if an invoice has no items recorded
-            r_tot = int(Decimal(str(inv.total or 0)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+            r_tot = int(inv_total.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+            r_cash = int(Decimal(str(cash_paid)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+            r_paytm = int(Decimal(str(paytm_paid)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+            r_card = int(Decimal(str(card_paid)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+            if (cash_paid + paytm_paid + card_paid) >= inv_total and (r_cash + r_paytm + r_card) != r_tot:
+                r_cash = r_tot - (r_paytm + r_card)
             line_items_data.append({
                 "sno": sno,
                 "service": "General Sale",
                 "staff": "Staff",
                 "amt": r_tot,
                 "gst": 0,
-                "cash": int(Decimal(str(cash_paid)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
-                "paytm": int(Decimal(str(paytm_paid)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
-                "card": int(Decimal(str(card_paid)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
+                "cash": r_cash,
+                "paytm": r_paytm,
+                "card": r_card,
                 "mc": 0,
                 "total": r_tot
             })
-            total_amt += Decimal(str(inv.total or 0))
-            grand_total += Decimal(str(inv.total or 0))
+            total_amt += Decimal(str(r_tot))
+            grand_total += Decimal(str(r_tot))
+            total_cash += Decimal(str(r_cash))
+            total_paytm += Decimal(str(r_paytm))
+            total_card += Decimal(str(r_card))
             sno += 1
+            continue
+
+        raw_items = []
+        for item in items:
+            serv_name = item.service.name if getattr(item, "service", None) else (item.product.name if getattr(item, "product", None) else "Service Item")
+            emp_name = f"{item.employee.first_name} {item.employee.last_name or ''}".strip() if getattr(item, "employee", None) else "Staff"
+            unit_price = Decimal(str(getattr(item, "unit_price", 0) or 0))
+            quantity = Decimal(str(getattr(item, "quantity", 1) or 1))
+            gross_amt = unit_price * quantity
+            item_disc = Decimal(str(getattr(item, "discount_amount", 0) or 0))
+            is_service = (getattr(item, "service_id", None) is not None) or (getattr(item, "service", None) is not None)
+            raw_items.append({
+                "serv_name": serv_name,
+                "emp_name": emp_name,
+                "gross_amt": gross_amt,
+                "item_disc": item_disc,
+                "is_service": is_service
+            })
+
+        sum_gross = sum(ri["gross_amt"] for ri in raw_items)
+        sum_item_disc = sum(ri["item_disc"] for ri in raw_items)
+
+        computed_items = []
+        if num_items == 1:
+            ri = raw_items[0]
+            net_amt = max(Decimal("0.00"), inv_subtotal - inv_discount) if (inv_subtotal - inv_discount) > 0 else max(Decimal("0.00"), ri["gross_amt"] - inv_discount)
+            line_gst = inv_tax
+            line_total = inv_total if inv_total > 0 else (net_amt + line_gst)
+            # Ensure line_amt + line_gst == line_total
+            line_amt = line_total - line_gst
+
+            computed_items.append({
+                "serv_name": ri["serv_name"],
+                "emp_name": ri["emp_name"],
+                "line_amt": line_amt,
+                "line_gst": line_gst,
+                "line_total": line_total,
+                "cash": cash_paid,
+                "paytm": paytm_paid,
+                "card": card_paid
+            })
         else:
-            for c_item in computed_items:
-                line_amt = c_item["line_amt"]
-                line_gst = c_item["line_gst"]
-                line_total = c_item["line_total"]
-                serv_name = c_item["serv_name"]
-                emp_name = c_item["emp_name"]
-
-                total_amt += line_amt
-                total_gst += line_gst
-                grand_total += line_total
-
-                if emp_name not in staff_sales_map:
-                    staff_sales_map[emp_name] = Decimal("0.00")
-                staff_sales_map[emp_name] += line_total
-
-                if num_items == 1:
-                    item_cash = cash_paid
-                    item_paytm = paytm_paid
-                    item_card = card_paid
+            # Multi-item invoice: apportion discount, tax and payments proportionally
+            item_nets = []
+            for ri in raw_items:
+                if sum_item_disc > Decimal("0.00"):
+                    it_disc = ri["item_disc"]
+                elif inv_discount > Decimal("0.00") and sum_gross > Decimal("0.00"):
+                    it_disc = inv_discount * (ri["gross_amt"] / sum_gross)
                 else:
-                    ratio = (line_total / inv_raw_total) if inv_raw_total > Decimal("0.00") else (Decimal("1.00") / Decimal(str(num_items)))
-                    item_cash = cash_paid * ratio
-                    item_paytm = paytm_paid * ratio
-                    item_card = card_paid * ratio
+                    it_disc = Decimal("0.00")
+                net_val = max(Decimal("0.00"), ri["gross_amt"] - it_disc)
+                item_nets.append(net_val)
 
-                r_line_amt = int(Decimal(str(line_amt)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-                r_line_gst = int(Decimal(str(line_gst)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-                r_line_total = int(Decimal(str(line_total)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-                r_item_cash = int(Decimal(str(item_cash)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-                r_item_paytm = int(Decimal(str(item_paytm)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-                r_item_card = int(Decimal(str(item_card)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+            tot_net = sum(item_nets)
+            svc_net = sum(item_nets[i] for i in range(num_items) if raw_items[i]["is_service"])
+            tax_base = svc_net if svc_net > Decimal("0.00") else tot_net
 
-                line_items_data.append({
-                    "sno": sno,
-                    "service": serv_name,
-                    "staff": emp_name,
-                    "amt": r_line_amt,
-                    "gst": r_line_gst,
-                    "cash": r_item_cash,
-                    "paytm": r_item_paytm,
-                    "card": r_item_card,
-                    "mc": 0,
-                    "total": r_line_total
+            for i in range(num_items):
+                ri = raw_items[i]
+                c_net = item_nets[i]
+                if ri["is_service"] and tax_base > Decimal("0.00"):
+                    c_tax = inv_tax * (c_net / tax_base)
+                elif not any(x["is_service"] for x in raw_items) and tax_base > Decimal("0.00"):
+                    c_tax = inv_tax * (c_net / tax_base)
+                else:
+                    c_tax = Decimal("0.00")
+
+                c_total = c_net + c_tax
+                ratio = (c_total / inv_total) if inv_total > Decimal("0.00") else (Decimal("1.00") / Decimal(str(num_items)))
+                c_cash = cash_paid * ratio
+                c_paytm = paytm_paid * ratio
+                c_card = card_paid * ratio
+
+                computed_items.append({
+                    "serv_name": ri["serv_name"],
+                    "emp_name": ri["emp_name"],
+                    "line_amt": c_net,
+                    "line_gst": c_tax,
+                    "line_total": c_total,
+                    "cash": c_cash,
+                    "paytm": c_paytm,
+                    "card": c_card
                 })
-                sno += 1
 
-        total_cash += cash_paid
-        total_paytm += paytm_paid
-        total_card += card_paid
+        for c_item in computed_items:
+            serv_name = c_item["serv_name"]
+            emp_name = c_item["emp_name"]
+
+            r_line_total = int(c_item["line_total"].quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+            r_line_gst = int(c_item["line_gst"].quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+            r_line_amt = r_line_total - r_line_gst
+
+            r_item_cash = int(c_item["cash"].quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+            r_item_paytm = int(c_item["paytm"].quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+            r_item_card = int(c_item["card"].quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+            # Guarantee: CASH + PAYTM + CARD == TOTAL (if invoice fully paid)
+            if (cash_paid + paytm_paid + card_paid) >= inv_total and (r_item_cash + r_item_paytm + r_item_card) != r_line_total:
+                diff = r_line_total - (r_item_cash + r_item_paytm + r_item_card)
+                if r_item_cash >= max(r_item_paytm, r_item_card):
+                    r_item_cash += diff
+                elif r_item_paytm >= r_item_card:
+                    r_item_paytm += diff
+                else:
+                    r_item_card += diff
+
+            total_amt += Decimal(str(r_line_amt))
+            total_gst += Decimal(str(r_line_gst))
+            grand_total += Decimal(str(r_line_total))
+            total_cash += Decimal(str(r_item_cash))
+            total_paytm += Decimal(str(r_item_paytm))
+            total_card += Decimal(str(r_item_card))
+
+            if emp_name not in staff_sales_map:
+                staff_sales_map[emp_name] = Decimal("0.00")
+            staff_sales_map[emp_name] += Decimal(str(r_line_total))
+
+            line_items_data.append({
+                "sno": sno,
+                "service": serv_name,
+                "staff": emp_name,
+                "amt": r_line_amt,
+                "gst": r_line_gst,
+                "cash": r_item_cash,
+                "paytm": r_item_paytm,
+                "card": r_item_card,
+                "mc": 0,
+                "total": r_line_total
+            })
+            sno += 1
 
     # Expenses for date
     expenses = []
@@ -679,7 +748,7 @@ def get_daily_sales_statement():
         Invoice.status != "Voided"
     ).all()
 
-    till_date_sales = sum(float(getattr(inv, "subtotal", 0) or 0) for inv in month_invoices)
+    till_date_sales = sum(float((getattr(inv, "subtotal", 0) or 0) - (getattr(inv, "discount", 0) or 0)) for inv in month_invoices)
     till_date_gst = sum(float(getattr(inv, "tax", 0) or 0) for inv in month_invoices)
     till_date_walkin = len(set(inv.customer_id for inv in month_invoices if getattr(inv, "customer_id", None)))
     till_date_abv = (till_date_sales / till_date_walkin) if till_date_walkin > 0 else 0.0
