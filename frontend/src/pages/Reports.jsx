@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
 import { useToast } from "../context/ToastContext";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { useTheme } from "../context/ThemeContext";
 import { exportToCSV, printDataList, exportToPDF, exportToExcel } from "../utils/exportUtils";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas-pro";
 import XLSX from "xlsx-js-style";
 import { EXCEL_COLORS, styleCell, styleRange } from "../utils/exportUtils";
 import { 
@@ -43,6 +45,8 @@ function Reports() {
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const reportCanvasRef = useRef(null);
 
   // Daily Sales Statement Opening Balance manual editing
   const [isEditingOpening, setIsEditingOpening] = useState(false);
@@ -106,6 +110,95 @@ function Reports() {
   useEffect(() => {
     fetchReport();
   }, [reportType, selectedDate, selectedMonth, selectedYear, preset, startDate, endDate]);
+
+  // PDF Export Handler for Daily Sales Statement + All Reports
+  const handleExportCustomPDF = async () => {
+    if (!reportData) return showError("No report data available to export.");
+    if (!reportCanvasRef.current) return showError("Report view not ready to capture.");
+
+    setExportingPdf(true);
+    try {
+      // 1. Determine clean filename based on report type and filters
+      let filename = "salon_report";
+      if (reportType === "daily_sales_statement") {
+        const dStr = (reportData.date_str || selectedDate || "").replace(/[^a-zA-Z0-9_-]/g, "_");
+        filename = `daily_sales_statement_${dStr}`;
+      } else if (reportType === "monthly_staff_performance") {
+        filename = `monthly_staff_performance_${selectedMonth}_${selectedYear}`;
+      } else if (reportType === "attendance_salary") {
+        filename = `attendance_salary_report_${selectedMonth}_${selectedYear}`;
+      } else {
+        filename = `${reportType}_report_${preset}`;
+      }
+
+      const element = reportCanvasRef.current;
+
+      // 2. High-DPI canvas capture using html2canvas
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: "#ffffff",
+        logging: false,
+        windowWidth: 1280
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+
+      // 3. Dynamic orientation (Landscape if wide, portrait if tall)
+      const isLandscape = canvas.width > canvas.height * 1.15;
+      const pdf = new jsPDF(isLandscape ? "l" : "p", "mm", "a4");
+      const pageWidth = isLandscape ? 297 : 210;
+      const pageHeight = isLandscape ? 210 : 297;
+      const margin = 8;
+      const contentWidth = pageWidth - (margin * 2);
+      const contentHeight = (canvas.height * contentWidth) / canvas.width;
+      const maxPageContentHeight = pageHeight - (margin * 2);
+
+      if (contentHeight <= maxPageContentHeight) {
+        // Fits entirely on a single page
+        pdf.addImage(imgData, "PNG", margin, margin, contentWidth, contentHeight);
+      } else {
+        // Multi-page slicing for longer reports
+        let yOffset = 0;
+        const pageCanvasHeight = (maxPageContentHeight * canvas.width) / contentWidth;
+
+        while (yOffset < canvas.height) {
+          const pageCanvas = document.createElement("canvas");
+          pageCanvas.width = canvas.width;
+          const currentSliceHeight = Math.min(pageCanvasHeight, canvas.height - yOffset);
+          pageCanvas.height = currentSliceHeight;
+
+          const ctx = pageCanvas.getContext("2d");
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+          ctx.drawImage(
+            canvas,
+            0, yOffset, canvas.width, currentSliceHeight,
+            0, 0, pageCanvas.width, currentSliceHeight
+          );
+
+          const sliceImgData = pageCanvas.toDataURL("image/png");
+          const sliceImgHeight = (currentSliceHeight * contentWidth) / canvas.width;
+
+          if (yOffset > 0) {
+            pdf.addPage();
+          }
+          pdf.addImage(sliceImgData, "PNG", margin, margin, contentWidth, sliceImgHeight);
+
+          yOffset += pageCanvasHeight;
+        }
+      }
+
+      pdf.save(`${filename}.pdf`);
+      showSuccess("PDF report generated and downloaded successfully!");
+    } catch (err) {
+      console.error("PDF export error:", err);
+      showError(err?.message || "Failed to generate PDF report.");
+    } finally {
+      setExportingPdf(false);
+    }
+  };
 
   // Excel Export Handler for 3 New Reports + Standard Reports
   const handleExportCustomExcel = () => {
@@ -754,14 +847,30 @@ function Reports() {
           )}
         </div>
 
-        {/* Excel Export Button */}
-        <button
-          onClick={handleExportCustomExcel}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-extrabold flex items-center space-x-2 transition shadow-md"
-        >
-          <FileSpreadsheet className="w-4 h-4" />
-          <span>Download Excel</span>
-        </button>
+        {/* Export Action Buttons: PDF & Excel */}
+        <div className="flex items-center gap-2.5">
+          {/* PDF Export Button */}
+          <button
+            onClick={handleExportCustomPDF}
+            disabled={exportingPdf || loading || !reportData}
+            className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl text-xs font-extrabold flex items-center space-x-2 transition shadow-md disabled:opacity-50 cursor-pointer"
+            title="Download formatted report as PDF"
+          >
+            <FileText className="w-4 h-4" />
+            <span>{exportingPdf ? "Generating PDF..." : "Download PDF"}</span>
+          </button>
+
+          {/* Excel Export Button */}
+          <button
+            onClick={handleExportCustomExcel}
+            disabled={loading || !reportData}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-extrabold flex items-center space-x-2 transition shadow-md disabled:opacity-50 cursor-pointer"
+            title="Download report as Excel spreadsheet (.xlsx)"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>Download Excel</span>
+          </button>
+        </div>
       </div>
 
       {/* Segmented Sub-Tabs */}
@@ -808,7 +917,7 @@ function Reports() {
         ) : !reportData ? (
           <div className="p-16 text-center text-xs text-slate-500">No report records found.</div>
         ) : (
-          <>
+          <div ref={reportCanvasRef} className="bg-white">
             {/* 1. DAILY SALES STATEMENT */}
             {reportType === "daily_sales_statement" && (
               <div className="p-6 space-y-6">
@@ -908,6 +1017,7 @@ function Reports() {
                           {!isEditingOpening && (
                             <button
                               type="button"
+                              data-html2canvas-ignore="true"
                               onClick={() => {
                                 setEditOpeningVal(reportData.balance?.opening_bal ?? "");
                                 setIsEditingOpening(true);
@@ -1564,7 +1674,7 @@ function Reports() {
                 </div>
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
     </div>

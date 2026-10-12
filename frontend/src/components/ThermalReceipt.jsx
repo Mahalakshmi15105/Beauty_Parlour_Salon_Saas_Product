@@ -2,7 +2,7 @@ import React from "react";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { getFullImageUrl } from "../utils/imageUrl";
 import { getShopNameStyle } from "../utils/fontLoader";
-import html2canvas from "html2canvas";
+import html2canvas from "html2canvas-pro";
 import jsPDF from "jspdf";
 
 export function buildThermalReceiptHtml(targetEl, paperSize = "80mm") {
