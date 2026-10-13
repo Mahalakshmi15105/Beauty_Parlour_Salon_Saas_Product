@@ -218,7 +218,7 @@ function Reports() {
         ["DAILY SALES STATEMENT"],
         [dateStrInfo],
         [],
-        ["S.NO", "SERVICE", "STAFF", "AMT", "GST", "CASH", "PAYTM", "CARD", "M/C", "TOTAL", "", "EXPENSES", "AMOUNT"],
+        ["S.NO", "CLIENT NAME", "STAFF", "SERVICE", "AMT", "GST", "CASH", "PAYTM", "CARD", "M/C", "TOTAL", "BILL TOTAL", "", "EXPENSES", "AMOUNT"],
       ];
 
       const lineItems = d.line_items || [];
@@ -230,8 +230,9 @@ function Reports() {
         const exp = expenses[i] || {};
         wsData.push([
           item.sno || (i < lineItems.length ? i + 1 : ""),
-          item.service || "",
+          item.client_name || (i < lineItems.length ? "—" : ""),
           item.staff || "",
+          item.service || "",
           item.amt !== undefined ? item.amt : "",
           item.gst !== undefined ? item.gst : "",
           item.cash !== undefined ? item.cash : "",
@@ -239,6 +240,7 @@ function Reports() {
           item.card !== undefined ? item.card : "",
           item.mc !== undefined ? item.mc : "",
           item.total !== undefined ? item.total : "",
+          item.bill_total !== undefined ? item.bill_total : (item.total !== undefined ? item.total : ""),
           "",
           exp.note || (i === 0 && expenses.length === 0 ? "No Expenses" : ""),
           exp.amount !== undefined ? exp.amount : ""
@@ -246,7 +248,7 @@ function Reports() {
       }
 
       const totalRowIdx = 6 + maxRows;
-      wsData.push(["TOTAL", "", "", d.totals?.amt || 0, d.totals?.gst || 0, d.totals?.cash || 0, d.totals?.paytm || 0, d.totals?.card || 0, 0, d.totals?.total || 0, "", "TOTAL EXPENSES", d.total_expenses || 0]);
+      wsData.push(["TOTAL", "", "", "", d.totals?.amt || 0, d.totals?.gst || 0, d.totals?.cash || 0, d.totals?.paytm || 0, d.totals?.card || 0, 0, d.totals?.total || 0, d.totals?.total || 0, "", "TOTAL EXPENSES", d.total_expenses || 0]);
       wsData.push([]);
       
       const staffList = d.staff_achieved || [];
@@ -279,8 +281,9 @@ function Reports() {
       // Auto Column Widths
       ws["!cols"] = [
         { wch: 8 },  // S.NO
-        { wch: 22 }, // SERVICE
+        { wch: 18 }, // CLIENT NAME
         { wch: 16 }, // STAFF
+        { wch: 28 }, // SERVICE
         { wch: 10 }, // AMT
         { wch: 10 }, // GST
         { wch: 10 }, // CASH
@@ -288,6 +291,7 @@ function Reports() {
         { wch: 10 }, // CARD
         { wch: 8 },  // M/C
         { wch: 12 }, // TOTAL
+        { wch: 14 }, // BILL TOTAL
         { wch: 4 },  // GAP
         { wch: 22 }, // EXPENSES / SUMMARY
         { wch: 14 }  // AMOUNT
@@ -295,48 +299,60 @@ function Reports() {
 
       // Merges
       ws["!merges"] = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: 12 } }, // Parlour Name
-        { s: { r: 1, c: 0 }, e: { r: 1, c: 12 } }, // Branch Name
-        { s: { r: 2, c: 0 }, e: { r: 2, c: 12 } }, // Daily Sales Statement Title
-        { s: { r: 3, c: 0 }, e: { r: 3, c: 12 } }, // Date & Day Info
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 14 } }, // Parlour Name
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 14 } }, // Branch Name
+        { s: { r: 2, c: 0 }, e: { r: 2, c: 14 } }, // Daily Sales Statement Title
+        { s: { r: 3, c: 0 }, e: { r: 3, c: 14 } }, // Date & Day Info
         { s: { r: summaryStartRowIdx, c: 0 }, e: { r: summaryStartRowIdx, c: 2 } }, // Staff Achieved Header
-        { s: { r: summaryStartRowIdx, c: 11 }, e: { r: summaryStartRowIdx, c: 12 } }, // Summary Balance Header
+        { s: { r: summaryStartRowIdx, c: 13 }, e: { r: summaryStartRowIdx, c: 14 } }, // Summary Balance Header
         { s: { r: denomHeaderRowIdx, c: 0 }, e: { r: denomHeaderRowIdx, c: 2 } }, // Cash Denomination Header
         { s: { r: denomHeaderRowIdx + 11, c: 0 }, e: { r: denomHeaderRowIdx + 11, c: 1 } } // Cash Denomination Total Label
       ];
 
+      // Merge multi-staff cells in Excel for S.NO, CLIENT NAME, and BILL TOTAL
+      for (let i = 0; i < lineItems.length; i++) {
+        const item = lineItems[i];
+        if (item.staff_count > 1 && item.is_first_staff) {
+          const rStart = 6 + i;
+          const rEnd = rStart + item.staff_count - 1;
+          ws["!merges"].push({ s: { r: rStart, c: 0 }, e: { r: rEnd, c: 0 } });
+          ws["!merges"].push({ s: { r: rStart, c: 1 }, e: { r: rEnd, c: 1 } });
+          ws["!merges"].push({ s: { r: rStart, c: 11 }, e: { r: rEnd, c: 11 } });
+        }
+      }
+
       // Apply Cell Styling
       // 1. Parlour Name & Branch Header (Pink Fill)
-      styleRange(ws, 0, 0, 0, 12, {
+      styleRange(ws, 0, 0, 0, 14, {
         fill: EXCEL_COLORS.PINK_HEADER,
         font: { bold: true, sz: 14, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
         alignment: { horizontal: "center", vertical: "center" }
       });
-      styleRange(ws, 1, 0, 1, 12, {
+      styleRange(ws, 1, 0, 1, 14, {
         fill: EXCEL_COLORS.PINK_HEADER,
         font: { bold: true, sz: 11, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
         alignment: { horizontal: "center", vertical: "center" }
       });
 
       // 2. Green Title & Date Banner
-      styleRange(ws, 2, 0, 2, 12, {
+      styleRange(ws, 2, 0, 2, 14, {
         fill: EXCEL_COLORS.GREEN_BANNER,
         font: { bold: true, sz: 12, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
         alignment: { horizontal: "center", vertical: "center" }
       });
-      styleRange(ws, 3, 0, 3, 12, {
+      styleRange(ws, 3, 0, 3, 14, {
         fill: EXCEL_COLORS.GREEN_BANNER,
         font: { bold: true, sz: 10, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
         alignment: { horizontal: "center", vertical: "center" }
       });
 
       // 3. Table Headers Row (Row 5)
-      styleRange(ws, 5, 0, 5, 9, {
+      styleRange(ws, 5, 0, 5, 11, {
         fill: EXCEL_COLORS.PINK_HEADER,
         font: { bold: true, sz: 10, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
         alignment: { horizontal: "center", vertical: "center" }
       });
-      styleRange(ws, 5, 11, 5, 12, {
+      styleRange(ws, 5, 13, 5, 14, {
         fill: EXCEL_COLORS.YELLOW_ACCENT,
         font: { bold: true, sz: 10, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
         alignment: { horizontal: "center", vertical: "center" }
@@ -346,36 +362,36 @@ function Reports() {
       for (let i = 0; i < maxRows; i++) {
         const r = 6 + i;
         const fill = i % 2 === 0 ? "FFFFFF" : EXCEL_COLORS.LIGHT_GRAY;
-        styleRange(ws, r, 0, r, 9, { fill, alignment: { vertical: "center" } });
+        styleRange(ws, r, 0, r, 11, { fill, alignment: { vertical: "center" } });
         // Right align numeric cells in line items
-        for (let c = 3; c <= 9; c++) {
+        for (let c = 4; c <= 11; c++) {
           styleCell(ws, r, c, { fill, alignment: { horizontal: "right", vertical: "center" } });
         }
         // Expense cells
-        styleRange(ws, r, 11, r, 12, { fill });
-        styleCell(ws, r, 12, { fill, alignment: { horizontal: "right", vertical: "center" } });
+        styleRange(ws, r, 13, r, 14, { fill });
+        styleCell(ws, r, 14, { fill, alignment: { horizontal: "right", vertical: "center" } });
       }
 
       // 5. Total Row
-      ws["!merges"].push({ s: { r: totalRowIdx, c: 0 }, e: { r: totalRowIdx, c: 2 } });
-      styleRange(ws, totalRowIdx, 0, totalRowIdx, 9, {
+      ws["!merges"].push({ s: { r: totalRowIdx, c: 0 }, e: { r: totalRowIdx, c: 3 } });
+      styleRange(ws, totalRowIdx, 0, totalRowIdx, 11, {
         fill: EXCEL_COLORS.LIGHT_YELLOW,
         font: { bold: true, sz: 10 },
         alignment: { vertical: "center" }
       });
-      for (let c = 3; c <= 9; c++) {
+      for (let c = 4; c <= 11; c++) {
         styleCell(ws, totalRowIdx, c, {
           fill: EXCEL_COLORS.LIGHT_YELLOW,
           font: { bold: true, sz: 10 },
           alignment: { horizontal: "right", vertical: "center" }
         });
       }
-      styleRange(ws, totalRowIdx, 11, totalRowIdx, 12, {
+      styleRange(ws, totalRowIdx, 13, totalRowIdx, 14, {
         fill: EXCEL_COLORS.LIGHT_YELLOW,
         font: { bold: true, sz: 10 },
         alignment: { vertical: "center" }
       });
-      styleCell(ws, totalRowIdx, 12, {
+      styleCell(ws, totalRowIdx, 14, {
         fill: EXCEL_COLORS.LIGHT_YELLOW,
         font: { bold: true, sz: 10 },
         alignment: { horizontal: "right", vertical: "center" }
@@ -398,7 +414,7 @@ function Reports() {
       }
 
       // 7. Summary Balance Box
-      styleRange(ws, summaryStartRowIdx, 11, summaryStartRowIdx, 12, {
+      styleRange(ws, summaryStartRowIdx, 13, summaryStartRowIdx, 14, {
         fill: EXCEL_COLORS.GREEN_BANNER,
         font: { bold: true, color: { rgb: EXCEL_COLORS.WHITE_TEXT } },
         alignment: { horizontal: "center", vertical: "center" }
@@ -407,12 +423,12 @@ function Reports() {
         const r = summaryStartRowIdx + 1 + i;
         const isClosing = i === 6;
         const bg = isClosing ? EXCEL_COLORS.LIGHT_YELLOW : EXCEL_COLORS.LIGHT_GRAY;
-        styleRange(ws, r, 11, r, 12, {
+        styleRange(ws, r, 13, r, 14, {
           fill: bg,
           font: { bold: isClosing || i === 0 },
           alignment: { vertical: "center" }
         });
-        styleCell(ws, r, 12, {
+        styleCell(ws, r, 14, {
           fill: bg,
           font: { bold: isClosing || i === 0 },
           alignment: { horizontal: "right", vertical: "center" }
@@ -942,43 +958,73 @@ function Reports() {
                       <thead>
                         <tr className="bg-amber-300 text-slate-900 border-b border-amber-400 font-extrabold uppercase">
                           <th className="p-2 text-center">S.NO</th>
-                          <th className="p-2">SERVICE</th>
+                          <th className="p-2">CLIENT NAME</th>
                           <th className="p-2">STAFF</th>
+                          <th className="p-2">SERVICE</th>
                           <th className="p-2 text-right">AMT</th>
                           <th className="p-2 text-right">GST</th>
                           <th className="p-2 text-right">CASH</th>
                           <th className="p-2 text-right">PAYTM</th>
                           <th className="p-2 text-right">CARD</th>
                           <th className="p-2 text-right">TOTAL</th>
+                          <th className="p-2 text-right">BILL TOTAL</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 font-semibold text-slate-800">
                         {(reportData.line_items || []).length === 0 ? (
-                          <tr><td colSpan="9" className="p-6 text-center text-slate-400">No sales transactions logged for this date.</td></tr>
+                          <tr><td colSpan="11" className="p-6 text-center text-slate-400">No sales transactions logged for this date.</td></tr>
                         ) : (
-                          (reportData.line_items || []).map((row) => (
-                            <tr key={row.sno} className="hover:bg-slate-50">
-                              <td className="p-2 text-center font-bold text-slate-400 numeric">{row.sno}</td>
-                              <td className="p-2 font-bold text-slate-900">{row.service}</td>
-                              <td className="p-2">{row.staff}</td>
-                              <td className="p-2 text-right numeric">₹{Math.round(row.amt || 0)}</td>
-                              <td className="p-2 text-right numeric">₹{Math.round(row.gst || 0)}</td>
-                              <td className="p-2 text-right numeric">₹{Math.round(row.cash || 0)}</td>
-                              <td className="p-2 text-right numeric">₹{Math.round(row.paytm || 0)}</td>
-                              <td className="p-2 text-right numeric">₹{Math.round(row.card || 0)}</td>
-                              <td className="p-2 text-right font-black text-slate-900 numeric">₹{Math.round(row.total || 0)}</td>
-                            </tr>
-                          ))
+                          (reportData.line_items || []).map((row, rIdx) => {
+                            const isFirst = row.is_first_staff !== false;
+                            const spanCount = row.staff_count || 1;
+                            return (
+                              <tr key={`${row.invoice_id || rIdx}-${row.staff}-${rIdx}`} className="hover:bg-slate-50">
+                                {isFirst && (
+                                  <td
+                                    rowSpan={spanCount}
+                                    className="p-2 text-center font-bold text-slate-700 align-middle border-r border-slate-100 bg-slate-50/40 numeric"
+                                  >
+                                    {row.sno}
+                                  </td>
+                                )}
+                                {isFirst && (
+                                  <td
+                                    rowSpan={spanCount}
+                                    className="p-2 font-bold text-slate-900 align-middle border-r border-slate-100 bg-slate-50/40"
+                                  >
+                                    {row.client_name || "—"}
+                                  </td>
+                                )}
+                                <td className="p-2 font-semibold text-slate-700">{row.staff}</td>
+                                <td className="p-2 font-medium text-slate-900">{row.service}</td>
+                                <td className="p-2 text-right numeric">₹{Math.round(row.amt || 0)}</td>
+                                <td className="p-2 text-right numeric">₹{Math.round(row.gst || 0)}</td>
+                                <td className="p-2 text-right numeric">₹{Math.round(row.cash || 0)}</td>
+                                <td className="p-2 text-right numeric">₹{Math.round(row.paytm || 0)}</td>
+                                <td className="p-2 text-right numeric">₹{Math.round(row.card || 0)}</td>
+                                <td className="p-2 text-right font-bold text-slate-800 numeric">₹{Math.round(row.total || 0)}</td>
+                                {isFirst && (
+                                  <td
+                                    rowSpan={spanCount}
+                                    className="p-2 text-right font-black text-rose-700 align-middle border-l border-slate-100 bg-amber-50/40 numeric"
+                                  >
+                                    ₹{Math.round(row.bill_total || row.total || 0)}
+                                  </td>
+                                )}
+                              </tr>
+                            );
+                          })
                         )}
                       </tbody>
                       <tfoot className="bg-amber-300 text-slate-900 font-black">
                         <tr>
-                          <td colSpan="3" className="p-2 uppercase">TOTAL</td>
+                          <td colSpan="4" className="p-2 uppercase">TOTAL</td>
                           <td className="p-2 text-right numeric">₹{Math.round(reportData.totals?.amt || 0)}</td>
                           <td className="p-2 text-right numeric">₹{Math.round(reportData.totals?.gst || 0)}</td>
                           <td className="p-2 text-right numeric">₹{Math.round(reportData.totals?.cash || 0)}</td>
                           <td className="p-2 text-right numeric">₹{Math.round(reportData.totals?.paytm || 0)}</td>
                           <td className="p-2 text-right numeric">₹{Math.round(reportData.totals?.card || 0)}</td>
+                          <td className="p-2 text-right text-rose-700 numeric">₹{Math.round(reportData.totals?.total || 0)}</td>
                           <td className="p-2 text-right text-rose-700 numeric">₹{Math.round(reportData.totals?.total || 0)}</td>
                         </tr>
                       </tfoot>

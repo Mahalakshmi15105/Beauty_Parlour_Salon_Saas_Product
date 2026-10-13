@@ -136,7 +136,19 @@ def checkout():
                     raise ValueError(f"Service ID {item_id} is inactive or invalid.")
                 
                 item_name = svc.name
-                unit_price = Decimal(str(svc.price))
+                
+                # Check for custom/edited unit price passed from billing UI
+                custom_rate = item.get("unit_price") if item.get("unit_price") is not None else item.get("gross_amount")
+                if custom_rate is not None:
+                    try:
+                        unit_price = Decimal(str(custom_rate))
+                        if unit_price < Decimal("0.00"):
+                            unit_price = Decimal(str(svc.price))
+                    except Exception:
+                        unit_price = Decimal(str(svc.price))
+                else:
+                    unit_price = Decimal(str(svc.price))
+
                 line_subtotal = unit_price * qty
 
                 # Check membership benefit redemption
@@ -259,34 +271,78 @@ def checkout():
             total_discount += discount_amount
 
             # Assemble line item row
-            line_item = InvoiceLineItem(
-                tenant_id=g.parlour_id,
-                branch_id=target_branch_id,
-                service_id=item_id if item_type == "service" else None,
-                product_id=item_id if item_type == "product" else None,
-                employee_id=employee_id,
-                quantity=qty,
-                unit_price=unit_price,
-                mrp=mrp_val if item_type == "product" else None,
-                discount_amount=discount_amount,
-                tax_amount=Decimal("0.00"),
-                line_total=line_total
-            )
-            line_items_to_save.append(line_item)
+            if item_type == "service" and len(emp_ids) > 1:
+                num_emps = len(emp_ids)
+                split_unit = (unit_price / Decimal(str(num_emps))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                split_disc = (discount_amount / Decimal(str(num_emps))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                prev_u_sum = Decimal("0.00")
+                prev_d_sum = Decimal("0.00")
+                for e_idx, eid in enumerate(emp_ids):
+                    curr_u = (unit_price - prev_u_sum) if e_idx == num_emps - 1 else split_unit
+                    curr_d = (discount_amount - prev_d_sum) if e_idx == num_emps - 1 else split_disc
+                    prev_u_sum += curr_u
+                    prev_d_sum += curr_d
+                    curr_line_tot = max(Decimal("0.00"), curr_u * qty - curr_d)
+                    
+                    e_obj = get_branch_query(Employee).filter_by(id=eid, status="active").first()
+                    e_name = f"{e_obj.first_name} {e_obj.last_name or ''}".strip() if e_obj else emp_name
 
-            response_line_items.append({
-                "item_name": item_name,
-                "name": item_name,
-                "type": item_type,
-                "quantity": qty,
-                "unit_price": float(unit_price),
-                "mrp": float(mrp_val) if mrp_val is not None else float(unit_price),
-                "discount": float(discount_amount),
-                "line_total": float(line_total),
-                "staff_name": emp_name,
-                "employee_name": emp_name,
-                "is_free_reward": bool(item.get("is_free_visit_reward") or item.get("is_free_reward"))
-            })
+                    li = InvoiceLineItem(
+                        tenant_id=g.parlour_id,
+                        branch_id=target_branch_id,
+                        service_id=item_id,
+                        product_id=None,
+                        employee_id=eid,
+                        quantity=qty,
+                        unit_price=curr_u,
+                        mrp=None,
+                        discount_amount=curr_d,
+                        tax_amount=Decimal("0.00"),
+                        line_total=curr_line_tot
+                    )
+                    line_items_to_save.append(li)
+                    response_line_items.append({
+                        "item_name": item_name,
+                        "name": item_name,
+                        "type": item_type,
+                        "quantity": qty,
+                        "unit_price": float(curr_u),
+                        "mrp": float(curr_u),
+                        "discount": float(curr_d),
+                        "line_total": float(curr_line_tot),
+                        "staff_name": e_name,
+                        "employee_name": e_name,
+                        "is_free_reward": bool(item.get("is_free_visit_reward") or item.get("is_free_reward"))
+                    })
+            else:
+                line_item = InvoiceLineItem(
+                    tenant_id=g.parlour_id,
+                    branch_id=target_branch_id,
+                    service_id=item_id if item_type == "service" else None,
+                    product_id=item_id if item_type == "product" else None,
+                    employee_id=employee_id,
+                    quantity=qty,
+                    unit_price=unit_price,
+                    mrp=mrp_val if item_type == "product" else None,
+                    discount_amount=discount_amount,
+                    tax_amount=Decimal("0.00"),
+                    line_total=line_total
+                )
+                line_items_to_save.append(line_item)
+
+                response_line_items.append({
+                    "item_name": item_name,
+                    "name": item_name,
+                    "type": item_type,
+                    "quantity": qty,
+                    "unit_price": float(unit_price),
+                    "mrp": float(mrp_val) if mrp_val is not None else float(unit_price),
+                    "discount": float(discount_amount),
+                    "line_total": float(line_total),
+                    "staff_name": emp_name,
+                    "employee_name": emp_name,
+                    "is_free_reward": bool(item.get("is_free_visit_reward") or item.get("is_free_reward"))
+                })
 
         # 3. Calculate Global Taxes & Grand Total
         # BUSINESS RULE #6: Apply GST/Tax ONLY to Services. Products have 0 GST/Tax.

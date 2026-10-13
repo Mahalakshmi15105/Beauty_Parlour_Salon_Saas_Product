@@ -2012,6 +2012,8 @@ function Billing() {
           type: x.type,
           item_id: x.item_id,
           quantity: x.quantity,
+          unit_price: x.gross_amount !== undefined && x.gross_amount !== null && !isNaN(parseFloat(x.gross_amount)) ? parseFloat(x.gross_amount) : undefined,
+          gross_amount: x.gross_amount !== undefined && x.gross_amount !== null && !isNaN(parseFloat(x.gross_amount)) ? parseFloat(x.gross_amount) : undefined,
           employee_ids: x.employee_ids || [],
           employee_id: x.employee_ids && x.employee_ids.length > 0 ? x.employee_ids[0] : null,
           discount: calculateRowDiscountAmount(x),
@@ -3287,7 +3289,29 @@ function Billing() {
                     }}
                     className="w-full bg-background border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary pr-8"
                   />
-                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                  {categorySearchQuery ? (
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedCategoryId("");
+                        setCategorySearchQuery("");
+                        setSelectedServiceId("");
+                        setServiceSearchQuery("");
+                        if (categorySelectRef.current) {
+                          categorySelectRef.current.focus();
+                          setIsCategoryDropdownOpen(true);
+                        }
+                      }}
+                      className="absolute right-2.5 top-2.5 p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100"
+                      title="Clear / Change Category"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                  )}
 
                   {/* Category Dropdown List */}
                   {isCategoryDropdownOpen && (() => {
@@ -3393,10 +3417,10 @@ function Billing() {
                         e.preventDefault();
                         if (isServiceDropdownOpen && filtered.length > 0) {
                           const targetSvc = filtered[serviceHighlightedIndex] || filtered[0];
-                          setSelectedServiceId(String(targetSvc.id));
-                          setServiceSearchQuery(`${targetSvc.name} - ${currencySymbol} ${parseFloat(targetSvc.price).toFixed(2)}`);
-                          setIsServiceDropdownOpen(false);
                           handleAddServiceToCart(targetSvc.id);
+                          setSelectedServiceId("");
+                          setServiceSearchQuery("");
+                          setIsServiceDropdownOpen(false);
                           setTimeout(() => {
                             const empSelects = document.querySelectorAll('[data-field="employee"]');
                             if (empSelects.length > 0) {
@@ -3418,7 +3442,27 @@ function Billing() {
                     }}
                     className="w-full bg-background border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-primary disabled:opacity-50 pr-8"
                   />
-                  <Search className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                  {serviceSearchQuery ? (
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setServiceSearchQuery("");
+                        setSelectedServiceId("");
+                        if (serviceSelectRef.current) {
+                          serviceSelectRef.current.focus();
+                          setIsServiceDropdownOpen(true);
+                        }
+                      }}
+                      className="absolute right-2.5 top-2.5 p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100"
+                      title="Clear Service Search"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  ) : (
+                    <Search className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                  )}
 
                   {/* Service Dropdown List */}
                   {isServiceDropdownOpen && selectedCategoryId && (() => {
@@ -3448,10 +3492,10 @@ function Billing() {
                                 key={svc.id}
                                 type="button"
                                 onClick={() => {
-                                  setSelectedServiceId(String(svc.id));
-                                  setServiceSearchQuery(`${svc.name} - ${currencySymbol} ${parseFloat(svc.price).toFixed(2)}`);
-                                  setIsServiceDropdownOpen(false);
                                   handleAddServiceToCart(svc.id);
+                                  setSelectedServiceId("");
+                                  setServiceSearchQuery("");
+                                  setIsServiceDropdownOpen(false);
                                   setTimeout(() => {
                                     const empSelects = document.querySelectorAll('[data-field="employee"]');
                                     if (empSelects.length > 0) {
@@ -3685,10 +3729,11 @@ function Billing() {
                                   if (val) {
                                     handleSelectEmployee(idx, val);
                                     setSelectedServiceId("");
+                                    setServiceSearchQuery("");
                                     setTimeout(() => {
-                                      if (categorySelectRef.current) {
-                                        categorySelectRef.current.focus();
-                                        openNativeSelectDropdown(categorySelectRef.current);
+                                      if (serviceSelectRef.current) {
+                                        serviceSelectRef.current.focus();
+                                        setIsServiceDropdownOpen(true);
                                       }
                                     }, 100);
                                   }
@@ -3697,10 +3742,11 @@ function Billing() {
                                   if (e.key === "Enter" && e.target.value) {
                                     handleSelectEmployee(idx, e.target.value);
                                     setSelectedServiceId("");
+                                    setServiceSearchQuery("");
                                     setTimeout(() => {
-                                      if (categorySelectRef.current) {
-                                        categorySelectRef.current.focus();
-                                        openNativeSelectDropdown(categorySelectRef.current);
+                                      if (serviceSelectRef.current) {
+                                        serviceSelectRef.current.focus();
+                                        setIsServiceDropdownOpen(true);
                                       }
                                     }, 100);
                                   } else {
