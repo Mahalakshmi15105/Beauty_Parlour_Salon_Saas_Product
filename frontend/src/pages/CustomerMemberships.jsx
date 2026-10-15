@@ -6,6 +6,7 @@ import { useModalFocusTrap, useFormKeyboardNavigation, focusAndOpenSelect } from
 import { User, X, ChevronDown, Check, Printer, FileSpreadsheet, FileText, Download, MessageSquare, Send, Calendar, Clock, Plus, Trash2, Sparkles, AlertCircle } from "lucide-react";
 import { exportToCSV, printDataList, exportToPDF, exportToExcel } from "../utils/exportUtils";
 import { ThermalReceipt, printThermalReceiptElement, downloadThermalReceiptPDF } from "../components/ThermalReceipt";
+import { getCachedBusinessProfile, getCachedReceiptSettings, fetchSettingsFast } from "../services/settingsCache";
 
 function CustomerMemberships() {
   const { showSuccess, showError } = useToast();
@@ -25,8 +26,8 @@ function CustomerMemberships() {
   // Receipt / Bill Preview Modal State
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [completedInvoice, setCompletedInvoice] = useState(null);
-  const [receiptSettings, setReceiptSettings] = useState(null);
-  const [businessProfile, setBusinessProfile] = useState(null);
+  const [receiptSettings, setReceiptSettings] = useState(() => getCachedReceiptSettings());
+  const [businessProfile, setBusinessProfile] = useState(() => getCachedBusinessProfile());
 
   // Assignment Modal State
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -73,9 +74,8 @@ function CustomerMemberships() {
 
   // Fetch receipt/business settings for thermal bill printing
   const fetchReceiptContext = () => {
-    API.get("/settings")
-      .then((res) => {
-        const data = res.data?.data || res.data;
+    fetchSettingsFast()
+      .then((data) => {
         if (data) {
           if (data.receipt_settings) {
             setReceiptSettings(data.receipt_settings);

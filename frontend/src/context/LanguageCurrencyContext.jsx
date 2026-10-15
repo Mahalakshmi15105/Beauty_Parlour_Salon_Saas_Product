@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import API from "../services/api";
+import { fetchSettingsFast } from "../services/settingsCache";
 import { TRANSLATIONS, SUPPORTED_CURRENCIES } from "../utils/translations";
 
 const LanguageCurrencyContext = createContext();
@@ -15,10 +16,10 @@ export function LanguageCurrencyProvider({ children }) {
     const token = localStorage.getItem("token");
     if (!token) return;
 
-    API.get("/settings")
+    fetchSettingsFast()
       .then((res) => {
-        const reg = res.data?.regional_settings || {};
-        const biz = res.data?.business_profile || {};
+        const reg = res?.regional_settings || res?.data?.regional_settings || {};
+        const biz = res?.business_profile || res?.data?.business_profile || {};
         const code = reg.currency_code || reg.currency || "INR";
         const sym = reg.currency_symbol || "₹";
         const lang = reg.language || "English";

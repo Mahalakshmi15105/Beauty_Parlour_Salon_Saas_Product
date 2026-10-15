@@ -8,6 +8,7 @@ import { SUPPORTED_LANGUAGES } from "../utils/translations";
 import { useFormKeyboardNavigation } from "../utils/keyboardNavigation";
 import { getFullImageUrl } from "../utils/imageUrl";
 import { ThermalReceipt, printThermalReceiptElement } from "../components/ThermalReceipt";
+import { getCachedSettings, setCachedSettings, fetchSettingsFast } from "../services/settingsCache";
 import {
   Building2,
   Upload,
@@ -64,7 +65,7 @@ function Settings() {
 
   const initialTab = new URLSearchParams(window.location.search).get("tab") || "business";
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !getCachedSettings());
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState(null);
@@ -106,8 +107,10 @@ function Settings() {
     if (submitBtn) submitBtn.click();
   });
 
+  const initialCachedSettings = getCachedSettings() || {};
   const [settingsData, setSettingsData] = useState({
     business_profile: {
+      ...(initialCachedSettings.business_profile || {}),
       name: "",
       logo_url: "",
       owner_name: "",
@@ -218,13 +221,15 @@ function Settings() {
       }));
 
       // Also persist to settings
-      await API.put("/settings", {
+      const updatedWithLogo = {
         ...settingsData,
         business_profile: {
           ...settingsData.business_profile,
           logo_url: newLogoUrl,
         },
-      });
+      };
+      setCachedSettings(updatedWithLogo);
+      await API.put("/settings", updatedWithLogo);
 
       setUploadingLogo(false);
       setSaveSuccess(true);
@@ -245,20 +250,24 @@ function Settings() {
   const handleRemoveLogo = () => {
     API.delete("/settings/remove-logo")
       .then(() => {
-        setSettingsData((prev) => ({
-          ...prev,
-          business_profile: {
-            ...prev.business_profile,
-            logo_url: "",
-          },
-        }));
+        setSettingsData((prev) => {
+          const next = {
+            ...prev,
+            business_profile: {
+              ...prev.business_profile,
+              logo_url: "",
+            },
+          };
+          setCachedSettings(next);
+          return next;
+        });
       })
       .catch((err) => console.error("Failed to remove logo:", err));
   };
 
   const fetchSettings = () => {
-    setLoading(true);
-    API.get("/settings")
+    if (!getCachedSettings()) setLoading(true);
+    fetchSettingsFast({ forceRefresh: true })
       .then((res) => {
         const rawData = (res && typeof res === 'object' && res.data) ? res.data : (res || {});
         setSettingsData((prev) => ({
@@ -364,6 +373,7 @@ function Settings() {
       }
     };
 
+    setCachedSettings(payload);
     API.put("/settings", payload)
       .then(() => {
         setSaving(false);

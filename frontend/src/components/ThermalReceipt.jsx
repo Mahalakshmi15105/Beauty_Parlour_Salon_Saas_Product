@@ -2,6 +2,7 @@ import React from "react";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { getFullImageUrl } from "../utils/imageUrl";
 import { getShopNameStyle } from "../utils/fontLoader";
+import { getCachedBusinessProfile, getCachedReceiptSettings } from "../services/settingsCache";
 import html2canvas from "html2canvas-pro";
 import jsPDF from "jspdf";
 
@@ -397,7 +398,29 @@ export function printThermalReceiptElement(elementOrRef, paperSize = "80mm") {
 export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, businessProfile = {}, hideLoyaltyStatus = false, hideLineItems = false }, ref) => {
   const { formatCurrency } = useLanguageCurrency();
 
-  const paperSize = settings.paper_size || "80mm";
+  const cachedBiz = getCachedBusinessProfile();
+  const cachedSettings = getCachedReceiptSettings();
+
+  const effectiveBusinessProfile = {
+    ...cachedBiz,
+    ...businessProfile,
+    name: (businessProfile?.name && businessProfile.name !== "Beauty Parlour") ? businessProfile.name : (cachedBiz?.name || "Beauty Parlour"),
+    logo_url: businessProfile?.logo_url !== undefined && businessProfile?.logo_url !== "" ? businessProfile.logo_url : (cachedBiz?.logo_url || ""),
+    phone: businessProfile?.phone || cachedBiz?.phone || "",
+    address: businessProfile?.address || cachedBiz?.address || "",
+    city: businessProfile?.city || cachedBiz?.city || "",
+    state: businessProfile?.state || cachedBiz?.state || "",
+    postal_code: businessProfile?.postal_code || cachedBiz?.postal_code || "",
+    gst_number: businessProfile?.gst_number || cachedBiz?.gst_number || "",
+    shop_name_typography: businessProfile?.shop_name_typography || cachedBiz?.shop_name_typography || null,
+  };
+
+  const effectiveSettings = {
+    ...cachedSettings,
+    ...settings,
+  };
+
+  const paperSize = effectiveSettings.paper_size || "80mm";
   const is58mm = paperSize === "58mm";
   const containerWidthClass = is58mm ? "w-[219px]" : "w-[302px]";
 
@@ -415,14 +438,14 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
     );
   }
 
-  const showLogo = settings.show_logo !== false && businessProfile.logo_url;
-  const showAddress = settings.show_address !== false;
-  const showPhone = settings.show_phone !== false;
-  const showGst = settings.show_gst !== false && businessProfile.gst_number;
-  const showQty = settings.show_qty !== false;
-  const showRate = settings.show_rate !== false;
-  const showMrp = settings.show_mrp !== false;
-  const showTax = settings.show_tax !== false;
+  const showLogo = effectiveSettings.show_logo !== false && effectiveBusinessProfile.logo_url;
+  const showAddress = effectiveSettings.show_address !== false;
+  const showPhone = effectiveSettings.show_phone !== false;
+  const showGst = effectiveSettings.show_gst !== false && effectiveBusinessProfile.gst_number;
+  const showQty = effectiveSettings.show_qty !== false;
+  const showRate = effectiveSettings.show_rate !== false;
+  const showMrp = effectiveSettings.show_mrp !== false;
+  const showTax = effectiveSettings.show_tax !== false;
 
   const resolveCustomerName = (inv) => {
     if (!inv) return "Walk-in Customer";
@@ -469,7 +492,7 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
   };
 
   const cleanBillNo = getCleanBillNumber(invoice);
-  const formattedLogoUrl = getFullImageUrl(businessProfile.logo_url);
+  const formattedLogoUrl = getFullImageUrl(effectiveBusinessProfile.logo_url);
 
   const formattedDate = invoice.created_at
     ? `${new Date(invoice.created_at).toLocaleDateString()} ${new Date(invoice.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
@@ -565,25 +588,25 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
 
         <h1
           className={`font-black uppercase tracking-wide text-black ${is58mm ? "text-sm" : "text-base"}`}
-          style={getShopNameStyle(businessProfile.shop_name_typography)}
+          style={getShopNameStyle(effectiveBusinessProfile.shop_name_typography)}
         >
-          {businessProfile.name || "Beauty Parlour"}
+          {effectiveBusinessProfile.name || "Beauty Parlour"}
         </h1>
 
-        {showAddress && (businessProfile.address || businessProfile.city) && (
+        {showAddress && (effectiveBusinessProfile.address || effectiveBusinessProfile.city) && (
           <p className="text-xs text-black break-words leading-tight">
-            {[businessProfile.address, businessProfile.city, businessProfile.state, businessProfile.postal_code].filter(Boolean).join(", ")}
+            {[effectiveBusinessProfile.address, effectiveBusinessProfile.city, effectiveBusinessProfile.state, effectiveBusinessProfile.postal_code].filter(Boolean).join(", ")}
           </p>
         )}
 
-        {showPhone && businessProfile.phone && (
+        {showPhone && effectiveBusinessProfile.phone && (
           <p className="text-xs font-bold text-black">
-            Ph: {businessProfile.phone}
+            Ph: {effectiveBusinessProfile.phone}
           </p>
         )}
 
         {showGst && (
-          <p className="text-xs font-bold text-black">GST: {businessProfile.gst_number}</p>
+          <p className="text-xs font-bold text-black">GST: {effectiveBusinessProfile.gst_number}</p>
         )}
       </div>
 
@@ -812,9 +835,9 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
 
       {/* 6. THANK YOU & FOOTER */}
       <div className="text-center space-y-0.5 text-xs text-black pt-1">
-        <p className="font-bold">{settings.thank_you_message || "Thank you. Please visit again."}</p>
-        {businessProfile.phone && (
-          <p className="text-[11px] font-semibold text-black">For appointments, Please call on {businessProfile.phone}</p>
+        <p className="font-bold">{effectiveSettings.thank_you_message || "Thank you. Please visit again."}</p>
+        {effectiveBusinessProfile.phone && (
+          <p className="text-[11px] font-semibold text-black">For appointments, Please call on {effectiveBusinessProfile.phone}</p>
         )}
         <p className="text-[9px] text-slate-400 font-semibold pt-1">Powered By SmartGoNext</p>
       </div>

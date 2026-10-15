@@ -13,7 +13,22 @@ export const getCachedBillingData = () => {
     return inMemoryBillingCache;
   }
 
-  // 2. Check sessionStorage (persists across page reloads and tab navigation)
+  // 2. Check localStorage (persists across tab reloads, restarts, and sessions)
+  try {
+    const raw = localStorage.getItem(BILLING_CACHE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.data && Date.now() - parsed.timestamp < BILLING_CACHE_TTL_MS) {
+        inMemoryBillingCache = parsed.data;
+        inMemoryTimestamp = parsed.timestamp;
+        return inMemoryBillingCache;
+      }
+    }
+  } catch (err) {
+    console.debug("Billing localStorage cache read skipped:", err);
+  }
+
+  // 3. Check sessionStorage
   try {
     const raw = sessionStorage.getItem(BILLING_CACHE_KEY);
     if (raw) {
@@ -28,7 +43,7 @@ export const getCachedBillingData = () => {
     console.debug("Billing session cache read skipped:", err);
   }
 
-  return null;
+  return inMemoryBillingCache || null;
 };
 
 export const setCachedBillingData = (data) => {
@@ -37,14 +52,19 @@ export const setCachedBillingData = (data) => {
   inMemoryBillingCache = { ...inMemoryBillingCache, ...data };
   inMemoryTimestamp = Date.now();
 
+  const payload = JSON.stringify({
+    timestamp: inMemoryTimestamp,
+    data: inMemoryBillingCache,
+  });
+
   try {
-    sessionStorage.setItem(
-      BILLING_CACHE_KEY,
-      JSON.stringify({
-        timestamp: inMemoryTimestamp,
-        data: inMemoryBillingCache,
-      })
-    );
+    localStorage.setItem(BILLING_CACHE_KEY, payload);
+  } catch (err) {
+    console.debug("Billing localStorage cache write skipped:", err);
+  }
+
+  try {
+    sessionStorage.setItem(BILLING_CACHE_KEY, payload);
   } catch (err) {
     console.debug("Billing session cache write skipped:", err);
   }
@@ -54,6 +74,7 @@ export const invalidateBillingCache = () => {
   inMemoryBillingCache = null;
   inMemoryTimestamp = 0;
   try {
+    localStorage.removeItem(BILLING_CACHE_KEY);
     sessionStorage.removeItem(BILLING_CACHE_KEY);
   } catch (err) {}
 };

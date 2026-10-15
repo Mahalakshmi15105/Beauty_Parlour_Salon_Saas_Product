@@ -291,6 +291,11 @@ def update_branch(branch_id):
             branch.enforce_wifi = bool(data["enforce_wifi"])
 
         db.session.commit()
+        try:
+            from app.services.cache import cache
+            cache.delete_pattern(f"settings:{g.parlour_id}:*")
+        except Exception:
+            pass
         return success_response({"message": "Branch updated successfully."})
 
     except Exception as e:

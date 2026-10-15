@@ -185,7 +185,7 @@ def get_settings():
         }
 
         try:
-            cache.set(cache_key, settings_payload, timeout=300)
+            cache.set(cache_key, settings_payload, timeout=86400)
         except Exception:
             pass
 
@@ -494,6 +494,11 @@ def update_currency_setting():
             status_code=500
         )
 
+    try:
+        cache.delete_pattern(f"settings:{g.parlour_id}:*")
+    except Exception:
+        pass
+
     return success_response({
         "currency_code": setting.currency,
         "currency_symbol": setting.currency_symbol,
@@ -547,6 +552,11 @@ def update_language_setting():
             message="Failed to update language setting.",
             status_code=500
         )
+
+    try:
+        cache.delete_pattern(f"settings:{g.parlour_id}:*")
+    except Exception:
+        pass
 
     return success_response({
         "language": getattr(setting, "language", lang),
@@ -697,6 +707,11 @@ def upload_logo():
             status_code=500
         )
 
+    try:
+        cache.delete_pattern(f"settings:{g.parlour_id}:*")
+    except Exception:
+        pass
+
     return success_response({
         "message": "Parlour logo uploaded successfully.",
         "logo_url": logo_url
@@ -714,5 +729,10 @@ def remove_logo():
         except Exception as e:
             db.session.rollback()
             return error_response("DATABASE_ERROR", "Failed to remove logo.", status_code=500)
+
+    try:
+        cache.delete_pattern(f"settings:{g.parlour_id}:*")
+    except Exception:
+        pass
 
     return success_response({"message": "Logo removed successfully.", "logo_url": None})

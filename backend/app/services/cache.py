@@ -47,13 +47,13 @@ class CacheManager:
                 port=Config.REDIS_PORT,
                 password=Config.REDIS_PASSWORD or None,
                 db=Config.REDIS_DB,
-                socket_timeout=2.0,
-                socket_connect_timeout=2.0,
-                retry_on_timeout=True,
+                socket_timeout=0.5,
+                socket_connect_timeout=0.3,
+                retry_on_timeout=False,
                 health_check_interval=30,
                 decode_responses=True,
             )
-            # Test connection
+            # Test connection with fast timeout
             if self.redis_client.ping():
                 self.using_redis = True
                 logger.info(
@@ -66,6 +66,9 @@ class CacheManager:
                     self.redis_client.config_set("maxmemory-policy", "allkeys-lru")
                 except Exception as cfg_err:
                     logger.debug(f"Redis config_set skipped/restricted: {cfg_err}")
+            else:
+                self.using_redis = False
+                self.redis_client = None
         except Exception as e:
             self.using_redis = False
             self.redis_client = None
@@ -97,14 +100,15 @@ class CacheManager:
 
     def set(self, key: str, value: Any, timeout: int = 300) -> bool:
         """Store value with expiration (default 300 seconds / 5 min)."""
+        redis_saved = False
         if self.using_redis and self.redis_client:
             try:
                 serialized = json.dumps(value, default=str)
-                return bool(self.redis_client.set(name=key, value=serialized, ex=timeout))
+                redis_saved = bool(self.redis_client.set(name=key, value=serialized, ex=timeout))
             except Exception as e:
                 logger.error(f"Redis SET error for key '{key}': {e}")
 
-        # Fallback in-memory
+        # Dual cache to in-memory store for 0.0ms instant fallback
         expire_at = time.time() + timeout if timeout else None
         self.in_memory_store[key] = (expire_at, value)
         self.clean_expired_in_memory()

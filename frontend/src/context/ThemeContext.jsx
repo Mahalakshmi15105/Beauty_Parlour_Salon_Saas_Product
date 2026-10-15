@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { THEMES, DEFAULT_THEME, getTheme, applyTheme, applyAccentColor } from "../themes/theme";
 import API from "../services/api";
+import { fetchSettingsFast } from "../services/settingsCache";
 
 const ThemeContext = createContext();
 
@@ -30,9 +31,9 @@ export function ThemeProvider({ children }) {
     // Fetch tenant settings on load if logged in to sync with backend
     const token = localStorage.getItem("token");
     if (token) {
-      API.get("/settings")
+      fetchSettingsFast()
         .then((res) => {
-          const thm = res.data.data?.theme_settings || res.data?.theme_settings;
+          const thm = res?.theme_settings || res?.data?.theme_settings;
           if (thm) {
             // Map backend theme names to frontend theme IDs (Sunlight or Starlight)
             const backendThemeName = thm.theme_name || 'light';

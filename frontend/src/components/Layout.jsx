@@ -30,6 +30,7 @@ import ThemeSelector from "./ThemeSelector";
 import { getFullImageUrl } from "../utils/imageUrl";
 import { getShopNameStyle } from "../utils/fontLoader";
 import { useSidebarKeyboardNavigation } from "../utils/keyboardNavigation";
+import { getCachedBusinessProfile, fetchSettingsFast } from "../services/settingsCache";
 
 const getMenuIcon = (id) => {
   switch (id) {
@@ -103,10 +104,11 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
   // ArrowLeft/Right toggle collapse — only when a sidebar item is focused.
   useSidebarKeyboardNavigation(sidebarRef, toggleSidebar);
 
-  // Parlour Branding & Logo State
-  const [logoUrl, setLogoUrl] = useState("");
-  const [parlourName, setParlourName] = useState("");
-  const [shopNameTypography, setShopNameTypography] = useState(null);
+  // Parlour Branding & Logo State with instant 0.0ms synchronous cache initialization
+  const cachedBiz = getCachedBusinessProfile();
+  const [logoUrl, setLogoUrl] = useState(() => (cachedBiz?.logo_url ? getFullImageUrl(cachedBiz.logo_url) : ""));
+  const [parlourName, setParlourName] = useState(() => cachedBiz?.name || user?.branch_name || user?.parlour_name || "Beauty Parlour");
+  const [shopNameTypography, setShopNameTypography] = useState(() => cachedBiz?.shop_name_typography || null);
   const [imgFailed, setImgFailed] = useState(false);
   const [branchData, setBranchData] = useState(null);
   const [customerTotalCount, setCustomerTotalCount] = useState(() => {
@@ -129,38 +131,48 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
         .then((res) => {
           const branch = res.data.data || res.data;
           setBranchData(branch);
-          setParlourName(branch.name || user.branch_name || "Branch");
+          if (branch.name) {
+            setParlourName(branch.name);
+          }
           if (branch.logo_url) {
             bLogo = getFullImageUrl(branch.logo_url);
             setLogoUrl(bLogo);
             setImgFailed(false);
           }
-          return API.get("/settings");
+          return fetchSettingsFast();
         })
-        .then((res) => {
-          const biz = res.data.business_profile || {};
+        .then((settings) => {
+          const biz = settings?.business_profile || {};
           // Fall back to main parlour logo if branch has no custom logo
           if (!bLogo && biz.logo_url) {
             const fullUrl = getFullImageUrl(biz.logo_url);
             setLogoUrl(fullUrl);
             setImgFailed(false);
           }
-          setShopNameTypography(biz.shop_name_typography || null);
+          if (biz.shop_name_typography) {
+            setShopNameTypography(biz.shop_name_typography);
+          }
         })
         .catch(() => {
           setParlourName(user.branch_name || "Branch");
         });
     } else {
-      API.get("/settings")
-        .then((res) => {
-          const biz = res.data.business_profile || {};
-          const fullUrl = getFullImageUrl(biz.logo_url);
-          if (fullUrl !== logoUrl) {
-            setLogoUrl(fullUrl);
-            setImgFailed(false);
+      fetchSettingsFast()
+        .then((settings) => {
+          const biz = settings?.business_profile || {};
+          if (biz.logo_url) {
+            const fullUrl = getFullImageUrl(biz.logo_url);
+            if (fullUrl !== logoUrl) {
+              setLogoUrl(fullUrl);
+              setImgFailed(false);
+            }
           }
-          setParlourName(biz.name || user?.parlour_name || "Beauty Parlour");
-          setShopNameTypography(biz.shop_name_typography || null);
+          if (biz.name) {
+            setParlourName(biz.name);
+          }
+          if (biz.shop_name_typography) {
+            setShopNameTypography(biz.shop_name_typography);
+          }
         })
         .catch(() => {});
     }
@@ -168,9 +180,23 @@ function Layout({ children, activeTab, setActiveTab, onLogout, onNavigateHome, u
 
   useEffect(() => {
     fetchBranding();
-    const handleBrandingUpdated = () => fetchBranding();
+    const handleBrandingUpdated = (e) => {
+      const biz = e?.detail || getCachedBusinessProfile();
+      if (biz) {
+        if (biz.name) setParlourName(biz.name);
+        if (biz.logo_url) {
+          setLogoUrl(getFullImageUrl(biz.logo_url));
+          setImgFailed(false);
+        }
+        if (biz.shop_name_typography) setShopNameTypography(biz.shop_name_typography);
+      }
+    };
     window.addEventListener("branding_updated", handleBrandingUpdated);
-    return () => window.removeEventListener("branding_updated", handleBrandingUpdated);
+    window.addEventListener("settings_updated", handleBrandingUpdated);
+    return () => {
+      window.removeEventListener("branding_updated", handleBrandingUpdated);
+      window.removeEventListener("settings_updated", handleBrandingUpdated);
+    };
   }, []);
 
   // Notification Dropdown State & Unread Polling
