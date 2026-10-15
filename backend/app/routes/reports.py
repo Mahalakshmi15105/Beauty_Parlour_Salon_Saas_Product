@@ -695,7 +695,7 @@ def get_daily_sales_statement():
 
             if emp_name not in staff_sales_map:
                 staff_sales_map[emp_name] = Decimal("0.00")
-            staff_sales_map[emp_name] += Decimal(str(r_line_total))
+            staff_sales_map[emp_name] += Decimal(str(r_line_amt))
 
             line_items_data.append({
                 "sno": bill_sno,
@@ -768,7 +768,10 @@ def get_daily_sales_statement():
 
     closing_bal = opening_bal + float(total_cash) - total_expenses
 
-    staff_achieved_list = [{"sno": idx + 1, "staff_name": k, "achieved": float(v)} for idx, (k, v) in enumerate(staff_sales_map.items())]
+    staff_achieved_list = [
+        {"sno": idx + 1, "staff_name": k, "achieved": float(v)}
+        for idx, (k, v) in enumerate([(k, v) for k, v in staff_sales_map.items() if k != "Membership"])
+    ]
 
     # Month till date stats
     first_of_month = target_date.replace(day=1)
