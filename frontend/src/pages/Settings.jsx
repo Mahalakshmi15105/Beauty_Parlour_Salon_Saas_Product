@@ -1053,6 +1053,7 @@ function Settings() {
                   <label className="block text-xs font-semibold text-text-secondary mb-1">GSTIN / Tax ID</label>
                   <input
                     type="text"
+                    placeholder="e.g. 33AAAAA0000A1Z5"
                     value={settingsData.business_profile.gst_number}
                     onChange={(e) =>
                       setSettingsData({

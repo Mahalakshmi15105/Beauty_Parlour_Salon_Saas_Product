@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
 import { useModalFocusTrap, useFormKeyboardNavigation, focusAndOpenSelect } from "../utils/keyboardNavigation";
-import { UserRoundX, X, MessageSquare, Phone, AlertTriangle, Calendar, Settings as SettingsIcon, Printer, FileSpreadsheet, FileText, Upload, Eye, Users, Loader2 } from "lucide-react";
+import { UserRoundX, X, MessageSquare, Phone, AlertTriangle, Calendar, Settings as SettingsIcon, Printer, FileSpreadsheet, FileText, Upload, Eye, Users, Loader2, History } from "lucide-react";
 import { exportToCSV, printDataList, exportToPDF, exportToExcel } from "../utils/exportUtils";
 import BulkUploadModal from "../components/BulkUploadModal";
 import DeleteConfirmModal from "../components/DeleteConfirmModal";
 import { useToast } from "../context/ToastContext";
+import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { invalidateCustomerCache } from "../services/customerCache";
 
 function Customers() {
   const { showSuccess, showError } = useToast();
+  const { formatCurrency } = useLanguageCurrency();
   const modalRef = useRef(null);
   const formRef = useRef(null);
   const firstNameInputRef = useRef(null);
@@ -45,6 +47,32 @@ function Customers() {
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Customer History State
+  const [historyCustomer, setHistoryCustomer] = useState(null);
+  const [customerHistoryData, setCustomerHistoryData] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState(null);
+  const [historyActiveTab, setHistoryActiveTab] = useState("overview");
+
+  const openHistoryModal = (cust) => {
+    setHistoryCustomer(cust);
+    setCustomerHistoryData(null);
+    setHistoryLoading(true);
+    setHistoryError(null);
+    setHistoryActiveTab("overview");
+
+    API.get(`/customers/${cust.id}/history`)
+      .then((res) => {
+        setCustomerHistoryData(res.data?.data || res.data || {});
+        setHistoryLoading(false);
+      })
+      .catch((err) => {
+        setHistoryError(err.response?.data?.message || err.message || "Failed to load customer history.");
+        setHistoryLoading(false);
+      });
+  };
+
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
@@ -108,11 +136,15 @@ function Customers() {
   };
 
   useEffect(() => {
-    if (activeSubTab === "all") {
-      fetchCustomers();
-    } else if (activeSubTab === "dormant") {
-      fetchDormantCustomers();
-    }
+    const timer = setTimeout(() => {
+      if (activeSubTab === "all") {
+        fetchCustomers();
+      } else if (activeSubTab === "dormant") {
+        fetchDormantCustomers();
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
   }, [search, gender, activeSubTab, churnThreshold]);
 
   // Fetch complete dataset (all 1000+ customers) for export / printing
@@ -537,13 +569,20 @@ function Customers() {
                       </div>
 
                       {/* Card Action Buttons */}
-                      <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border-soft/60">
+                      <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-border-soft/60">
                         <button
                           onClick={() => setViewCustomer(c)}
                           className="py-1.5 px-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1"
                         >
                           <Eye className="w-3.5 h-3.5" />
                           <span>View</span>
+                        </button>
+                        <button
+                          onClick={() => openHistoryModal(c)}
+                          className="py-1.5 px-2 bg-pink-50 hover:bg-pink-100 text-pink-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1"
+                        >
+                          <History className="w-3.5 h-3.5" />
+                          <span>History</span>
                         </button>
                         <button
                           onClick={() => openEditModal(c)}
@@ -591,9 +630,16 @@ function Customers() {
                           <td className="px-6 py-4 text-sm text-text-secondary numeric">{c.phone}</td>
                           <td className="px-6 py-4 text-sm text-text-secondary">{c.email || "-"}</td>
                           <td className="px-6 py-4 text-sm text-text-secondary">{c.gender || "-"}</td>
-                          <td className="px-6 py-4 text-sm space-x-3">
+                          <td className="px-6 py-4 text-sm space-x-2.5">
                             <button onClick={() => setViewCustomer(c)} className="text-indigo-600 font-medium hover:underline">
                               View
+                            </button>
+                            <button
+                              onClick={() => openHistoryModal(c)}
+                              className="text-pink-600 font-bold hover:underline inline-flex items-center gap-1"
+                            >
+                              <History className="w-3.5 h-3.5" />
+                              <span>History</span>
                             </button>
                             <button onClick={() => openEditModal(c)} className="text-primary hover:underline">
                               Edit
@@ -977,26 +1023,346 @@ function Customers() {
                 </div>
               )}
 
-              <div className="pt-3 border-t border-border-soft flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => setViewCustomer(null)}
-                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-extrabold transition"
-                >
-                  Close
-                </button>
+              <div className="pt-3 border-t border-border-soft flex flex-wrap justify-between items-center gap-2">
                 <button
                   type="button"
                   onClick={() => {
-                    const custToEdit = viewCustomer;
+                    const target = viewCustomer;
                     setViewCustomer(null);
-                    openEditModal(custToEdit);
+                    openHistoryModal(target);
                   }}
-                  className="px-5 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-extrabold shadow-md transition"
+                  className="px-4 py-2 bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 rounded-xl text-xs font-extrabold flex items-center space-x-1.5 transition"
                 >
-                  Edit Profile
+                  <History className="w-3.5 h-3.5" />
+                  <span>View Visit & Billing History</span>
                 </button>
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setViewCustomer(null)}
+                    className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-extrabold transition"
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const custToEdit = viewCustomer;
+                      setViewCustomer(null);
+                      openEditModal(custToEdit);
+                    }}
+                    className="px-5 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-extrabold shadow-md transition"
+                  >
+                    Edit Profile
+                  </button>
+                </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Customer History Modal */}
+      {historyCustomer && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in">
+          <div className="glowe-glass-card max-w-4xl w-full max-h-[92vh] flex flex-col rounded-3xl shadow-2xl border border-white/70 overflow-hidden bg-white/95">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-pink-100/60 flex justify-between items-center bg-white/70 backdrop-blur-md shrink-0">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-2xl bg-pink-100 text-pink-700 flex items-center justify-center font-black text-sm">
+                  <History className="w-5 h-5 text-pink-600" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <h3 className="text-base font-extrabold text-slate-900">
+                      {historyCustomer.first_name} {historyCustomer.last_name || ""}
+                    </h3>
+                    {historyCustomer.phone && (
+                      <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full numeric">
+                        {historyCustomer.phone}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-semibold">Salon Visit & Billing History</p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setHistoryCustomer(null)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Navigation Tabs */}
+            <div className="px-6 pt-3 border-b border-slate-100 flex items-center space-x-4 bg-slate-50/50 shrink-0">
+              <button
+                type="button"
+                onClick={() => setHistoryActiveTab("overview")}
+                className={`pb-2.5 text-xs font-bold transition border-b-2 ${
+                  historyActiveTab === "overview"
+                    ? "border-pink-600 text-pink-700 font-extrabold"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                Overview & Summary
+              </button>
+              <button
+                type="button"
+                onClick={() => setHistoryActiveTab("visits")}
+                className={`pb-2.5 text-xs font-bold transition border-b-2 flex items-center space-x-1.5 ${
+                  historyActiveTab === "visits"
+                    ? "border-pink-600 text-pink-700 font-extrabold"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <span>Visits & Invoices</span>
+                {customerHistoryData?.visit_history?.length > 0 && (
+                  <span className="bg-pink-100 text-pink-800 text-[10px] font-black px-2 py-0.5 rounded-full">
+                    {customerHistoryData.visit_history.length}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setHistoryActiveTab("services")}
+                className={`pb-2.5 text-xs font-bold transition border-b-2 ${
+                  historyActiveTab === "services"
+                    ? "border-pink-600 text-pink-700 font-extrabold"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                Services & Products Taken
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 overflow-y-auto space-y-5 text-xs flex-1">
+              {historyLoading ? (
+                <div className="py-16 text-center space-y-3">
+                  <Loader2 className="w-8 h-8 text-pink-600 animate-spin mx-auto" />
+                  <p className="text-xs font-bold text-slate-500">Loading visit history & invoices...</p>
+                </div>
+              ) : historyError ? (
+                <div className="p-5 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs font-bold text-center">
+                  {historyError}
+                </div>
+              ) : customerHistoryData ? (
+                <>
+                  {/* TAB 1: OVERVIEW */}
+                  {historyActiveTab === "overview" && (
+                    <div className="space-y-4">
+                      {/* Metric Cards */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="bg-pink-50/70 p-4 rounded-2xl border border-pink-100">
+                          <span className="text-[10px] text-pink-700 font-bold uppercase tracking-wider block">Total Visits</span>
+                          <span className="text-xl font-black text-pink-900 numeric mt-1 block">
+                            {customerHistoryData.summary?.total_visits || 0}
+                          </span>
+                        </div>
+                        <div className="bg-emerald-50/70 p-4 rounded-2xl border border-emerald-100">
+                          <span className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider block">Total Spent</span>
+                          <span className="text-xl font-black text-emerald-900 numeric mt-1 block">
+                            {formatCurrency(customerHistoryData.summary?.total_amount_spent || 0)}
+                          </span>
+                        </div>
+                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Last Visit</span>
+                          <span className="text-xs font-black text-slate-800 mt-1 block">
+                            {customerHistoryData.summary?.last_visit_date || "No visits yet"}
+                          </span>
+                        </div>
+                        <div className="bg-purple-50/70 p-4 rounded-2xl border border-purple-100">
+                          <span className="text-[10px] text-purple-700 font-bold uppercase tracking-wider block">Preferred Stylist</span>
+                          <span className="text-xs font-black text-purple-900 mt-1 block truncate">
+                            {customerHistoryData.summary?.preferred_stylist || "None"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Financial Breakdown */}
+                      {customerHistoryData.financial_summary && (
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                          <h4 className="font-extrabold text-slate-900 uppercase text-[11px] tracking-wider">
+                            Financial Breakdown
+                          </h4>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center pt-1">
+                            <div className="p-2.5 bg-white rounded-xl border border-slate-100">
+                              <span className="text-[10px] text-slate-400 block font-bold">Services Total</span>
+                              <span className="text-xs font-black text-slate-800 numeric">
+                                {formatCurrency(customerHistoryData.financial_summary.total_services_amount || 0)}
+                              </span>
+                            </div>
+                            <div className="p-2.5 bg-white rounded-xl border border-slate-100">
+                              <span className="text-[10px] text-slate-400 block font-bold">Products Total</span>
+                              <span className="text-xs font-black text-slate-800 numeric">
+                                {formatCurrency(customerHistoryData.financial_summary.total_products_amount || 0)}
+                              </span>
+                            </div>
+                            <div className="p-2.5 bg-white rounded-xl border border-slate-100">
+                              <span className="text-[10px] text-slate-400 block font-bold">Total Discounts</span>
+                              <span className="text-xs font-black text-emerald-600 numeric">
+                                -{formatCurrency(customerHistoryData.financial_summary.total_discounts_given || 0)}
+                              </span>
+                            </div>
+                            <div className="p-2.5 bg-white rounded-xl border border-slate-100">
+                              <span className="text-[10px] text-slate-400 block font-bold">Total Tax</span>
+                              <span className="text-xs font-black text-slate-800 numeric">
+                                {formatCurrency(customerHistoryData.financial_summary.total_tax_paid || 0)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Frequent Services */}
+                      {customerHistoryData.purchased_services?.length > 0 && (
+                        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+                          <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 font-extrabold text-xs text-slate-800">
+                            Most Frequent Services
+                          </div>
+                          <div className="divide-y divide-slate-100">
+                            {customerHistoryData.purchased_services.slice(0, 5).map((s, idx) => (
+                              <div key={idx} className="px-4 py-2.5 flex justify-between items-center text-xs">
+                                <div>
+                                  <span className="font-bold text-slate-900 block">{s.name}</span>
+                                  <span className="text-[11px] text-slate-400">Taken {s.times_taken} times</span>
+                                </div>
+                                <span className="font-extrabold text-slate-800 numeric">
+                                  {formatCurrency(s.total_spent)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* TAB 2: VISITS & INVOICES */}
+                  {historyActiveTab === "visits" && (
+                    <div className="space-y-3">
+                      {customerHistoryData.visit_history?.length > 0 ? (
+                        <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs border-collapse min-w-[600px]">
+                              <thead className="bg-slate-50 border-b border-slate-200 font-extrabold text-slate-600 uppercase text-[11px]">
+                                <tr>
+                                  <th className="p-3">Bill No</th>
+                                  <th className="p-3">Date</th>
+                                  <th className="p-3">Services & Products</th>
+                                  <th className="p-3">Staff</th>
+                                  <th className="p-3">Payment</th>
+                                  <th className="p-3 text-right">Amount</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
+                                {customerHistoryData.visit_history.map((v) => (
+                                  <tr key={v.id} className="hover:bg-slate-50/50 transition">
+                                    <td className="p-3 font-extrabold text-pink-700">{v.invoice_number}</td>
+                                    <td className="p-3 text-slate-600 numeric">{v.date}</td>
+                                    <td className="p-3 max-w-[220px]">
+                                      <div className="font-bold text-slate-900">
+                                        {v.services?.length > 0 ? v.services.join(", ") : "-"}
+                                      </div>
+                                      {v.products?.length > 0 && (
+                                        <div className="text-[11px] text-emerald-700 font-semibold">
+                                          + {v.products.join(", ")}
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td className="p-3 text-slate-600">
+                                      {v.employees?.length > 0 ? v.employees.join(", ") : "—"}
+                                    </td>
+                                    <td className="p-3">
+                                      <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                                        {v.payment_methods?.join(", ") || "Cash"}
+                                      </span>
+                                    </td>
+                                    <td className="p-3 text-right font-black text-slate-900 numeric">
+                                      {formatCurrency(v.total)}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-12 text-center text-slate-400 font-bold space-y-2">
+                          <History className="w-10 h-10 text-slate-300 mx-auto" />
+                          <p>No past visits or bills recorded yet for this customer.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* TAB 3: SERVICES & PRODUCTS */}
+                  {historyActiveTab === "services" && (
+                    <div className="space-y-4">
+                      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+                        <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 font-extrabold text-xs text-slate-800">
+                          Services History
+                        </div>
+                        {customerHistoryData.purchased_services?.length > 0 ? (
+                          <div className="divide-y divide-slate-100">
+                            {customerHistoryData.purchased_services.map((s, idx) => (
+                              <div key={idx} className="p-3.5 flex justify-between items-center text-xs">
+                                <div>
+                                  <span className="font-bold text-slate-900 block">{s.name}</span>
+                                  <span className="text-[11px] text-slate-400">
+                                    Taken {s.times_taken} times • Last: {s.last_taken_date || "—"}
+                                  </span>
+                                </div>
+                                <span className="font-black text-slate-900 numeric">
+                                  {formatCurrency(s.total_spent)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="p-6 text-center text-slate-400">No service history.</p>
+                        )}
+                      </div>
+
+                      {customerHistoryData.purchased_products?.length > 0 && (
+                        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+                          <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 font-extrabold text-xs text-slate-800">
+                            Retail Products Purchased
+                          </div>
+                          <div className="divide-y divide-slate-100">
+                            {customerHistoryData.purchased_products.map((p, idx) => (
+                              <div key={idx} className="p-3.5 flex justify-between items-center text-xs">
+                                <div>
+                                  <span className="font-bold text-slate-900 block">{p.name}</span>
+                                  <span className="text-[11px] text-slate-400">
+                                    Qty: {p.quantity_purchased} • Last: {p.last_purchased_date || "—"}
+                                  </span>
+                                </div>
+                                <span className="font-black text-slate-900 numeric">
+                                  {formatCurrency(p.total_spent)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : null}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50/80 flex justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setHistoryCustomer(null)}
+                className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-extrabold transition"
+              >
+                Close History
+              </button>
             </div>
           </div>
         </div>

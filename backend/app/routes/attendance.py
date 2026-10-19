@@ -785,10 +785,23 @@ def manual_attendance_checkin():
     ).filter(Attendance.timestamp >= target_start, Attendance.timestamp <= target_end).order_by(Attendance.timestamp.desc()).first()
 
     now = get_ist_now()
-    if target_date == get_ist_today():
+    time_str = (data.get("time") or "").strip()
+    selected_time = None
+    if time_str:
+        for fmt in ("%H:%M:%S", "%H:%M", "%I:%M %p", "%I:%M%p"):
+            try:
+                selected_time = datetime.strptime(time_str, fmt).time()
+                break
+            except ValueError:
+                pass
+
+    if selected_time:
+        att_timestamp = datetime.combine(target_date, selected_time)
+    elif target_date == get_ist_today():
         att_timestamp = now
     else:
-        att_timestamp = datetime.combine(target_date, datetime.strptime("09:30:00", "%H:%M:%S").time())
+        default_time_str = "09:30:00" if action_type == "checkin" else "18:30:00"
+        att_timestamp = datetime.combine(target_date, datetime.strptime(default_time_str, "%H:%M:%S").time())
 
     date_formatted = target_date.strftime("%d %b %Y")
 
@@ -798,19 +811,20 @@ def manual_attendance_checkin():
             existing.status = status_type
             existing.branch_id = target_branch_id
             existing.checkin_method = "Manual"
-            if target_date == get_ist_today():
-                existing.timestamp = now
+            existing.timestamp = att_timestamp
             db.session.commit()
 
             status_label = get_status_label(existing.status)
+            formatted_time = existing.timestamp.strftime("%I:%M %p")
             return jsonify({
                 "status": "success",
                 "action": "checkin",
-                "message": f"✅ Attendance updated to {status_label} for {employee.first_name} {employee.last_name or ''} for {date_formatted} ({branch_name}).",
+                "message": f"✅ Attendance updated to {status_label} (Time: {formatted_time}) for {employee.first_name} {employee.last_name or ''} for {date_formatted} ({branch_name}).",
                 "data": {
                     "id": existing.id,
                     "employee_name": f"{employee.first_name} {employee.last_name or ''}".strip(),
                     "date": target_date.strftime("%Y-%m-%d"),
+                    "checkin_time": formatted_time,
                     "status": existing.status
                 }
             }), 200
@@ -830,14 +844,16 @@ def manual_attendance_checkin():
         db.session.commit()
 
         status_label = get_status_label(attendance.status)
+        formatted_time = attendance.timestamp.strftime("%I:%M %p")
         return jsonify({
             "status": "success",
             "action": "checkin",
-            "message": f"✅ Manual attendance ({status_label}) submitted for {employee.first_name} {employee.last_name or ''} for {date_formatted} ({branch_name}). Audit Reason: {reason}",
+            "message": f"✅ Manual attendance ({status_label} at {formatted_time}) submitted for {employee.first_name} {employee.last_name or ''} for {date_formatted} ({branch_name}). Audit Reason: {reason}",
             "data": {
                 "id": attendance.id,
                 "employee_name": f"{employee.first_name} {employee.last_name or ''}".strip(),
                 "date": target_date.strftime("%Y-%m-%d"),
+                "checkin_time": formatted_time,
                 "status": attendance.status
             }
         }), 201
@@ -849,18 +865,8 @@ def manual_attendance_checkin():
                 "message": f"This employee has no check-in recorded on {date_formatted}."
             }), 400
 
-        if existing.check_out_time and target_date == get_ist_today():
-            cout_time = existing.check_out_time.strftime("%I:%M %p")
-            return jsonify({
-                "status": "error",
-                "message": f"This employee already checked out today at {cout_time}."
-            }), 400
-
         # Perform Manual Check-out
-        if target_date == get_ist_today():
-            existing.check_out_time = now
-        else:
-            existing.check_out_time = datetime.combine(target_date, datetime.strptime("18:30:00", "%H:%M:%S").time())
+        existing.check_out_time = att_timestamp
         db.session.commit()
 
         cout_time = existing.check_out_time.strftime("%I:%M %p")

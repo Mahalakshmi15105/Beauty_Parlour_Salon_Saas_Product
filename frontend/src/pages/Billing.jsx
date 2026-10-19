@@ -2303,6 +2303,12 @@ function Billing() {
       msg += `📞 Ph: ${shopPhone}\n`;
     }
 
+    const rawGst = effectiveProfile?.gst_number ? String(effectiveProfile.gst_number).trim() : "";
+    if (rawGst) {
+      const gstText = rawGst.toUpperCase().startsWith("GST") ? rawGst : `GST: ${rawGst}`;
+      msg += `📄 ${gstText}\n`;
+    }
+
     msg += `━━━━━━━━━━━━━━━━━━━━\n`;
     msg += `*Bill No:* ${billNo}\n`;
     msg += `*Client:* ${customerName}\n`;

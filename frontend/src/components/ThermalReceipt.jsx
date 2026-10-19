@@ -441,7 +441,9 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
   const showLogo = effectiveSettings.show_logo !== false && effectiveBusinessProfile.logo_url;
   const showAddress = effectiveSettings.show_address !== false;
   const showPhone = effectiveSettings.show_phone !== false;
-  const showGst = effectiveSettings.show_gst !== false && effectiveBusinessProfile.gst_number;
+  const rawGst = effectiveBusinessProfile.gst_number ? String(effectiveBusinessProfile.gst_number).trim() : "";
+  const showGst = effectiveSettings.show_gst !== false && Boolean(rawGst);
+  const displayGst = rawGst.toUpperCase().startsWith("GST") ? rawGst : `GST: ${rawGst}`;
   const showQty = effectiveSettings.show_qty !== false;
   const showRate = effectiveSettings.show_rate !== false;
   const showMrp = effectiveSettings.show_mrp !== false;
@@ -606,7 +608,7 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
         )}
 
         {showGst && (
-          <p className="text-xs font-bold text-black">GST: {effectiveBusinessProfile.gst_number}</p>
+          <p className="text-xs font-bold text-black">{displayGst}</p>
         )}
       </div>
 

@@ -34,6 +34,10 @@ export default function CheckInPage({ onNavigateHome }) {
   const [showManualForm, setShowManualForm] = useState(false);
   const [employeesList, setEmployeesList] = useState([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
+  const [manualTime, setManualTime] = useState(() => {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  });
   const [manualReason, setManualReason] = useState("");
   const [manualLoading, setManualLoading] = useState(false);
   const [manualFeedback, setManualFeedback] = useState(null);
@@ -71,6 +75,7 @@ export default function CheckInPage({ onNavigateHome }) {
         body: JSON.stringify({
           employee_id: parseInt(selectedEmployeeId, 10),
           branch_id: parseInt(branchId, 10),
+          time: manualTime,
           reason: manualReason || "Manual Front-Desk Fallback",
         })
       });
@@ -531,6 +536,19 @@ export default function CheckInPage({ onNavigateHome }) {
                         </option>
                       ))}
                     </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider mb-1.5">
+                      CHECK-IN TIME *
+                    </label>
+                    <input
+                      type="time"
+                      required
+                      value={manualTime}
+                      onChange={(e) => setManualTime(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-pink-500"
+                    />
                   </div>
 
                   <div>

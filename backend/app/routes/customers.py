@@ -47,14 +47,24 @@ def get_customers():
         # Search filter
         if q:
             clean_digits = "".join(filter(str.isdigit, q))
+            full_name_col = func.concat(Customer.first_name, " ", func.coalesce(Customer.last_name, ""))
+            cleaned_phone_col = func.replace(func.replace(func.replace(func.replace(func.replace(Customer.phone, '+', ''), ' ', ''), '-', ''), '(', ''), ')', '')
+
             search_conds = [
                 Customer.first_name.ilike(f"%{q}%"),
                 Customer.last_name.ilike(f"%{q}%"),
+                full_name_col.ilike(f"%{q}%"),
                 Customer.phone.ilike(f"%{q}%"),
-                Customer.email.ilike(f"%{q}%")
+                Customer.email.ilike(f"%{q}%"),
+                cleaned_phone_col.ilike(f"%{q}%")
             ]
-            if clean_digits and len(clean_digits) >= 4:
+            if clean_digits:
                 search_conds.append(Customer.phone.ilike(f"%{clean_digits}%"))
+                search_conds.append(cleaned_phone_col.ilike(f"%{clean_digits}%"))
+                if len(clean_digits) >= 10:
+                    last10 = clean_digits[-10:]
+                    search_conds.append(Customer.phone.ilike(f"%{last10}%"))
+                    search_conds.append(cleaned_phone_col.ilike(f"%{last10}%"))
             query = query.filter(or_(*search_conds))
 
         # Gender filter
@@ -503,8 +513,8 @@ def get_customer_history(customer_id):
     from collections import defaultdict
     from decimal import Decimal
 
-    # 1. Verify customer exists in branch context
-    customer = get_branch_query(Customer).filter_by(id=customer_id).first()
+    # 1. Verify customer exists in tenant context
+    customer = get_tenant_query(Customer).filter_by(id=customer_id).first()
     if not customer:
         return error_response(
             error_code="CUSTOMER_NOT_FOUND",
@@ -512,13 +522,11 @@ def get_customer_history(customer_id):
             status_code=404
         )
 
-    # 2. Query customer's invoices (tenant + branch isolated)
+    # 2. Query customer's invoices (tenant isolated across all parlour visits)
     invoice_query = Invoice.query.filter_by(
         customer_id=customer_id,
         tenant_id=g.parlour_id
     )
-    if g.role == "BranchAdmin" and g.branch_id:
-        invoice_query = invoice_query.filter_by(branch_id=g.branch_id)
     invoices = invoice_query.order_by(Invoice.created_at.desc()).all()
 
     # 3. Query active/past memberships

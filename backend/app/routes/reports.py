@@ -739,32 +739,29 @@ def get_daily_sales_statement():
         "total": float(getattr(cd_rec, "total", 0) or 0) if cd_rec else 0.0
     }
 
-    # Opening Cash Balance calculation
-    if cd_rec and getattr(cd_rec, "opening_balance", None) is not None:
-        opening_bal = float(cd_rec.opening_balance)
-    else:
-        prev_invoices = get_branch_query(Invoice).filter(
-            Invoice.created_at < start_dt,
-            Invoice.status != "Voided"
-        ).all()
+    # Opening Cash Balance is strictly yesterday's closing cash balance
+    prev_invoices = get_branch_query(Invoice).filter(
+        Invoice.created_at < start_dt,
+        Invoice.status != "Voided"
+    ).all()
 
-        prev_cash_sum = Decimal("0.00")
-        for inv in prev_invoices:
-            pm_list = InvoicePayment.query.filter_by(invoice_id=inv.id).all()
-            if pm_list:
-                prev_cash_sum += sum(Decimal(str(p.amount or 0)) for p in pm_list if str(getattr(p, "payment_method", getattr(p, "method", ""))).lower() == "cash")
-            else:
-                prev_cash_sum += Decimal(str(inv.total or 0))
+    prev_cash_sum = Decimal("0.00")
+    for inv in prev_invoices:
+        pm_list = InvoicePayment.query.filter_by(invoice_id=inv.id).all()
+        if pm_list:
+            prev_cash_sum += sum(Decimal(str(p.amount or 0)) for p in pm_list if str(getattr(p, "payment_method", getattr(p, "method", ""))).lower() == "cash")
+        else:
+            prev_cash_sum += Decimal(str(inv.total or 0))
 
-        prev_expenses_q = Expense.query.filter_by(tenant_id=tenant_id, is_deleted=False).filter(Expense.date < target_date) if tenant_id else None
-        if prev_expenses_q and branch_id:
-            prev_expenses_q = prev_expenses_q.filter_by(branch_id=branch_id)
-        prev_exp_sum = sum(Decimal(str(exp.amount or 0)) for exp in (prev_expenses_q.all() if prev_expenses_q else []))
+    prev_expenses_q = Expense.query.filter_by(tenant_id=tenant_id, is_deleted=False).filter(Expense.date < target_date) if tenant_id else None
+    if prev_expenses_q and branch_id:
+        prev_expenses_q = prev_expenses_q.filter_by(branch_id=branch_id)
+    prev_exp_sum = sum(Decimal(str(exp.amount or 0)) for exp in (prev_expenses_q.all() if prev_expenses_q else []))
 
-        init_bal = Decimal(str(getattr(branch, "initial_opening_balance", 0) or 0)) if branch else Decimal("0.00")
-        opening_bal = float(init_bal + prev_cash_sum - prev_exp_sum)
-        if opening_bal < 0:
-            opening_bal = 0.0
+    init_bal = Decimal(str(getattr(branch, "initial_opening_balance", 0) or 0)) if branch else Decimal("0.00")
+    opening_bal = float(init_bal + prev_cash_sum - prev_exp_sum)
+    if opening_bal < 0:
+        opening_bal = 0.0
 
     closing_bal = opening_bal + float(total_cash) - total_expenses
 
@@ -804,7 +801,7 @@ def get_daily_sales_statement():
         "total_expenses": int(round(total_expenses)),
         "balance": {
             "opening_bal": int(round(opening_bal)),
-            "is_manual_opening": bool(cd_rec and getattr(cd_rec, "opening_balance", None) is not None),
+            "is_manual_opening": False,
             "total_sale": int(Decimal(str(grand_total)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
             "cash_pay": int(Decimal(str(total_cash)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
             "phone_pay": int(Decimal(str(total_paytm)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),

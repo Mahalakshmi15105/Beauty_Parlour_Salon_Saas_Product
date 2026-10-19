@@ -20,6 +20,13 @@ export default function Attendance() {
     return `${year}-${month}-${day}`;
   };
 
+  const getCurrentTimeStr = () => {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
+    return `${hours}:${minutes}`;
+  };
+
   // Filters
   const [startDate, setStartDate] = useState(getTodayStr());
   const [endDate, setEndDate] = useState(getTodayStr());
@@ -40,6 +47,7 @@ export default function Attendance() {
   const [manualReason, setManualReason] = useState("");
   const [manualStatus, setManualStatus] = useState("P");
   const [manualDate, setManualDate] = useState(getTodayStr());
+  const [manualTime, setManualTime] = useState(getCurrentTimeStr());
   const [isDoubleDeduction, setIsDoubleDeduction] = useState(false);
   const [manualLoading, setManualLoading] = useState(false);
   const [manualFeedback, setManualFeedback] = useState(null);
@@ -105,6 +113,7 @@ export default function Attendance() {
     API.post("/attendance/manual-checkin", {
       action_type: manualAction,
       date: manualDate,
+      time: manualTime,
       employee_id: parseInt(selectedEmployeeId, 10),
       branch_id: empBranchId ? parseInt(empBranchId, 10) : undefined,
       reason: manualReason || "Manual Front-Desk Fallback",
@@ -555,29 +564,58 @@ export default function Attendance() {
                 </div>
               </div>
 
-              {/* Attendance Date Selector */}
-              <div>
-                <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">
-                  ATTENDANCE DATE *
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={manualDate}
-                  max={getTodayStr()}
-                  onChange={(e) => {
-                    const chosen = e.target.value;
-                    setManualDate(chosen);
-                    if (chosen && (manualStatus === "L" || manualStatus === "HP")) {
-                      if (checkIsWeekend(chosen)) setIsDoubleDeduction(true);
-                      else setIsDoubleDeduction(false);
-                    }
-                  }}
-                  className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:border-pink-500 transition numeric"
-                />
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Select today or any past date to record or update attendance for that day.
-                </p>
+              {/* Attendance Date & Time Selectors */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">
+                    ATTENDANCE DATE *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={manualDate}
+                    max={getTodayStr()}
+                    onChange={(e) => {
+                      const chosen = e.target.value;
+                      setManualDate(chosen);
+                      if (chosen && (manualStatus === "L" || manualStatus === "HP")) {
+                        if (checkIsWeekend(chosen)) setIsDoubleDeduction(true);
+                        else setIsDoubleDeduction(false);
+                      }
+                    }}
+                    className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:border-pink-500 transition numeric"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Select today or any past date to record or update attendance for that day.
+                  </p>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">
+                      ATTENDANCE TIME *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setManualTime(getCurrentTimeStr())}
+                      className="text-[11px] font-bold text-pink-600 hover:text-pink-700 hover:underline"
+                    >
+                      Set to Current Time
+                    </button>
+                  </div>
+                  <input
+                    type="time"
+                    required
+                    value={manualTime}
+                    onChange={(e) => setManualTime(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:border-pink-500 transition numeric"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    {manualAction === "checkin"
+                      ? "Enter the exact check-in / arrival time when they came."
+                      : "Enter the exact check-out / departure time."}
+                  </p>
+                </div>
               </div>
 
               {/* Status Selector */}
