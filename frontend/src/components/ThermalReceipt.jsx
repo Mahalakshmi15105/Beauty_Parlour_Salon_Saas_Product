@@ -74,8 +74,9 @@ export function buildThermalReceiptHtml(targetEl, paperSize = "80mm") {
         background: #ffffff !important;
         color: #000000 !important;
         font-family: 'Courier New', Courier, monospace, sans-serif !important;
-        font-size: 11.5px !important;
-        line-height: 1.25 !important;
+        font-size: 12.5px !important;
+        font-weight: 700 !important;
+        line-height: 1.3 !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
@@ -86,12 +87,13 @@ export function buildThermalReceiptHtml(targetEl, paperSize = "80mm") {
         padding: 8px 6px !important;
         box-sizing: border-box !important;
         background: #ffffff !important;
-        border: 1px solid #e2e8f0 !important;
-        border-radius: 4px !important;
+        border: 1.5px solid #000000 !important;
+        border-radius: 2px !important;
         color: #000000 !important;
       }
-      .receipt * {
+      .receipt, .receipt * {
         color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
         background: transparent !important;
         text-shadow: none !important;
       }
@@ -104,7 +106,7 @@ export function buildThermalReceiptHtml(targetEl, paperSize = "80mm") {
         object-fit: cover !important;
         display: block !important;
         margin: 0 auto 4px auto !important;
-        border: 1px solid #e2e8f0 !important;
+        border: 1.5px solid #000000 !important;
       }
       .rounded-full { border-radius: 50% !important; }
       .object-cover { object-fit: cover !important; }
@@ -117,7 +119,7 @@ export function buildThermalReceiptHtml(targetEl, paperSize = "80mm") {
       .text-center { text-align: center !important; }
       .text-right { text-align: right !important; }
       .text-left { text-align: left !important; }
-      .font-bold, .font-extrabold, .font-black { font-weight: bold !important; }
+      .font-bold, .font-extrabold, .font-black { font-weight: 900 !important; }
       .uppercase { text-transform: uppercase !important; }
       .grid { display: grid !important; }
       .grid-cols-3 { display: flex !important; justify-content: space-between !important; }
@@ -126,23 +128,24 @@ export function buildThermalReceiptHtml(targetEl, paperSize = "80mm") {
       .w-1\\/3 { width: 33% !important; }
       .w-1\\/4 { width: 25% !important; }
       .border-b, .border-t, .border-y {
-        border-color: #cbd5e1 !important;
-        border-width: 1px !important;
+        border-color: #000000 !important;
+        border-width: 1.5px !important;
       }
-      .border-b { border-bottom: 1px solid #cbd5e1 !important; }
-      .border-t { border-top: 1px solid #cbd5e1 !important; }
+      .border-b { border-bottom: 1.5px solid #000000 !important; }
+      .border-t { border-top: 1.5px solid #000000 !important; }
+      .border-y { border-top: 1.5px solid #000000 !important; border-bottom: 1.5px solid #000000 !important; }
       .border-dashed, .border-dotted {
         border-style: solid !important;
-        border-color: #cbd5e1 !important;
-        border-bottom: 1px solid #cbd5e1 !important;
+        border-color: #000000 !important;
+        border-bottom: 1.5px solid #000000 !important;
       }
-      .border-slate-300, .border-slate-200 { border-color: #cbd5e1 !important; }
-      .my-1 { margin-top: 2px !important; margin-bottom: 2px !important; }
-      .my-1\\.5 { margin-top: 3px !important; margin-bottom: 3px !important; }
-      .py-1 { padding-top: 2px !important; padding-bottom: 2px !important; }
-      .p-1 { padding: 2px !important; }
-      .p-1\\.5 { padding: 3px !important; }
-      .p-2 { padding: 4px !important; }
+      .border-slate-300, .border-slate-200, .border-slate-100 { border-color: #000000 !important; }
+      .my-1 { margin-top: 3px !important; margin-bottom: 3px !important; }
+      .my-1\\.5 { margin-top: 4px !important; margin-bottom: 4px !important; }
+      .py-1 { padding-top: 3px !important; padding-bottom: 3px !important; }
+      .p-1 { padding: 3px !important; }
+      .p-1\\.5 { padding: 4px !important; }
+      .p-2 { padding: 5px !important; }
       .mt-0\\.5 { margin-top: 2px !important; }
       .mt-1 { margin-top: 4px !important; }
       .mb-0\\.5 { margin-bottom: 2px !important; }
@@ -152,9 +155,9 @@ export function buildThermalReceiptHtml(targetEl, paperSize = "80mm") {
       .pb-0\\.5 { padding-bottom: 2px !important; }
       .pb-1 { padding-bottom: 4px !important; }
       .space-y-0\\.5 > * + * { margin-top: 2px !important; }
-      .space-y-1 > * + * { margin-top: 2px !important; }
-      .space-y-1\\.5 > * + * { margin-top: 3px !important; }
-      .space-y-2 > * + * { margin-top: 4px !important; }
+      .space-y-1 > * + * { margin-top: 3px !important; }
+      .space-y-1\\.5 > * + * { margin-top: 4px !important; }
+      .space-y-2 > * + * { margin-top: 5px !important; }
       .space-x-1 > * + * { margin-left: 4px !important; }
       .space-x-2 > * + * { margin-left: 8px !important; }
       .space-x-3 > * + * { margin-left: 12px !important; }
@@ -165,32 +168,33 @@ export function buildThermalReceiptHtml(targetEl, paperSize = "80mm") {
       .flex-wrap { flex-wrap: wrap !important; }
       .mr-1 { margin-right: 4px !important; }
       .mr-2 { margin-right: 8px !important; }
-      .text-\\[10px\\], [class*="text-[10px]"] { font-size: 10px !important; }
-      .text-\\[11px\\], [class*="text-[11px]"] { font-size: 11px !important; }
-      .text-xs { font-size: 11.5px !important; }
-      .text-sm { font-size: 13px !important; }
-      .text-base { font-size: 14px !important; }
-      .leading-tight { line-height: 1.25 !important; }
+      .text-\\[9px\\], [class*="text-[9px]"] { font-size: 10.5px !important; font-weight: 700 !important; }
+      .text-\\[10px\\], [class*="text-[10px]"] { font-size: 11.5px !important; font-weight: 700 !important; }
+      .text-\\[11px\\], [class*="text-[11px]"] { font-size: 12px !important; font-weight: 700 !important; }
+      .text-xs { font-size: 12.5px !important; font-weight: 700 !important; }
+      .text-sm { font-size: 14px !important; font-weight: 800 !important; }
+      .text-base { font-size: 16px !important; font-weight: 900 !important; }
+      .leading-tight { line-height: 1.3 !important; }
       .leading-normal { line-height: 1.4 !important; }
-      .italic { font-style: italic !important; }
+      .italic { font-style: normal !important; }
       .font-mono { font-family: 'Courier New', Courier, monospace !important; }
       .truncate { overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
       .break-words { overflow-wrap: break-word !important; word-break: break-word !important; }
       table { width: 100%; border-collapse: collapse; }
-      th, td { font-size: 11px; padding: 2px 0; color: #000000; }
+      th, td { font-size: 12px; padding: 2px 0; color: #000000; font-weight: 700; }
       .dashed-line {
-        border-bottom: 1px solid #cbd5e1 !important;
+        border-bottom: 1.5px solid #000000 !important;
         margin: 3px 0 !important;
         width: 100% !important;
       }
       .net-payable-box {
-        border-top: 1px solid #cbd5e1 !important;
-        border-bottom: 1px solid #cbd5e1 !important;
+        border-top: 2px solid #000000 !important;
+        border-bottom: 2px solid #000000 !important;
         background: #ffffff !important;
-        padding: 3px 0 !important;
-        font-weight: bold !important;
-        margin-top: 3px !important;
-        margin-bottom: 3px !important;
+        padding: 4px 0 !important;
+        font-weight: 900 !important;
+        margin-top: 4px !important;
+        margin-bottom: 4px !important;
       }
     </style>
   </head>
@@ -251,7 +255,7 @@ export async function generateThermalReceiptPDF(elementOrRef, invoiceNumber = "I
     const receiptEl = doc.querySelector(".receipt") || doc.body;
 
     const canvas = await html2canvas(receiptEl, {
-      scale: 2,
+      scale: 3,
       useCORS: true,
       allowTaint: false,
       backgroundColor: "#ffffff",
@@ -504,7 +508,7 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
     <div
       ref={ref}
       id="thermal-receipt-printable"
-      className={`thermal-receipt-print-area ${containerWidthClass} bg-white text-black font-mono text-xs leading-normal p-3 mx-auto select-text`}
+      className={`thermal-receipt-print-area ${containerWidthClass} bg-white text-black font-mono text-[12.5px] leading-normal p-3 mx-auto select-text font-bold`}
       style={{ boxSizing: "border-box" }}
     >
       <style>{`
@@ -537,6 +541,7 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
           #thermal-receipt-printable * {
             visibility: visible !important;
             color: #000000 !important;
+            -webkit-text-fill-color: #000000 !important;
           }
           #thermal-receipt-printable {
             display: block !important;
@@ -558,6 +563,9 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
             break-inside: avoid !important;
             page-break-after: avoid !important;
           }
+          .border-b, .border-t, .border-y, .border-slate-200, .border-slate-300 {
+            border-color: #000000 !important;
+          }
         }
       `}</style>
 
@@ -578,7 +586,7 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
                 objectFit: "cover",
                 display: "block",
                 margin: "0 auto 4px auto",
-                border: "1px solid #cbd5e1"
+                border: "1.5px solid #000000"
               }}
               onError={(e) => {
                 e.target.onerror = null;
@@ -596,49 +604,49 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
         </h1>
 
         {showAddress && (effectiveBusinessProfile.address || effectiveBusinessProfile.city) && (
-          <p className="text-xs text-black break-words leading-tight">
+          <p className="text-[11.5px] font-bold text-black break-words leading-tight">
             {[effectiveBusinessProfile.address, effectiveBusinessProfile.city, effectiveBusinessProfile.state, effectiveBusinessProfile.postal_code].filter(Boolean).join(", ")}
           </p>
         )}
 
         {showPhone && effectiveBusinessProfile.phone && (
-          <p className="text-xs font-bold text-black">
+          <p className="text-xs font-black text-black">
             Ph: {effectiveBusinessProfile.phone}
           </p>
         )}
 
         {showGst && (
-          <p className="text-xs font-bold text-black">{displayGst}</p>
+          <p className="text-xs font-black text-black">{displayGst}</p>
         )}
       </div>
 
       {/* SEPARATOR 1 */}
-      <div className="border-b border-slate-200 my-1 w-full" />
+      <div className="border-b-2 border-black my-1 w-full" />
 
       {/* 2. INVOICE METADATA (Bill No -> Client -> Date -> Loyalty Visit Status) */}
-      <div className="text-xs space-y-1 text-black">
+      <div className="text-xs space-y-1 text-black font-bold">
         <div className="flex justify-between items-center font-bold">
           <span className="shrink-0 mr-2">Bill No:</span>
-          <span className="font-extrabold numeric text-right">{cleanBillNo}</span>
+          <span className="font-black numeric text-right">{cleanBillNo}</span>
         </div>
         <div className="flex justify-between items-start font-bold">
           <span className="shrink-0 mr-2">Client:</span>
-          <span className="text-right font-extrabold break-words">{customerName}</span>
+          <span className="text-right font-black break-words">{customerName}</span>
         </div>
-        <div className="flex justify-between items-center font-semibold">
+        <div className="flex justify-between items-center font-bold">
           <span className="shrink-0 mr-2">Date:</span>
-          <span className="numeric text-right">{formattedDate}</span>
+          <span className="numeric text-right font-bold">{formattedDate}</span>
         </div>
         {!hideLoyaltyStatus && invoice.membership_name && (
-          <div className="flex justify-between font-bold text-black border-t border-slate-200 pt-1 mt-1">
+          <div className="flex justify-between font-black text-black border-t-2 border-black pt-1 mt-1">
             <span className="shrink-0 mr-2">Loyalty Status:</span>
-            <span className="font-extrabold text-right break-words">{invoice.membership_name}</span>
+            <span className="font-black text-right break-words">{invoice.membership_name}</span>
           </div>
         )}
       </div>
 
       {/* SEPARATOR 2 (only show if line items section is visible) */}
-      {!hideLineItems && <div className="border-b border-slate-200 my-1 w-full" />}
+      {!hideLineItems && <div className="border-b-2 border-black my-1 w-full" />}
 
       {/* 3. ITEM TABLE HEADER */}
       {!hideLineItems && (
@@ -660,9 +668,9 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
 
                       return (
                         <div key={idx} className="space-y-0.5 text-black">
-                          <div className="flex justify-between items-start font-bold">
+                          <div className="flex justify-between items-start font-black">
                             <span className="w-2/3 break-words leading-tight">{itemName}</span>
-                            <span className="w-1/3 text-right font-extrabold numeric">{formatCurrency(amount)}</span>
+                            <span className="w-1/3 text-right font-black numeric">{formatCurrency(amount)}</span>
                           </div>
                         </div>
                       );
@@ -673,11 +681,11 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
                 {/* SERVICES SECTION */}
                 {serviceItems.length > 0 && (
                   <div>
-                    <div className="font-bold uppercase border-b border-slate-200 pb-0.5 mb-1 text-black flex justify-between">
+                    <div className="font-black uppercase border-b-2 border-black pb-0.5 mb-1 text-black flex justify-between">
                       <span className="w-2/3">SERVICES</span>
                       <span className="w-1/3 text-right">AMT</span>
                     </div>
-                    <div className="space-y-1">
+                    <div className="space-y-1.5">
                       {serviceItems.map((item, idx) => {
                         const isFreeReward = item.is_free_reward || item.is_free_visit_reward || (item.discount > 0 && item.line_total === 0);
                         const itemName = (item.item_name || item.name || item.service_name || `Service #${idx + 1}`).toUpperCase();
@@ -688,29 +696,29 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
 
                         return (
                           <div key={idx} className="space-y-0.5 text-black">
-                            <div className="flex justify-between items-start font-bold">
-                              <span className="w-2/3 break-words leading-tight">
+                            <div className="flex justify-between items-start font-black">
+                              <span className="w-2/3 break-words leading-tight font-black">
                                 {itemName}
                                 {isFreeReward && (
-                                  <span className="block text-[10px] text-black font-extrabold italic">
+                                  <span className="block text-[11px] text-black font-black">
                                     🎁 Membership Reward Claimed: FREE
                                   </span>
                                 )}
                               </span>
-                              <span className="w-1/3 text-right font-extrabold numeric">
+                              <span className="w-1/3 text-right font-black numeric">
                                 {isFreeReward ? "FREE" : formatCurrency(amount)}
                               </span>
                             </div>
                             {(showQty || showRate || staffName) && (
-                              <div className="text-[10px] text-black flex flex-wrap items-center gap-x-3 mt-0.5 leading-tight font-mono">
-                                {showQty && <span>Qty:&nbsp;<span className="numeric">{qty}</span></span>}
-                                {showRate && <span>Rate:&nbsp;<span className="numeric">{formatCurrency(rate)}</span></span>}
-                                {staffName && <span className="italic">Staff:&nbsp;{staffName}</span>}
+                              <div className="text-[11px] font-bold text-black flex flex-wrap items-center gap-x-3 mt-0.5 leading-tight font-mono">
+                                {showQty && <span>Qty:&nbsp;<span className="numeric font-bold">{qty}</span></span>}
+                                {showRate && <span>Rate:&nbsp;<span className="numeric font-bold">{formatCurrency(rate)}</span></span>}
+                                {staffName && <span>Staff:&nbsp;<span className="font-bold">{staffName}</span></span>}
                               </div>
                             )}
                             {item.discount > 0 && !isFreeReward && (
-                              <div className="text-[11px] text-black">
-                                Disc: -<span className="numeric">{formatCurrency(item.discount)}</span>
+                              <div className="text-[11.5px] font-bold text-black">
+                                Disc: -<span className="numeric font-bold">{formatCurrency(item.discount)}</span>
                               </div>
                             )}
                           </div>
@@ -723,11 +731,11 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
                 {/* PRODUCTS SECTION */}
                 {productItems.length > 0 && (
                   <div>
-                    <div className="font-bold uppercase border-b border-slate-200 pb-0.5 mb-1 text-black flex justify-between">
+                    <div className="font-black uppercase border-b-2 border-black pb-0.5 mb-1 text-black flex justify-between">
                       <span className="w-2/3 text-left">PRODUCTS</span>
                       <span className="w-1/3 text-right">AMT</span>
                     </div>
-                    <div className="space-y-1">
+                    <div className="space-y-1.5">
                       {productItems.map((item, idx) => {
                         const itemName = (item.item_name || item.name || item.product_name || `Product #${idx + 1}`).toUpperCase();
                         const qty = item.quantity || item.qty || 1;
@@ -737,24 +745,24 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
 
                         return (
                           <div key={idx} className="space-y-0.5 text-black">
-                            <div className="flex justify-between items-start">
-                              <span className="w-2/3 break-words leading-tight font-bold">{itemName}</span>
-                              <span className="w-1/3 text-right font-extrabold numeric">{formatCurrency(amount)}</span>
+                            <div className="flex justify-between items-start font-black">
+                              <span className="w-2/3 break-words leading-tight font-black">{itemName}</span>
+                              <span className="w-1/3 text-right font-black numeric">{formatCurrency(amount)}</span>
                             </div>
                             {(showQty || showRate || showMrp) && (
-                              <div className="text-[10px] text-black flex flex-wrap items-center gap-x-3 mt-0.5 leading-tight font-mono">
-                                {showQty && <span>Qty:&nbsp;<span className="numeric">{qty}</span></span>}
-                                {showRate && <span>Rate:&nbsp;<span className="numeric">{formatCurrency(rate)}</span></span>}
+                              <div className="text-[11px] font-bold text-black flex flex-wrap items-center gap-x-3 mt-0.5 leading-tight font-mono">
+                                {showQty && <span>Qty:&nbsp;<span className="numeric font-bold">{qty}</span></span>}
+                                {showRate && <span>Rate:&nbsp;<span className="numeric font-bold">{formatCurrency(rate)}</span></span>}
                                 {showMrp && mrp > rate && (
-                                  <span className="line-through text-slate-500">
+                                  <span className="line-through font-bold text-black">
                                     MRP:&nbsp;{formatCurrency(mrp)}
                                   </span>
                                 )}
                               </div>
                             )}
                             {item.discount > 0 && (
-                              <div className="text-[11px] text-black text-right">
-                                Disc: -<span className="numeric">{formatCurrency(item.discount)}</span>
+                              <div className="text-[11.5px] font-bold text-black text-right">
+                                Disc: -<span className="numeric font-bold">{formatCurrency(item.discount)}</span>
                               </div>
                             )}
                           </div>
@@ -770,62 +778,62 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
       )}
 
       {/* SEPARATOR 3 */}
-      <div className="border-b border-slate-200 my-1 w-full" />
+      <div className="border-b-2 border-black my-1 w-full" />
 
       {/* 4. FINANCIAL SUMMARY */}
-      <div className="text-xs space-y-0.5 text-black">
+      <div className="text-xs space-y-1 text-black font-bold">
         <div className="flex justify-between">
-          <span>Subtotal:</span>
-          <span className="font-semibold numeric">{formatCurrency(invoice.subtotal || 0)}</span>
+          <span className="font-bold">Subtotal:</span>
+          <span className="font-bold numeric">{formatCurrency(invoice.subtotal || 0)}</span>
         </div>
 
         {(invoice.discount || 0) > 0 && (
-          <div className="flex justify-between font-bold">
+          <div className="flex justify-between font-black">
             <span>Discount:</span>
             <span className="numeric">-{formatCurrency(invoice.discount)}</span>
           </div>
         )}
 
         {invoice.membership_name && (
-          <div className="flex justify-between font-bold text-black border-t border-slate-200 pt-0.5">
+          <div className="flex justify-between font-black text-black border-t-2 border-black pt-0.5">
             <span>Membership ({invoice.membership_name}):</span>
             <span className="numeric">-{formatCurrency(invoice.membership_discount || 0)}</span>
           </div>
         )}
 
         {showTax && (invoice.tax || 0) > 0 && (
-          <div className="flex justify-between">
-            <span>GST (Service):</span>
-            <span className="numeric">{formatCurrency(invoice.tax)}</span>
+          <div className="flex justify-between font-bold">
+            <span className="font-bold">GST (Service):</span>
+            <span className="font-bold numeric">{formatCurrency(invoice.tax)}</span>
           </div>
         )}
 
-        {/* HIGHLIGHTED NET PAYABLE WITH THIN FULL-WIDTH BORDER */}
-        <div className="flex justify-between items-center text-sm font-bold text-black border-y border-slate-300 py-1 my-1 w-full">
+        {/* HIGHLIGHTED NET PAYABLE WITH THICK BORDER */}
+        <div className="flex justify-between items-center text-sm font-black text-black border-y-2 border-black py-1.5 my-1.5 w-full">
           <span>NET PAYABLE:</span>
           <span className="text-base font-black numeric">{formatCurrency(invoice.total || invoice.net_payable || 0)}</span>
         </div>
       </div>
 
       {/* 5. PAYMENT METHOD(S) */}
-      <div className="text-xs space-y-0.5 text-black">
-        <span className="font-bold text-xs uppercase block mb-0.5">PAYMENT METHOD(S):</span>
+      <div className="text-xs space-y-1 text-black font-bold">
+        <span className="font-black text-xs uppercase block mb-0.5">PAYMENT METHOD(S):</span>
         {invoice.payments && invoice.payments.length > 0 ? (
           invoice.payments.map((p, idx) => (
-            <div key={idx} className="flex justify-between">
-              <span>Paid ({p.method || p.payment_method}):</span>
-              <span className="font-bold numeric">{formatCurrency(p.amount || 0)}</span>
+            <div key={idx} className="flex justify-between font-bold">
+              <span className="font-bold">Paid ({p.method || p.payment_method}):</span>
+              <span className="font-black numeric">{formatCurrency(p.amount || 0)}</span>
             </div>
           ))
         ) : (
-          <div className="flex justify-between">
-            <span>Paid ({invoice.payment_method || "Cash"}):</span>
-            <span className="font-bold numeric">{formatCurrency(invoice.total || 0)}</span>
+          <div className="flex justify-between font-bold">
+            <span className="font-bold">Paid ({invoice.payment_method || "Cash"}):</span>
+            <span className="font-black numeric">{formatCurrency(invoice.total || 0)}</span>
           </div>
         )}
 
         {invoice.change_returned > 0 && (
-          <div className="flex justify-between font-bold border-t border-slate-200 pt-0.5 mt-0.5">
+          <div className="flex justify-between font-black border-t-2 border-black pt-0.5 mt-0.5">
             <span>Change Returned:</span>
             <span className="numeric">{formatCurrency(invoice.change_returned)}</span>
           </div>
@@ -833,22 +841,22 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
       </div>
 
       {/* SEPARATOR 5 */}
-      <div className="border-b border-slate-200 my-1 w-full" />
+      <div className="border-b-2 border-black my-1 w-full" />
 
       {/* 6. THANK YOU & FOOTER */}
-      <div className="text-center space-y-0.5 text-xs text-black pt-1">
-        <p className="font-bold">{effectiveSettings.thank_you_message || "Thank you. Please visit again."}</p>
+      <div className="text-center space-y-1 text-xs text-black pt-1 font-bold">
+        <p className="font-black">{effectiveSettings.thank_you_message || "Thank you. Please visit again."}</p>
         {effectiveBusinessProfile.phone && (
-          <p className="text-[11px] font-semibold text-black">For appointments, Please call on {effectiveBusinessProfile.phone}</p>
+          <p className="text-xs font-bold text-black">For appointments, Please call on {effectiveBusinessProfile.phone}</p>
         )}
-        <p className="text-[9px] text-slate-400 font-semibold pt-1">Powered By SmartGoNext</p>
+        <p className="text-[10px] text-black font-bold pt-1">Powered By SmartGoNext</p>
       </div>
 
       {/* 7. NOTES */}
       {invoice.notes && (
-        <div className="text-xs text-black space-y-0.5 pt-0.5">
-          <span className="font-bold block">Notes:</span>
-          <p className="italic">{invoice.notes}</p>
+        <div className="text-xs text-black space-y-0.5 pt-0.5 font-bold">
+          <span className="font-black block">Notes:</span>
+          <p>{invoice.notes}</p>
         </div>
       )}
     </div>
