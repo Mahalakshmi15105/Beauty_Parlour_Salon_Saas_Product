@@ -167,6 +167,145 @@ def get_employee(employee_id):
     })
 
 
+@employees_bp.route("/employees/<int:employee_id>/history", methods=["GET"])
+@require_role(["ParlourAdmin", "BranchAdmin", "Receptionist", "Employee"])
+def get_employee_history(employee_id):
+    employee = get_branch_query(Employee).filter_by(id=employee_id).first()
+    if not employee:
+        return error_response(
+            error_code="EMPLOYEE_NOT_FOUND",
+            message="Employee not found or access denied.",
+            status_code=404
+        )
+
+    from decimal import Decimal
+    from app.models.billing import Invoice, InvoiceLineItem
+    from app.models.customer import Customer
+    from app.models.catalog import Service, Product
+    from app.models.branch import Branch
+    from app.models.user import User
+
+    u_rec = None
+    try:
+        u_rec = User.query.filter(
+            (User.email == employee.phone) | 
+            (User.email == employee.username) |
+            (User.email.ilike(f"%{employee.first_name}%"))
+        ).filter_by(is_deleted=False).first()
+    except Exception:
+        pass
+
+    br_name = "Main Branch"
+    try:
+        if employee.branch_id:
+            br_obj = Branch.query.get(employee.branch_id)
+            if br_obj and br_obj.name:
+                br_name = br_obj.name
+    except Exception:
+        pass
+
+    # Query all invoice line items serviced by this employee
+    line_items = (
+        db.session.query(InvoiceLineItem)
+        .join(Invoice, InvoiceLineItem.invoice_id == Invoice.id)
+        .filter(
+            InvoiceLineItem.employee_id == employee_id,
+            Invoice.status != "Voided"
+        )
+        .order_by(Invoice.created_at.desc())
+        .all()
+    )
+
+    history_records = []
+    total_rev = Decimal("0.00")
+    unique_clients = set()
+    now_dt = datetime.utcnow()
+    this_month_services = 0
+    this_month_revenue = Decimal("0.00")
+
+    for item in line_items:
+        inv = item.invoice
+        cust = getattr(inv, "customer", None) if inv else None
+        
+        c_name = "Walk-in"
+        c_phone = "-"
+        c_id = None
+        if cust:
+            c_id = cust.id
+            unique_clients.add(c_id)
+            full_c = f"{cust.first_name or ''} {cust.last_name or ''}".strip()
+            c_name = full_c or "Client"
+            c_phone = cust.phone or "-"
+        elif inv and getattr(inv, "customer_id", None):
+            unique_clients.add(inv.customer_id)
+
+        item_name = "Service"
+        if getattr(item, "service", None) and item.service:
+            item_name = item.service.name
+        elif getattr(item, "product", None) and item.product:
+            item_name = f"{item.product.name} (Product)"
+
+        lt = Decimal(str(item.line_total or 0.0))
+        total_rev += lt
+
+        item_dt = inv.created_at if (inv and inv.created_at) else (item.created_at or now_dt)
+        if item_dt and hasattr(item_dt, "year") and item_dt.year == now_dt.year and item_dt.month == now_dt.month:
+            this_month_services += 1
+            this_month_revenue += lt
+
+        history_records.append({
+            "id": item.id,
+            "invoice_id": inv.id if inv else None,
+            "invoice_number": inv.invoice_number if inv else "-",
+            "date": item_dt.isoformat() if hasattr(item_dt, "isoformat") else str(item_dt),
+            "date_formatted": item_dt.strftime("%d %b %Y, %I:%M %p") if hasattr(item_dt, "strftime") else str(item_dt),
+            "client_name": c_name,
+            "client_phone": c_phone,
+            "client_id": c_id,
+            "service_name": item_name,
+            "quantity": int(item.quantity or 1),
+            "unit_price": float(item.unit_price or 0.0),
+            "discount_amount": float(item.discount_amount or 0.0),
+            "line_total": float(lt),
+            "invoice_status": inv.status if inv else "Paid"
+        })
+
+    emp_details = {
+        "id": employee.id,
+        "first_name": employee.first_name or "",
+        "last_name": employee.last_name or "",
+        "full_name": f"{employee.first_name or ''} {employee.last_name or ''}".strip(),
+        "phone": employee.phone or "",
+        "email": employee.email or (u_rec.email if u_rec else "") or employee.username or employee.phone,
+        "username": employee.username or (u_rec.email if u_rec else "") or employee.email or employee.phone,
+        "specialization": employee.specialization or "All-Rounder",
+        "role": employee.role or "Staff",
+        "salary": float(employee.salary or 0.0),
+        "target": float(getattr(employee, "target", 0.0) or 0.0),
+        "level": getattr(employee, "level", "L1") or "L1",
+        "commission_percentage": float(employee.commission_percentage or 0.0),
+        "joining_date": employee.joining_date.isoformat() if employee.joining_date else None,
+        "shift_hours": f"{getattr(employee, 'shift_start_time', '09:00') or '09:00'} - {getattr(employee, 'shift_end_time', '18:00') or '18:00'}",
+        "monthly_offs": getattr(employee, "monthly_offs", 4) or 4,
+        "status": employee.status or "active",
+        "branch_name": br_name
+    }
+
+    stats = {
+        "total_services": len(history_records),
+        "total_revenue": float(total_rev),
+        "total_clients": len(unique_clients),
+        "this_month_services": this_month_services,
+        "this_month_revenue": float(this_month_revenue)
+    }
+
+    return success_response({
+        "employee": emp_details,
+        "stats": stats,
+        "history": history_records
+    })
+
+
 @employees_bp.route("/employees", methods=["POST"])
 @require_role(["ParlourAdmin", "BranchAdmin"])
 def create_employee():

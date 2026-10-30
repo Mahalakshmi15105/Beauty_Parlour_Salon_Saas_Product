@@ -25,6 +25,7 @@ import {
 import API from "../services/api";
 import { useToast } from "../context/ToastContext";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
+import { focusAndOpenSelect } from "../utils/keyboardNavigation";
 
 function Appointments() {
   const { showSuccess, showError } = useToast();
@@ -34,6 +35,7 @@ function Appointments() {
   const [appointments, setAppointments] = useState([]);
   const [servicesList, setServicesList] = useState([]);
   const [employeesList, setEmployeesList] = useState([]);
+  const [categoriesList, setCategoriesList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [actionError, setActionError] = useState(null);
   const [actionSuccess, setActionSuccess] = useState(null);
@@ -63,7 +65,7 @@ function Appointments() {
   const [appointmentType, setAppointmentType] = useState("Regular");
   const [notes, setNotes] = useState("");
   const [selectedItems, setSelectedItems] = useState([
-    { service_id: "", employee_id: "", price: 0, duration_minutes: 30 },
+    { category_id: "", service_id: "", employee_id: "", price: 0, duration_minutes: 30 },
   ]);
   const [savingAppointment, setSavingAppointment] = useState(false);
 
@@ -99,6 +101,19 @@ function Appointments() {
   };
 
   const fetchCatalogAndStaff = () => {
+    API.get("/service-categories").then((res) => {
+      const dataPayload = res?.data;
+      let list = [];
+      if (Array.isArray(dataPayload)) list = dataPayload;
+      else if (dataPayload && Array.isArray(dataPayload.items)) list = dataPayload.items;
+      else if (Array.isArray(res?.items)) list = res.items;
+      else if (Array.isArray(res)) list = res;
+      setCategoriesList(list);
+    }).catch((err) => {
+      console.error("[Appointments] GET /service-categories error:", err);
+      setCategoriesList([]);
+    });
+
     API.get("/services?limit=100").then((res) => {
       console.log("[Appointments] GET /services unwrapped res:", res);
       const dataPayload = res?.data;
@@ -177,8 +192,26 @@ function Appointments() {
   const handleAddServiceRow = () => {
     setSelectedItems([
       ...selectedItems,
-      { service_id: "", employee_id: "", price: 0, duration_minutes: 30 },
+      { category_id: "", service_id: "", employee_id: "", price: 0, duration_minutes: 30 },
     ]);
+  };
+
+  const handleCategoryChange = (index, categoryId) => {
+    const updated = [...selectedItems];
+    updated[index].category_id = categoryId;
+    updated[index].service_id = "";
+    updated[index].price = 0;
+    updated[index].duration_minutes = 30;
+    setSelectedItems(updated);
+
+    if (categoryId) {
+      setTimeout(() => {
+        const serviceSelect = document.getElementById(`service-select-${index}`);
+        if (serviceSelect) {
+          focusAndOpenSelect(serviceSelect);
+        }
+      }, 50);
+    }
   };
 
   const handleRemoveServiceRow = (index) => {
@@ -194,9 +227,21 @@ function Appointments() {
     const s = servicesList.find((x) => String(x.id) === String(serviceId));
     const updated = [...selectedItems];
     updated[index].service_id = serviceId;
+    if (s && s.category_id && !updated[index].category_id) {
+      updated[index].category_id = String(s.category_id);
+    }
     updated[index].price = s ? floatVal(s.price) : 0;
     updated[index].duration_minutes = s ? intVal(s.duration_minutes) : 30;
     setSelectedItems(updated);
+
+    if (serviceId) {
+      setTimeout(() => {
+        const staffSelect = document.getElementById(`staff-select-${index}`);
+        if (staffSelect) {
+          focusAndOpenSelect(staffSelect);
+        }
+      }, 50);
+    }
   };
 
   const handleEmployeeChange = (index, employeeId) => {
@@ -269,7 +314,7 @@ function Appointments() {
           active_memberships: [],
         });
         setNotes("");
-        setSelectedItems([{ service_id: "", employee_id: "", price: 0, duration_minutes: 30 }]);
+        setSelectedItems([{ category_id: "", service_id: "", employee_id: "", price: 0, duration_minutes: 30 }]);
         setFilterDate(bookingDate);
         fetchAppointments();
         setActiveSubTab("todays");
@@ -872,71 +917,107 @@ function Appointments() {
               </div>
 
               <div className="space-y-3">
-                {selectedItems.map((row, idx) => (
-                  <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center bg-surface p-3 rounded-xl border border-border-soft">
-                    {/* Service Dropdown */}
-                    <div className="col-span-5">
-                      <label className="block text-[10px] font-bold text-text-secondary mb-0.5">Service #{idx + 1}</label>
-                      <select
-                        value={row.service_id}
-                        onChange={(e) => handleServiceChange(idx, e.target.value)}
-                        className="w-full bg-background border border-border-soft px-3 py-1.5 rounded-lg text-xs font-bold text-text-primary focus:outline-none"
-                      >
-                        <option value="">Select Service...</option>
-                        {Array.isArray(servicesList) && servicesList.length > 0 ? (
-                          servicesList.map((srv) => (
-                            <option key={srv.id} value={srv.id}>
-                              {srv.name} ({formatCurrency(srv.price)} - {srv.duration_minutes}m)
-                            </option>
-                          ))
-                        ) : (
-                          <option value="" disabled>No active services found</option>
-                        )}
-                      </select>
-                    </div>
+                {selectedItems.map((row, idx) => {
+                  const filteredServices = row.category_id
+                    ? servicesList.filter((s) => String(s.category_id) === String(row.category_id))
+                    : servicesList;
 
-                    {/* Staff Dropdown */}
-                    <div className="col-span-4">
-                      <label className="block text-[10px] font-bold text-text-secondary mb-0.5">Assigned Staff (Optional)</label>
-                      <select
-                        value={row.employee_id}
-                        onChange={(e) => handleEmployeeChange(idx, e.target.value)}
-                        className="w-full bg-background border border-border-soft px-3 py-1.5 rounded-lg text-xs font-bold text-text-primary focus:outline-none"
-                      >
-                        <option value="">Auto Assign / Unassigned</option>
-                        {Array.isArray(employeesList) && employeesList.length > 0 ? (
-                          employeesList.map((emp) => (
-                            <option key={emp.id} value={emp.id}>
-                              {emp.first_name} {emp.last_name}
-                            </option>
-                          ))
-                        ) : (
-                          <option value="" disabled>No employees found</option>
-                        )}
-                      </select>
-                    </div>
-
-                    {/* Read-Only Price */}
-                    <div className="col-span-2 text-right">
-                      <label className="block text-[10px] font-bold text-text-secondary mb-0.5">Price</label>
-                      <span className="text-xs font-extrabold text-primary block numeric">{formatCurrency(row.price)}</span>
-                    </div>
-
-                    {/* Delete Row Button */}
-                    <div className="col-span-1 text-center pt-3">
-                      {selectedItems.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveServiceRow(idx)}
-                          className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition"
-                          title="Remove Service"
+                  return (
+                    <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center bg-surface p-3.5 rounded-xl border border-border-soft shadow-xs">
+                      {/* 1. Category Dropdown */}
+                      <div className="col-span-12 md:col-span-4">
+                        <label className="block text-[10px] font-bold text-text-secondary mb-1 uppercase tracking-wider">
+                          Category #{idx + 1} <span className="text-rose-500">*</span>
+                        </label>
+                        <select
+                          value={row.category_id || ""}
+                          onChange={(e) => handleCategoryChange(idx, e.target.value)}
+                          className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-xs font-bold text-text-primary focus:outline-none focus:border-primary transition"
                         >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
+                          <option value="">-- Select Category First --</option>
+                          {Array.isArray(categoriesList) && categoriesList.length > 0 ? (
+                            categoriesList.map((cat) => (
+                              <option key={cat.id} value={cat.id}>
+                                {cat.name}
+                              </option>
+                            ))
+                          ) : (
+                            <option value="" disabled>No categories available</option>
+                          )}
+                        </select>
+                      </div>
+
+                      {/* 2. Service Dropdown (Strictly No Price Display) */}
+                      <div className="col-span-12 md:col-span-4">
+                        <label className="block text-[10px] font-bold text-text-secondary mb-1 uppercase tracking-wider">
+                          Service #{idx + 1} <span className="text-rose-500">*</span>
+                        </label>
+                        <select
+                          id={`service-select-${idx}`}
+                          value={row.service_id || ""}
+                          onChange={(e) => handleServiceChange(idx, e.target.value)}
+                          disabled={!row.category_id}
+                          className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-xs font-bold text-text-primary focus:outline-none focus:border-primary transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <option value="">
+                            {row.category_id ? "-- Select Service --" : "-- Select Category First --"}
+                          </option>
+                          {row.category_id ? (
+                            filteredServices.length > 0 ? (
+                              filteredServices.map((srv) => (
+                                <option key={srv.id} value={srv.id}>
+                                  {srv.name}
+                                </option>
+                              ))
+                            ) : (
+                              <option value="" disabled>No services in this category</option>
+                            )
+                          ) : null}
+                        </select>
+                      </div>
+
+                      {/* 3. Assigned Staff Dropdown */}
+                      <div className="col-span-12 md:col-span-3">
+                        <label className="block text-[10px] font-bold text-text-secondary mb-1 uppercase tracking-wider">
+                          Assigned Staff (Optional)
+                        </label>
+                        <select
+                          id={`staff-select-${idx}`}
+                          value={row.employee_id || ""}
+                          onChange={(e) => handleEmployeeChange(idx, e.target.value)}
+                          className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-xs font-bold text-text-primary focus:outline-none focus:border-primary transition"
+                        >
+                          <option value="">Auto Assign / Unassigned</option>
+                          {Array.isArray(employeesList) && employeesList.length > 0 ? (
+                            employeesList.map((emp) => (
+                              <option key={emp.id} value={emp.id}>
+                                {emp.first_name} {emp.last_name || ""}
+                              </option>
+                            ))
+                          ) : (
+                            <option value="" disabled>No employees found</option>
+                          )}
+                        </select>
+                      </div>
+
+                      {/* 4. Delete Row Button */}
+                      <div className="col-span-12 md:col-span-1 flex items-center justify-center md:pt-4">
+                        {selectedItems.length > 1 ? (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveServiceRow(idx)}
+                            className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition"
+                            title="Remove Service"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <div className="w-4 h-4"></div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 

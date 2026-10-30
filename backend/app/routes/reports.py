@@ -497,16 +497,16 @@ def get_daily_sales_statement():
     total_gst = Decimal("0.00")
     grand_total = Decimal("0.00")
 
+    def _categorize_pm(p):
+        m = str(getattr(p, "payment_method", getattr(p, "method", "")) or "").strip().lower()
+        if "cash" in m:
+            return "cash"
+        elif "card" in m:
+            return "card"
+        return "paytm"  # UPI, Paytm, Google Pay, PhonePe, Net Banking, etc.
+
     for inv in invoices:
         pm_list = InvoicePayment.query.filter_by(invoice_id=inv.id).all()
-        
-        def _categorize_pm(p):
-            m = str(getattr(p, "payment_method", getattr(p, "method", "")) or "").strip().lower()
-            if "cash" in m:
-                return "cash"
-            elif "card" in m:
-                return "card"
-            return "paytm"  # UPI, Paytm, Google Pay, PhonePe, Net Banking, etc.
 
         if pm_list:
             cash_paid = sum(Decimal(str(p.amount or 0)) for p in pm_list if _categorize_pm(p) == "cash")
@@ -739,29 +739,62 @@ def get_daily_sales_statement():
         "total": float(getattr(cd_rec, "total", 0) or 0) if cd_rec else 0.0
     }
 
-    # Opening Cash Balance is strictly yesterday's closing cash balance
-    prev_invoices = get_branch_query(Invoice).filter(
-        Invoice.created_at < start_dt,
-        Invoice.status != "Voided"
-    ).all()
+    # Opening Cash Balance strictly matches yesterday's closing cash balance:
+    # 1. Manual opening balance entered for target_date takes highest priority
+    # 2. Most recent previous CashDenomination record (e.g. yesterday's counted drawer cash)
+    #    along with any intermediate days' cash sales minus expenses (if staff skipped any days)
+    # 3. Fallback to branch initial float + prior cash - prior expenses
+    is_manual = False
+    if cd_rec and getattr(cd_rec, "opening_balance", None) is not None:
+        opening_bal = float(cd_rec.opening_balance)
+        is_manual = True
+    else:
+        prev_cd = CashDenomination.query.filter(
+            CashDenomination.tenant_id == tenant_id,
+            CashDenomination.branch_id == branch_id,
+            CashDenomination.date < target_date
+        ).order_by(CashDenomination.date.desc()).first() if tenant_id and branch_id else None
 
-    prev_cash_sum = Decimal("0.00")
-    for inv in prev_invoices:
-        pm_list = InvoicePayment.query.filter_by(invoice_id=inv.id).all()
-        if pm_list:
-            prev_cash_sum += sum(Decimal(str(p.amount or 0)) for p in pm_list if str(getattr(p, "payment_method", getattr(p, "method", ""))).lower() == "cash")
+        if prev_cd:
+            base_opening = Decimal(str(prev_cd.total or 0.0))
+            anchor_dt = datetime.combine(prev_cd.date, datetime.max.time())
+            anchor_date = prev_cd.date
         else:
-            prev_cash_sum += Decimal(str(inv.total or 0))
+            base_opening = Decimal(str(getattr(branch, "initial_opening_balance", 0) or 0)) if branch else Decimal("0.00")
+            anchor_dt = None
+            anchor_date = None
 
-    prev_expenses_q = Expense.query.filter_by(tenant_id=tenant_id, is_deleted=False).filter(Expense.date < target_date) if tenant_id else None
-    if prev_expenses_q and branch_id:
-        prev_expenses_q = prev_expenses_q.filter_by(branch_id=branch_id)
-    prev_exp_sum = sum(Decimal(str(exp.amount or 0)) for exp in (prev_expenses_q.all() if prev_expenses_q else []))
+        # Calculate cash sales between anchor_dt and start_dt (if intermediate days existed)
+        inter_inv_q = get_branch_query(Invoice).filter(
+            Invoice.created_at < start_dt,
+            Invoice.status != "Voided"
+        )
+        if anchor_dt:
+            inter_inv_q = inter_inv_q.filter(Invoice.created_at > anchor_dt)
+        inter_invoices = inter_inv_q.all()
 
-    init_bal = Decimal(str(getattr(branch, "initial_opening_balance", 0) or 0)) if branch else Decimal("0.00")
-    opening_bal = float(init_bal + prev_cash_sum - prev_exp_sum)
-    if opening_bal < 0:
-        opening_bal = 0.0
+        inter_cash_sum = Decimal("0.00")
+        for inv in inter_invoices:
+            pm_list = InvoicePayment.query.filter_by(invoice_id=inv.id).all()
+            if pm_list:
+                inter_cash_sum += sum(Decimal(str(p.amount or 0)) for p in pm_list if _categorize_pm(p) == "cash")
+            elif anchor_dt is not None:
+                m = str(getattr(inv, "payment_method", getattr(inv, "method", "")) or "").strip().lower()
+                if "cash" in m:
+                    inter_cash_sum += Decimal(str(inv.total or 0))
+
+        inter_exp_q = Expense.query.filter_by(tenant_id=tenant_id, is_deleted=False).filter(
+            Expense.date < target_date
+        ) if tenant_id else None
+        if inter_exp_q and branch_id:
+            inter_exp_q = inter_exp_q.filter_by(branch_id=branch_id)
+        if anchor_date:
+            inter_exp_q = inter_exp_q.filter(Expense.date > anchor_date)
+        inter_exp_sum = sum(Decimal(str(exp.amount or 0)) for exp in (inter_exp_q.all() if inter_exp_q else []))
+
+        opening_bal = float(base_opening + inter_cash_sum - inter_exp_sum)
+        if opening_bal < 0:
+            opening_bal = 0.0
 
     closing_bal = opening_bal + float(total_cash) - total_expenses
 
@@ -801,7 +834,7 @@ def get_daily_sales_statement():
         "total_expenses": int(round(total_expenses)),
         "balance": {
             "opening_bal": int(round(opening_bal)),
-            "is_manual_opening": False,
+            "is_manual_opening": is_manual,
             "total_sale": int(Decimal(str(grand_total)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
             "cash_pay": int(Decimal(str(total_cash)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
             "phone_pay": int(Decimal(str(total_paytm)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),

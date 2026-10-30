@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../services/api";
 import { useModalFocusTrap, useFormKeyboardNavigation, focusAndOpenSelect } from "../utils/keyboardNavigation";
-import { X, Printer, FileSpreadsheet, FileText, Upload, DollarSign, Eye, EyeOff, Check, Copy, UserCheck, Phone } from "lucide-react";
+import { X, Printer, FileSpreadsheet, FileText, Upload, DollarSign, Eye, EyeOff, Check, Copy, UserCheck, Phone, History } from "lucide-react";
 import { exportToCSV, printDataList, exportToPDF, exportToExcel } from "../utils/exportUtils";
 import BulkUploadModal from "../components/BulkUploadModal";
+import StaffHistoryModal from "../components/StaffHistoryModal";
 import AddPayrollAdjustmentModal from "../components/AddPayrollAdjustmentModal";
 import DeleteConfirmModal from "../components/DeleteConfirmModal";
 import { useToast } from "../context/ToastContext";
@@ -31,6 +32,7 @@ function Employees() {
 
   // View Modal & Password Toggle State
   const [viewEmp, setViewEmp] = useState(null);
+  const [historyEmp, setHistoryEmp] = useState(null);
   const [visiblePasswords, setVisiblePasswords] = useState({});
   const [copiedField, setCopiedField] = useState(null);
 
@@ -479,23 +481,31 @@ function Employees() {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border-soft/60">
+                    <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-border-soft/60">
+                      <button
+                        onClick={() => setHistoryEmp(emp)}
+                        className="py-1.5 px-1 bg-pink-50 hover:bg-pink-100 text-pink-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1"
+                        title="Staff History"
+                      >
+                        <History className="w-3.5 h-3.5" />
+                        <span>History</span>
+                      </button>
                       <button
                         onClick={() => setViewEmp(emp)}
-                        className="py-1.5 px-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1"
+                        className="py-1.5 px-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         <span>View</span>
                       </button>
                       <button
                         onClick={() => openEditModal(emp)}
-                        className="py-1.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1"
+                        className="py-1.5 px-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1"
                       >
                         <span>Edit</span>
                       </button>
                       <button
                         onClick={() => handleDeleteClick(emp)}
-                        className="py-1.5 px-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1"
+                        className="py-1.5 px-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1"
                       >
                         <span>Delete</span>
                       </button>
@@ -515,6 +525,7 @@ function Employees() {
                     <th className="px-5 py-3 text-xs font-semibold text-text-secondary uppercase">Password</th>
                     <th className="px-5 py-3 text-xs font-semibold text-text-secondary uppercase">Phone</th>
                     <th className="px-5 py-3 text-xs font-semibold text-text-secondary uppercase">Status</th>
+                    <th className="px-5 py-3 text-xs font-semibold text-text-secondary uppercase">Staff History</th>
                     <th className="px-5 py-3 text-xs font-semibold text-text-secondary uppercase">Actions</th>
                   </tr>
                 </thead>
@@ -569,6 +580,16 @@ function Employees() {
                           }`}>
                             {emp.status}
                           </span>
+                        </td>
+                        <td className="px-5 py-4 text-sm">
+                          <button
+                            type="button"
+                            onClick={() => setHistoryEmp(emp)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200/80 rounded-xl text-xs font-bold transition shadow-sm hover:scale-[1.02]"
+                          >
+                            <History className="w-3.5 h-3.5 text-pink-600" />
+                            <span>History</span>
+                          </button>
                         </td>
                         <td className="px-5 py-4 text-sm space-x-3">
                           <button
@@ -995,6 +1016,13 @@ function Employees() {
           </div>
         </div>
       )}
+
+      {/* Staff History & Client Services Modal */}
+      <StaffHistoryModal
+        isOpen={Boolean(historyEmp)}
+        employee={historyEmp}
+        onClose={() => setHistoryEmp(null)}
+      />
 
       {/* Modern In-App Delete Confirmation Modal */}
       <DeleteConfirmModal
