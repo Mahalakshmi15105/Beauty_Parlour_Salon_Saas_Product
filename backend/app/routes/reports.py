@@ -721,7 +721,7 @@ def get_daily_sales_statement():
     expenses = []
     if tenant_id and branch_id:
         expenses = Expense.query.filter_by(tenant_id=tenant_id, branch_id=branch_id, is_deleted=False).filter(Expense.date == target_date).all()
-    expense_list = [{"note": exp.note or "Expense", "amount": float(exp.amount or 0)} for exp in expenses]
+    expense_list = [{"id": exp.id, "note": exp.note or "Expense", "amount": float(exp.amount or 0)} for exp in expenses]
     total_expenses = float(sum(exp["amount"] for exp in expense_list))
 
     # Cash Denominations

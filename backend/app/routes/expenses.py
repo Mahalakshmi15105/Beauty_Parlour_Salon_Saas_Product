@@ -114,12 +114,12 @@ def create_expense():
 
 
 @expenses_bp.route("/<int:expense_id>", methods=["DELETE"])
-@require_role(["ParlourAdmin", "BranchAdmin"])
+@require_role(["ParlourAdmin", "BranchAdmin", "Receptionist"])
 def delete_expense(expense_id):
-    expense = get_branch_query(Expense).filter_by(id=expense_id, is_deleted=False).first()
+    expense = get_branch_query(Expense).filter_by(id=expense_id).first()
     if not expense:
         return error_response("NOT_FOUND", "Expense record not found.", 404)
 
-    expense.soft_delete()
+    db.session.delete(expense)
     db.session.commit()
     return success_response({"message": "Expense record deleted successfully."})

@@ -8,6 +8,7 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas-pro";
 import XLSX from "xlsx-js-style";
 import { EXCEL_COLORS, styleCell, styleRange } from "../utils/exportUtils";
+import DeleteConfirmModal from "../components/DeleteConfirmModal";
 import { 
   Printer, 
   FileSpreadsheet, 
@@ -25,7 +26,8 @@ import {
   DollarSign,
   Edit2,
   Check,
-  X
+  X,
+  Trash2
 } from "lucide-react";
 
 function Reports() {
@@ -46,6 +48,8 @@ function Reports() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [expenseToDelete, setExpenseToDelete] = useState(null);
+  const [isDeletingExpense, setIsDeletingExpense] = useState(false);
   const reportCanvasRef = useRef(null);
 
   const fetchReport = () => {
@@ -76,6 +80,29 @@ function Reports() {
       .catch((err) => {
         setError(err.message || "Failed to load report data.");
         setLoading(false);
+      });
+  };
+
+  const handleDeleteExpense = (exp) => {
+    if (!exp?.id) return;
+    setExpenseToDelete(exp);
+  };
+
+  const handleConfirmDeleteExpense = () => {
+    if (!expenseToDelete?.id) return;
+    setIsDeletingExpense(true);
+
+    API.delete(`/expenses/${expenseToDelete.id}`)
+      .then(() => {
+        showSuccess("Expense deleted successfully.");
+        setExpenseToDelete(null);
+        fetchReport();
+      })
+      .catch((err) => {
+        showError(err.message || "Failed to delete expense.");
+      })
+      .finally(() => {
+        setIsDeletingExpense(false);
       });
   };
 
@@ -1016,9 +1043,21 @@ function Reports() {
                           <p className="text-slate-400 text-center py-2">No expenses logged today.</p>
                         ) : (
                           (reportData.expenses || []).map((exp, idx) => (
-                            <div key={idx} className="flex justify-between">
-                              <span>{exp.note}</span>
-                              <span className="font-bold text-rose-600 numeric">₹{exp.amount}</span>
+                            <div key={exp.id || idx} className="flex justify-between items-center group py-0.5">
+                              <span className="truncate pr-2">{exp.note}</span>
+                              <div className="flex items-center space-x-1.5 shrink-0">
+                                <span className="font-bold text-rose-600 numeric">₹{exp.amount}</span>
+                                {exp.id && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteExpense(exp)}
+                                    className="text-slate-400 hover:text-rose-600 transition p-1 rounded-md hover:bg-rose-50"
+                                    title="Delete Expense"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           ))
                         )}
@@ -1644,6 +1683,17 @@ function Reports() {
           </div>
         )}
       </div>
+
+      {/* Modern Centered In-App Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={Boolean(expenseToDelete)}
+        title="Delete Expense?"
+        itemName={expenseToDelete ? `${expenseToDelete.note || "Expense"} (₹${expenseToDelete.amount})` : ""}
+        itemType="expense"
+        loading={isDeletingExpense}
+        onConfirm={handleConfirmDeleteExpense}
+        onClose={() => setExpenseToDelete(null)}
+      />
     </div>
   );
 }
