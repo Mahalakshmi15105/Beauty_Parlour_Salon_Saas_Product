@@ -530,6 +530,15 @@ function Billing() {
   const [modalCatHighlightedIndex, setModalCatHighlightedIndex] = useState(0);
   const modalCatComboboxRef = useRef(null);
 
+  const [modalProductId, setModalProductId] = useState("");
+  const [modalProductQty, setModalProductQty] = useState(1);
+  const [productSearchQuery, setProductSearchQuery] = useState("");
+  const [selectedProductIds, setSelectedProductIds] = useState([]);
+  const [productQuantities, setProductQuantities] = useState({});
+  const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
+  const [modalProdHighlightedIndex, setModalProdHighlightedIndex] = useState(0);
+  const modalProdComboboxRef = useRef(null);
+
   // Clean distinct product categories derived from loaded products and categories
   const productCategoriesList = useMemo(() => {
     const catMap = new Map();
@@ -569,15 +578,6 @@ function Billing() {
       }
     }
   }, [modalProdHighlightedIndex, isProductDropdownOpen, showAddProductModal]);
-
-  const [modalProductId, setModalProductId] = useState("");
-  const [modalProductQty, setModalProductQty] = useState(1);
-  const [productSearchQuery, setProductSearchQuery] = useState("");
-  const [selectedProductIds, setSelectedProductIds] = useState([]);
-  const [productQuantities, setProductQuantities] = useState({});
-  const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
-  const [modalProdHighlightedIndex, setModalProdHighlightedIndex] = useState(0);
-  const modalProdComboboxRef = useRef(null);
 
   const quickCustomerModalRef = useRef(null);
   const quickCustomerFormRef = useRef(null);
