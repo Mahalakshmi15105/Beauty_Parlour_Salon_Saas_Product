@@ -10,6 +10,7 @@ from app.utils.responses import success_response, error_response
 from app.utils.auth import require_role, get_tenant_query, get_branch_query
 from app.utils.query import paginate_query, generate_unique_invoice_number
 from decimal import Decimal, ROUND_HALF_UP
+from datetime import datetime, timezone, timedelta
 import logging
 
 logger = logging.getLogger(__name__)
@@ -382,6 +383,20 @@ def checkout():
         # 5. Generate unique sequential invoice number
         invoice_number = generate_unique_invoice_number(g.parlour_id, target_branch_id)
 
+        # Check for custom invoice date (e.g. backdated bill for yesterday or past date)
+        custom_invoice_date = None
+        req_date_str = data.get("invoice_date") or data.get("date")
+        if req_date_str:
+            try:
+                if len(str(req_date_str)) == 10:
+                    parsed_d = datetime.strptime(str(req_date_str), "%Y-%m-%d").date()
+                    now_time = datetime.now().time()
+                    custom_invoice_date = datetime.combine(parsed_d, now_time)
+                else:
+                    custom_invoice_date = datetime.fromisoformat(str(req_date_str).replace("Z", "+00:00"))
+            except Exception as ex:
+                logger.warning(f"Failed to parse custom invoice_date {req_date_str}: {ex}")
+
         # 6. Save Invoice Header
         invoice = Invoice(
             tenant_id=g.parlour_id,
@@ -396,16 +411,26 @@ def checkout():
             membership_name=data.get("membership_name"),
             membership_discount=Decimal(str(data.get("membership_discount", 0.00))) if data.get("membership_discount") else Decimal("0.00")
         )
+        if custom_invoice_date:
+            invoice.created_at = custom_invoice_date
+            invoice.updated_at = custom_invoice_date
+
         db.session.add(invoice)
         db.session.flush()  # obtain invoice.id
 
         # Bind lines and payments to invoice ID
         for line in line_items_to_save:
             line.invoice_id = invoice.id
+            if custom_invoice_date:
+                line.created_at = custom_invoice_date
+                line.updated_at = custom_invoice_date
             db.session.add(line)
 
         for pay in payments_to_save:
             pay.invoice_id = invoice.id
+            if custom_invoice_date:
+                pay.created_at = custom_invoice_date
+                pay.updated_at = custom_invoice_date
             db.session.add(pay)
         # 7. Visit-Based and Points-Based Membership Counter Logic (Branch Scoped)
         if customer_id and str(customer_id) not in ["walkin", "0"]:

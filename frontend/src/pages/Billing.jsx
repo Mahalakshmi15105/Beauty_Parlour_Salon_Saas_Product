@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import API from "../services/api";
 import { useToast } from "../context/ToastContext";
 import { ThermalReceipt, printThermalReceiptElement, downloadThermalReceiptPDF, generateThermalReceiptPDF } from "../components/ThermalReceipt";
@@ -152,6 +152,7 @@ function Billing() {
       selectedGender: "",
       selectedCategoryId: "",
       selectedServiceId: "",
+      billDate: new Date().toISOString().split("T")[0],
       cart: [],
       invoiceTaxAmount: 0,
       isTaxAmountOverridden: false,
@@ -175,6 +176,7 @@ function Billing() {
           categorySearchQuery,
           selectedServiceId,
           serviceSearchQuery,
+          billDate,
           cart,
           invoiceTaxAmount,
           isTaxAmountOverridden,
@@ -204,6 +206,7 @@ function Billing() {
       setCategorySearchQuery(targetTab.categorySearchQuery || "");
       setSelectedServiceId(targetTab.selectedServiceId || "");
       setServiceSearchQuery(targetTab.serviceSearchQuery || "");
+      setBillDate(targetTab.billDate || new Date().toISOString().split("T")[0]);
       setCart(targetTab.cart || []);
       setInvoiceTaxAmount(targetTab.invoiceTaxAmount || 0);
       setIsTaxAmountOverridden(targetTab.isTaxAmountOverridden || false);
@@ -232,6 +235,7 @@ function Billing() {
       categorySearchQuery: "",
       selectedServiceId: "",
       serviceSearchQuery: "",
+      billDate: new Date().toISOString().split("T")[0],
       cart: [],
       invoiceTaxAmount: 0,
       isTaxAmountOverridden: false,
@@ -250,6 +254,7 @@ function Billing() {
     setCategorySearchQuery("");
     setSelectedServiceId("");
     setServiceSearchQuery("");
+    setBillDate(new Date().toISOString().split("T")[0]);
     setServices([]);
     setCart([]);
     setInvoiceTaxAmount(0);
@@ -516,12 +521,54 @@ function Billing() {
     showSuccess(`Membership plan "${selectedPlan.name}" assigned and added to bill! Member discount applied.`);
   };
 
+  const [billDate, setBillDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [modalProductCategory, setModalProductCategory] = useState("");
   const [modalProductCategoryId, setModalProductCategoryId] = useState("");
   const [modalProductCatSearchQuery, setModalProductCatSearchQuery] = useState("");
   const [isModalCatDropdownOpen, setIsModalCatDropdownOpen] = useState(false);
   const [modalCatHighlightedIndex, setModalCatHighlightedIndex] = useState(0);
   const modalCatComboboxRef = useRef(null);
+
+  // Clean distinct product categories derived from loaded products and categories
+  const productCategoriesList = useMemo(() => {
+    const catMap = new Map();
+    // 1. Collect distinct category strings from existing products
+    (products || []).forEach((p) => {
+      const c = (p.category || "").trim();
+      if (c && !catMap.has(c.toLowerCase())) {
+        catMap.set(c.toLowerCase(), c);
+      }
+    });
+    // 2. Also include categories from service_categories that match or are available
+    (categories || []).forEach((c) => {
+      const cName = (c.name || "").trim();
+      if (cName && !catMap.has(cName.toLowerCase())) {
+        catMap.set(cName.toLowerCase(), cName);
+      }
+    });
+    return Array.from(catMap.values()).sort((a, b) => a.localeCompare(b));
+  }, [products, categories]);
+
+  // Auto-scroll highlighted category in product modal
+  useEffect(() => {
+    if (isModalCatDropdownOpen) {
+      const el = document.getElementById(`modal-cat-opt-${modalCatHighlightedIndex}`);
+      if (el && typeof el.scrollIntoView === "function") {
+        el.scrollIntoView({ block: "nearest" });
+      }
+    }
+  }, [modalCatHighlightedIndex, isModalCatDropdownOpen]);
+
+  // Auto-scroll highlighted product in product modal
+  useEffect(() => {
+    if (isProductDropdownOpen && showAddProductModal) {
+      const el = document.getElementById(`modal-prod-opt-${modalProdHighlightedIndex}`);
+      if (el && typeof el.scrollIntoView === "function") {
+        el.scrollIntoView({ block: "nearest" });
+      }
+    }
+  }, [modalProdHighlightedIndex, isProductDropdownOpen, showAddProductModal]);
 
   const [modalProductId, setModalProductId] = useState("");
   const [modalProductQty, setModalProductQty] = useState(1);
@@ -1991,6 +2038,8 @@ function Billing() {
     const payload = {
       client_transaction_id: clientTxId,
       customer_id: selectedCustomerId === "walkin" || !selectedCustomerId ? "walkin" : parseInt(selectedCustomerId),
+      invoice_date: billDate,
+      date: billDate,
       is_tax_enabled: isTaxEnabled,
       tax_rate: isTaxEnabled ? (taxRate || 0) : 0,
       tax_amount: isTaxEnabled ? totalTaxAmount : 0,
@@ -2753,8 +2802,8 @@ function Billing() {
               <span>Step 1 & 2: Customer & Gender Selection</span>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-6">
-              <div ref={customerComboboxRef} className="relative">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+              <div ref={customerComboboxRef} className="relative md:col-span-5">
                 <div className="flex justify-between items-center mb-1">
                   <label className="block text-xs font-bold text-slate-700">Select Customer *</label>
                   {selectedCustomerId && selectedCustomerId !== "walkin" && (
@@ -2980,7 +3029,7 @@ function Billing() {
                 </div>
               </div>
 
-              <div>
+              <div className="md:col-span-3">
                 <label className="block text-xs font-bold text-slate-700 mb-1">Gender (Auto-fetched)</label>
                 <input
                   type="text"
@@ -2990,6 +3039,66 @@ function Billing() {
                   value={selectedGender || ""}
                   className="w-full bg-slate-100 border border-border-soft px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 cursor-not-allowed focus:outline-none"
                 />
+              </div>
+
+              {/* Bill / Invoice Date Selector */}
+              <div className="md:col-span-4">
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-xs font-bold text-slate-700 flex items-center space-x-1">
+                    <Calendar className="w-3.5 h-3.5 text-primary" />
+                    <span>Bill / Invoice Date *</span>
+                  </label>
+                  {billDate !== new Date().toISOString().split("T")[0] && (
+                    <span className="text-[10px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded-md">
+                      Missed / Past Bill
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <input
+                    type="date"
+                    value={billDate}
+                    max={new Date().toISOString().split("T")[0]}
+                    onChange={(e) => setBillDate(e.target.value)}
+                    className={`w-full border px-3.5 py-2 rounded-xl text-xs font-bold focus:outline-none focus:border-primary cursor-pointer transition ${
+                      billDate !== new Date().toISOString().split("T")[0]
+                        ? "bg-amber-50/70 border-amber-300 text-amber-900"
+                        : "bg-background border-border-soft text-slate-900"
+                    }`}
+                  />
+                  <div className="flex items-center space-x-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setBillDate(new Date().toISOString().split("T")[0])}
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition ${
+                        billDate === new Date().toISOString().split("T")[0]
+                          ? "bg-primary text-white"
+                          : "bg-slate-100 hover:bg-slate-200 text-slate-600"
+                      }`}
+                    >
+                      Today
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const y = new Date();
+                        y.setDate(y.getDate() - 1);
+                        setBillDate(y.toISOString().split("T")[0]);
+                      }}
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition ${
+                        billDate === (() => {
+                          const y = new Date();
+                          y.setDate(y.getDate() - 1);
+                          return y.toISOString().split("T")[0];
+                        })()
+                          ? "bg-amber-600 text-white shadow-xs"
+                          : "bg-slate-100 hover:bg-slate-200 text-slate-600"
+                      }`}
+                    >
+                      Yesterday
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -3527,6 +3636,12 @@ function Billing() {
                     setSelectedProductIds([]);
                     setProductQuantities({});
                     setIsProductDropdownOpen(false);
+                    setModalProductCategory("");
+                    setModalProductCategoryId("");
+                    setModalProductCatSearchQuery("");
+                    setIsModalCatDropdownOpen(false);
+                    setModalProductId("");
+                    setModalProductQty(1);
                     setShowAddProductModal(true);
                   }}
                   onKeyDown={(e) => {
@@ -4101,6 +4216,39 @@ function Billing() {
             </div>
 
             <div className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
+              {/* Bill Date Selector inside Payment Modal */}
+              <div className="flex items-center justify-between bg-slate-50 border border-border-soft px-4 py-2.5 rounded-xl">
+                <div className="flex items-center space-x-2">
+                  <Calendar className="w-4 h-4 text-primary" />
+                  <div>
+                    <span className="text-xs font-bold text-slate-800 block">Invoice / Bill Date:</span>
+                    <span className="text-[10px] text-text-secondary">
+                      {billDate === new Date().toISOString().split("T")[0]
+                        ? "Today's Bill"
+                        : `Past-dated bill for ${billDate}`}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="date"
+                    value={billDate}
+                    max={new Date().toISOString().split("T")[0]}
+                    onChange={(e) => setBillDate(e.target.value)}
+                    className="bg-white border border-border-soft px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:border-primary cursor-pointer"
+                  />
+                  {billDate !== new Date().toISOString().split("T")[0] && (
+                    <button
+                      type="button"
+                      onClick={() => setBillDate(new Date().toISOString().split("T")[0])}
+                      className="text-[10px] text-primary hover:underline font-bold"
+                    >
+                      Reset to Today
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <div className="bg-background border border-border-soft p-4 rounded-2xl flex justify-between items-center text-xs">
                 <div>
                   <span className="text-text-secondary block">Net Payable Due:</span>
@@ -5286,10 +5434,10 @@ function Billing() {
 
       {/* ADD SALON RETAIL PRODUCT MODAL */}
       {showAddProductModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 animate-fade-in">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
           <div
             ref={addProductModalRef}
-            className="bg-surface max-w-2xl w-full rounded-2xl shadow-2xl border border-border-soft overflow-hidden p-6 space-y-5"
+            className="bg-surface max-w-2xl w-full rounded-2xl shadow-2xl border border-border-soft overflow-visible p-6 space-y-5 min-h-[380px]"
           >
             <div className="flex justify-between items-center border-b border-border-soft pb-3">
               <div className="flex items-center space-x-2">
@@ -5326,14 +5474,15 @@ function Billing() {
                         setModalProductCatSearchQuery(e.target.value);
                         setIsModalCatDropdownOpen(true);
                         setModalCatHighlightedIndex(0);
+                        setModalProductCategory("");
                         setModalProductCategoryId("");
                       }}
                       onKeyDown={(e) => {
                         const filteredCats = [
-                          { id: "", name: "All Categories" },
-                          ...categories.filter((cat) => {
+                          "All Categories",
+                          ...productCategoriesList.filter((cat) => {
                             if (!modalProductCatSearchQuery) return true;
-                            return cat.name?.toLowerCase().includes(modalProductCatSearchQuery.toLowerCase().trim());
+                            return cat.toLowerCase().includes(modalProductCatSearchQuery.toLowerCase().trim());
                           })
                         ];
 
@@ -5349,8 +5498,10 @@ function Billing() {
                           e.preventDefault();
                           if (isModalCatDropdownOpen && filteredCats.length > 0) {
                             const targetCat = filteredCats[modalCatHighlightedIndex] || filteredCats[0];
-                            setModalProductCategoryId(String(targetCat.id));
-                            setModalProductCatSearchQuery(targetCat.name === "All Categories" ? "" : targetCat.name);
+                            const selectedName = targetCat === "All Categories" ? "" : targetCat;
+                            setModalProductCategory(selectedName);
+                            setModalProductCategoryId(selectedName);
+                            setModalProductCatSearchQuery(selectedName);
                             setIsModalCatDropdownOpen(false);
                             setModalProductId("");
                             setProductSearchQuery("");
@@ -5377,25 +5528,28 @@ function Billing() {
                     {/* Category Dropdown List */}
                     {isModalCatDropdownOpen && (() => {
                       const filteredCats = [
-                        { id: "", name: "All Categories" },
-                        ...categories.filter((cat) => {
+                        "All Categories",
+                        ...productCategoriesList.filter((cat) => {
                           if (!modalProductCatSearchQuery) return true;
-                          return cat.name?.toLowerCase().includes(modalProductCatSearchQuery.toLowerCase().trim());
+                          return cat.toLowerCase().includes(modalProductCatSearchQuery.toLowerCase().trim());
                         })
                       ];
 
                       return (
-                        <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-border-soft rounded-xl shadow-2xl z-[100] max-h-52 overflow-y-auto p-1.5 space-y-1">
-                          {filteredCats.map((cat, idx) => {
+                        <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-border-soft rounded-xl shadow-2xl z-[100] max-h-56 overflow-y-auto p-1.5 space-y-1">
+                          {filteredCats.map((catName, idx) => {
                             const isHighlighted = idx === modalCatHighlightedIndex;
-                            const isSelected = String(cat.id) === String(modalProductCategoryId);
+                            const isSelected = (catName === "All Categories" && !modalProductCategory) || catName === modalProductCategory;
                             return (
                               <button
-                                key={cat.id || "all"}
+                                key={catName}
+                                id={`modal-cat-opt-${idx}`}
                                 type="button"
                                 onClick={() => {
-                                  setModalProductCategoryId(String(cat.id));
-                                  setModalProductCatSearchQuery(cat.name === "All Categories" ? "" : cat.name);
+                                  const selectedName = catName === "All Categories" ? "" : catName;
+                                  setModalProductCategory(selectedName);
+                                  setModalProductCategoryId(selectedName);
+                                  setModalProductCatSearchQuery(selectedName);
                                   setIsModalCatDropdownOpen(false);
                                   setModalProductId("");
                                   setProductSearchQuery("");
@@ -5410,7 +5564,7 @@ function Billing() {
                                   isHighlighted ? "bg-primary-light text-primary" : "text-slate-800 hover:bg-slate-100"
                                 }`}
                               >
-                                <span>{cat.name}</span>
+                                <span>{catName}</span>
                                 {isSelected && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
                               </button>
                             );
@@ -5443,8 +5597,14 @@ function Billing() {
                       }}
                       onKeyDown={(e) => {
                         const filteredProds = products.filter((prod) => {
-                          if (modalProductCategoryId && String(prod.category_id) !== String(modalProductCategoryId) && String(prod.category) !== String(modalProductCategoryId)) {
-                            return false;
+                          if (modalProductCategory && modalProductCategory !== "All Categories") {
+                            const pCat = (prod.category || "").trim().toLowerCase();
+                            const selCat = modalProductCategory.trim().toLowerCase();
+                            const matchName = pCat === selCat;
+                            const matchId = prod.category_id && String(prod.category_id) === String(modalProductCategoryId);
+                            if (!matchName && !matchId) {
+                              return false;
+                            }
                           }
                           if (!productSearchQuery) return true;
                           const q = productSearchQuery.toLowerCase().trim();
@@ -5496,8 +5656,14 @@ function Billing() {
                     {/* Product Dropdown List */}
                     {isProductDropdownOpen && (() => {
                       const filteredProds = products.filter((prod) => {
-                        if (modalProductCategoryId && String(prod.category_id) !== String(modalProductCategoryId) && String(prod.category) !== String(modalProductCategoryId)) {
-                          return false;
+                        if (modalProductCategory && modalProductCategory !== "All Categories") {
+                          const pCat = (prod.category || "").trim().toLowerCase();
+                          const selCat = modalProductCategory.trim().toLowerCase();
+                          const matchName = pCat === selCat;
+                          const matchId = prod.category_id && String(prod.category_id) === String(modalProductCategoryId);
+                          if (!matchName && !matchId) {
+                            return false;
+                          }
                         }
                         if (!productSearchQuery) return true;
                         const q = productSearchQuery.toLowerCase().trim();
@@ -5518,6 +5684,7 @@ function Billing() {
                               return (
                                 <button
                                   key={prod.id}
+                                  id={`modal-prod-opt-${idx}`}
                                   type="button"
                                   onClick={() => {
                                     setModalProductId(String(prod.id));
