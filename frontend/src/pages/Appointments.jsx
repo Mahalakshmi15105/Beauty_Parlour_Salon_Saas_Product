@@ -345,31 +345,36 @@ function Appointments() {
     // Format phone number with country code (91 if 10 digits)
     const targetPhone = rawPhone.length === 10 ? `91${rawPhone}` : rawPhone;
 
+    // Professional salon quotes
+    const quotes = [
+      "You’re one appointment away from a better mood.",
+      "Self-care isn’t selfish. It’s scheduled.",
+      "Your glow-up starts now. We can't wait to see you!",
+      "Enter as a client. Leave feeling like royalty."
+    ];
+    const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+
     const lines = [];
-    lines.push(`✨ *${parlourName}* ✨`);
-    lines.push(`📅 *APPOINTMENT CONFIRMATION*`);
+    lines.push(`*${parlourName}*`);
+    lines.push(`*APPOINTMENT CONFIRMATION*`);
     lines.push(`────────────────────────`);
-    lines.push(`👤 *Client:* ${app.customer_name || "Valued Client"}`);
-    lines.push(`🔖 *Ref No:* ${app.appointment_number}`);
-    lines.push(`📆 *Date:* ${app.appointment_date}`);
-    lines.push(`⏰ *Time:* ${app.start_time_12h || app.start_time || "Scheduled"} (${app.estimated_duration_minutes || 30} mins)`);
-    if (app.token_number) {
-      lines.push(`🔢 *Token:* #${app.token_number}`);
-    }
+    lines.push(`*Client:* ${app.customer_name || "Valued Client"}`);
+    lines.push(`*Date:* ${app.appointment_date}`);
+    lines.push(`*Time:* ${app.start_time_12h || app.start_time || "Scheduled"} (${app.estimated_duration_minutes || 30} mins)`);
 
     const services = (app.items || []).map((it) => it.service_name).filter(Boolean);
     if (services.length > 0) {
-      lines.push(`💇 *Services:* ${services.join(", ")}`);
+      lines.push(`*Services:* ${services.join(", ")}`);
     }
 
     const staff = (app.items || []).map((it) => it.employee_name).filter(Boolean);
     if (staff.length > 0) {
-      lines.push(`👩‍💼 *Staff:* ${[...new Set(staff)].join(", ")}`);
+      lines.push(`*Staff:* ${[...new Set(staff)].join(", ")}`);
     }
 
-    lines.push(`📌 *Status:* ${app.status || "Booked"}`);
+    lines.push(`*Status:* ${app.status || "Booked"}`);
     lines.push(`────────────────────────`);
-    lines.push(`Thank you for booking with us! We look forward to seeing you.`);
+    lines.push(`"${randomQuote}"`);
 
     const encodedText = encodeURIComponent(lines.join("\n"));
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
