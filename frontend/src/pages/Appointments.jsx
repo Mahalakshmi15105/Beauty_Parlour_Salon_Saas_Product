@@ -302,7 +302,9 @@ function Appointments() {
     API.post("/appointments", payload)
       .then((res) => {
         console.log("[Appointments] Save Success Response:", res);
-        setActionSuccess(res?.message || res?.data?.message || "Appointment booked successfully!");
+        const bookedApp = res?.data || res;
+        const successMsg = res?.message || res?.data?.message || `Appointment ${bookedApp?.appointment_number || ''} booked successfully.`;
+        setActionSuccess({ message: successMsg, appointment: bookedApp });
         // Reset form
         setPhoneInput("");
         setCustomerData({
@@ -325,6 +327,58 @@ function Appointments() {
         setActionError(msg);
       })
       .finally(() => setSavingAppointment(false));
+  };
+
+  // Send Appointment Details via WhatsApp
+  const handleSendWhatsAppAppointment = (app) => {
+    if (!app) return;
+    const rawPhone = (app.customer_phone || "").replace(/[^0-9]/g, "");
+    if (!rawPhone) {
+      showError("Customer phone number is missing.");
+      return;
+    }
+
+    const businessProfile = JSON.parse(localStorage.getItem("tenant") || "{}");
+    const userObj = JSON.parse(localStorage.getItem("user") || "{}");
+    const parlourName = (businessProfile?.name || userObj?.parlour_name || "NEGHA PARLOUR").toUpperCase();
+
+    // Format phone number with country code (91 if 10 digits)
+    const targetPhone = rawPhone.length === 10 ? `91${rawPhone}` : rawPhone;
+
+    const lines = [];
+    lines.push(`✨ *${parlourName}* ✨`);
+    lines.push(`📅 *APPOINTMENT CONFIRMATION*`);
+    lines.push(`────────────────────────`);
+    lines.push(`👤 *Client:* ${app.customer_name || "Valued Client"}`);
+    lines.push(`🔖 *Ref No:* ${app.appointment_number}`);
+    lines.push(`📆 *Date:* ${app.appointment_date}`);
+    lines.push(`⏰ *Time:* ${app.start_time_12h || app.start_time || "Scheduled"} (${app.estimated_duration_minutes || 30} mins)`);
+    if (app.token_number) {
+      lines.push(`🔢 *Token:* #${app.token_number}`);
+    }
+
+    const services = (app.items || []).map((it) => it.service_name).filter(Boolean);
+    if (services.length > 0) {
+      lines.push(`💇 *Services:* ${services.join(", ")}`);
+    }
+
+    const staff = (app.items || []).map((it) => it.employee_name).filter(Boolean);
+    if (staff.length > 0) {
+      lines.push(`👩‍💼 *Staff:* ${[...new Set(staff)].join(", ")}`);
+    }
+
+    lines.push(`📌 *Status:* ${app.status || "Booked"}`);
+    lines.push(`────────────────────────`);
+    lines.push(`Thank you for booking with us! We look forward to seeing you.`);
+
+    const encodedText = encodeURIComponent(lines.join("\n"));
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const waUrl = isMobile
+      ? `https://api.whatsapp.com/send?phone=${targetPhone}&text=${encodedText}`
+      : `https://web.whatsapp.com/send?phone=${targetPhone}&text=${encodedText}`;
+
+    window.open(waUrl, "_blank");
+    showSuccess(`Opening WhatsApp for ${app.customer_name} (${rawPhone})...`);
   };
 
   // Status Change Handler
@@ -512,9 +566,21 @@ function Appointments() {
       )}
 
       {actionSuccess && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-bold flex items-center space-x-2">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
-          <span>{actionSuccess}</span>
+        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-bold flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <span>{typeof actionSuccess === "string" ? actionSuccess : actionSuccess.message}</span>
+          </div>
+          {typeof actionSuccess === "object" && actionSuccess.appointment && (
+            <button
+              type="button"
+              onClick={() => handleSendWhatsAppAppointment(actionSuccess.appointment)}
+              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center space-x-1.5 shadow-xs transition"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>Send WhatsApp</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -672,14 +738,11 @@ function Appointments() {
                       <div className="space-y-1 border-t border-border-soft pt-2">
                         <p className="text-[11px] font-bold text-text-secondary uppercase">Services Rendered:</p>
                         {app.items?.map((it, idx) => (
-                          <div key={idx} className="flex justify-between items-center bg-surface p-2 rounded-xl border border-border-soft">
-                            <div>
-                              <p className="font-bold text-text-primary">{it.service_name}</p>
-                              {it.employee_name && (
-                                <p className="text-[10px] text-text-secondary">Staff: {it.employee_name}</p>
-                              )}
-                            </div>
-                            <span className="font-bold text-primary">{formatCurrency(it.price)}</span>
+                          <div key={idx} className="bg-surface p-2 rounded-xl border border-border-soft">
+                            <p className="font-bold text-text-primary">{it.service_name}</p>
+                            {it.employee_name && (
+                              <p className="text-[10px] text-text-secondary">Staff: {it.employee_name}</p>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -737,6 +800,16 @@ function Appointments() {
                           </button>
                         </>
                       )}
+
+                      <button
+                        type="button"
+                        onClick={() => handleSendWhatsAppAppointment(app)}
+                        className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold transition flex items-center space-x-1 shadow-xs ml-auto"
+                        title="Send Appointment Details via WhatsApp"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>WhatsApp</span>
+                      </button>
                     </div>
                   </div>
                 ))}

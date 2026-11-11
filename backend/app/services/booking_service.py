@@ -344,7 +344,12 @@ class BookingService:
                 if employee_id:
                     emp_filter = [Employee.id == employee_id, Employee.tenant_id == tenant_id, Employee.is_deleted == False]
                     if target_branch_id:
-                        emp_filter.append(Employee.branch_id == target_branch_id)
+                        emp_filter.append(
+                            db.or_(
+                                Employee.branch_id == target_branch_id,
+                                Employee.branch_id.is_(None)
+                            )
+                        )
                     employee = Employee.query.filter(*emp_filter).first()
                     if not employee:
                         return False, {"error_code": "VALIDATION_FAILED", "message": f"Selected staff (ID: {employee_id}) not found or does not belong to this branch."}, 400
