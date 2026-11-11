@@ -54,6 +54,7 @@ function Services() {
   const [serviceForm, setServiceForm] = useState({
     name: "",
     category_id: "",
+    sac_code: "",
     price: "",
     status: "active",
     image_url: "",
@@ -300,6 +301,7 @@ function Services() {
     setServiceForm({
       name: "",
       category_id: "",
+      sac_code: "",
       price: "",
       image_url: "",
       status: "active",
@@ -313,6 +315,7 @@ function Services() {
     setServiceForm({
       name: s.name || "",
       category_id: s.category_id || "",
+      sac_code: s.sac_code || "",
       price: s.price || "",
       image_url: s.image_url || "",
       status: s.status || "active",
@@ -746,6 +749,17 @@ function Services() {
                     onChange={(e) => handleServicePriceChange(e.target.value)}
                     className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-sm focus:outline-none numeric-input"
                     placeholder="0.00"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">SAC Code (GST Service Code)</label>
+                  <input
+                    type="text"
+                    value={serviceForm.sac_code || ""}
+                    onChange={(e) => setServiceForm({ ...serviceForm, sac_code: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-sm focus:outline-none"
+                    placeholder="e.g. 999721"
                   />
                 </div>
 

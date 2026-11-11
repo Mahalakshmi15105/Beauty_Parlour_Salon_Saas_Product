@@ -57,6 +57,7 @@ function Products() {
     category: "",
     sku: "",
     barcode: "",
+    hsn_code: "",
     cost_price: "",
     selling_price: "",
     mrp: "",
@@ -282,6 +283,7 @@ function Products() {
       category: "",
       sku: "",
       barcode: "",
+      hsn_code: "",
       cost_price: "",
       selling_price: "",
       mrp: "",
@@ -300,6 +302,7 @@ function Products() {
       category: p.category || "",
       sku: p.sku || "",
       barcode: p.barcode || "",
+      hsn_code: p.hsn_code || "",
       cost_price: p.cost_price || "",
       selling_price: p.selling_price || "",
       mrp: p.mrp || "",
@@ -1305,7 +1308,7 @@ function Products() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Barcode</label>
                   <input
@@ -1313,6 +1316,17 @@ function Products() {
                     value={formData.barcode}
                     onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
                     className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-sm focus:outline-none"
+                    placeholder="Optional barcode"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">HSN Code (GST)</label>
+                  <input
+                    type="text"
+                    value={formData.hsn_code || ""}
+                    onChange={(e) => setFormData({ ...formData, hsn_code: e.target.value })}
+                    className="w-full bg-background border border-border-soft px-3 py-2 rounded-xl text-sm focus:outline-none"
+                    placeholder="e.g. 3305"
                   />
                 </div>
                 <div>

@@ -302,6 +302,7 @@ def get_services():
         data.append({
             "id": s.id,
             "name": s.name or "",
+            "sac_code": getattr(s, "sac_code", None) or "",
             "price": float(s.price or 0.0),
             "duration_minutes": s.duration_minutes or 0,
             "status": s.status or "active",
@@ -348,6 +349,7 @@ def get_service(service_id):
     return success_response({
         "id": service.id,
         "name": service.name or "",
+        "sac_code": getattr(service, "sac_code", None) or "",
         "price": float(service.price or 0.0),
         "duration_minutes": service.duration_minutes or 0,
         "status": service.status or "active",
@@ -415,6 +417,7 @@ def create_service():
             branch_id=target_branch_id,
             category_id=category_id,
             name=name,
+            sac_code=data.get("sac_code", "").strip() or None,
             price=price_val,
             duration_minutes=dur_val,
             description=data.get("description"),
@@ -518,6 +521,8 @@ def update_service(service_id):
 
     try:
         service.name = name
+        if "sac_code" in data:
+            service.sac_code = data.get("sac_code", "").strip() or None
         service.category_id = category_id
         service.price = price_val
         service.duration_minutes = dur_val

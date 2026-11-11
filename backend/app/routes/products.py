@@ -73,6 +73,7 @@ def get_products():
                 "category": p.category or "",
                 "sku": p.sku or "",
                 "barcode": p.barcode or "",
+                "hsn_code": getattr(p, "hsn_code", None) or "",
                 "cost_price": float(p.cost_price or 0.0),
                 "selling_price": float(p.selling_price or 0.0),
                 "mrp": float(p.mrp or 0.0),
@@ -119,6 +120,7 @@ def get_product(product_id):
         "category": product.category or "",
         "sku": product.sku or "",
         "barcode": product.barcode or "",
+        "hsn_code": getattr(product, "hsn_code", None) or "",
         "cost_price": float(product.cost_price or 0.0),
         "selling_price": float(product.selling_price or 0.0),
         "mrp": float(product.mrp or 0.0),
@@ -195,6 +197,7 @@ def create_product():
             category=data.get("category"),
             sku=sku,
             barcode=barcode,
+            hsn_code=data.get("hsn_code", "").strip() or None,
             cost_price=cp_val,
             selling_price=sp_val,
             mrp=mrp_val,
@@ -291,6 +294,8 @@ def update_product(product_id):
         product.category = data.get("category")
         product.sku = sku
         product.barcode = barcode
+        if "hsn_code" in data:
+            product.hsn_code = data.get("hsn_code", "").strip() or None
         product.cost_price = cp_val
         product.selling_price = sp_val
         product.mrp = mrp_val

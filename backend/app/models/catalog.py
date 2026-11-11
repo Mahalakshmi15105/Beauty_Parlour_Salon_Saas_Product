@@ -26,6 +26,7 @@ class Service(db.Model, TimestampMixin, SoftDeleteMixin):
     branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True, index=True)
     category_id = db.Column(db.Integer, db.ForeignKey("service_categories.id"), nullable=False, index=True)
     name = db.Column(db.String(150), nullable=False)
+    sac_code = db.Column(db.String(50), nullable=True)
     price = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
     duration_minutes = db.Column(db.Integer, nullable=False, default=30)
     status = db.Column(db.String(50), nullable=False, default="active")  # active, inactive
@@ -51,6 +52,7 @@ class Product(db.Model, TimestampMixin, SoftDeleteMixin):
     category = db.Column(db.String(100), nullable=True)
     sku = db.Column(db.String(100), nullable=True, index=True)
     barcode = db.Column(db.String(100), nullable=True, index=True)
+    hsn_code = db.Column(db.String(50), nullable=True)
     cost_price = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
     selling_price = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
     mrp = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)

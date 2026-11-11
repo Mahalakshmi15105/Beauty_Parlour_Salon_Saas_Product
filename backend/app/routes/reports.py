@@ -31,6 +31,13 @@ REQUIRED_TABLE_COLUMNS = {
 
 def parse_date_range(preset, start_str=None, end_str=None):
     now = datetime.now(timezone.utc)
+    if start_str and end_str:
+        try:
+            start = datetime.strptime(start_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            end = datetime.strptime(end_str, "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1) - timedelta(microseconds=1)
+            return start, end
+        except ValueError:
+            pass
     if preset == "today":
         start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
         end = now
@@ -147,39 +154,117 @@ def get_tax_report():
     preset = request.args.get("preset", "30days")
     start_date, end_date = parse_date_range(preset, request.args.get("start_date"), request.args.get("end_date"))
 
-    tax_q = db.session.query(
-        cast(Invoice.created_at, Date).label("date"),
-        func.sum(Invoice.subtotal).label("gross_subtotal"),
-        func.sum(Invoice.discount).label("discount"),
-        func.sum(Invoice.tax).label("tax_collected"),
-        func.sum(Invoice.total).label("net_total")
-    ).filter(
-        Invoice.tenant_id == g.parlour_id,
-        Invoice.status != "Voided",
+    query = get_branch_query(Invoice).filter(
         Invoice.created_at >= start_date,
-        Invoice.created_at <= end_date
-    )
-    if g.branch_id:
-        tax_q = tax_q.filter(Invoice.branch_id == g.branch_id)
-    tax_query = tax_q.group_by(cast(Invoice.created_at, Date)).order_by(cast(Invoice.created_at, Date).desc()).all()
+        Invoice.created_at <= end_date,
+        Invoice.status != "Voided"
+    ).order_by(Invoice.created_at.desc())
+
+    invoices = query.all()
 
     items = []
+    total_taxable_value = Decimal("0.00")
     total_tax_collected = Decimal("0.00")
+    total_discount = Decimal("0.00")
+    total_invoice_value = Decimal("0.00")
 
-    for row in tax_query:
-        tax_val = row.tax_collected or Decimal("0.00")
+    for inv in invoices:
+        cust_name = f"{inv.customer.first_name} {inv.customer.last_name or ''}".strip() if inv.customer else "Walk-In Client"
+        discount_val = inv.discount or Decimal("0.00")
+        subtotal_val = inv.subtotal or Decimal("0.00")
+        tax_val = inv.tax or Decimal("0.00")
+        total_val = inv.total or Decimal("0.00")
+
+        # Taxable value is gross subtotal minus discount
+        taxable_val = max(Decimal("0.00"), subtotal_val - discount_val)
+
+        # Calculate effective GST rate
+        if taxable_val > 0 and tax_val > 0:
+            rate_num = round((tax_val / taxable_val) * Decimal("100.00"), 1)
+            tax_rate_str = f"{int(rate_num)}%" if rate_num == int(rate_num) else f"{rate_num}%"
+        elif tax_val > 0:
+            tax_rate_str = "5%"
+        else:
+            tax_rate_str = "0%"
+
+        # Item details with SAC/HSN codes
+        details_list = []
+        line_items_detail = []
+        for li in inv.line_items:
+            if li.service_id and li.service:
+                s_name = li.service.name
+                sac = getattr(li.service, "sac_code", None)
+                code_text = f"SAC: {sac}" if sac else ""
+                details_list.append(f"{s_name} ({code_text})" if code_text else s_name)
+                line_items_detail.append({
+                    "name": s_name,
+                    "type": "Service",
+                    "code_type": "SAC",
+                    "code": sac or "—",
+                    "quantity": li.quantity or 1,
+                    "unit_price": float(li.unit_price or 0.0),
+                    "line_total": float(li.line_total or 0.0)
+                })
+            elif li.product_id and li.product:
+                p_name = li.product.name
+                hsn = getattr(li.product, "hsn_code", None)
+                code_text = f"HSN: {hsn}" if hsn else ""
+                details_list.append(f"{p_name} ({code_text})" if code_text else p_name)
+                line_items_detail.append({
+                    "name": p_name,
+                    "type": "Product",
+                    "code_type": "HSN",
+                    "code": hsn or "—",
+                    "quantity": li.quantity or 1,
+                    "unit_price": float(li.unit_price or 0.0),
+                    "line_total": float(li.line_total or 0.0)
+                })
+            else:
+                details_list.append("General Service")
+                line_items_detail.append({
+                    "name": "General Service",
+                    "type": "Service",
+                    "code_type": "SAC",
+                    "code": "—",
+                    "quantity": li.quantity or 1,
+                    "unit_price": float(li.unit_price or 0.0),
+                    "line_total": float(li.line_total or 0.0)
+                })
+
+        details_str = ", ".join(details_list) if details_list else "—"
+
+        total_taxable_value += taxable_val
         total_tax_collected += tax_val
+        total_discount += discount_val
+        total_invoice_value += total_val
+
         items.append({
-            "date": row.date.strftime("%Y-%m-%d") if row.date else "",
-            "gross_subtotal": float(row.gross_subtotal or 0.0),
-            "discount": float(row.discount or 0.0),
-            "tax_collected": float(tax_val),
-            "net_total": float(row.net_total or 0.0)
+            "id": inv.id,
+            "invoice_number": inv.invoice_number,
+            "invoice_date": inv.created_at.strftime("%Y-%m-%d"),
+            "customer_name": cust_name,
+            "details": details_str,
+            "line_items_detail": line_items_detail,
+            "taxable_value": float(taxable_val),
+            "tax_rate": tax_rate_str,
+            "tax_amount": float(tax_val),
+            "discount": float(discount_val),
+            "invoice_value": float(total_val),
+            "status": inv.status
         })
 
     return success_response({
+        "summary": {
+            "total_invoices": len(invoices),
+            "total_taxable_value": float(total_taxable_value),
+            "total_tax_collected": float(total_tax_collected),
+            "total_discount": float(total_discount),
+            "total_invoice_value": float(total_invoice_value)
+        },
+        "items": items,
         "total_tax_collected": float(total_tax_collected),
-        "daily_tax_logs": items
+        "start_date": start_date.strftime("%Y-%m-%d"),
+        "end_date": end_date.strftime("%Y-%m-%d")
     })
 
 
