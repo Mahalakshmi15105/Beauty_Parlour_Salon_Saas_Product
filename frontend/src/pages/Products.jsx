@@ -3,7 +3,7 @@ import API from "../services/api";
 import { useToast } from "../context/ToastContext";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { useModalFocusTrap, useFormKeyboardNavigation } from "../utils/keyboardNavigation";
-import { AlertTriangle, X, Printer, FileSpreadsheet, FileText, Boxes, Users, ClipboardList, Plus, Trash2, Edit, CheckCircle, Upload, HardDrive } from "lucide-react";
+import { AlertTriangle, X, Printer, FileSpreadsheet, FileText, Boxes, Users, ClipboardList, Plus, Trash2, Edit, CheckCircle, Upload, HardDrive, Loader2 } from "lucide-react";
 import { exportToCSV, printDataList, exportToPDF, exportToExcel } from "../utils/exportUtils";
 import BulkUploadModal from "../components/BulkUploadModal";
 import DeleteConfirmModal from "../components/DeleteConfirmModal";
@@ -51,6 +51,7 @@ function Products() {
   // Product Form Modal State
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -316,14 +317,20 @@ function Products() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
     const action = editId ? API.put(`/products/${editId}`, formData) : API.post("/products", formData);
     action
       .then(() => {
         setShowModal(false);
+        showSuccess(editId ? "Product updated successfully!" : "Product created successfully!");
         fetchProducts(cursor);
       })
       .catch((err) => {
-        showError(err.message || "Operation failed.");
+        const errorMsg = err.response?.data?.message || err.message || "Failed to save product.";
+        showError(errorMsg);
+      })
+      .finally(() => {
+        setIsSubmitting(false);
       });
   };
 
@@ -1469,9 +1476,11 @@ function Products() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs sm:text-sm font-bold shadow-xs"
+                  disabled={isSubmitting}
+                  className="px-5 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs sm:text-sm font-bold shadow-xs disabled:opacity-50 flex items-center gap-2 cursor-pointer"
                 >
-                  Save Product
+                  {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {isSubmitting ? "Saving..." : "Save Product"}
                 </button>
               </div>
             </form>

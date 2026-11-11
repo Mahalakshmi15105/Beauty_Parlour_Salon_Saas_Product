@@ -136,9 +136,9 @@ def get_product(product_id):
 @require_role(["ParlourAdmin", "BranchAdmin"])
 def create_product():
     data = request.get_json() or {}
-    name = data.get("name", "").strip()
-    sku = data.get("sku", "").strip() or None
-    barcode = data.get("barcode", "").strip() or None
+    name = str(data.get("name") or "").strip()
+    sku = str(data.get("sku") or "").strip() or None
+    barcode = str(data.get("barcode") or "").strip() or None
     cost_price = data.get("cost_price", 0.00)
     selling_price = data.get("selling_price", 0.00)
     mrp = data.get("mrp", 0.00)
@@ -197,7 +197,7 @@ def create_product():
             category=data.get("category"),
             sku=sku,
             barcode=barcode,
-            hsn_code=data.get("hsn_code", "").strip() or None,
+            hsn_code=str(data.get("hsn_code") or "").strip() or None,
             cost_price=cp_val,
             selling_price=sp_val,
             mrp=mrp_val,
@@ -208,6 +208,9 @@ def create_product():
         )
         db.session.add(product)
         db.session.commit()
+        from app.services.cache import cache
+        cache.delete_pattern(f"products:{g.parlour_id}:*")
+        cache.delete_pattern("products:*")
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error creating product: {str(e)}")
@@ -239,9 +242,9 @@ def update_product(product_id):
         )
 
     data = request.get_json() or {}
-    name = data.get("name", "").strip()
-    sku = data.get("sku", "").strip() or None
-    barcode = data.get("barcode", "").strip() or None
+    name = str(data.get("name") or "").strip()
+    sku = str(data.get("sku") or "").strip() or None
+    barcode = str(data.get("barcode") or "").strip() or None
     cost_price = data.get("cost_price", 0.00)
     selling_price = data.get("selling_price", 0.00)
     mrp = data.get("mrp", 0.00)
@@ -295,7 +298,7 @@ def update_product(product_id):
         product.sku = sku
         product.barcode = barcode
         if "hsn_code" in data:
-            product.hsn_code = data.get("hsn_code", "").strip() or None
+            product.hsn_code = str(data.get("hsn_code") or "").strip() or None
         product.cost_price = cp_val
         product.selling_price = sp_val
         product.mrp = mrp_val
@@ -305,6 +308,9 @@ def update_product(product_id):
         if "image_url" in data:
             product.image_url = data.get("image_url")
         db.session.commit()
+        from app.services.cache import cache
+        cache.delete_pattern(f"products:{g.parlour_id}:*")
+        cache.delete_pattern("products:*")
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error updating product: {str(e)}")
@@ -331,6 +337,9 @@ def delete_product(product_id):
     try:
         product.soft_delete()
         db.session.commit()
+        from app.services.cache import cache
+        cache.delete_pattern(f"products:{g.parlour_id}:*")
+        cache.delete_pattern("products:*")
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error deleting product: {str(e)}")

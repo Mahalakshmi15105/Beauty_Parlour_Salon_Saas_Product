@@ -1355,11 +1355,12 @@ function Reports() {
 
                 {/* Unified GST Sales & Tax Invoice Table */}
                 <div className="border border-slate-200 rounded-2xl overflow-x-auto">
-                  <div className="bg-pink-600 text-white py-2.5 px-4 flex justify-between items-center text-xs font-black tracking-wider uppercase">
-                    <span>GST SALES & TAX INVOICE REPORT</span>
-                    <span>RANGE: {startDate} TO {endDate}</span>
-                  </div>
-                  <table className="w-full text-left text-xs border-collapse">
+                  <div className="min-w-full inline-block align-top">
+                    <div className="bg-pink-600 text-white py-2.5 px-4 flex justify-between items-center text-xs font-black tracking-wider uppercase">
+                      <span>GST SALES & TAX INVOICE REPORT</span>
+                      <span>RANGE: {startDate} TO {endDate}</span>
+                    </div>
+                    <table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="bg-slate-100 font-bold text-slate-700 border-b border-slate-200">
                         <th className="p-3 text-center">S.NO</th>
@@ -1447,6 +1448,7 @@ function Reports() {
                       </tr>
                     </tfoot>
                   </table>
+                  </div>
                 </div>
               </div>
             )}
@@ -1479,7 +1481,8 @@ function Reports() {
                 </div>
 
                 <div className="border border-slate-200 rounded-2xl overflow-x-auto">
-                  <div className="bg-indigo-600 text-white py-2.5 px-4 flex justify-between items-center text-xs font-black tracking-wider uppercase">
+                  <div className="min-w-full inline-block align-top">
+                    <div className="bg-indigo-600 text-white py-2.5 px-4 flex justify-between items-center text-xs font-black tracking-wider uppercase">
                     <span>STAFF PERFORMANCE & COMMISSIONS</span>
                     <span>RANGE: {startDate} TO {endDate}</span>
                   </div>
@@ -1526,6 +1529,7 @@ function Reports() {
                       </tr>
                     </tfoot>
                   </table>
+                  </div>
                 </div>
               </div>
             )}
@@ -1558,7 +1562,8 @@ function Reports() {
                 </div>
 
                 <div className="border border-slate-200 rounded-2xl overflow-x-auto">
-                  <div className="bg-rose-600 text-white py-2.5 px-4 flex justify-between items-center text-xs font-black tracking-wider uppercase">
+                  <div className="min-w-full inline-block align-top">
+                    <div className="bg-rose-600 text-white py-2.5 px-4 flex justify-between items-center text-xs font-black tracking-wider uppercase">
                     <span>PRODUCT PERFORMANCE & SALES LEDGER</span>
                     <span>RANGE: {startDate} TO {endDate}</span>
                   </div>
@@ -1604,6 +1609,7 @@ function Reports() {
                       </tr>
                     </tfoot>
                   </table>
+                  </div>
                 </div>
               </div>
             )}
