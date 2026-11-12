@@ -219,19 +219,23 @@ def get_tax_report():
         else:
             payment_mode = "Cash"
 
-        # 1. Item details with separate SAC / HSN codes
+        # 1. Item details with separate SAC / HSN codes and Service/Product break-up
         service_names = []
         codes_list = []
         details_list = []
         line_items_detail = []
+        service_val = Decimal("0.00")
+        product_val = Decimal("0.00")
 
         for li in inv.line_items:
+            line_tot = Decimal(str(li.line_total or 0.00))
             if li.service_id and li.service:
                 s_name = li.service.name
                 sac = getattr(li.service, "sac_code", None) or "9997"
                 service_names.append(s_name)
                 codes_list.append(f"SAC: {sac}")
                 details_list.append(f"{s_name} (SAC: {sac})")
+                service_val += line_tot
                 line_items_detail.append({
                     "name": s_name,
                     "type": "Service",
@@ -247,6 +251,7 @@ def get_tax_report():
                 service_names.append(p_name)
                 codes_list.append(f"HSN: {hsn}")
                 details_list.append(f"{p_name} (HSN: {hsn})")
+                product_val += line_tot
                 line_items_detail.append({
                     "name": p_name,
                     "type": "Product",
@@ -260,6 +265,7 @@ def get_tax_report():
                 service_names.append("General Service")
                 codes_list.append("SAC: 9997")
                 details_list.append("General Service (SAC: 9997)")
+                service_val += line_tot
                 line_items_detail.append({
                     "name": "General Service",
                     "type": "Service",
@@ -269,6 +275,21 @@ def get_tax_report():
                     "unit_price": float(li.unit_price or 0.0),
                     "line_total": float(li.line_total or 0.0)
                 })
+
+        # Separate break-up of product value and service value (net of discount if any)
+        total_lines = service_val + product_val
+        if total_lines > 0 and discount_val > 0:
+            s_ratio = service_val / total_lines
+            p_ratio = product_val / total_lines
+            net_service_val = max(Decimal("0.00"), round(service_val - (discount_val * s_ratio), 2))
+            net_product_val = max(Decimal("0.00"), round(product_val - (discount_val * p_ratio), 2))
+        else:
+            net_service_val = service_val
+            net_product_val = product_val
+
+        has_services = net_service_val > 0 or any(li.get("type") == "Service" for li in line_items_detail)
+        has_products = net_product_val > 0 or any(li.get("type") == "Product" for li in line_items_detail)
+        supply_type = "Both" if (has_services and has_products) else ("Product" if has_products else "Service")
 
         service_details_str = ", ".join(service_names) if service_names else "General Service"
         sac_hsn_str = ", ".join(list(dict.fromkeys(codes_list))) if codes_list else "SAC: 9997"
@@ -288,7 +309,10 @@ def get_tax_report():
             "sac_hsn_code": sac_hsn_str,
             "details": details_str,
             "line_items_detail": line_items_detail,
+            "service_value": float(net_service_val),
+            "product_value": float(net_product_val),
             "taxable_value": float(taxable_val),
+            "supply_type": supply_type,
             "tax_rate": tax_rate_str,
             "tax_amount": float(tax_val),
             "discount": float(discount_val),
@@ -298,10 +322,14 @@ def get_tax_report():
         })
 
     summary_tax_rate = rate_setting_str
+    total_service_value = sum(Decimal(str(it.get("service_value", 0.00))) for it in items)
+    total_product_value = sum(Decimal(str(it.get("product_value", 0.00))) for it in items)
 
     return success_response({
         "summary": {
             "total_invoices": len(invoices),
+            "total_service_value": float(total_service_value),
+            "total_product_value": float(total_product_value),
             "total_taxable_value": float(total_taxable_value),
             "total_tax_collected": float(total_tax_collected),
             "total_discount": float(total_discount),

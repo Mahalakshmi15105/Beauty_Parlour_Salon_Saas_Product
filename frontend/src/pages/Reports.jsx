@@ -714,6 +714,8 @@ function Reports() {
         { header: "CUSTOMER NAME", accessor: "customer_name" },
         { header: "SERVICE / PRODUCT DETAILS", accessor: (row) => row.service_details || row.details || "—" },
         { header: "SAC / HSN CODE", accessor: (row) => row.sac_hsn_code || "SAC: 9997" },
+        { header: "SERVICE VALUE", accessor: (row) => Number(row.service_value || 0).toFixed(2) },
+        { header: "PRODUCT VALUE", accessor: (row) => Number(row.product_value || 0).toFixed(2) },
         { header: "TAXABLE VALUE", accessor: (row) => Number(row.taxable_value || 0).toFixed(2) },
         { header: "GST TAX RATE", accessor: (row) => row.tax_rate ?? "0%" },
         { header: "GST TAX AMOUNT COLLECTED", accessor: (row) => Number(row.tax_amount || 0).toFixed(2) },
@@ -1324,31 +1326,45 @@ function Reports() {
             {(reportType === "tax" || reportType === "sales") && (
               <div className="p-6 space-y-6">
                 {/* Summary Metric Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl space-y-1">
-                    <p className="text-[11px] font-bold text-emerald-800 uppercase tracking-wide">Total Invoice Value</p>
-                    <p className="text-xl font-black text-emerald-700 numeric">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+                  <div className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-2xl space-y-1">
+                    <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wide">Total Invoice Value</p>
+                    <p className="text-lg font-black text-emerald-700 numeric">
                       ₹{(reportData.summary?.total_invoice_value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </p>
                     <p className="text-[10px] text-emerald-600 font-semibold">{reportData.summary?.total_invoices || (reportData.items || []).length} Invoices Generated</p>
                   </div>
-                  <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl space-y-1">
-                    <p className="text-[11px] font-bold text-amber-800 uppercase tracking-wide">Total GST Collected</p>
-                    <p className="text-xl font-black text-amber-700 numeric">
-                      ₹{(reportData.summary?.total_tax_collected || reportData.total_tax_collected || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                    </p>
-                    <p className="text-[10px] text-amber-600 font-semibold">Government Tax Liability</p>
-                  </div>
-                  <div className="bg-purple-50 border border-purple-200 p-4 rounded-2xl space-y-1">
-                    <p className="text-[11px] font-bold text-purple-800 uppercase tracking-wide">Total Taxable Value</p>
-                    <p className="text-xl font-black text-purple-700 numeric">
+                  <div className="bg-purple-50 border border-purple-200 p-3.5 rounded-2xl space-y-1">
+                    <p className="text-[10px] font-bold text-purple-800 uppercase tracking-wide">Total Taxable Value</p>
+                    <p className="text-lg font-black text-purple-700 numeric">
                       ₹{(reportData.summary?.total_taxable_value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </p>
                     <p className="text-[10px] text-purple-600 font-semibold">Pre-Tax Turnover</p>
                   </div>
-                  <div className="bg-rose-50 border border-rose-200 p-4 rounded-2xl space-y-1">
-                    <p className="text-[11px] font-bold text-rose-800 uppercase tracking-wide">Total Discounts Given</p>
-                    <p className="text-xl font-black text-rose-700 numeric">
+                  <div className="bg-indigo-50 border border-indigo-200 p-3.5 rounded-2xl space-y-1">
+                    <p className="text-[10px] font-bold text-indigo-800 uppercase tracking-wide">Service Value</p>
+                    <p className="text-lg font-black text-indigo-700 numeric">
+                      ₹{(reportData.summary?.total_service_value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-[10px] text-indigo-600 font-semibold">Services Break-up</p>
+                  </div>
+                  <div className="bg-teal-50 border border-teal-200 p-3.5 rounded-2xl space-y-1">
+                    <p className="text-[10px] font-bold text-teal-800 uppercase tracking-wide">Product Value</p>
+                    <p className="text-lg font-black text-teal-700 numeric">
+                      ₹{(reportData.summary?.total_product_value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-[10px] text-teal-600 font-semibold">Products Break-up</p>
+                  </div>
+                  <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-2xl space-y-1">
+                    <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wide">Total GST Collected</p>
+                    <p className="text-lg font-black text-amber-700 numeric">
+                      ₹{(reportData.summary?.total_tax_collected || reportData.total_tax_collected || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-[10px] text-amber-600 font-semibold">Tax Liability</p>
+                  </div>
+                  <div className="bg-rose-50 border border-rose-200 p-3.5 rounded-2xl space-y-1">
+                    <p className="text-[10px] font-bold text-rose-800 uppercase tracking-wide">Total Discounts Given</p>
+                    <p className="text-lg font-black text-rose-700 numeric">
                       ₹{(reportData.summary?.total_discount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </p>
                     <p className="text-[10px] text-rose-600 font-semibold">Discounts Applied</p>
@@ -1371,6 +1387,8 @@ function Reports() {
                         <th className="p-3 whitespace-nowrap">CUSTOMER NAME</th>
                         <th className="p-3 min-w-[200px]">SERVICE / PRODUCT DETAILS</th>
                         <th className="p-3 whitespace-nowrap text-center">SAC / HSN CODE</th>
+                        <th className="p-3 text-right whitespace-nowrap">SERVICE VALUE</th>
+                        <th className="p-3 text-right whitespace-nowrap">PRODUCT VALUE</th>
                         <th className="p-3 text-right whitespace-nowrap">TAXABLE VALUE</th>
                         <th className="p-3 text-center whitespace-nowrap">GST TAX RATE</th>
                         <th className="p-3 text-right whitespace-nowrap text-amber-800">GST TAX COLLECTED</th>
@@ -1382,7 +1400,7 @@ function Reports() {
                     <tbody className="divide-y divide-slate-100 font-semibold text-slate-800">
                       {(reportData.items || []).length === 0 ? (
                         <tr>
-                          <td colSpan="12" className="p-8 text-center text-slate-400 font-bold">
+                          <td colSpan="14" className="p-8 text-center text-slate-400 font-bold">
                             No billing transactions found for this date range.
                           </td>
                         </tr>
@@ -1397,10 +1415,18 @@ function Reports() {
                               <div className="space-y-1">
                                 {(row.line_items_detail || []).length > 0 ? (
                                   row.line_items_detail.map((li, liIdx) => (
-                                    <div key={liIdx} className="flex items-center gap-1.5 flex-wrap">
-                                      <span className="font-semibold text-slate-900">{li.name}</span>
-                                      {li.quantity > 1 && (
-                                        <span className="text-[10px] text-slate-500 font-bold">x{li.quantity}</span>
+                                    <div key={liIdx} className="flex items-center justify-between gap-2 flex-wrap">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${li.type === "Service" ? "bg-purple-100 text-purple-700" : "bg-emerald-100 text-emerald-700"}`}>
+                                          {li.type}
+                                        </span>
+                                        <span className="font-semibold text-slate-900">{li.name}</span>
+                                        {li.quantity > 1 && (
+                                          <span className="text-[10px] text-slate-500 font-bold">x{li.quantity}</span>
+                                        )}
+                                      </div>
+                                      {li.line_total !== undefined && (
+                                        <span className="text-[11px] text-slate-500 font-medium numeric">₹{Number(li.line_total).toFixed(2)}</span>
                                       )}
                                     </div>
                                   ))
@@ -1427,6 +1453,12 @@ function Reports() {
                                   </span>
                                 )}
                               </div>
+                            </td>
+                            <td className="p-3 text-right font-semibold text-indigo-900 numeric">
+                              ₹{(row.service_value || 0).toFixed(2)}
+                            </td>
+                            <td className="p-3 text-right font-semibold text-teal-900 numeric">
+                              ₹{(row.product_value || 0).toFixed(2)}
                             </td>
                             <td className="p-3 text-right font-semibold text-slate-800 numeric">
                               ₹{(row.taxable_value || 0).toFixed(2)}
@@ -1463,6 +1495,12 @@ function Reports() {
                     <tfoot className="bg-amber-300 text-slate-900 font-black uppercase">
                       <tr>
                         <td colSpan="6" className="p-3">TOTAL (ZERO DUPLICATES)</td>
+                        <td className="p-3 text-right numeric text-indigo-950">
+                          ₹{(reportData.summary?.total_service_value || 0).toFixed(2)}
+                        </td>
+                        <td className="p-3 text-right numeric text-teal-950">
+                          ₹{(reportData.summary?.total_product_value || 0).toFixed(2)}
+                        </td>
                         <td className="p-3 text-right numeric">
                           ₹{(reportData.summary?.total_taxable_value || 0).toFixed(2)}
                         </td>
