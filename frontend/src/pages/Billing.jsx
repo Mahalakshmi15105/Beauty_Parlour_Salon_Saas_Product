@@ -116,7 +116,7 @@ function Billing() {
   // Regional & Tax Settings
   const [taxRate, setTaxRate] = useState(() => {
     const saved = localStorage.getItem("app_tax_rate");
-    return saved !== null && !isNaN(parseFloat(saved)) ? parseFloat(saved) : 18.0;
+    return saved !== null && !isNaN(parseFloat(saved)) ? parseFloat(saved) : 0;
   });
   const [taxName, setTaxName] = useState(() => {
     return localStorage.getItem("app_tax_name") || "GST";

@@ -165,7 +165,12 @@ def get_tax_report():
 
     tenant_id = g.parlour_id if hasattr(g, "parlour_id") and g.parlour_id else None
     t_setting = TenantSetting.query.filter_by(tenant_id=tenant_id).first() if tenant_id else None
-    default_tax_rate = Decimal(str(t_setting.tax_rate)) if t_setting and getattr(t_setting, "tax_rate", None) is not None and Decimal(str(t_setting.tax_rate)) > 0 else Decimal("5.00")
+    # Read the exact tax rate set by the user in Settings -> Invoice & Taxes (zero hardcoded fallback)
+    if t_setting and getattr(t_setting, "tax_rate", None) is not None:
+        user_tax_rate = Decimal(str(t_setting.tax_rate))
+    else:
+        user_tax_rate = Decimal("0.00")
+    rate_setting_str = f"{int(user_tax_rate)}%" if user_tax_rate == int(user_tax_rate) else f"{user_tax_rate}%"
 
     items = []
     total_taxable_value = Decimal("0.00")
@@ -183,15 +188,12 @@ def get_tax_report():
         # Taxable value is gross subtotal minus discount
         taxable_val = max(Decimal("0.00"), subtotal_val - discount_val)
 
-        # 2. Calculate GST rate (shall NEVER be 0%)
+        # Calculate GST rate from the bill if tax was charged; otherwise use the parlour's Settings tax rate
         if taxable_val > 0 and tax_val > 0:
             rate_num = round((tax_val / taxable_val) * Decimal("100.00"), 1)
-            if rate_num > 0:
-                tax_rate_str = f"{int(rate_num)}%" if rate_num == int(rate_num) else f"{rate_num}%"
-            else:
-                tax_rate_str = f"{int(default_tax_rate)}%" if default_tax_rate == int(default_tax_rate) else f"{default_tax_rate}%"
+            tax_rate_str = f"{int(rate_num)}%" if rate_num == int(rate_num) else f"{rate_num}%"
         else:
-            tax_rate_str = f"{int(default_tax_rate)}%" if default_tax_rate == int(default_tax_rate) else f"{default_tax_rate}%"
+            tax_rate_str = rate_setting_str
 
         # 3. Determine Mode of Payment
         pm_list = getattr(inv, "payments", []) or []
@@ -295,7 +297,7 @@ def get_tax_report():
             "status": inv.status
         })
 
-    summary_tax_rate = f"{int(default_tax_rate)}%" if default_tax_rate == int(default_tax_rate) else f"{default_tax_rate}%"
+    summary_tax_rate = rate_setting_str
 
     return success_response({
         "summary": {

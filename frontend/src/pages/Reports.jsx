@@ -715,7 +715,7 @@ function Reports() {
         { header: "SERVICE / PRODUCT DETAILS", accessor: (row) => row.service_details || row.details || "—" },
         { header: "SAC / HSN CODE", accessor: (row) => row.sac_hsn_code || "SAC: 9997" },
         { header: "TAXABLE VALUE", accessor: (row) => Number(row.taxable_value || 0).toFixed(2) },
-        { header: "GST TAX RATE", accessor: (row) => row.tax_rate || "5%" },
+        { header: "GST TAX RATE", accessor: (row) => row.tax_rate ?? "0%" },
         { header: "GST TAX AMOUNT COLLECTED", accessor: (row) => Number(row.tax_amount || 0).toFixed(2) },
         { header: "DISCOUNT", accessor: (row) => Number(row.discount || 0).toFixed(2) },
         { header: "MODE OF PAYMENT", accessor: (row) => row.payment_mode || "Cash" },
@@ -1433,7 +1433,7 @@ function Reports() {
                             </td>
                             <td className="p-3 text-center font-bold text-slate-700">
                               <span className="inline-block px-2 py-0.5 rounded text-xs font-extrabold bg-amber-50 text-amber-900 border border-amber-200">
-                                {row.tax_rate || "5%"}
+                                {row.tax_rate || "0%"}
                               </span>
                             </td>
                             <td className="p-3 text-right font-bold text-amber-700 numeric">
@@ -1467,7 +1467,7 @@ function Reports() {
                           ₹{(reportData.summary?.total_taxable_value || 0).toFixed(2)}
                         </td>
                         <td className="p-3 text-center">
-                          {reportData.summary?.tax_rate || "5%"}
+                          {reportData.summary?.tax_rate || "0%"}
                         </td>
                         <td className="p-3 text-right text-amber-900 numeric">
                           ₹{(reportData.summary?.total_tax_collected || reportData.total_tax_collected || 0).toFixed(2)}
