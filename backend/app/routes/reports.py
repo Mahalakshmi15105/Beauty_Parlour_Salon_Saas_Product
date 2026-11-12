@@ -188,12 +188,12 @@ def get_tax_report():
         # Taxable value is gross subtotal minus discount
         taxable_val = max(Decimal("0.00"), subtotal_val - discount_val)
 
-        # Calculate GST rate from the bill if tax was charged; otherwise use the parlour's Settings tax rate
+        # Calculate GST rate from the bill if tax was charged; otherwise "—"
         if taxable_val > 0 and tax_val > 0:
             rate_num = round((tax_val / taxable_val) * Decimal("100.00"), 1)
             tax_rate_str = f"{int(rate_num)}%" if rate_num == int(rate_num) else f"{rate_num}%"
         else:
-            tax_rate_str = rate_setting_str
+            tax_rate_str = "—"
 
         # 3. Determine Mode of Payment
         pm_list = getattr(inv, "payments", []) or []
@@ -219,9 +219,11 @@ def get_tax_report():
         else:
             payment_mode = "Cash"
 
-        # 1. Item details with separate SAC / HSN codes and Service/Product break-up
+        # 1. Item details with separate SAC & HSN codes and Service/Product break-up
         service_names = []
         codes_list = []
+        sac_codes = []
+        hsn_codes = []
         details_list = []
         line_items_detail = []
         service_val = Decimal("0.00")
@@ -234,6 +236,7 @@ def get_tax_report():
                 sac = getattr(li.service, "sac_code", None) or "9997"
                 service_names.append(s_name)
                 codes_list.append(f"SAC: {sac}")
+                sac_codes.append(sac)
                 details_list.append(f"{s_name} (SAC: {sac})")
                 service_val += line_tot
                 line_items_detail.append({
@@ -250,6 +253,7 @@ def get_tax_report():
                 hsn = getattr(li.product, "hsn_code", None) or "3305"
                 service_names.append(p_name)
                 codes_list.append(f"HSN: {hsn}")
+                hsn_codes.append(hsn)
                 details_list.append(f"{p_name} (HSN: {hsn})")
                 product_val += line_tot
                 line_items_detail.append({
@@ -264,6 +268,7 @@ def get_tax_report():
             else:
                 service_names.append("General Service")
                 codes_list.append("SAC: 9997")
+                sac_codes.append("9997")
                 details_list.append("General Service (SAC: 9997)")
                 service_val += line_tot
                 line_items_detail.append({
@@ -292,6 +297,8 @@ def get_tax_report():
         supply_type = "Both" if (has_services and has_products) else ("Product" if has_products else "Service")
 
         service_details_str = ", ".join(service_names) if service_names else "General Service"
+        sac_code_str = ", ".join(list(dict.fromkeys(sac_codes))) if sac_codes else "—"
+        hsn_code_str = ", ".join(list(dict.fromkeys(hsn_codes))) if hsn_codes else "—"
         sac_hsn_str = ", ".join(list(dict.fromkeys(codes_list))) if codes_list else "SAC: 9997"
         details_str = ", ".join(details_list) if details_list else "—"
 
@@ -306,6 +313,8 @@ def get_tax_report():
             "invoice_date": inv.created_at.strftime("%Y-%m-%d"),
             "customer_name": cust_name,
             "service_details": service_details_str,
+            "sac_code": sac_code_str,
+            "hsn_code": hsn_code_str,
             "sac_hsn_code": sac_hsn_str,
             "details": details_str,
             "line_items_detail": line_items_detail,
@@ -321,7 +330,11 @@ def get_tax_report():
             "status": inv.status
         })
 
-    summary_tax_rate = rate_setting_str
+    if total_tax_collected > 0 and total_taxable_value > 0:
+        sum_rate_num = round((total_tax_collected / total_taxable_value) * Decimal("100.00"), 1)
+        summary_tax_rate = f"{int(sum_rate_num)}%" if sum_rate_num == int(sum_rate_num) else f"{sum_rate_num}%"
+    else:
+        summary_tax_rate = "—"
     total_service_value = sum(Decimal(str(it.get("service_value", 0.00))) for it in items)
     total_product_value = sum(Decimal(str(it.get("product_value", 0.00))) for it in items)
 
