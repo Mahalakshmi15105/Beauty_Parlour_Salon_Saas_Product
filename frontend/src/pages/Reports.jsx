@@ -712,11 +712,13 @@ function Reports() {
         { header: "INVOICE NUMBER", accessor: "invoice_number" },
         { header: "INVOICE DATE", accessor: "invoice_date" },
         { header: "CUSTOMER NAME", accessor: "customer_name" },
-        { header: "SERVICE / PRODUCT DETAILS (SAC / HSN CODE)", accessor: "details" },
+        { header: "SERVICE / PRODUCT DETAILS", accessor: (row) => row.service_details || row.details || "—" },
+        { header: "SAC / HSN CODE", accessor: (row) => row.sac_hsn_code || "SAC: 9997" },
         { header: "TAXABLE VALUE", accessor: (row) => Number(row.taxable_value || 0).toFixed(2) },
-        { header: "GST TAX RATE", accessor: "tax_rate" },
+        { header: "GST TAX RATE", accessor: (row) => row.tax_rate || "5%" },
         { header: "GST TAX AMOUNT COLLECTED", accessor: (row) => Number(row.tax_amount || 0).toFixed(2) },
         { header: "DISCOUNT", accessor: (row) => Number(row.discount || 0).toFixed(2) },
+        { header: "MODE OF PAYMENT", accessor: (row) => row.payment_mode || "Cash" },
         { header: "INVOICE VALUE", accessor: (row) => Number(row.invoice_value || 0).toFixed(2) },
       ];
       exportToExcel("GST SALES & TAX REPORT", items, columns, `gst_sales_tax_report_${startDate}_to_${endDate}`, d.parlour_name || "Salon");
@@ -1367,18 +1369,20 @@ function Reports() {
                         <th className="p-3 whitespace-nowrap">INVOICE NUMBER</th>
                         <th className="p-3 whitespace-nowrap">INVOICE DATE</th>
                         <th className="p-3 whitespace-nowrap">CUSTOMER NAME</th>
-                        <th className="p-3 min-w-[240px]">SERVICE / PRODUCT DETAILS (SAC / HSN CODE)</th>
+                        <th className="p-3 min-w-[200px]">SERVICE / PRODUCT DETAILS</th>
+                        <th className="p-3 whitespace-nowrap text-center">SAC / HSN CODE</th>
                         <th className="p-3 text-right whitespace-nowrap">TAXABLE VALUE</th>
                         <th className="p-3 text-center whitespace-nowrap">GST TAX RATE</th>
                         <th className="p-3 text-right whitespace-nowrap text-amber-800">GST TAX COLLECTED</th>
                         <th className="p-3 text-right whitespace-nowrap text-rose-700">DISCOUNT</th>
+                        <th className="p-3 text-center whitespace-nowrap">MODE OF PAYMENT</th>
                         <th className="p-3 text-right whitespace-nowrap font-black text-emerald-800">INVOICE VALUE</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-semibold text-slate-800">
                       {(reportData.items || []).length === 0 ? (
                         <tr>
-                          <td colSpan="10" className="p-8 text-center text-slate-400 font-bold">
+                          <td colSpan="12" className="p-8 text-center text-slate-400 font-bold">
                             No billing transactions found for this date range.
                           </td>
                         </tr>
@@ -1395,18 +1399,32 @@ function Reports() {
                                   row.line_items_detail.map((li, liIdx) => (
                                     <div key={liIdx} className="flex items-center gap-1.5 flex-wrap">
                                       <span className="font-semibold text-slate-900">{li.name}</span>
-                                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
-                                        li.type === "Service" ? "bg-purple-100 text-purple-800" : "bg-emerald-100 text-emerald-800"
-                                      }`}>
-                                        {li.code_type}: {li.code}
-                                      </span>
                                       {li.quantity > 1 && (
                                         <span className="text-[10px] text-slate-500 font-bold">x{li.quantity}</span>
                                       )}
                                     </div>
                                   ))
                                 ) : (
-                                  <span>{row.details || "—"}</span>
+                                  <span>{row.service_details || row.details || "—"}</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-3 text-center whitespace-nowrap">
+                              <div className="space-y-1">
+                                {(row.line_items_detail || []).length > 0 ? (
+                                  row.line_items_detail.map((li, liIdx) => (
+                                    <div key={liIdx}>
+                                      <span className={`inline-block text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
+                                        li.type === "Service" ? "bg-purple-100 text-purple-800" : "bg-emerald-100 text-emerald-800"
+                                      }`}>
+                                        {li.code_type}: {li.code || (li.type === "Service" ? "9997" : "3305")}
+                                      </span>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <span className="text-[10px] font-mono px-2 py-0.5 rounded font-bold bg-purple-100 text-purple-800">
+                                    {row.sac_hsn_code || "SAC: 9997"}
+                                  </span>
                                 )}
                               </div>
                             </td>
@@ -1414,13 +1432,26 @@ function Reports() {
                               ₹{(row.taxable_value || 0).toFixed(2)}
                             </td>
                             <td className="p-3 text-center font-bold text-slate-700">
-                              {row.tax_rate || "0%"}
+                              <span className="inline-block px-2 py-0.5 rounded text-xs font-extrabold bg-amber-50 text-amber-900 border border-amber-200">
+                                {row.tax_rate || "5%"}
+                              </span>
                             </td>
                             <td className="p-3 text-right font-bold text-amber-700 numeric">
                               ₹{(row.tax_amount || 0).toFixed(2)}
                             </td>
                             <td className="p-3 text-right text-rose-600 numeric">
                               ₹{(row.discount || 0).toFixed(2)}
+                            </td>
+                            <td className="p-3 text-center whitespace-nowrap">
+                              <span className={`inline-block px-2.5 py-0.5 rounded-lg text-xs font-bold ${
+                                (row.payment_mode || "Cash").toLowerCase().includes("cash")
+                                  ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                                  : (row.payment_mode || "").toLowerCase().includes("card")
+                                  ? "bg-purple-50 text-purple-800 border border-purple-200"
+                                  : "bg-blue-50 text-blue-800 border border-blue-200"
+                              }`}>
+                                {row.payment_mode || "Cash"}
+                              </span>
                             </td>
                             <td className="p-3 text-right font-black text-emerald-700 numeric">
                               ₹{(row.invoice_value || 0).toFixed(2)}
@@ -1431,23 +1462,26 @@ function Reports() {
                     </tbody>
                     <tfoot className="bg-amber-300 text-slate-900 font-black uppercase">
                       <tr>
-                        <td colSpan="5" className="p-3">TOTAL (ZERO DUPLICATES)</td>
+                        <td colSpan="6" className="p-3">TOTAL (ZERO DUPLICATES)</td>
                         <td className="p-3 text-right numeric">
                           ₹{(reportData.summary?.total_taxable_value || 0).toFixed(2)}
                         </td>
-                        <td className="p-3 text-center">—</td>
+                        <td className="p-3 text-center">
+                          {reportData.summary?.tax_rate || "5%"}
+                        </td>
                         <td className="p-3 text-right text-amber-900 numeric">
                           ₹{(reportData.summary?.total_tax_collected || reportData.total_tax_collected || 0).toFixed(2)}
                         </td>
                         <td className="p-3 text-right text-rose-800 numeric">
                           ₹{(reportData.summary?.total_discount || 0).toFixed(2)}
                         </td>
+                        <td className="p-3 text-center">—</td>
                         <td className="p-3 text-right text-emerald-900 numeric">
                           ₹{(reportData.summary?.total_invoice_value || 0).toFixed(2)}
                         </td>
                       </tr>
                     </tfoot>
-                  </table>
+                    </table>
                   </div>
                 </div>
               </div>

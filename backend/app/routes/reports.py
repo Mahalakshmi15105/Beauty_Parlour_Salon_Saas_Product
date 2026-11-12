@@ -5,6 +5,7 @@ from app.models.catalog import Service, Product, StockReorderLog
 from app.models.customer import Customer
 from app.models.employee import Employee
 from app.models.membership import CustomerMembership
+from app.models.user import TenantSetting
 from app.utils.responses import success_response, error_response
 from app.utils.auth import require_role, get_tenant_query, get_branch_query
 from sqlalchemy import func, cast, Date
@@ -162,6 +163,10 @@ def get_tax_report():
 
     invoices = query.all()
 
+    tenant_id = g.parlour_id if hasattr(g, "parlour_id") and g.parlour_id else None
+    t_setting = TenantSetting.query.filter_by(tenant_id=tenant_id).first() if tenant_id else None
+    default_tax_rate = Decimal(str(t_setting.tax_rate)) if t_setting and getattr(t_setting, "tax_rate", None) is not None and Decimal(str(t_setting.tax_rate)) > 0 else Decimal("5.00")
+
     items = []
     total_taxable_value = Decimal("0.00")
     total_tax_collected = Decimal("0.00")
@@ -178,59 +183,93 @@ def get_tax_report():
         # Taxable value is gross subtotal minus discount
         taxable_val = max(Decimal("0.00"), subtotal_val - discount_val)
 
-        # Calculate effective GST rate
+        # 2. Calculate GST rate (shall NEVER be 0%)
         if taxable_val > 0 and tax_val > 0:
             rate_num = round((tax_val / taxable_val) * Decimal("100.00"), 1)
-            tax_rate_str = f"{int(rate_num)}%" if rate_num == int(rate_num) else f"{rate_num}%"
-        elif tax_val > 0:
-            tax_rate_str = "5%"
+            if rate_num > 0:
+                tax_rate_str = f"{int(rate_num)}%" if rate_num == int(rate_num) else f"{rate_num}%"
+            else:
+                tax_rate_str = f"{int(default_tax_rate)}%" if default_tax_rate == int(default_tax_rate) else f"{default_tax_rate}%"
         else:
-            tax_rate_str = "0%"
+            tax_rate_str = f"{int(default_tax_rate)}%" if default_tax_rate == int(default_tax_rate) else f"{default_tax_rate}%"
 
-        # Item details with SAC/HSN codes
+        # 3. Determine Mode of Payment
+        pm_list = getattr(inv, "payments", []) or []
+        if pm_list:
+            pm_methods = []
+            for p in pm_list:
+                m = (getattr(p, "method", "") or "").strip()
+                if m:
+                    m_lower = m.lower()
+                    if m_lower in ["gpay", "google pay", "googlepay"]:
+                        pm_methods.append("Google Pay")
+                    elif m_lower == "paytm":
+                        pm_methods.append("Paytm")
+                    elif m_lower == "phonepe":
+                        pm_methods.append("PhonePe")
+                    elif m_lower == "cash":
+                        pm_methods.append("Cash")
+                    elif m_lower in ["card", "credit card", "debit card"]:
+                        pm_methods.append("Card")
+                    else:
+                        pm_methods.append(m.title())
+            payment_mode = ", ".join(list(dict.fromkeys(pm_methods))) if pm_methods else "Cash"
+        else:
+            payment_mode = "Cash"
+
+        # 1. Item details with separate SAC / HSN codes
+        service_names = []
+        codes_list = []
         details_list = []
         line_items_detail = []
+
         for li in inv.line_items:
             if li.service_id and li.service:
                 s_name = li.service.name
-                sac = getattr(li.service, "sac_code", None)
-                code_text = f"SAC: {sac}" if sac else ""
-                details_list.append(f"{s_name} ({code_text})" if code_text else s_name)
+                sac = getattr(li.service, "sac_code", None) or "9997"
+                service_names.append(s_name)
+                codes_list.append(f"SAC: {sac}")
+                details_list.append(f"{s_name} (SAC: {sac})")
                 line_items_detail.append({
                     "name": s_name,
                     "type": "Service",
                     "code_type": "SAC",
-                    "code": sac or "—",
+                    "code": sac,
                     "quantity": li.quantity or 1,
                     "unit_price": float(li.unit_price or 0.0),
                     "line_total": float(li.line_total or 0.0)
                 })
             elif li.product_id and li.product:
                 p_name = li.product.name
-                hsn = getattr(li.product, "hsn_code", None)
-                code_text = f"HSN: {hsn}" if hsn else ""
-                details_list.append(f"{p_name} ({code_text})" if code_text else p_name)
+                hsn = getattr(li.product, "hsn_code", None) or "3305"
+                service_names.append(p_name)
+                codes_list.append(f"HSN: {hsn}")
+                details_list.append(f"{p_name} (HSN: {hsn})")
                 line_items_detail.append({
                     "name": p_name,
                     "type": "Product",
                     "code_type": "HSN",
-                    "code": hsn or "—",
+                    "code": hsn,
                     "quantity": li.quantity or 1,
                     "unit_price": float(li.unit_price or 0.0),
                     "line_total": float(li.line_total or 0.0)
                 })
             else:
-                details_list.append("General Service")
+                service_names.append("General Service")
+                codes_list.append("SAC: 9997")
+                details_list.append("General Service (SAC: 9997)")
                 line_items_detail.append({
                     "name": "General Service",
                     "type": "Service",
                     "code_type": "SAC",
-                    "code": "—",
+                    "code": "9997",
                     "quantity": li.quantity or 1,
                     "unit_price": float(li.unit_price or 0.0),
                     "line_total": float(li.line_total or 0.0)
                 })
 
+        service_details_str = ", ".join(service_names) if service_names else "General Service"
+        sac_hsn_str = ", ".join(list(dict.fromkeys(codes_list))) if codes_list else "SAC: 9997"
         details_str = ", ".join(details_list) if details_list else "—"
 
         total_taxable_value += taxable_val
@@ -243,15 +282,20 @@ def get_tax_report():
             "invoice_number": inv.invoice_number,
             "invoice_date": inv.created_at.strftime("%Y-%m-%d"),
             "customer_name": cust_name,
+            "service_details": service_details_str,
+            "sac_hsn_code": sac_hsn_str,
             "details": details_str,
             "line_items_detail": line_items_detail,
             "taxable_value": float(taxable_val),
             "tax_rate": tax_rate_str,
             "tax_amount": float(tax_val),
             "discount": float(discount_val),
+            "payment_mode": payment_mode,
             "invoice_value": float(total_val),
             "status": inv.status
         })
+
+    summary_tax_rate = f"{int(default_tax_rate)}%" if default_tax_rate == int(default_tax_rate) else f"{default_tax_rate}%"
 
     return success_response({
         "summary": {
@@ -259,7 +303,8 @@ def get_tax_report():
             "total_taxable_value": float(total_taxable_value),
             "total_tax_collected": float(total_tax_collected),
             "total_discount": float(total_discount),
-            "total_invoice_value": float(total_invoice_value)
+            "total_invoice_value": float(total_invoice_value),
+            "tax_rate": summary_tax_rate
         },
         "items": items,
         "total_tax_collected": float(total_tax_collected),
