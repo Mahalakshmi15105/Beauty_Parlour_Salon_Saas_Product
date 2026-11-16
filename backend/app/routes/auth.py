@@ -116,10 +116,14 @@ def login():
     clean_ident = email.strip()
     name_part = clean_ident.split("@")[0] if "@" in clean_ident else clean_ident
 
-    # Check User table by email or username
+    # Check User table by email or username, prioritizing exact matches and ParlourAdmin
     user = User.query.filter(
         (User.email.ilike(clean_ident)) | (User.email.ilike(name_part)),
         User.is_deleted == False
+    ).order_by(
+        (User.email == clean_ident).desc(),
+        (User.role == "ParlourAdmin").desc(),
+        User.id.asc()
     ).first()
 
     # Also search Employee table by username, email, phone, or name
@@ -226,6 +230,18 @@ def login():
             message="Invalid username/email or password.",
             status_code=401
         )
+
+    # Auto self-heal: If this user is registered as the parlour admin in Master DB (TenantLookup),
+    # ensure their role is restored to 'ParlourAdmin' even if accidentally demoted earlier
+    if user and user.role != "ParlourAdmin" and lookup and lookup.email.lower() in (clean_ident.lower(), user.email.lower()):
+        try:
+            current_app.logger.warning(f"[Login] Self-healing accidentally demoted ParlourAdmin role for '{user.email}' in tenant {tenant.id}")
+            user.role = "ParlourAdmin"
+            db.session.add(user)
+            db.session.commit()
+        except Exception as heal_err:
+            db.session.rollback()
+            current_app.logger.warning(f"[Login] Notice during ParlourAdmin self-healing: {heal_err}")
 
     if user.status != "active":
         return error_response(

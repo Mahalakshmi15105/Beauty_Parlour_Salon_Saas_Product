@@ -118,7 +118,7 @@ def get_tenants():
 
     items = []
     for t in tenants:
-        lookup = TenantLookup.query.filter_by(tenant_id=t.id).first()
+        lookup = TenantLookup.query.filter_by(tenant_id=t.id).order_by(TenantLookup.id.asc()).first()
         admin_email = lookup.email if lookup else "N/A"
         items.append({
             "id": t.id,
@@ -330,7 +330,8 @@ def update_tenant(tenant_id):
                 tenant.subscription_plan_id = plan.id
                 tenant.subscription_expires_at = datetime.now(timezone.utc) + timedelta(days=plan.duration_days)
 
-        lookup = TenantLookup.query.filter_by(tenant_id=tenant.id).first()
+        lookup = TenantLookup.query.filter_by(tenant_id=tenant.id).order_by(TenantLookup.id.asc()).first()
+        old_admin_email = lookup.email.lower() if (lookup and lookup.email) else None
         if admin_email:
             existing_lookup = TenantLookup.query.filter(TenantLookup.email == admin_email, TenantLookup.tenant_id != tenant.id).first()
             if existing_lookup:
@@ -358,25 +359,50 @@ def update_tenant(tenant_id):
                 from werkzeug.security import generate_password_hash
                 t_engine = db.get_tenant_engine(tenant_db_uri)
                 with t_engine.connect() as conn:
-                    res_u = conn.execute(text("SELECT id FROM users WHERE role = 'ParlourAdmin' LIMIT 1;")).first()
+                    # Look up admin user by new admin_email, old_admin_email, or role = 'ParlourAdmin'
+                    res_u = conn.execute(text("""
+                        SELECT id, email, role FROM users 
+                        WHERE (:new_email != '' AND LOWER(email) = LOWER(:new_email))
+                           OR (:old_email IS NOT NULL AND :old_email != '' AND LOWER(email) = LOWER(:old_email))
+                           OR role = 'ParlourAdmin'
+                        ORDER BY 
+                            (CASE WHEN :new_email != '' AND LOWER(email) = LOWER(:new_email) THEN 1 ELSE 0 END) DESC,
+                            (CASE WHEN role = 'ParlourAdmin' THEN 1 ELSE 0 END) DESC,
+                            id ASC
+                        LIMIT 1;
+                    """), {"new_email": admin_email or "", "old_email": old_admin_email or ""}).first()
+
                     if res_u:
                         user_id = res_u[0]
-                        if admin_email and new_password:
+                        update_parts = ["role = 'ParlourAdmin'", "status = 'active'", "updated_at = NOW()"]
+                        up_params = {"id": user_id}
+                        if admin_email:
+                            update_parts.append("email = :email")
+                            up_params["email"] = admin_email
+                        if new_password:
                             p_hash = generate_password_hash(new_password)
-                            conn.execute(text("UPDATE users SET email = :email, password_hash = :hash WHERE id = :id"), {"email": admin_email, "hash": p_hash, "id": user_id})
-                        elif admin_email:
-                            conn.execute(text("UPDATE users SET email = :email WHERE id = :id"), {"email": admin_email, "id": user_id})
-                        elif new_password:
-                            p_hash = generate_password_hash(new_password)
-                            conn.execute(text("UPDATE users SET password_hash = :hash WHERE id = :id"), {"hash": p_hash, "id": user_id})
+                            update_parts.append("password_hash = :hash")
+                            up_params["hash"] = p_hash
+                        
+                        conn.execute(text(f"UPDATE users SET {', '.join(update_parts)} WHERE id = :id"), up_params)
                         conn.commit()
+                        logger.info(f"Updated credentials and restored ParlourAdmin role for user ID {user_id} in tenant {tenant.id}")
                     else:
-                        target_email = admin_email or "admin@smartgonext.com"
+                        target_email = admin_email or old_admin_email or "admin@smartgonext.com"
                         p_hash = generate_password_hash(new_password or "ParlourAdmin123!")
-                        conn.execute(text("INSERT INTO users (tenant_id, email, password_hash, role, status, created_at, updated_at) VALUES (:t_id, :email, :hash, 'ParlourAdmin', 'active', NOW(), NOW())"), {"t_id": tenant.id, "email": target_email, "hash": p_hash})
+                        conn.execute(text("""
+                            INSERT INTO users (tenant_id, email, password_hash, role, status, created_at, updated_at) 
+                            VALUES (:t_id, :email, :hash, 'ParlourAdmin', 'active', NOW(), NOW())
+                        """), {"t_id": tenant.id, "email": target_email, "hash": p_hash})
                         conn.commit()
+                        logger.info(f"Created new ParlourAdmin user for tenant {tenant.id}")
             except Exception as t_err:
-                logger.warning(f"Notice updating tenant DB user credentials: {t_err}")
+                logger.error(f"Failed updating tenant DB user credentials for tenant {tenant.id}: {t_err}")
+                return error_response(
+                    error_code="CREDENTIAL_UPDATE_FAILED",
+                    message=f"Failed to update tenant admin user credentials: {str(t_err)}",
+                    status_code=500
+                )
 
     except Exception as e:
         db.session.rollback()
@@ -511,7 +537,7 @@ def get_tenant_details(tenant_id):
         )
 
     admin_email = None
-    lookup = TenantLookup.query.filter_by(tenant_id=tenant.id).first()
+    lookup = TenantLookup.query.filter_by(tenant_id=tenant.id).order_by(TenantLookup.id.asc()).first()
     if lookup:
         admin_email = lookup.email
 

@@ -461,15 +461,19 @@ def create_employee():
                     status="active"
                 )
                 user_rec.set_password(effective_password)
+                db.session.add(user_rec)
+                db.session.commit()
             else:
-                user_rec.role = "Employee"
-                user_rec.branch_id = target_branch_id
-                user_rec.status = "active"
-                if password:
-                    user_rec.set_password(password)
-
-            db.session.add(user_rec)
-            db.session.commit()
+                if user_rec.role in ("ParlourAdmin", "SuperAdmin"):
+                    logger.warning(f"Protected user '{username}' from demotion - maintaining role '{user_rec.role}'")
+                else:
+                    user_rec.role = "Employee"
+                    user_rec.branch_id = target_branch_id
+                    user_rec.status = "active"
+                    if password:
+                        user_rec.set_password(password)
+                    db.session.add(user_rec)
+                    db.session.commit()
 
             # Register TenantLookup in Master DB for this employee login username
             try:
@@ -649,16 +653,20 @@ def update_employee(employee_id):
                     status="active"
                 )
                 user_rec.set_password(password or phone)
+                db.session.add(user_rec)
+                db.session.commit()
             else:
-                user_rec.email = username
-                user_rec.role = "Employee"
-                user_rec.branch_id = employee.branch_id
-                user_rec.status = "active"
-                if password:
-                    user_rec.set_password(password)
-
-            db.session.add(user_rec)
-            db.session.commit()
+                if user_rec.role in ("ParlourAdmin", "SuperAdmin"):
+                    logger.warning(f"Protected user '{user_rec.email}' from demotion - maintaining role '{user_rec.role}'")
+                else:
+                    user_rec.email = username
+                    user_rec.role = "Employee"
+                    user_rec.branch_id = employee.branch_id
+                    user_rec.status = "active"
+                    if password:
+                        user_rec.set_password(password)
+                    db.session.add(user_rec)
+                    db.session.commit()
 
             # Sync TenantLookup in Master DB
             try:
