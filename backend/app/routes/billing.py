@@ -571,7 +571,7 @@ def checkout():
         "id": invoice.id,
         "invoice_id": invoice.id,
         "invoice_number": invoice.invoice_number,
-        "created_at": invoice.created_at.isoformat(),
+        "created_at": (invoice.created_at.isoformat() + "Z") if invoice.created_at else None,
         "cashier": getattr(g.user, "first_name", "Admin") if hasattr(g, "user") and g.user else "Admin",
         "customer_id": customer.id if customer else None,
         "customer_name": full_customer_name,
@@ -667,7 +667,7 @@ def get_invoices():
             "membership_name": inv.membership_name,
             "membership_price": mem_price,
             "membership_discount": float(inv.membership_discount or 0),
-            "created_at": inv.created_at.isoformat()
+            "created_at": (inv.created_at.isoformat() + "Z") if inv.created_at else None
         })
 
     return success_response({
@@ -740,7 +740,7 @@ def get_invoice(invoice_id):
         "tax": float(invoice.tax),
         "total": float(invoice.total),
         "status": invoice.status,
-        "created_at": invoice.created_at.isoformat(),
+        "created_at": (invoice.created_at.isoformat() + "Z") if invoice.created_at else None,
         "line_items": lines,
         "payments": payments,
         "membership_name": invoice.membership_name,

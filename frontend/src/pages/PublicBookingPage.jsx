@@ -19,6 +19,7 @@ import {
   X
 } from "lucide-react";
 import axios from "axios";
+import { formatToIndiaDate, formatToIndia12hTime } from "../utils/dateUtils";
 
 const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "/api/v1" : "https://salon-backend.smartgonext.com/api/v1");
 const BACKEND_BASE = API_BASE.replace(/\/api\/v1\/?$/, "");
@@ -353,7 +354,7 @@ function PublicBookingPage({ tenantId = 1, tenantIdentifier, isBranch = false, o
               <div className="flex justify-between text-slate-700">
                 <span className="text-slate-500 font-semibold">Date & Time</span>
                 <span className="font-bold text-slate-900">
-                  {confirmationData.appointment_date} {confirmationData.start_time ? `at ${confirmationData.start_time}` : `(Token #${confirmationData.token_number})`}
+                  {formatToIndiaDate(confirmationData.appointment_date)} {confirmationData.start_time ? `at ${formatToIndia12hTime(confirmationData.start_time)}` : `(Token #${confirmationData.token_number})`}
                 </span>
               </div>
 
@@ -370,12 +371,29 @@ function PublicBookingPage({ tenantId = 1, tenantIdentifier, isBranch = false, o
               </div>
             </div>
 
-            <button
-              onClick={() => window.location.reload()}
-              className="px-8 py-4 bg-gradient-to-r from-pink-600 to-rose-500 hover:from-pink-700 hover:to-rose-600 text-white rounded-xl text-sm font-extrabold shadow-lg shadow-pink-500/25 transition"
-            >
-              Book Another Appointment
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(
+                  `*${config.parlour_name || "SALON"} - APPOINTMENT CONFIRMATION*\n\n` +
+                  `Client: ${confirmationData.customer_name}\n` +
+                  `Date: ${formatToIndiaDate(confirmationData.appointment_date)}\n` +
+                  (confirmationData.token_number ? `Token Number: #${confirmationData.token_number}\n` : '') +
+                  (confirmationData.start_time ? `Time: ${formatToIndia12hTime(confirmationData.start_time)}\n` : '') +
+                  `Status: Confirmed ✔️\n\nThank you for choosing us!`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-6 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-extrabold flex items-center justify-center space-x-2 shadow-lg shadow-emerald-600/25 transition"
+              >
+                <span>Save on WhatsApp</span>
+              </a>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-6 py-4 bg-gradient-to-r from-pink-600 to-rose-500 hover:from-pink-700 hover:to-rose-600 text-white rounded-xl text-sm font-extrabold shadow-lg shadow-pink-500/25 transition"
+              >
+                Book Another Appointment
+              </button>
+            </div>
           </div>
         </div>
       </div>

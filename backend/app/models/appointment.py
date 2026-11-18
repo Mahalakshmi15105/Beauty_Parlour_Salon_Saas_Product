@@ -55,6 +55,7 @@ class Appointment(db.Model, TimestampMixin, SoftDeleteMixin):
             "appointment_type": self.appointment_type,
             "status": self.status,
             "notes": self.notes or "",
+            "created_at": (self.created_at.isoformat() + "Z") if hasattr(self, "created_at") and self.created_at else "",
             "items": [item.to_dict() for item in self.items] if self.items else []
         }
 

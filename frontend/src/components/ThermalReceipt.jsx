@@ -3,6 +3,7 @@ import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { getFullImageUrl } from "../utils/imageUrl";
 import { getShopNameStyle } from "../utils/fontLoader";
 import { getCachedBusinessProfile, getCachedReceiptSettings } from "../services/settingsCache";
+import { formatToIndiaDateTime } from "../utils/dateUtils";
 import html2canvas from "html2canvas-pro";
 import jsPDF from "jspdf";
 
@@ -500,9 +501,7 @@ export const ThermalReceipt = React.forwardRef(({ invoice, settings = {}, busine
   const cleanBillNo = getCleanBillNumber(invoice);
   const formattedLogoUrl = getFullImageUrl(effectiveBusinessProfile.logo_url);
 
-  const formattedDate = invoice.created_at
-    ? `${new Date(invoice.created_at).toLocaleDateString()} ${new Date(invoice.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-    : new Date().toLocaleDateString();
+  const formattedDate = formatToIndiaDateTime(invoice.created_at || invoice.date || new Date());
 
   return (
     <div

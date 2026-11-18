@@ -26,6 +26,7 @@ import API from "../services/api";
 import { useToast } from "../context/ToastContext";
 import { useLanguageCurrency } from "../context/LanguageCurrencyContext";
 import { focusAndOpenSelect } from "../utils/keyboardNavigation";
+import { formatToIndiaDateTime, formatToIndiaDate, formatToIndia12hTime } from "../utils/dateUtils";
 
 function Appointments() {
   const { showSuccess, showError } = useToast();
@@ -354,13 +355,30 @@ function Appointments() {
     ];
     const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
 
+    // Indian Standard Time & Date Formatting
+    const formattedApptDate = formatToIndiaDate(app.appointment_date);
+    const formattedTime = formatToIndia12hTime(app.start_time_12h || app.start_time);
+
     const lines = [];
     lines.push(`*${parlourName}*`);
     lines.push(`*APPOINTMENT CONFIRMATION*`);
     lines.push(`────────────────────────`);
     lines.push(`*Client:* ${app.customer_name || "Valued Client"}`);
-    lines.push(`*Date:* ${app.appointment_date}`);
-    lines.push(`*Time:* ${app.start_time_12h || app.start_time || "Scheduled"} (${app.estimated_duration_minutes || 30} mins)`);
+    lines.push(`*Date:* ${formattedApptDate || app.appointment_date}`);
+    if (app.token_number) {
+      lines.push(`*Token Number:* #${app.token_number}`);
+    }
+    if (formattedTime) {
+      lines.push(`*Time:* ${formattedTime} (${app.estimated_duration_minutes || 30} mins)`);
+    } else if (app.token_number) {
+      lines.push(`*Time:* Walk-in / Turn-based`);
+    } else {
+      lines.push(`*Time:* Scheduled (${app.estimated_duration_minutes || 30} mins)`);
+    }
+
+    if (app.created_at) {
+      lines.push(`*Booked At (IST):* ${formatToIndiaDateTime(app.created_at)}`);
+    }
 
     const services = (app.items || []).map((it) => it.service_name).filter(Boolean);
     if (services.length > 0) {
