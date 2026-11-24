@@ -365,13 +365,8 @@ function Appointments() {
     lines.push(`────────────────────────`);
     lines.push(`*Client:* ${app.customer_name || "Valued Client"}`);
     lines.push(`*Date:* ${formattedApptDate || app.appointment_date}`);
-    if (app.token_number) {
-      lines.push(`*Token Number:* #${app.token_number}`);
-    }
     if (formattedTime) {
       lines.push(`*Time:* ${formattedTime} (${app.estimated_duration_minutes || 30} mins)`);
-    } else if (app.token_number) {
-      lines.push(`*Time:* Walk-in / Turn-based`);
     } else {
       lines.push(`*Time:* Scheduled (${app.estimated_duration_minutes || 30} mins)`);
     }

@@ -199,7 +199,7 @@ def get_booking_settings():
             try:
                 working_days = json.loads(settings.working_days)
             except Exception:
-                working_days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]
+                working_days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
 
         data = {
             "booking_enabled": bool(getattr(settings, "booking_enabled", True)),
@@ -262,7 +262,7 @@ def update_booking_settings():
             try:
                 working_days = json.loads(settings.working_days)
             except Exception:
-                working_days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]
+                working_days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
 
         updated_data = {
             "booking_enabled": bool(getattr(settings, "booking_enabled", True)),

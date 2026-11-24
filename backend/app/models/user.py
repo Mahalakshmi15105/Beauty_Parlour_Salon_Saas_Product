@@ -99,7 +99,7 @@ class TenantSetting(db.Model, TimestampMixin):
     booking_enabled = db.Column(db.Boolean, nullable=False, default=True)
     booking_type = db.Column(db.String(20), nullable=False, default="Token")  # Token, Slot
     allow_staff_selection = db.Column(db.Boolean, nullable=False, default=False)
-    working_days = db.Column(db.Text, nullable=False, default='["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]')
+    working_days = db.Column(db.Text, nullable=False, default='["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]')
     opening_time = db.Column(db.String(20), nullable=False, default="09:00")
     closing_time = db.Column(db.String(20), nullable=False, default="20:00")
     break_start_time = db.Column(db.String(20), nullable=True, default="13:00")

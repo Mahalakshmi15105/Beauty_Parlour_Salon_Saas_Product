@@ -30,19 +30,7 @@ class BookingService:
 
     @staticmethod
     def is_working_day(settings, target_date):
-        """Check if target_date falls on an enabled working day for the parlour."""
-        day_name = target_date.strftime("%A").strip().lower()
-        working_days = []
-        if settings.working_days:
-            try:
-                raw_days = json.loads(settings.working_days)
-                if isinstance(raw_days, list):
-                    working_days = [_clean_str(d).lower() for d in raw_days]
-            except Exception:
-                working_days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
-        
-        if working_days and day_name not in working_days:
-            return False, f"The parlour is closed on {target_date.strftime('%A')}s."
+        """Check if target_date falls on an enabled working day for the parlour. The parlour runs on any day, including Sundays."""
         return True, ""
 
     @staticmethod

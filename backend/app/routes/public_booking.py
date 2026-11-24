@@ -108,7 +108,7 @@ def get_public_booking_config(tenant_identifier):
             try:
                 working_days = json.loads(settings.working_days)
             except Exception:
-                working_days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]
+                working_days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
 
         raw_logo = settings.logo_url or ""
         
@@ -179,12 +179,12 @@ def get_branch_booking_config(branch_identifier):
             try:
                 working_days = json.loads(branch_settings.working_days)
             except Exception:
-                working_days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]
+                working_days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
         elif tenant_settings.working_days:
             try:
                 working_days = json.loads(tenant_settings.working_days)
             except Exception:
-                working_days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]
+                working_days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
 
         # Use branch-specific logo if available, otherwise tenant logo
         raw_logo = branch.logo_url if branch.logo_url else (tenant_settings.logo_url or "")

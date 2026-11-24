@@ -339,13 +339,6 @@ function PublicBookingPage({ tenantId = 1, tenantIdentifier, isBranch = false, o
                 <span className="font-extrabold text-slate-900 text-base bg-white px-3 py-1.5 rounded-lg border border-slate-200">{confirmationData.appointment_number}</span>
               </div>
 
-              {confirmationData.token_number && (
-                <div className="flex justify-between items-center pb-2 border-b border-slate-200">
-                  <span className="text-slate-500 font-semibold">Token Number</span>
-                  <span className="font-extrabold text-pink-600 text-xl">Token #{confirmationData.token_number}</span>
-                </div>
-              )}
-
               <div className="flex justify-between text-slate-700">
                 <span className="text-slate-500 font-semibold">Customer Name</span>
                 <span className="font-bold text-slate-900">{confirmationData.customer_name}</span>
@@ -354,7 +347,7 @@ function PublicBookingPage({ tenantId = 1, tenantIdentifier, isBranch = false, o
               <div className="flex justify-between text-slate-700">
                 <span className="text-slate-500 font-semibold">Date & Time</span>
                 <span className="font-bold text-slate-900">
-                  {formatToIndiaDate(confirmationData.appointment_date)} {confirmationData.start_time ? `at ${formatToIndia12hTime(confirmationData.start_time)}` : `(Token #${confirmationData.token_number})`}
+                  {formatToIndiaDate(confirmationData.appointment_date)} {confirmationData.start_time ? `at ${formatToIndia12hTime(confirmationData.start_time)}` : ''}
                 </span>
               </div>
 
@@ -377,7 +370,6 @@ function PublicBookingPage({ tenantId = 1, tenantIdentifier, isBranch = false, o
                   `*${config.parlour_name || "SALON"} - APPOINTMENT CONFIRMATION*\n\n` +
                   `Client: ${confirmationData.customer_name}\n` +
                   `Date: ${formatToIndiaDate(confirmationData.appointment_date)}\n` +
-                  (confirmationData.token_number ? `Token Number: #${confirmationData.token_number}\n` : '') +
                   (confirmationData.start_time ? `Time: ${formatToIndia12hTime(confirmationData.start_time)}\n` : '') +
                   `Status: Confirmed ✔️\n\nThank you for choosing us!`
                 )}`}
@@ -940,7 +932,7 @@ function PublicBookingPage({ tenantId = 1, tenantIdentifier, isBranch = false, o
               </div>
               <div className="flex items-center justify-between py-2">
                 <span className="text-sm text-slate-600">Sunday</span>
-                <span className="text-sm font-bold text-slate-900">Closed</span>
+                <span className="text-sm font-bold text-slate-900">{config.opening_time} - {config.closing_time}</span>
               </div>
             </div>
           </div>
